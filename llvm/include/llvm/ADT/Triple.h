@@ -212,7 +212,8 @@ public:
     WASI,       // Experimental WebAssembly OS
     Emscripten,
     ShaderModel, // DirectX ShaderModel
-    LastOSType = ShaderModel
+    EVM,        // Ethereum Virtual Machine
+    LastOSType = EVM
   };
   enum EnvironmentType {
     UnknownEnvironment,
@@ -270,6 +271,7 @@ public:
     SPIRV,
     Wasm,
     XCOFF,
+    EVMJson,
   };
 
 private:
@@ -633,6 +635,10 @@ public:
     return getOS() == Triple::Emscripten;
   }
 
+  bool isOSEVM() const {
+    return getOS() == Triple::EVM;
+  }
+
   /// Tests whether the OS uses glibc.
   bool isOSGlibc() const {
     return (getOS() == Triple::Linux || getOS() == Triple::KFreeBSD ||
@@ -673,7 +679,11 @@ public:
     return getObjectFormat() == Triple::XCOFF;
   }
 
-  /// Tests whether the target is the PS4 platform.
+  bool isOSBinFormatEVM() const {
+    return getObjectFormat() == Triple::EVMJson;
+  }
+
+  /// Tests whether the target is the PS4 CPU
   bool isPS4() const {
     return getArch() == Triple::x86_64 &&
            getVendor() == Triple::SCEI &&

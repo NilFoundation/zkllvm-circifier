@@ -29,6 +29,7 @@ class MCExpr;
 class MCInst;
 class MCInstPrinter;
 class MCRegisterInfo;
+class ConstantInt;
 class raw_ostream;
 
 /// Instances of this class represent operands of the MCInst class.
@@ -38,6 +39,7 @@ class MCOperand {
     kInvalid,      ///< Uninitialized.
     kRegister,     ///< Register operand.
     kImmediate,    ///< Immediate operand.
+    kCImmediate,  ///< Arbitrary size immediate operand.
     kSFPImmediate, ///< Single-floating-point immediate operand.
     kDFPImmediate, ///< Double-Floating-point immediate operand.
     kExpr,         ///< Relocatable immediate operand.
@@ -52,6 +54,7 @@ class MCOperand {
     uint64_t FPImmVal;
     const MCExpr *ExprVal;
     const MCInst *InstVal;
+    const ConstantInt *CI;   // For kCImmediate.
   };
 
 public:
@@ -62,6 +65,7 @@ public:
   bool isImm() const { return Kind == kImmediate; }
   bool isSFPImm() const { return Kind == kSFPImmediate; }
   bool isDFPImm() const { return Kind == kDFPImmediate; }
+  bool isCImm() const { return Kind == kCImmediate; }
   bool isExpr() const { return Kind == kExpr; }
   bool isInst() const { return Kind == kInst; }
 
@@ -82,6 +86,11 @@ public:
     return ImmVal;
   }
 
+  const ConstantInt *getCImm() const {
+    assert(isCImm() && "This is not an ConstantInt");
+    return CI;
+  }
+
   void setImm(int64_t Val) {
     assert(isImm() && "This is not an immediate");
     ImmVal = Val;
@@ -95,6 +104,11 @@ public:
   void setSFPImm(uint32_t Val) {
     assert(isSFPImm() && "This is not an SFP immediate");
     SFPImmVal = Val;
+  }
+
+  void setCImm(const ConstantInt * CI_) {
+    assert(isCImm() && "This is not a constant immediate");
+    CI = CI_;
   }
 
   uint64_t getDFPImm() const {
@@ -135,6 +149,13 @@ public:
     MCOperand Op;
     Op.Kind = kRegister;
     Op.RegVal = Reg;
+    return Op;
+  }
+
+  static MCOperand createCImm(const ConstantInt *CI_) {
+    MCOperand Op;
+    Op.Kind = kCImmediate;
+    Op.CI = CI_;
     return Op;
   }
 

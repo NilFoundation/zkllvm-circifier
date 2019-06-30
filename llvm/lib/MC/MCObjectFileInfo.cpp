@@ -1041,6 +1041,13 @@ void MCObjectFileInfo::initMCObjectFileInfo(MCContext &MCCtx, bool PIC,
   case MCContext::IsGOFF:
     initGOFFMCObjectFileInfo(TheTriple);
     break;
+  case Triple::EVMJson:
+    report_fatal_error("EVMJson is unimplemented.");
+    break;
+  case Triple::Wasm:
+    Env = IsWasm;
+    initWasmMCObjectFileInfo(TT);
+    break;
   case MCContext::IsSPIRV:
     initSPIRVMCObjectFileInfo(TheTriple);
     break;
@@ -1070,6 +1077,7 @@ MCSection *MCObjectFileInfo::getDwarfComdatSection(const char *Name,
   case Triple::SPIRV:
   case Triple::XCOFF:
   case Triple::DXContainer:
+  case Triple::EVMJson:
   case Triple::UnknownObjectFormat:
     report_fatal_error("Cannot get DWARF comdat section for this object file "
                        "format: not implemented.");

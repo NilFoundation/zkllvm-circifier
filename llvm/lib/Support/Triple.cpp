@@ -171,7 +171,7 @@ StringRef Triple::getArchTypePrefix(ArchType Kind) {
 
   case loongarch32:
   case loongarch64: return "loongarch";
-  
+
   case dxil:        return "dx";
   case evm:         return "evm";
   }
@@ -216,6 +216,7 @@ StringRef Triple::getOSTypeName(OSType Kind) {
   case DriverKit: return "driverkit";
   case ELFIAMCU: return "elfiamcu";
   case Emscripten: return "emscripten";
+  case EVM: return "evm";
   case FreeBSD: return "freebsd";
   case Fuchsia: return "fuchsia";
   case Haiku: return "haiku";
@@ -751,6 +752,8 @@ static StringRef getObjectFormatTypeName(Triple::ObjectFormatType Kind) {
     return "coff";
   case Triple::ELF:
     return "elf";
+  case Triple::EVMJson:
+    return "evmjson";
   case Triple::GOFF:
     return "goff";
   case Triple::MachO:
@@ -1457,6 +1460,7 @@ Triple Triple::get32BitArchVariant() const {
   case Triple::avr:
   case Triple::bpfeb:
   case Triple::bpfel:
+  case Triple::evm:
   case Triple::msp430:
   case Triple::systemz:
   case Triple::ve:

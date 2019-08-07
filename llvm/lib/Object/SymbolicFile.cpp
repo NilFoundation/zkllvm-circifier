@@ -68,6 +68,8 @@ SymbolicFile::createSymbolicFile(MemoryBufferRef Object, file_magic Type,
   case file_magic::xcoff_object_64:
   case file_magic::wasm_object:
     return ObjectFile::createObjectFile(Object, Type, InitContent);
+  case file_magic::evm_executable:
+    return ObjectFile::createObjectFile(Object, Type);
   case file_magic::coff_import_library:
     return std::unique_ptr<SymbolicFile>(new COFFImportFile(Object));
   case file_magic::elf_relocatable:

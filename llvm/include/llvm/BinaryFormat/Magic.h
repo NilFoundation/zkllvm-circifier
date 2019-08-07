@@ -53,6 +53,7 @@ struct file_magic {
     tapi_file,           ///< Text-based Dynamic Library Stub file
     cuda_fatbinary,      ///< CUDA Fatbinary object file
     dxcontainer_object,  ///< DirectX container file
+    evm_executable,      ///< Ethereum Binary Format
   };
 
   bool is_object() const { return V != unknown; }

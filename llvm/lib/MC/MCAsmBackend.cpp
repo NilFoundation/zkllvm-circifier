@@ -15,6 +15,7 @@
 #include "llvm/MC/MCObjectWriter.h"
 #include "llvm/MC/MCSPIRVObjectWriter.h"
 #include "llvm/MC/MCWasmObjectWriter.h"
+#include "llvm/MC/MCEVMObjectWriter.h"
 #include "llvm/MC/MCWinCOFFObjectWriter.h"
 #include "llvm/MC/MCXCOFFObjectWriter.h"
 #include <cassert>
@@ -49,6 +50,9 @@ MCAsmBackend::createObjectWriter(raw_pwrite_stream &OS) const {
   case Triple::XCOFF:
     return createXCOFFObjectWriter(
         cast<MCXCOFFObjectTargetWriter>(std::move(TW)), OS);
+  case Triple::EVMBinary:
+    return createEVMObjectWriter(cast<MCEVMObjectTargetWriter>(std::move(TW)),
+                                 OS);
   default:
     llvm_unreachable("unexpected object format");
   }

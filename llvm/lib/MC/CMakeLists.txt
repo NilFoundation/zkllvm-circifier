@@ -60,6 +60,7 @@ add_llvm_component_library(LLVMMC
   MCWinEH.cpp
   MCXCOFFObjectTargetWriter.cpp
   MCXCOFFStreamer.cpp
+  EVMBinaryObjectWriter.cpp
   MachObjectWriter.cpp
   SPIRVObjectWriter.cpp
   StringTableBuilder.cpp

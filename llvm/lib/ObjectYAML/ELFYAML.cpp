@@ -871,6 +871,9 @@ void ScalarEnumerationTraits<ELFYAML::ELF_REL>::enumeration(
   case ELF::EM_LOONGARCH:
 #include "llvm/BinaryFormat/ELFRelocs/LoongArch.def"
     break;
+  case ELF::EM_EVM:
+#include "llvm/BinaryFormat/ELFRelocs/EVM.def"
+    break;
   default:
     // Nothing to do.
     break;

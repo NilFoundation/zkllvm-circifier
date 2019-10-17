@@ -336,6 +336,23 @@ IntegerType *IntegerType::get(LLVMContext &C, unsigned NumBits) {
 
 APInt IntegerType::getMask() const { return APInt::getAllOnes(getBitWidth()); }
 
+IntegerType *IntegerType::get(MCContext &Ctx, unsigned NumBits) {
+  assert(NumBits >= MIN_INT_BITS && "bitwidth too small");
+  assert(NumBits <= MAX_INT_BITS && "bitwidth too large");
+
+  return new (&Ctx) IntegerType(Ctx, NumBits);
+}
+
+bool IntegerType::isPowerOf2ByteWidth() const {
+  unsigned BitWidth = getBitWidth();
+  return (BitWidth > 7) && isPowerOf2_32(BitWidth);
+}
+
+APInt IntegerType::getMask() const {
+  return APInt::getAllOnesValue(getBitWidth());
+}
+>>>>>>> 27974a9a3fe1 (Issue #19: Make ConstantInt available in MCContext):lib/IR/Type.cpp
+
 //===----------------------------------------------------------------------===//
 //                       FunctionType Implementation
 //===----------------------------------------------------------------------===//

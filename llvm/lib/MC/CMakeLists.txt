@@ -9,6 +9,7 @@ add_llvm_component_library(LLVMMC
   MCAsmInfoGOFF.cpp
   MCAsmInfoWasm.cpp
   MCAsmInfoXCOFF.cpp
+  MCAsmInfoEVM.cpp
   MCAsmMacro.cpp
   MCAsmStreamer.cpp
   MCAssembler.cpp
@@ -42,6 +43,7 @@ add_llvm_component_library(LLVMMC
   MCSectionMachO.cpp
   MCSectionWasm.cpp
   MCSectionXCOFF.cpp
+  MCSectionEVM.cpp
   MCStreamer.cpp
   MCSPIRVStreamer.cpp
   MCSubtargetInfo.cpp
@@ -60,13 +62,13 @@ add_llvm_component_library(LLVMMC
   MCWinEH.cpp
   MCXCOFFObjectTargetWriter.cpp
   MCXCOFFStreamer.cpp
-  EVMBinaryObjectWriter.cpp
   MachObjectWriter.cpp
   SPIRVObjectWriter.cpp
   StringTableBuilder.cpp
   SubtargetFeature.cpp
   TargetRegistry.cpp
   WasmObjectWriter.cpp
+  EVMBinaryObjectWriter.cpp
   WinCOFFObjectWriter.cpp
   XCOFFObjectWriter.cpp
 

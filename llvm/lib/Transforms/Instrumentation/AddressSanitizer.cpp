@@ -1951,6 +1951,7 @@ StringRef ModuleAddressSanitizer::getGlobalMetadataSection() const {
   case Triple::Wasm:
   case Triple::GOFF:
   case Triple::SPIRV:
+  case Triple::EVMBinary:
   case Triple::XCOFF:
   case Triple::DXContainer:
     report_fatal_error(

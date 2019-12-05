@@ -20,7 +20,6 @@ add_llvm_component_library(LLVMMC
   MCELFObjectTargetWriter.cpp
   MCELFStreamer.cpp
   MCExpr.cpp
-  MCEVMMetadata.cpp
   MCFragment.cpp
   MCInst.cpp
   MCInstPrinter.cpp

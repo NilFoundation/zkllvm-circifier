@@ -52,6 +52,8 @@
 #include "llvm/Support/SMLoc.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_ostream.h"
+
+#include "llvm/IR/Constants.h"
 #include <cassert>
 #include <cstdlib>
 #include <tuple>

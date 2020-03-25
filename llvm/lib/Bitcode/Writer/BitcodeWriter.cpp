@@ -4911,6 +4911,9 @@ static const char *getSectionNameForBitcode(const Triple &T) {
   case Triple::SPIRV:
     llvm_unreachable("SPIRV is not yet implemented");
     break;
+  case Triple::EVMBinary:
+    llvm_unreachable("EVMBinary is not yet implemented");
+    break;
   case Triple::XCOFF:
     llvm_unreachable("XCOFF is not yet implemented");
     break;
@@ -4935,6 +4938,9 @@ static const char *getSectionNameForCommandline(const Triple &T) {
     break;
   case Triple::SPIRV:
     llvm_unreachable("SPIRV is not yet implemented");
+    break;
+  case Triple::EVMBinary:
+    llvm_unreachable("EVMBinary is not yet implemented");
     break;
   case Triple::XCOFF:
     llvm_unreachable("XCOFF is not yet implemented");

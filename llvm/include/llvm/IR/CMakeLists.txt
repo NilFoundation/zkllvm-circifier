@@ -20,4 +20,5 @@ tablegen(LLVM IntrinsicsWebAssembly.h -gen-intrinsic-enums -intrinsic-prefix=was
 tablegen(LLVM IntrinsicsX86.h -gen-intrinsic-enums -intrinsic-prefix=x86)
 tablegen(LLVM IntrinsicsXCore.h -gen-intrinsic-enums -intrinsic-prefix=xcore)
 tablegen(LLVM IntrinsicsVE.h -gen-intrinsic-enums -intrinsic-prefix=ve)
+tablegen(LLVM IntrinsicsEVM.h -gen-intrinsic-enums -intrinsic-prefix=evm)
 add_public_tablegen_target(intrinsics_gen)

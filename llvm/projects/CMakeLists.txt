@@ -41,6 +41,7 @@ endif()
 
 add_llvm_external_project(dragonegg)
 add_llvm_external_project(openmp)
+add_llvm_external_project(soll)
 
 if(LLVM_INCLUDE_TESTS)
   add_llvm_external_project(cross-project-tests)

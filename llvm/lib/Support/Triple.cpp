@@ -38,6 +38,7 @@ StringRef Triple::getArchTypeName(ArchType Kind) {
   case bpfel:          return "bpfel";
   case csky:           return "csky";
   case dxil:           return "dxil";
+  case evm:            return "evm";
   case hexagon:        return "hexagon";
   case hsail64:        return "hsail64";
   case hsail:          return "hsail";
@@ -170,8 +171,9 @@ StringRef Triple::getArchTypePrefix(ArchType Kind) {
 
   case loongarch32:
   case loongarch64: return "loongarch";
-  
+
   case dxil:        return "dx";
+  case evm:         return "evm";
   }
 }
 
@@ -214,6 +216,7 @@ StringRef Triple::getOSTypeName(OSType Kind) {
   case DriverKit: return "driverkit";
   case ELFIAMCU: return "elfiamcu";
   case Emscripten: return "emscripten";
+  case EVM: return "evm";
   case FreeBSD: return "freebsd";
   case Fuchsia: return "fuchsia";
   case Haiku: return "haiku";
@@ -371,6 +374,7 @@ Triple::ArchType Triple::getArchTypeForLLVMName(StringRef Name) {
     .Case("loongarch32", loongarch32)
     .Case("loongarch64", loongarch64)
     .Case("dxil", dxil)
+    .Case("evm", evm)
     .Default(UnknownArch);
 }
 
@@ -509,6 +513,7 @@ static Triple::ArchType parseArch(StringRef ArchName) {
     .Case("loongarch32", Triple::loongarch32)
     .Case("loongarch64", Triple::loongarch64)
     .Case("dxil", Triple::dxil)
+    .Case("evm", Triple::evm)
     .Default(Triple::UnknownArch);
 
   // Some architectures require special parsing logic just to compute the
@@ -747,6 +752,8 @@ static StringRef getObjectFormatTypeName(Triple::ObjectFormatType Kind) {
     return "coff";
   case Triple::ELF:
     return "elf";
+  case Triple::EVMBinary:
+    return "evmbin";
   case Triple::GOFF:
     return "goff";
   case Triple::MachO:
@@ -788,6 +795,7 @@ static Triple::ObjectFormatType getDefaultFormat(const Triple &T) {
   case Triple::bpfeb:
   case Triple::bpfel:
   case Triple::csky:
+  case Triple::evm:
   case Triple::hexagon:
   case Triple::hsail64:
   case Triple::hsail:
@@ -1425,6 +1433,9 @@ static unsigned getArchPointerBitWidth(llvm::Triple::ArchType Arch) {
   case llvm::Triple::wasm64:
   case llvm::Triple::x86_64:
     return 64;
+
+  case llvm::Triple::evm:
+    return 256;
   }
   llvm_unreachable("Invalid architecture value");
 }
@@ -1449,6 +1460,7 @@ Triple Triple::get32BitArchVariant() const {
   case Triple::avr:
   case Triple::bpfeb:
   case Triple::bpfel:
+  case Triple::evm:
   case Triple::msp430:
   case Triple::systemz:
   case Triple::ve:
@@ -1526,6 +1538,7 @@ Triple Triple::get64BitArchVariant() const {
   case Triple::avr:
   case Triple::csky:
   case Triple::dxil:
+  case Triple::evm:
   case Triple::hexagon:
   case Triple::kalimba:
   case Triple::lanai:

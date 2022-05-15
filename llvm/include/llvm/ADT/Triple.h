@@ -57,6 +57,7 @@ public:
     bpfeb,          // eBPF or extended BPF or 64-bit BPF (big endian)
     csky,           // CSKY: csky
     dxil,           // DXIL 32-bit DirectX bytecode
+    evm,            // EVM: Ethereum Virtual Machine
     hexagon,        // Hexagon: hexagon
     loongarch32,    // LoongArch (32-bit): loongarch32
     loongarch64,    // LoongArch (64-bit): loongarch64
@@ -211,7 +212,8 @@ public:
     WASI,       // Experimental WebAssembly OS
     Emscripten,
     ShaderModel, // DirectX ShaderModel
-    LastOSType = ShaderModel
+    EVM,        // Ethereum Virtual Machine
+    LastOSType = EVM
   };
   enum EnvironmentType {
     UnknownEnvironment,
@@ -269,6 +271,7 @@ public:
     SPIRV,
     Wasm,
     XCOFF,
+    EVMBinary,
   };
 
 private:
@@ -632,6 +635,10 @@ public:
     return getOS() == Triple::Emscripten;
   }
 
+  bool isOSEVM() const {
+    return getOS() == Triple::EVM;
+  }
+
   /// Tests whether the OS uses glibc.
   bool isOSGlibc() const {
     return (getOS() == Triple::Linux || getOS() == Triple::KFreeBSD ||
@@ -672,7 +679,11 @@ public:
     return getObjectFormat() == Triple::XCOFF;
   }
 
-  /// Tests whether the target is the PS4 platform.
+  bool isOSBinFormatEVM() const {
+    return getObjectFormat() == Triple::EVMBinary;
+  }
+
+  /// Tests whether the target is the PS4 CPU
   bool isPS4() const {
     return getArch() == Triple::x86_64 &&
            getVendor() == Triple::SCEI &&

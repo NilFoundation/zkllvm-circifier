@@ -39,9 +39,14 @@ class LLVMContext;
 /// Integer representation type
 class IntegerType : public Type {
   friend class LLVMContextImpl;
+  friend class MCContext;
 
 protected:
   explicit IntegerType(LLVMContext &C, unsigned NumBits) : Type(C, IntegerTyID){
+    setSubclassData(NumBits);
+  }
+
+  explicit IntegerType(MCContext &C, unsigned NumBits) : Type(C, IntegerTyID){
     setSubclassData(NumBits);
   }
 
@@ -68,6 +73,11 @@ public:
     return Type::getIntNTy(getContext(), 2 * getScalarSizeInBits());
   }
 
+  /// This is an hacked version to create an IntegerType outside LLVMContext
+  /// but inside MCContext. This should use the MCContext's own allocator for 
+  /// memory references.
+  static IntegerType *get(MCContext &C, unsigned NumBits);
+
   /// Get the number of bits in this IntegerType
   unsigned getBitWidth() const { return getSubclassData(); }
 
@@ -87,6 +97,12 @@ public:
   /// @returns a bit mask with ones set for all the bits of this type.
   /// Get a bit mask for this type.
   APInt getMask() const;
+
+  /// This method determines if the width of this IntegerType is a power-of-2
+  /// in terms of 8 bit bytes.
+  /// @returns true if this is a power-of-2 byte width.
+  /// Is this a power-of-2 byte-width IntegerType ?
+  bool isPowerOf2ByteWidth() const;
 
   /// Methods for support type inquiry through isa, cast, and dyn_cast.
   static bool classof(const Type *T) {

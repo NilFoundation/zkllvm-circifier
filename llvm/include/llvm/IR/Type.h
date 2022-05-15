@@ -29,6 +29,7 @@ namespace llvm {
 class IntegerType;
 struct fltSemantics;
 class LLVMContext;
+class MCContext;
 class PointerType;
 class raw_ostream;
 class StringRef;
@@ -80,7 +81,10 @@ public:
 
 private:
   /// This refers to the LLVMContext in which this type was uniqued.
-  LLVMContext &Context;
+  union {
+    LLVMContext *Context;
+    MCContext   *MContext;
+  };
 
   TypeID   ID : 8;            // The current base type of this type.
   unsigned SubclassData : 24; // Space for subclasses to store data.
@@ -89,10 +93,14 @@ private:
 
 protected:
   friend class LLVMContextImpl;
+  friend class MCContext;
 
   explicit Type(LLVMContext &C, TypeID tid)
-    : Context(C), ID(tid), SubclassData(0) {}
+    : Context(&C), ID(tid), SubclassData(0) {}
   ~Type() = default;
+
+  explicit Type(MCContext &C, TypeID tid)
+    : MContext(&C), ID(tid), SubclassData(0) {}
 
   unsigned getSubclassData() const { return SubclassData; }
 
@@ -125,7 +133,15 @@ public:
   void dump() const;
 
   /// Return the LLVMContext in which this type was uniqued.
-  LLVMContext &getContext() const { return Context; }
+  LLVMContext &getContext() const {
+    assert(Context != nullptr);
+    return *Context;
+  }
+
+  MCContext &getMCContext() const {
+    assert(MContext != nullptr);
+    return *MContext;
+  }
 
   //===--------------------------------------------------------------------===//
   // Accessors for working with types.
@@ -433,6 +449,7 @@ public:
   static IntegerType *getInt32Ty(LLVMContext &C);
   static IntegerType *getInt64Ty(LLVMContext &C);
   static IntegerType *getInt128Ty(LLVMContext &C);
+  static IntegerType *getInt256Ty(LLVMContext &C);
   template <typename ScalarTy> static Type *getScalarTy(LLVMContext &C) {
     int noOfBits = sizeof(ScalarTy) * CHAR_BIT;
     if (std::is_integral<ScalarTy>::value) {

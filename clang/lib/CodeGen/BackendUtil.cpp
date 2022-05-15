@@ -240,6 +240,8 @@ static bool asanUseGlobalsGC(const Triple &T, const CodeGenOptions &CGOpts) {
   case Triple::SPIRV:
   case Triple::UnknownObjectFormat:
     break;
+  case Triple::EVMBinary:
+    break;
   }
   return false;
 }

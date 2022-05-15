@@ -77,6 +77,10 @@ public:
   using DiagHandlerTy =
       std::function<void(const SMDiagnostic &, bool, const SourceMgr &,
                          std::vector<const MDNode *> &)>;
+
+  /// The ConstantIntsPool reference getter
+  std::vector<ConstantInt *> &getConstantPool() { return ConstantIntsVector; }
+
   enum Environment {
     IsMachO,
     IsELF,
@@ -85,7 +89,8 @@ public:
     IsSPIRV,
     IsWasm,
     IsXCOFF,
-    IsDXContainer
+    IsDXContainer,
+    IsEVM
   };
 
 private:
@@ -186,6 +191,9 @@ private:
   /// Prefix replacement map for source file information.
   std::map<const std::string, const std::string> DebugPrefixMap;
 
+  /// ConstantInt pool for EVM backend
+  std::vector<ConstantInt *> ConstantIntsVector;
+
   /// The main file name if passed in explicitly.
   std::string MainFileName;
 
@@ -201,6 +209,9 @@ private:
 
   /// Generate dwarf debugging info for assembly source files.
   bool GenDwarfForAssembly = false;
+
+  /// Generate EVM binary metadata information.
+  bool GenEVMMetadataForAssembly = false;
 
   /// The current dwarf file number when generate dwarf debugging info for
   /// assembly source files.
@@ -705,6 +716,9 @@ public:
                                   Optional<StringRef> Source, unsigned CUID);
 
   bool isValidDwarfFileNumber(unsigned FileNumber, unsigned CUID = 0);
+
+  bool getGenEVMMetadataForAssembly() { return GenEVMMetadataForAssembly; }
+  void setGenEVMMetaDataForAssembly(bool Value) { GenEVMMetadataForAssembly = Value; }
 
   const std::map<unsigned, MCDwarfLineTable> &getMCDwarfLineTables() const {
     return MCDwarfLineTablesCUMap;

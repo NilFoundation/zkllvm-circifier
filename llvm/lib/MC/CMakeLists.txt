@@ -9,6 +9,7 @@ add_llvm_component_library(LLVMMC
   MCAsmInfoGOFF.cpp
   MCAsmInfoWasm.cpp
   MCAsmInfoXCOFF.cpp
+  MCAsmInfoEVM.cpp
   MCAsmMacro.cpp
   MCAsmStreamer.cpp
   MCAssembler.cpp
@@ -42,6 +43,7 @@ add_llvm_component_library(LLVMMC
   MCSectionMachO.cpp
   MCSectionWasm.cpp
   MCSectionXCOFF.cpp
+  MCSectionEVM.cpp
   MCStreamer.cpp
   MCSPIRVStreamer.cpp
   MCSubtargetInfo.cpp
@@ -53,6 +55,8 @@ add_llvm_component_library(LLVMMC
   MCValue.cpp
   MCWasmObjectTargetWriter.cpp
   MCWasmStreamer.cpp
+  MCEVMObjectTargetWriter.cpp
+  MCEVMStreamer.cpp
   MCWin64EH.cpp
   MCWinCOFFStreamer.cpp
   MCWinEH.cpp
@@ -64,6 +68,7 @@ add_llvm_component_library(LLVMMC
   SubtargetFeature.cpp
   TargetRegistry.cpp
   WasmObjectWriter.cpp
+  EVMBinaryObjectWriter.cpp
   WinCOFFObjectWriter.cpp
   XCOFFObjectWriter.cpp
 
@@ -71,6 +76,7 @@ add_llvm_component_library(LLVMMC
   ${LLVM_MAIN_INCLUDE_DIR}/llvm/MC
 
   LINK_COMPONENTS
+  Core
   Support
   BinaryFormat
   DebugInfoCodeView

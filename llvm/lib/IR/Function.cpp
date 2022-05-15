@@ -36,6 +36,7 @@
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 #include "llvm/IR/IntrinsicsARM.h"
 #include "llvm/IR/IntrinsicsBPF.h"
+#include "llvm/IR/IntrinsicsEVM.h"
 #include "llvm/IR/IntrinsicsHexagon.h"
 #include "llvm/IR/IntrinsicsMips.h"
 #include "llvm/IR/IntrinsicsNVPTX.h"
@@ -964,27 +965,29 @@ enum IIT_Info {
   IIT_PTR_TO_ELT = 33,
   IIT_VEC_OF_ANYPTRS_TO_ELT = 34,
   IIT_I128 = 35,
-  IIT_V512 = 36,
-  IIT_V1024 = 37,
-  IIT_STRUCT6 = 38,
-  IIT_STRUCT7 = 39,
-  IIT_STRUCT8 = 40,
-  IIT_F128 = 41,
-  IIT_VEC_ELEMENT = 42,
-  IIT_SCALABLE_VEC = 43,
-  IIT_SUBDIVIDE2_ARG = 44,
-  IIT_SUBDIVIDE4_ARG = 45,
-  IIT_VEC_OF_BITCASTS_TO_INT = 46,
-  IIT_V128 = 47,
-  IIT_BF16 = 48,
-  IIT_STRUCT9 = 49,
-  IIT_V256 = 50,
-  IIT_AMX  = 51,
-  IIT_PPCF128 = 52,
-  IIT_V3 = 53,
-  IIT_EXTERNREF = 54,
-  IIT_FUNCREF = 55,
-  IIT_ANYPTR_TO_ELT = 56,
+  IIT_I160 = 36,
+  IIT_I256 = 37,
+  IIT_V512 = 38,
+  IIT_V1024 = 39,
+  IIT_STRUCT6 = 40,
+  IIT_STRUCT7 = 41,
+  IIT_STRUCT8 = 42,
+  IIT_F128 = 43,
+  IIT_VEC_ELEMENT = 44,
+  IIT_SCALABLE_VEC = 45,
+  IIT_SUBDIVIDE2_ARG = 46,
+  IIT_SUBDIVIDE4_ARG = 47,
+  IIT_VEC_OF_BITCASTS_TO_INT = 48,
+  IIT_V128 = 49,
+  IIT_BF16 = 50,
+  IIT_STRUCT9 = 51,
+  IIT_V256 = 52,
+  IIT_AMX  = 53,
+  IIT_PPCF128 = 54,
+  IIT_V3 = 55,
+  IIT_EXTERNREF = 56,
+  IIT_FUNCREF = 57,
+  IIT_ANYPTR_TO_ELT = 58,
 };
 
 static void DecodeIITType(unsigned &NextElt, ArrayRef<unsigned char> Infos,
@@ -1051,6 +1054,12 @@ static void DecodeIITType(unsigned &NextElt, ArrayRef<unsigned char> Infos,
     return;
   case IIT_I128:
     OutputTable.push_back(IITDescriptor::get(IITDescriptor::Integer, 128));
+    return;
+  case IIT_I160:
+    OutputTable.push_back(IITDescriptor::get(IITDescriptor::Integer, 160));
+    return;
+  case IIT_I256:
+    OutputTable.push_back(IITDescriptor::get(IITDescriptor::Integer, 256));
     return;
   case IIT_V1:
     OutputTable.push_back(IITDescriptor::getVector(1, IsScalableVector));

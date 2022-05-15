@@ -239,6 +239,7 @@ IntegerType *Type::getInt16Ty(LLVMContext &C) { return &C.pImpl->Int16Ty; }
 IntegerType *Type::getInt32Ty(LLVMContext &C) { return &C.pImpl->Int32Ty; }
 IntegerType *Type::getInt64Ty(LLVMContext &C) { return &C.pImpl->Int64Ty; }
 IntegerType *Type::getInt128Ty(LLVMContext &C) { return &C.pImpl->Int128Ty; }
+IntegerType *Type::getInt256Ty(LLVMContext &C) { return &C.pImpl->Int256Ty; }
 
 IntegerType *Type::getIntNTy(LLVMContext &C, unsigned N) {
   return IntegerType::get(C, N);
@@ -320,6 +321,7 @@ IntegerType *IntegerType::get(LLVMContext &C, unsigned NumBits) {
   case  32: return cast<IntegerType>(Type::getInt32Ty(C));
   case  64: return cast<IntegerType>(Type::getInt64Ty(C));
   case 128: return cast<IntegerType>(Type::getInt128Ty(C));
+  case 256: return cast<IntegerType>(Type::getInt256Ty(C));
   default:
     break;
   }
@@ -333,6 +335,18 @@ IntegerType *IntegerType::get(LLVMContext &C, unsigned NumBits) {
 }
 
 APInt IntegerType::getMask() const { return APInt::getAllOnes(getBitWidth()); }
+
+IntegerType *IntegerType::get(MCContext &Ctx, unsigned NumBits) {
+  assert(NumBits >= MIN_INT_BITS && "bitwidth too small");
+  assert(NumBits <= MAX_INT_BITS && "bitwidth too large");
+
+  return new (&Ctx) IntegerType(Ctx, NumBits);
+}
+
+bool IntegerType::isPowerOf2ByteWidth() const {
+  unsigned BitWidth = getBitWidth();
+  return (BitWidth > 7) && isPowerOf2_32(BitWidth);
+}
 
 //===----------------------------------------------------------------------===//
 //                       FunctionType Implementation

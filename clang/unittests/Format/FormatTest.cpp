@@ -25348,6 +25348,20 @@ TEST_F(FormatTest, RemoveBraces) {
                "}",
                Style);
 
+  verifyFormat("if (a)\n"
+               "  foo();\n"
+               "// comment\n"
+               "else\n"
+               "  bar();",
+               "if (a) {\n"
+               "  foo();\n"
+               "}\n"
+               "// comment\n"
+               "else {\n"
+               "  bar();\n"
+               "}",
+               Style);
+
   verifyFormat("if (a) {\n"
                "Label:\n"
                "}",
@@ -25365,8 +25379,25 @@ TEST_F(FormatTest, RemoveBraces) {
                "}",
                Style);
 
-  // FIXME: See https://github.com/llvm/llvm-project/issues/53543.
-#if 0
+  verifyFormat("if consteval {\n"
+               "  f();\n"
+               "} else {\n"
+               "  g();\n"
+               "}",
+               Style);
+
+  verifyFormat("if not consteval {\n"
+               "  f();\n"
+               "} else if (a) {\n"
+               "  g();\n"
+               "}",
+               Style);
+
+  verifyFormat("if !consteval {\n"
+               "  g();\n"
+               "}",
+               Style);
+
   Style.ColumnLimit = 65;
 
   verifyFormat("if (condition) {\n"
@@ -25379,6 +25410,15 @@ TEST_F(FormatTest, RemoveBraces) {
                Style);
 
   Style.ColumnLimit = 20;
+
+  verifyFormat("int ab = [](int i) {\n"
+               "  if (i > 0) {\n"
+               "    i = 12345678 -\n"
+               "        i;\n"
+               "  }\n"
+               "  return i;\n"
+               "};",
+               Style);
 
   verifyFormat("if (a) {\n"
                "  b = c + // 1 -\n"
@@ -25394,9 +25434,6 @@ TEST_F(FormatTest, RemoveBraces) {
                "  b = c >= 0 ? d : e;\n"
                "}",
                Style);
-#endif
-
-  Style.ColumnLimit = 20;
 
   verifyFormat("if (a)\n"
                "  b = c > 0 ? d : e;",

@@ -24,7 +24,7 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/MC/MCFixedLenDisassembler.h"
+#include "llvm/MC/MCDecoderOps.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -236,11 +236,11 @@ static BitsInit &getBitsField(const Record &def, StringRef str) {
       Bits.push_back(const_cast<BitInit *>(BI));
     } else {
       for (unsigned Idx = 0U; Idx < SI.BitWidth; ++Idx)
-        Bits.push_back(UnsetInit::get());
+        Bits.push_back(UnsetInit::get(def.getRecords()));
     }
   }
 
-  return *BitsInit::get(Bits);
+  return *BitsInit::get(def.getRecords(), Bits);
 }
 
 // Representation of the instruction to work on.

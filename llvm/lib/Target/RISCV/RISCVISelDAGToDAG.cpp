@@ -311,6 +311,10 @@ void RISCVDAGToDAGISel::addVectorLoadStoreOperands(
     Operands.push_back(Glue);
 }
 
+static bool isAllUndef(ArrayRef<SDValue> Values) {
+  return llvm::all_of(Values, [](SDValue V) { return V->isUndef(); });
+}
+
 void RISCVDAGToDAGISel::selectVLSEG(SDNode *Node, bool IsMasked,
                                     bool IsStrided) {
   SDLoc DL(Node);
@@ -321,19 +325,21 @@ void RISCVDAGToDAGISel::selectVLSEG(SDNode *Node, bool IsMasked,
 
   unsigned CurOp = 2;
   SmallVector<SDValue, 8> Operands;
-  if (IsMasked) {
-    SmallVector<SDValue, 8> Regs(Node->op_begin() + CurOp,
-                                 Node->op_begin() + CurOp + NF);
-    SDValue MaskedOff = createTuple(*CurDAG, Regs, NF, LMUL);
-    Operands.push_back(MaskedOff);
-    CurOp += NF;
+
+  SmallVector<SDValue, 8> Regs(Node->op_begin() + CurOp,
+                               Node->op_begin() + CurOp + NF);
+  bool IsTU = IsMasked || !isAllUndef(Regs);
+  if (IsTU) {
+    SDValue Merge = createTuple(*CurDAG, Regs, NF, LMUL);
+    Operands.push_back(Merge);
   }
+  CurOp += NF;
 
   addVectorLoadStoreOperands(Node, Log2SEW, DL, CurOp, IsMasked, IsStrided,
                              Operands, /*IsLoad=*/true);
 
   const RISCV::VLSEGPseudo *P =
-      RISCV::getVLSEGPseudo(NF, IsMasked, IsStrided, /*FF*/ false, Log2SEW,
+      RISCV::getVLSEGPseudo(NF, IsMasked, IsTU, IsStrided, /*FF*/ false, Log2SEW,
                             static_cast<unsigned>(LMUL));
   MachineSDNode *Load =
       CurDAG->getMachineNode(P->Pseudo, DL, MVT::Untyped, MVT::Other, Operands);
@@ -363,20 +369,22 @@ void RISCVDAGToDAGISel::selectVLSEGFF(SDNode *Node, bool IsMasked) {
 
   unsigned CurOp = 2;
   SmallVector<SDValue, 7> Operands;
-  if (IsMasked) {
-    SmallVector<SDValue, 8> Regs(Node->op_begin() + CurOp,
-                                 Node->op_begin() + CurOp + NF);
+
+  SmallVector<SDValue, 8> Regs(Node->op_begin() + CurOp,
+                               Node->op_begin() + CurOp + NF);
+  bool IsTU = IsMasked || !isAllUndef(Regs);
+  if (IsTU) {
     SDValue MaskedOff = createTuple(*CurDAG, Regs, NF, LMUL);
     Operands.push_back(MaskedOff);
-    CurOp += NF;
   }
+  CurOp += NF;
 
   addVectorLoadStoreOperands(Node, Log2SEW, DL, CurOp, IsMasked,
                              /*IsStridedOrIndexed*/ false, Operands,
                              /*IsLoad=*/true);
 
   const RISCV::VLSEGPseudo *P =
-      RISCV::getVLSEGPseudo(NF, IsMasked, /*Strided*/ false, /*FF*/ true,
+      RISCV::getVLSEGPseudo(NF, IsMasked, IsTU, /*Strided*/ false, /*FF*/ true,
                             Log2SEW, static_cast<unsigned>(LMUL));
   MachineSDNode *Load = CurDAG->getMachineNode(P->Pseudo, DL, MVT::Untyped,
                                                MVT::Other, MVT::Glue, Operands);
@@ -418,13 +426,15 @@ void RISCVDAGToDAGISel::selectVLXSEG(SDNode *Node, bool IsMasked,
 
   unsigned CurOp = 2;
   SmallVector<SDValue, 8> Operands;
-  if (IsMasked) {
-    SmallVector<SDValue, 8> Regs(Node->op_begin() + CurOp,
-                                 Node->op_begin() + CurOp + NF);
+
+  SmallVector<SDValue, 8> Regs(Node->op_begin() + CurOp,
+                               Node->op_begin() + CurOp + NF);
+  bool IsTU = IsMasked || !isAllUndef(Regs);
+  if (IsTU) {
     SDValue MaskedOff = createTuple(*CurDAG, Regs, NF, LMUL);
     Operands.push_back(MaskedOff);
-    CurOp += NF;
   }
+  CurOp += NF;
 
   MVT IndexVT;
   addVectorLoadStoreOperands(Node, Log2SEW, DL, CurOp, IsMasked,
@@ -441,7 +451,7 @@ void RISCVDAGToDAGISel::selectVLXSEG(SDNode *Node, bool IsMasked,
                        "values when XLEN=32");
   }
   const RISCV::VLXSEGPseudo *P = RISCV::getVLXSEGPseudo(
-      NF, IsMasked, IsOrdered, IndexLog2EEW, static_cast<unsigned>(LMUL),
+      NF, IsMasked, IsTU, IsOrdered, IndexLog2EEW, static_cast<unsigned>(LMUL),
       static_cast<unsigned>(IndexLMUL));
   MachineSDNode *Load =
       CurDAG->getMachineNode(P->Pseudo, DL, MVT::Untyped, MVT::Other, Operands);
@@ -2125,10 +2135,8 @@ bool RISCVDAGToDAGISel::doPeepholeLoadStoreADDI(SDNode *N) {
   // There is a ADD between ADDI and load/store. We can only fold ADDI that
   // do not have a FrameIndex operand.
   SDValue Add;
-  int AddBaseIdx;
-  if (Base.getMachineOpcode() == RISCV::ADD) {
-    if (!Base.hasOneUse())
-      return false;
+  unsigned AddBaseIdx;
+  if (Base.getMachineOpcode() == RISCV::ADD && Base.hasOneUse()) {
     Add = Base;
     SDValue Op0 = Base.getOperand(0);
     SDValue Op1 = Base.getOperand(1);
@@ -2142,12 +2150,36 @@ bool RISCVDAGToDAGISel::doPeepholeLoadStoreADDI(SDNode *N) {
                isa<ConstantSDNode>(Op1.getOperand(1))) {
       AddBaseIdx = 0;
       Base = Op1;
+    } else if (Op1.isMachineOpcode() &&
+               Op1.getMachineOpcode() == RISCV::ADDIW &&
+               isa<ConstantSDNode>(Op1.getOperand(1)) &&
+               Op1.getOperand(0).isMachineOpcode() &&
+               Op1.getOperand(0).getMachineOpcode() == RISCV::LUI) {
+      // We found an LUI+ADDIW constant materialization. We might be able to
+      // fold the ADDIW offset if it could be treated as ADDI.
+      // Emulate the constant materialization to see if the result would be
+      // a simm32 if ADDI was used instead of ADDIW.
+
+      // First the LUI.
+      uint64_t Imm = Op1.getOperand(0).getConstantOperandVal(0);
+      Imm <<= 12;
+      Imm = SignExtend64(Imm, 32);
+
+      // Then the ADDI.
+      uint64_t LoImm = cast<ConstantSDNode>(Op1.getOperand(1))->getSExtValue();
+      Imm += LoImm;
+
+      // If the result isn't a simm32, we can't do the optimization.
+      if (!isInt<32>(Imm))
+        return false;
+
+      AddBaseIdx = 0;
+      Base = Op1;
     } else
       return false;
-  }
-
-  // If the base is an ADDI, we can merge it in to the load/store.
-  if (Base.getMachineOpcode() != RISCV::ADDI)
+  } else if (Base.getMachineOpcode() == RISCV::ADDI) {
+    // If the base is an ADDI, we can merge it in to the load/store.
+  } else
     return false;
 
   SDValue ImmOperand = Base.getOperand(1);

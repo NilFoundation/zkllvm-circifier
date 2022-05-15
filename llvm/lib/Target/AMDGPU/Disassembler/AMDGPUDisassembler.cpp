@@ -24,8 +24,8 @@
 #include "llvm/BinaryFormat/ELF.h"
 #include "llvm/MC/MCAsmInfo.h"
 #include "llvm/MC/MCContext.h"
+#include "llvm/MC/MCDecoderOps.h"
 #include "llvm/MC/MCExpr.h"
-#include "llvm/MC/MCFixedLenDisassembler.h"
 #include "llvm/MC/MCInstrDesc.h"
 #include "llvm/MC/MCRegisterInfo.h"
 #include "llvm/MC/MCSubtargetInfo.h"
@@ -386,23 +386,6 @@ template <typename T> static inline T eatBytes(ArrayRef<uint8_t>& Bytes) {
   const auto Res = support::endian::read<T, support::endianness::little>(Bytes.data());
   Bytes = Bytes.slice(sizeof(T));
   return Res;
-}
-
-DecodeStatus AMDGPUDisassembler::tryDecodeInst(const uint8_t* Table,
-                                               MCInst &MI,
-                                               uint64_t Inst,
-                                               uint64_t Address) const {
-  assert(MI.getOpcode() == 0);
-  assert(MI.getNumOperands() == 0);
-  MCInst TmpInst;
-  HasLiteral = false;
-  const auto SavedBytes = Bytes;
-  if (decodeInstruction(Table, TmpInst, Inst, Address, this, STI)) {
-    MI = TmpInst;
-    return MCDisassembler::Success;
-  }
-  Bytes = SavedBytes;
-  return MCDisassembler::Fail;
 }
 
 // The disassembler is greedy, so we need to check FI operand value to

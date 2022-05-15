@@ -806,7 +806,7 @@ AsmParser::AsmParser(SourceMgr &SM, MCContext &Ctx, MCStreamer &Out,
   case MCContext::IsDXContainer:
     llvm_unreachable("DXContainer is not supported yet");
     break;
-  case MCObjectFileInfo::IsEVM:
+  case MCContext::IsEVM:
     PlatformParser.reset(createEVMAsmParser());
     break;
   }

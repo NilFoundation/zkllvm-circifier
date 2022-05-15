@@ -5073,6 +5073,8 @@ std::string CGObjCCommonMac::GetSectionName(StringRef Section,
   case llvm::Triple::DXContainer:
     llvm::report_fatal_error(
         "Objective-C support is unimplemented for object file format");
+  case llvm::Triple::EVMBinary:
+    break;
   }
 
   llvm_unreachable("Unhandled llvm::Triple::ObjectFormatType enum");

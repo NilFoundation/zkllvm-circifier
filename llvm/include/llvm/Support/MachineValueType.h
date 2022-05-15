@@ -52,8 +52,8 @@ namespace llvm {
       FIRST_INTEGER_VALUETYPE = i1,
       LAST_INTEGER_VALUETYPE  = i256,
 
-      bf16           =   10,   // This is a 16 bit brain floating point value
-      f16            =   11,   // This is a 16 bit floating point value
+      bf16           =  10,   // This is a 16 bit brain floating point value
+      f16            =  11,   // This is a 16 bit floating point value
       f32            =  12,   // This is a 32 bit floating point value
       f64            =  13,   // This is a 64 bit floating point value
       f80            =  14,   // This is a 80 bit floating point value
@@ -116,18 +116,18 @@ namespace llvm {
       v1024i32       =  64,   // 1024 x i32
       v2048i32       =  65,   // 2048 x i32
 
-      v1i64          =  67,   //   1 x i64
-      v2i64          =  68,   //   2 x i64
-      v3i64          =  69,   //   3 x i64
-      v4i64          =  70,   //   4 x i64
-      v8i64          =  71,   //   8 x i64
-      v16i64         =  72,   //  16 x i64
-      v32i64         =  73,   //  32 x i64
-      v64i64         =  74,   //  64 x i64
-      v128i64        =  75,   // 128 x i64
-      v256i64        =  76,   // 256 x i64
+      v1i64          =  66,   //   1 x i64
+      v2i64          =  67,   //   2 x i64
+      v3i64          =  68,   //   3 x i64
+      v4i64          =  69,   //   4 x i64
+      v8i64          =  70,   //   8 x i64
+      v16i64         =  71,   //  16 x i64
+      v32i64         =  72,   //  32 x i64
+      v64i64         =  73,   //  64 x i64
+      v128i64        =  74,   // 128 x i64
+      v256i64        =  75,   // 256 x i64
 
-      v1i128         =  77,   //  1 x i128
+      v1i128         =  76,   //  1 x i128
 
       FIRST_INTEGER_FIXEDLEN_VECTOR_VALUETYPE = v1i1,
       LAST_INTEGER_FIXEDLEN_VECTOR_VALUETYPE = v1i128,

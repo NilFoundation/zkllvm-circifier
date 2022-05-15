@@ -1045,13 +1045,8 @@ void MCObjectFileInfo::initMCObjectFileInfo(MCContext &MCCtx, bool PIC,
   case MCContext::IsGOFF:
     initGOFFMCObjectFileInfo(TheTriple);
     break;
-  case Triple::EVMBinary:
-    Env = IsEVM;
-    initEVMMCObjectFileInfo(TT);
-    break;
-  case Triple::Wasm:
-    Env = IsWasm;
-    initWasmMCObjectFileInfo(TT);
+  case MCContext::IsEVM:
+    initEVMMCObjectFileInfo(TheTriple);
     break;
   case MCContext::IsSPIRV:
     initSPIRVMCObjectFileInfo(TheTriple);

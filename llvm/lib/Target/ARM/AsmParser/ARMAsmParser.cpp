@@ -6376,6 +6376,7 @@ bool ARMAsmParser::parsePrefix(ARMMCExpr::VariantKind &RefKind) {
   case MCContext::IsWasm:
     CurrentFormat = WASM;
     break;
+  case MCContext::IsEVM:
   case MCContext::IsGOFF:
   case MCContext::IsSPIRV:
   case MCContext::IsXCOFF:

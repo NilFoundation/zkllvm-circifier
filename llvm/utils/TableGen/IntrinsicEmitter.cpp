@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <iostream>
+
 #include "CodeGenIntrinsics.h"
 #include "CodeGenTarget.h"
 #include "SequenceToOffsetTable.h"

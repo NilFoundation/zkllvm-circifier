@@ -24,10 +24,10 @@
 #include "llvm/MC/MCSection.h"
 #include "llvm/MC/MCSymbol.h"
 #include "llvm/MC/MCValue.h"
+#include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace llvm;
@@ -47,7 +47,7 @@ void MCEVMStreamer::mergeFragment(MCDataFragment *DF, MCDataFragment *EF) {
   DF->getContents().append(EF->getContents().begin(), EF->getContents().end());
 }
 
-void MCEVMStreamer::EmitAssemblerFlag(MCAssemblerFlag Flag) {
+void MCEVMStreamer::emitAssemblerFlag(MCAssemblerFlag Flag) {
   // Let the target do whatever target specific stuff it needs to do.
   getAssembler().getBackend().handleAssemblerFlag(Flag);
 
@@ -55,24 +55,24 @@ void MCEVMStreamer::EmitAssemblerFlag(MCAssemblerFlag Flag) {
   llvm_unreachable("invalid assembler flag!");
 }
 
-void MCEVMStreamer::ChangeSection(MCSection *Section,
+void MCEVMStreamer::changeSection(MCSection *Section,
                                   const MCExpr *Subsection) {
   llvm_unreachable("unimplemented");
 }
 
-void MCEVMStreamer::EmitWeakReference(MCSymbol *Alias, const MCSymbol *Symbol) {
+void MCEVMStreamer::emitWeakReference(MCSymbol *Alias, const MCSymbol *Symbol) {
   getAssembler().registerSymbol(*Symbol);
   const MCExpr *Value = MCSymbolRefExpr::create(
       Symbol, MCSymbolRefExpr::VK_WEAKREF, getContext());
   Alias->setVariableValue(Value);
 }
 
-bool MCEVMStreamer::EmitSymbolAttribute(MCSymbol *S, MCSymbolAttr Attribute) {
+bool MCEVMStreamer::emitSymbolAttribute(MCSymbol *S, MCSymbolAttr Attribute) {
 
   return true;
 }
 
-void MCEVMStreamer::EmitCommonSymbol(MCSymbol *S, uint64_t Size,
+void MCEVMStreamer::emitCommonSymbol(MCSymbol *S, uint64_t Size,
                                      unsigned ByteAlignment) {
   llvm_unreachable("Common symbols are not yet implemented for EVM");
 }
@@ -81,34 +81,34 @@ void MCEVMStreamer::emitELFSize(MCSymbol *Symbol, const MCExpr *Value) {
   llvm_unreachable("unimplemented");
 }
 
-void MCEVMStreamer::EmitLocalCommonSymbol(MCSymbol *S, uint64_t Size,
+void MCEVMStreamer::emitLocalCommonSymbol(MCSymbol *S, uint64_t Size,
                                           unsigned ByteAlignment) {
   llvm_unreachable("Local common symbols are not yet implemented for EVM");
 }
 
-void MCEVMStreamer::EmitValueImpl(const MCExpr *Value, unsigned Size,
+void MCEVMStreamer::emitValueImpl(const MCExpr *Value, unsigned Size,
                                   SMLoc Loc) {
-  MCObjectStreamer::EmitValueImpl(Value, Size, Loc);
+  MCObjectStreamer::emitValueImpl(Value, Size, Loc);
 }
 
-void MCEVMStreamer::EmitValueToAlignment(unsigned ByteAlignment, int64_t Value,
+void MCEVMStreamer::emitValueToAlignment(unsigned ByteAlignment, int64_t Value,
                                          unsigned ValueSize,
-                                         unsigned MaxBytesToEmit) {
-  MCObjectStreamer::EmitValueToAlignment(ByteAlignment, Value, ValueSize,
-                                         MaxBytesToEmit);
+                                         unsigned MaxBytesToemit) {
+  MCObjectStreamer::emitValueToAlignment(ByteAlignment, Value, ValueSize,
+                                         MaxBytesToemit);
 }
 
-void MCEVMStreamer::EmitIdent(StringRef IdentString) {
+void MCEVMStreamer::emitIdent(StringRef IdentString) {
   // TODO(sbc): Add the ident section once we support mergable strings
   // sections in the object format
 }
 
-void MCEVMStreamer::EmitInstToFragment(const MCInst &Inst,
+void MCEVMStreamer::emitInstToFragment(const MCInst &Inst,
                                        const MCSubtargetInfo &STI) {
-  this->MCObjectStreamer::EmitInstToFragment(Inst, STI);
+  this->MCObjectStreamer::emitInstToFragment(Inst, STI);
 }
 
-void MCEVMStreamer::EmitInstToData(const MCInst &Inst,
+void MCEVMStreamer::emitInstToData(const MCInst &Inst,
                                    const MCSubtargetInfo &STI) {
   MCAssembler &Assembler = getAssembler();
   SmallVector<MCFixup, 4> Fixups;
@@ -129,10 +129,10 @@ void MCEVMStreamer::EmitInstToData(const MCInst &Inst,
   DF->getContents().append(Code.begin(), Code.end());
 }
 
-void MCEVMStreamer::FinishImpl() {
-  EmitFrames(nullptr);
+void MCEVMStreamer::finishImpl() {
+  emitFrames(nullptr);
 
-  this->MCObjectStreamer::FinishImpl();
+  this->MCObjectStreamer::finishImpl();
 }
 
 MCStreamer *llvm::createEVMStreamer(MCContext &Context,
@@ -147,21 +147,21 @@ MCStreamer *llvm::createEVMStreamer(MCContext &Context,
   return S;
 }
 
-void MCEVMStreamer::EmitThumbFunc(MCSymbol *Func) {
+void MCEVMStreamer::emitThumbFunc(MCSymbol *Func) {
   llvm_unreachable("Generic EVM doesn't support this directive");
 }
 
-void MCEVMStreamer::EmitSymbolDesc(MCSymbol *Symbol, unsigned DescValue) {
+void MCEVMStreamer::emitSymbolDesc(MCSymbol *Symbol, unsigned DescValue) {
   llvm_unreachable("EVM doesn't support this directive");
 }
 
-void MCEVMStreamer::EmitZerofill(MCSection *Section, MCSymbol *Symbol,
+void MCEVMStreamer::emitZerofill(MCSection *Section, MCSymbol *Symbol,
                                  uint64_t Size, unsigned ByteAlignment,
                                  SMLoc Loc) {
   llvm_unreachable("EVM doesn't support this directive");
 }
 
-void MCEVMStreamer::EmitTBSSSymbol(MCSection *Section, MCSymbol *Symbol,
+void MCEVMStreamer::emitTBSSSymbol(MCSection *Section, MCSymbol *Symbol,
                                    uint64_t Size, unsigned ByteAlignment) {
   llvm_unreachable("EVM doesn't support this directive");
 }

@@ -348,11 +348,6 @@ bool IntegerType::isPowerOf2ByteWidth() const {
   return (BitWidth > 7) && isPowerOf2_32(BitWidth);
 }
 
-APInt IntegerType::getMask() const {
-  return APInt::getAllOnesValue(getBitWidth());
-}
->>>>>>> 27974a9a3fe1 (Issue #19: Make ConstantInt available in MCContext):lib/IR/Type.cpp
-
 //===----------------------------------------------------------------------===//
 //                       FunctionType Implementation
 //===----------------------------------------------------------------------===//

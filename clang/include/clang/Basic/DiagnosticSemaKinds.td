@@ -990,6 +990,8 @@ def err_super_in_lambda_unsupported : Error<
 
 def err_pragma_expected_file_scope : Error<
   "'#pragma %0' can only appear at file scope">;
+def err_pragma_alloc_text_c_linkage: Error<
+  "'#pragma alloc_text' is applicable only to functions with C linkage">;
 
 def warn_pragma_unused_undeclared_var : Warning<
   "undeclared variable %0 used as an argument for '#pragma unused'">,
@@ -2851,6 +2853,8 @@ def err_constrained_virtual_method : Error<
   "virtual function cannot have a requires clause">;
 def err_trailing_requires_clause_on_deduction_guide : Error<
   "deduction guide cannot have a requires clause">;
+def err_constrained_non_templated_function
+    : Error<"non-templated function cannot have a requires clause">;
 def err_reference_to_function_with_unsatisfied_constraints : Error<
   "invalid reference to function %0: constraints not satisfied">;
 def err_requires_expr_local_parameter_default_argument : Error<
@@ -11243,6 +11247,9 @@ def warn_always_inline_coroutine : Warning<
   "this coroutine may be split into pieces; not every piece is guaranteed to be inlined"
   >,
   InGroup<AlwaysInlineCoroutine>;
+def err_coroutine_unusable_new : Error<
+  "'operator new' provided by %0 is not usable with the function signature of %1"
+>;
 } // end of coroutines issue category
 
 let CategoryName = "Documentation Issue" in {

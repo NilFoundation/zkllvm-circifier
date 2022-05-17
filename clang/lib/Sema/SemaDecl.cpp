@@ -10219,6 +10219,7 @@ Sema::ActOnFunctionDeclarator(Scope *S, Declarator &D, DeclContext *DC,
   if (D.isFunctionDefinition()) {
     AddRangeBasedOptnone(NewFD);
     AddImplicitMSFunctionNoBuiltinAttr(NewFD);
+    AddSectionMSAllocText(NewFD);
   }
 
   // If this is the first declaration of an extern C variable, update
@@ -11390,6 +11391,15 @@ bool Sema::CheckFunctionDeclaration(Scope *S, FunctionDecl *NewFD,
 
       if (Method->isStatic())
         checkThisInStaticMemberFunctionType(Method);
+    }
+
+    // C++20: dcl.decl.general p4:
+    // The optional requires-clause ([temp.pre]) in an init-declarator or
+    // member-declarator shall be present only if the declarator declares a
+    // templated function ([dcl.fct]).
+    if (Expr *TRC = NewFD->getTrailingRequiresClause()) {
+      if (!NewFD->isTemplated() && !NewFD->isTemplateInstantiation())
+        Diag(TRC->getBeginLoc(), diag::err_constrained_non_templated_function);
     }
 
     if (CXXConversionDecl *Conversion = dyn_cast<CXXConversionDecl>(NewFD))

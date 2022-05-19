@@ -3143,6 +3143,10 @@ StringRef BuiltinType::getName(const PrintingPolicy &Policy) const {
   case Id:                                                                     \
     return Name;
 #include "clang/Basic/RISCVVTypes.def"
+#define EVM_TYPE(Name, Id, SingletonId)                                        \
+  case Id:                                                                     \
+    return Name;
+#include "clang/Basic/EVMTypes.def"
   }
 
   llvm_unreachable("Invalid builtin type.");

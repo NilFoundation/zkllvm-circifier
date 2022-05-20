@@ -4186,6 +4186,10 @@ bool Type::canHaveNullability(bool ResultIfUnknown) const {
 #include "clang/Basic/PPCTypes.def"
 #define RVV_TYPE(Name, Id, SingletonId) case BuiltinType::Id:
 #include "clang/Basic/RISCVVTypes.def"
+      //EVM local
+#define EVM_TYPE(Name, Id, SingletonId) case BuiltinType::Id:
+#include "clang/Basic/EVMTypes.def"
+      // EVM local
     case BuiltinType::BuiltinFn:
     case BuiltinType::NullPtr:
     case BuiltinType::IncompleteMatrixIdx:

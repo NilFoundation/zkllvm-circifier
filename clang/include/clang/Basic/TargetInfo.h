@@ -229,6 +229,10 @@ protected:
 
   unsigned HasRISCVVTypes : 1;
 
+  // EVM local
+  unsigned HasEVMTypes : 1;
+  //EVM local
+
   unsigned AllowAMDGPUUnsafeFPAtomics : 1;
 
   unsigned ARMCDECoprocMask : 8;
@@ -946,6 +950,10 @@ public:
   /// Returns whether or not the RISC-V V built-in types are
   /// available on this target.
   bool hasRISCVVTypes() const { return HasRISCVVTypes; }
+
+  /// Returns whether or not the EVM built-in types are
+  /// available on this target.
+  bool hasEVMTypes() const { return HasEVMTypes; }
 
   /// Returns whether or not the AMDGPU unsafe floating point atomics are
   /// allowed.

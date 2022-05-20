@@ -75,6 +75,18 @@ namespace clang {
   };
   }
 
+  // EVM local
+  /// EVM builtins
+  namespace EVM {
+  enum {
+    LastTIBuiltin = clang::Builtin::FirstTSBuiltin - 1,
+#define BUILTIN(ID, TYPE, ATTRS) BI##ID,
+#include "clang/Basic/BuiltinsEVM.def"
+    LastTSBuiltin
+  };
+  }
+  // EVM local
+
   /// PPC builtins
   namespace PPC {
     enum {

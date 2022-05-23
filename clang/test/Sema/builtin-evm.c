@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 -x c -triple evm-pc-evm-gnu -dwarf-version=4 -fsyntax-only -verify %s
+// RUN: %clang -x c -triple evm -dwarf-version=4 -fsyntax-only -verify %s
 
 struct {
   char f1[100];

@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 -arch evm-pc-evm-gnu -target-feature +v -ast-print %s \
+// RUN: %clang -triple evm -target-feature +v -ast-print %s \
 // RUN:    | FileCheck %s
 
 void bar(void) {

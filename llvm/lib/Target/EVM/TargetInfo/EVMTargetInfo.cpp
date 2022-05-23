@@ -14,9 +14,12 @@ Target &getTheEVMTarget() {
   static Target TheEVMTarget;
   return TheEVMTarget;
 }
-}
+} // namespace llvm
 
 extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeEVMTargetInfo() {
-  llvm::RegisterTarget<llvm::Triple::evm, /*HasJIT=*/false>
-    X(llvm::getTheEVMTarget(), "evm", "Ethereum Virtual Machine", "EVM");
+  TargetRegistry::RegisterTarget(
+      getTheEVMTarget(), "evm", "Ethereum Virtual Machine", "EVM",
+      [](Triple::ArchType) { return false; }, true);
+  RegisterTarget<Triple::evm, /*HasJIT=*/true> X(
+      getTheEVMTarget(), "evm", "Ethereum Virtual Machine", "EVM");
 }

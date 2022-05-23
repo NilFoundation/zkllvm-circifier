@@ -717,7 +717,7 @@ TEST(TripleTest, ParsedIDs) {
   EXPECT_EQ(Triple::Amplification, T.getEnvironment());
 
   T = Triple("evm");
-  EXPECT_EQ(Triple::EVM, T.getArch());
+  EXPECT_EQ(Triple::EVMBinary, T.getArch());
 
   T = Triple("huh");
   EXPECT_EQ(Triple::UnknownArch, T.getArch());

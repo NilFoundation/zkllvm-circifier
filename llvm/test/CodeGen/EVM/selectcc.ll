@@ -1,4 +1,4 @@
-; RUN: llc-mtriple=evm -filetype=asm | FileCheck %s
+; RUN: llc -march=evm -filetype=asm < %s | FileCheck %s
 
 define i256 @foo__(i256 %b, i256 %c) nounwind readnone ssp {
 ; CHECK-LABEL: foo__

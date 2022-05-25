@@ -1,4 +1,4 @@
-; RUN: llvm-as < %s | llc -mtriple=evm -filetype=asm | FileCheck %s
+; RUN: llc -march=evm -filetype=asm < %s | FileCheck %s
 
 define i256 @int_exp(i256 %a, i256 %b) {
 entry:
@@ -24,8 +24,6 @@ entry:
   ret i256 %rv
 }
 
-
-
 define i256 @int_origin() {
 entry:
   %rv = call i256 @llvm.evm.origin()
@@ -41,8 +39,6 @@ entry:
 ; CHECK: CALLER
   ret i256 %rv
 }
-
-
 
 define i256 @int_callvalue() {
 entry:

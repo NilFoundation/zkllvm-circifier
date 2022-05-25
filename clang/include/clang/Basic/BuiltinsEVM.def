@@ -27,7 +27,7 @@
 //    - `hash: bytes32`: resulting hash
 //- **Codegen details:**
 //    - SHA3 opcode: `0x20`
-BUILTIN(__builtin_evm_keccak1600, "WiTs", "nc")
+BUILTIN(__builtin_evm_sha3, "WiTs", "nc")
 
 // @brief Address
 //

@@ -1,4 +1,4 @@
-; RUN: llc < %s -mtriple=evm -filetype=asm | FileCheck %s
+; RUN: llc < %s -march=evm -filetype=asm | FileCheck %s
 
 define i8 @trunc8_loreg(i256 %x, i256 %y) {
 ; CHECK-LABEL: trunc8_loreg__:

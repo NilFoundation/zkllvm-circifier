@@ -3403,7 +3403,8 @@ bool Sema::CheckBPFBuiltinFunctionCall(unsigned BuiltinID,
 // EVM local
 bool Sema::CheckEVMBuiltinFunctionCall(unsigned BuiltinID,
                                        CallExpr *TheCall) {
-  assert(BuiltinID == EVM::BI__builtin_evm_keccak && "unexpected EVM builtin");
+  assert(BuiltinID == EVM::BI__builtin_evm_sha3 && "unexpected EVM "
+                                                       "builtin");
 
   if (checkArgCount(*this, TheCall, 2))
     return true;
@@ -3415,7 +3416,7 @@ bool Sema::CheckEVMBuiltinFunctionCall(unsigned BuiltinID,
   Optional<llvm::APSInt> Value = Arg->getIntegerConstantExpr(Context);
   diag::kind kind = 0;
   if (!Value) {
-    if (BuiltinID == EVM::BI__builtin_evm_keccak) {
+    if (BuiltinID == EVM::BI__builtin_evm_sha3) {
       kind = diag::err_preserve_field_info_not_const;
     }
     Diag(Arg->getBeginLoc(), kind) << 2 << Arg->getSourceRange();
@@ -3426,7 +3427,7 @@ bool Sema::CheckEVMBuiltinFunctionCall(unsigned BuiltinID,
   Arg = TheCall->getArg(1);
   Value = Arg->getIntegerConstantExpr(Context);
   if (!Value) {
-    if (BuiltinID == EVM::BI__builtin_evm_keccak) {
+    if (BuiltinID == EVM::BI__builtin_evm_sha3) {
       kind = diag::err_preserve_field_info_not_const;
     }
     Diag(Arg->getBeginLoc(), kind) << 2 << Arg->getSourceRange();

@@ -1,4 +1,4 @@
-; RUN: llc -mtriple=evm -filetype=asm | FileCheck %s
+; RUN: llc -march=evm -filetype=asm | FileCheck %s
 
 define i256 @brcc1(i256 %a, i256 %b) nounwind {
 ; CHECK-LABEL: brcc1

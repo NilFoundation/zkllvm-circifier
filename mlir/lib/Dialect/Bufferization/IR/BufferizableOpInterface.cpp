@@ -45,6 +45,29 @@ static const char *kBufferAllocationAttr = "bufferization.allocation";
 static const char *kSkipDeallocAttr = "bufferization.skip_dealloc";
 
 //===----------------------------------------------------------------------===//
+// OpFilter
+//===----------------------------------------------------------------------===//
+
+bool OpFilter::isOpAllowed(Operation *op) const {
+  // All other ops: Allow/disallow according to filter.
+  bool isAllowed = !hasAllowRule();
+  for (const Entry &entry : entries) {
+    bool filterResult = entry.fn(op);
+    switch (entry.type) {
+    case Entry::ALLOW:
+      isAllowed |= filterResult;
+      break;
+    case Entry::DENY:
+      if (filterResult)
+        // DENY filter matches. This op is no allowed. (Even if other ALLOW
+        // filters may match.)
+        return false;
+    };
+  }
+  return isAllowed;
+}
+
+//===----------------------------------------------------------------------===//
 // BufferizationOptions
 //===----------------------------------------------------------------------===//
 
@@ -58,22 +81,7 @@ bool BufferizationOptions::isOpAllowed(Operation *op) const {
   if (!bufferizeFunctionBoundaries && isFuncBoundaryOp)
     return false;
 
-  // All other ops: Allow/disallow according to filter.
-  bool isAllowed = !filterHasAllowRule();
-  for (const OpFilterEntry &entry : opFilter) {
-    bool filterResult = entry.fn(op);
-    switch (entry.type) {
-    case OpFilterEntry::ALLOW:
-      isAllowed |= filterResult;
-      break;
-    case OpFilterEntry::DENY:
-      if (filterResult)
-        // DENY filter matches. This op is no allowed. (Even if other ALLOW
-        // filters may match.)
-        return false;
-    };
-  }
-  return isAllowed;
+  return opFilter.isOpAllowed(op);
 }
 
 BufferizableOpInterface
@@ -333,13 +341,12 @@ BufferizationState::getBuffer(RewriterBase &rewriter, OpOperand &opOperand,
   return resultBuffer;
 }
 
-/// Return the buffer type for a given OpOperand (tensor) after bufferization.
-BaseMemRefType BufferizationState::getBufferType(OpOperand &opOperand) const {
-  Value tensor = opOperand.get();
-  auto tensorType = tensor.getType().dyn_cast<TensorType>();
+/// Return the buffer type for a given Value (tensor) after bufferization.
+BaseMemRefType BufferizationState::getBufferType(Value value) const {
+  auto tensorType = value.getType().dyn_cast<TensorType>();
   assert(tensorType && "unexpected non-tensor type");
 
-  if (auto toTensorOp = tensor.getDefiningOp<bufferization::ToTensorOp>())
+  if (auto toTensorOp = value.getDefiningOp<bufferization::ToTensorOp>())
     return toTensorOp.memref().getType().cast<BaseMemRefType>();
 
   return getMemRefType(tensorType, getOptions());
@@ -373,43 +380,6 @@ void bufferization::replaceOpWithBufferizedValues(RewriterBase &rewriter,
   }
 
   rewriter.replaceOp(op, replacements);
-}
-
-AlwaysCopyAnalysisState::AlwaysCopyAnalysisState(
-    const BufferizationOptions &options)
-    : AnalysisState(options) {
-  // Note: Allocations must be deallocated with a subsequent run of the buffer
-  // deallocation pass.
-  assert(!options.createDeallocs &&
-         "cannot create deallocs with AlwaysCopyBufferizationState");
-}
-
-/// Return `true` if the given OpResult has been decided to bufferize inplace.
-bool AlwaysCopyAnalysisState::isInPlace(OpOperand &opOperand) const {
-  // OpOperands that bufferize to a memory write are out-of-place, i.e., an
-  // alloc and copy is inserted.
-  return !bufferizesToMemoryWrite(opOperand);
-}
-
-/// Return true if `v1` and `v2` bufferize to equivalent buffers.
-bool AlwaysCopyAnalysisState::areEquivalentBufferizedValues(Value v1,
-                                                            Value v2) const {
-  // There is no analysis, so we do not know if the values are equivalent. The
-  // conservative answer is "false".
-  return false;
-}
-
-/// Return `true` if the given tensor has undefined contents.
-bool AlwaysCopyAnalysisState::hasUndefinedContents(OpOperand *opOperand) const {
-  // There is no analysis, so the conservative answer is "false".
-  return false;
-}
-
-/// Return true if the given tensor (or an aliasing tensor) is yielded from
-/// the containing block. Also include all aliasing tensors in the same block.
-bool AlwaysCopyAnalysisState::isTensorYielded(Value tensor) const {
-  // There is no analysis, so conservatively answer "true".
-  return true;
 }
 
 //===----------------------------------------------------------------------===//
@@ -581,63 +551,6 @@ bufferization::createAllocDeallocOps(Operation *op,
   });
 
   return success(!status.wasInterrupted());
-}
-
-/// Try to hoist all new buffer allocations until the next hoisting barrier.
-// TODO: Consolidate this function with the existing buffer hoisting pass.
-LogicalResult
-bufferization::hoistBufferAllocations(Operation *op,
-                                      const BufferizationOptions &options) {
-  // Nothing to do if allocation hoisting is deactivated.
-  if (!options.hoistAllocations)
-    return success();
-
-  // Gather all buffer allocations that were created by the bufferization.
-  SmallVector<Operation *> allocaOps;
-  op->walk([&](memref::AllocaOp allocaOp) {
-    if (allocaOp->hasAttr(kBufferAllocationAttr))
-      allocaOps.push_back(allocaOp);
-  });
-
-  for (Operation *allocaOp : allocaOps) {
-    // TODO: Hoisting of allocs with dynamic shape not implemented.
-    if (!allocaOp->getOpOperands().empty())
-      continue;
-
-    Operation *op = allocaOp->getParentOp();
-    while (op) {
-      if (auto bufferizableOp = dyn_cast<BufferizableOpInterface>(op)) {
-        if (bufferizableOp.isAllocationHoistingBarrier()) {
-          break;
-        }
-      } else {
-        // Op is not bufferizable: It may not be safe to hoist across this op.
-        break;
-      }
-      op = op->getParentOp();
-    }
-
-    // FuncOp is an allocation hoisting barrier, so this should never happen.
-    assert(op && "allocation hoisting barrier not found");
-
-    // Nothing to do if the insertion point is in the same block.
-    if (op == allocaOp->getParentOp())
-      continue;
-
-    // `op` may have multiple blocks. Make sure that we insert in the right one.
-    SmallVector<Block *> blocks;
-    for (Region &r : op->getRegions())
-      for (Block &b : r.getBlocks())
-        blocks.push_back(&b);
-    auto *insertionBlock = llvm::find_if(
-        blocks, [&](Block *b) { return b->findAncestorOpInBlock(*allocaOp); });
-    assert(insertionBlock != blocks.end() && "owning block not found");
-
-    // Move to the beginning of the block.
-    allocaOp->moveBefore(&(*insertionBlock)->front());
-  }
-
-  return success();
 }
 
 //===----------------------------------------------------------------------===//

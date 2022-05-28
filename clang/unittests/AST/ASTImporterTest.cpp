@@ -4279,6 +4279,10 @@ TEST_P(DeclContextTest,
   // This asserts in the old implementation.
   DC->removeDecl(A0);
   EXPECT_FALSE(DC->containsDecl(A0));
+
+  // Make sure we do not leave a StoredDeclsList with no entries.
+  DC->removeDecl(A1);
+  ASSERT_EQ(Map->find(A1->getDeclName()), Map->end());
 }
 
 struct ImportFunctionTemplateSpecializations
@@ -7696,6 +7700,38 @@ TEST_P(ASTImporterOptionSpecificTestBase,
   auto *ToF = Import(FromF, Lang_CXX11);
   EXPECT_TRUE(ToF);
   EXPECT_TRUE(ToX->getInClassInitializer());
+}
+
+TEST_P(ASTImporterOptionSpecificTestBase, isNewDecl) {
+  Decl *FromTU = getTuDecl(
+      R"(
+      int bar() {
+        return 0;
+      }
+      void other() {
+        bar();
+      }
+      )",
+      Lang_CXX11);
+  Decl *ToTU = getToTuDecl(
+      R"(
+      int bar() {
+        return 0;
+      }
+      )",
+      Lang_CXX11);
+  auto *FromOther = FirstDeclMatcher<FunctionDecl>().match(
+      FromTU, functionDecl(hasName("other")));
+  ASSERT_TRUE(FromOther);
+
+  auto *ToOther = Import(FromOther, Lang_CXX11);
+  ASSERT_TRUE(ToOther);
+
+  auto *ToBar = FirstDeclMatcher<FunctionDecl>().match(
+      ToTU, functionDecl(hasName("bar")));
+
+  EXPECT_TRUE(SharedStatePtr->isNewDecl(ToOther));
+  EXPECT_FALSE(SharedStatePtr->isNewDecl(ToBar));
 }
 
 INSTANTIATE_TEST_SUITE_P(ParameterizedTests, ASTImporterLookupTableTest,

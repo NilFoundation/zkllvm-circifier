@@ -301,8 +301,9 @@ Instruction *InstCombinerImpl::visitMul(BinaryOperator &I) {
     }
   }
 
-  /// i1 mul -> i1 and.
-  if (I.getType()->isIntOrIntVectorTy(1))
+  // i1 mul -> i1 and.
+  Type *Ty = I.getType();
+  if (Ty->isIntOrIntVectorTy(1))
     return BinaryOperator::CreateAnd(Op0, Op1);
 
   // X*(1 << Y) --> X << Y
@@ -335,7 +336,7 @@ Instruction *InstCombinerImpl::visitMul(BinaryOperator &I) {
       X->getType()->isIntOrIntVectorTy(1) && X->getType() == Y->getType() &&
       (Op0->hasOneUse() || Op1->hasOneUse() || X == Y)) {
     Value *And = Builder.CreateAnd(X, Y, "mulbool");
-    return CastInst::Create(Instruction::ZExt, And, I.getType());
+    return CastInst::Create(Instruction::ZExt, And, Ty);
   }
   // (sext bool X) * (zext bool Y) --> sext (and X, Y)
   // (zext bool X) * (sext bool Y) --> sext (and X, Y)
@@ -345,35 +346,43 @@ Instruction *InstCombinerImpl::visitMul(BinaryOperator &I) {
       X->getType()->isIntOrIntVectorTy(1) && X->getType() == Y->getType() &&
       (Op0->hasOneUse() || Op1->hasOneUse())) {
     Value *And = Builder.CreateAnd(X, Y, "mulbool");
-    return CastInst::Create(Instruction::SExt, And, I.getType());
+    return CastInst::Create(Instruction::SExt, And, Ty);
   }
 
   // (zext bool X) * Y --> X ? Y : 0
   // Y * (zext bool X) --> X ? Y : 0
   if (match(Op0, m_ZExt(m_Value(X))) && X->getType()->isIntOrIntVectorTy(1))
-    return SelectInst::Create(X, Op1, ConstantInt::get(I.getType(), 0));
+    return SelectInst::Create(X, Op1, ConstantInt::getNullValue(Ty));
   if (match(Op1, m_ZExt(m_Value(X))) && X->getType()->isIntOrIntVectorTy(1))
-    return SelectInst::Create(X, Op0, ConstantInt::get(I.getType(), 0));
+    return SelectInst::Create(X, Op0, ConstantInt::getNullValue(Ty));
 
-  // (sext bool X) * C --> X ? -C : 0
   Constant *ImmC;
-  if (match(Op0, m_SExt(m_Value(X))) && X->getType()->isIntOrIntVectorTy(1) &&
-      match(Op1, m_ImmConstant(ImmC))) {
-    Constant *NegC = ConstantExpr::getNeg(ImmC);
-    return SelectInst::Create(X, NegC, ConstantInt::getNullValue(I.getType()));
+  if (match(Op1, m_ImmConstant(ImmC))) {
+    // (sext bool X) * C --> X ? -C : 0
+    if (match(Op0, m_SExt(m_Value(X))) && X->getType()->isIntOrIntVectorTy(1)) {
+      Constant *NegC = ConstantExpr::getNeg(ImmC);
+      return SelectInst::Create(X, NegC, ConstantInt::getNullValue(Ty));
+    }
+
+    // (ashr i32 X, 31) * C --> (X < 0) ? -C : 0
+    const APInt *C;
+    if (match(Op0, m_OneUse(m_AShr(m_Value(X), m_APInt(C)))) &&
+        *C == C->getBitWidth() - 1) {
+      Constant *NegC = ConstantExpr::getNeg(ImmC);
+      Value *IsNeg = Builder.CreateIsNeg(X, "isneg");
+      return SelectInst::Create(IsNeg, NegC, ConstantInt::getNullValue(Ty));
+    }
   }
 
-  // (lshr X, 31) * Y --> (ashr X, 31) & Y
-  // Y * (lshr X, 31) --> (ashr X, 31) & Y
+  // (lshr X, 31) * Y --> (X < 0) ? Y : 0
   // TODO: We are not checking one-use because the elimination of the multiply
   //       is better for analysis?
-  // TODO: Should we canonicalize to '(X < 0) ? Y : 0' instead? That would be
-  //       more similar to what we're doing above.
   const APInt *C;
-  if (match(Op0, m_LShr(m_Value(X), m_APInt(C))) && *C == C->getBitWidth() - 1)
-    return BinaryOperator::CreateAnd(Builder.CreateAShr(X, *C), Op1);
-  if (match(Op1, m_LShr(m_Value(X), m_APInt(C))) && *C == C->getBitWidth() - 1)
-    return BinaryOperator::CreateAnd(Builder.CreateAShr(X, *C), Op0);
+  if (match(&I, m_c_Mul(m_LShr(m_Value(X), m_APInt(C)), m_Value(Y))) &&
+      *C == C->getBitWidth() - 1) {
+    Value *IsNeg = Builder.CreateIsNeg(X, "isneg");
+    return SelectInst::Create(IsNeg, Y, ConstantInt::getNullValue(Ty));
+  }
 
   // ((ashr X, 31) | 1) * X --> abs(X)
   // X * ((ashr X, 31) | 1) --> abs(X)
@@ -529,9 +538,8 @@ Instruction *InstCombinerImpl::visitFMul(BinaryOperator &I) {
     // sqrt(X) * sqrt(Y) -> sqrt(X * Y)
     // nnan disallows the possibility of returning a number if both operands are
     // negative (in that case, we should return NaN).
-    if (I.hasNoNaNs() &&
-        match(Op0, m_OneUse(m_Intrinsic<Intrinsic::sqrt>(m_Value(X)))) &&
-        match(Op1, m_OneUse(m_Intrinsic<Intrinsic::sqrt>(m_Value(Y))))) {
+    if (I.hasNoNaNs() && match(Op0, m_OneUse(m_Sqrt(m_Value(X)))) &&
+        match(Op1, m_OneUse(m_Sqrt(m_Value(Y))))) {
       Value *XY = Builder.CreateFMulFMF(X, Y, &I);
       Value *Sqrt = Builder.CreateUnaryIntrinsic(Intrinsic::sqrt, XY, &I);
       return replaceInstUsesWith(I, Sqrt);
@@ -545,11 +553,11 @@ Instruction *InstCombinerImpl::visitFMul(BinaryOperator &I) {
     // has the necessary (reassoc) fast-math-flags.
     if (I.hasNoSignedZeros() &&
         match(Op0, (m_FDiv(m_SpecificFP(1.0), m_Value(Y)))) &&
-        match(Y, m_Intrinsic<Intrinsic::sqrt>(m_Value(X))) && Op1 == X)
+        match(Y, m_Sqrt(m_Value(X))) && Op1 == X)
       return BinaryOperator::CreateFDivFMF(X, Y, &I);
     if (I.hasNoSignedZeros() &&
         match(Op1, (m_FDiv(m_SpecificFP(1.0), m_Value(Y)))) &&
-        match(Y, m_Intrinsic<Intrinsic::sqrt>(m_Value(X))) && Op0 == X)
+        match(Y, m_Sqrt(m_Value(X))) && Op0 == X)
       return BinaryOperator::CreateFDivFMF(X, Y, &I);
 
     // Like the similar transform in instsimplify, this requires 'nsz' because
@@ -558,14 +566,12 @@ Instruction *InstCombinerImpl::visitFMul(BinaryOperator &I) {
         Op0->hasNUses(2)) {
       // Peek through fdiv to find squaring of square root:
       // (X / sqrt(Y)) * (X / sqrt(Y)) --> (X * X) / Y
-      if (match(Op0, m_FDiv(m_Value(X),
-                            m_Intrinsic<Intrinsic::sqrt>(m_Value(Y))))) {
+      if (match(Op0, m_FDiv(m_Value(X), m_Sqrt(m_Value(Y))))) {
         Value *XX = Builder.CreateFMulFMF(X, X, &I);
         return BinaryOperator::CreateFDivFMF(XX, Y, &I);
       }
       // (sqrt(Y) / X) * (sqrt(Y) / X) --> Y / (X * X)
-      if (match(Op0, m_FDiv(m_Intrinsic<Intrinsic::sqrt>(m_Value(Y)),
-                            m_Value(X)))) {
+      if (match(Op0, m_FDiv(m_Sqrt(m_Value(Y)), m_Value(X)))) {
         Value *XX = Builder.CreateFMulFMF(X, X, &I);
         return BinaryOperator::CreateFDivFMF(Y, XX, &I);
       }

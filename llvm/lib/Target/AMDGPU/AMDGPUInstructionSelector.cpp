@@ -458,6 +458,19 @@ bool AMDGPUInstructionSelector::selectG_UADDO_USUBO_UADDE_USUBE(
   return true;
 }
 
+bool AMDGPUInstructionSelector::selectG_AMDGPU_MAD_64_32(
+    MachineInstr &I) const {
+  MachineBasicBlock *BB = I.getParent();
+  MachineFunction *MF = BB->getParent();
+  const bool IsUnsigned = I.getOpcode() == AMDGPU::G_AMDGPU_MAD_U64_U32;
+
+  I.setDesc(TII.get(IsUnsigned ? AMDGPU::V_MAD_U64_U32_e64
+                               : AMDGPU::V_MAD_I64_I32_e64));
+  I.addOperand(*MF, MachineOperand::CreateImm(0));
+  I.addImplicitDefUseOperands(*MF);
+  return constrainSelectedInstRegOperands(I, TII, TRI, RBI);
+}
+
 // TODO: We should probably legalize these to only using 32-bit results.
 bool AMDGPUInstructionSelector::selectG_EXTRACT(MachineInstr &I) const {
   MachineBasicBlock *BB = I.getParent();
@@ -1434,23 +1447,7 @@ bool AMDGPUInstructionSelector::selectDSGWSIntrinsic(MachineInstr &MI,
 
   if (HasVSrc) {
     Register VSrc = MI.getOperand(1).getReg();
-
-    if (STI.needsAlignedVGPRs()) {
-      // Add implicit aligned super-reg to force alignment on the data operand.
-      Register Undef = MRI->createVirtualRegister(&AMDGPU::VGPR_32RegClass);
-      BuildMI(*MBB, &*MIB, DL, TII.get(AMDGPU::IMPLICIT_DEF), Undef);
-      Register NewVR =
-          MRI->createVirtualRegister(&AMDGPU::VReg_64_Align2RegClass);
-      BuildMI(*MBB, &*MIB, DL, TII.get(AMDGPU::REG_SEQUENCE), NewVR)
-          .addReg(VSrc, 0, MI.getOperand(1).getSubReg())
-          .addImm(AMDGPU::sub0)
-          .addReg(Undef)
-          .addImm(AMDGPU::sub1);
-      MIB.addReg(NewVR, 0, AMDGPU::sub0);
-      MIB.addReg(NewVR, RegState::Implicit);
-    } else {
-      MIB.addReg(VSrc);
-    }
+    MIB.addReg(VSrc);
 
     if (!RBI.constrainGenericRegister(VSrc, AMDGPU::VGPR_32RegClass, *MRI))
       return false;
@@ -1458,6 +1455,8 @@ bool AMDGPUInstructionSelector::selectDSGWSIntrinsic(MachineInstr &MI,
 
   MIB.addImm(ImmOffset)
      .cloneMemRefs(MI);
+
+  TII.enforceOperandRCAlignment(*MIB, AMDGPU::OpName::data0);
 
   MI.eraseFromParent();
   return true;
@@ -1753,7 +1752,9 @@ bool AMDGPUInstructionSelector::selectImageIntrinsic(
   }
 
   MI.eraseFromParent();
-  return constrainSelectedInstRegOperands(*MIB, TII, TRI, RBI);
+  constrainSelectedInstRegOperands(*MIB, TII, TRI, RBI);
+  TII.enforceOperandRCAlignment(*MIB, AMDGPU::OpName::vaddr);
+  return true;
 }
 
 bool AMDGPUInstructionSelector::selectG_INTRINSIC_W_SIDE_EFFECTS(
@@ -2507,7 +2508,7 @@ bool AMDGPUInstructionSelector::selectG_PTRMASK(MachineInstr &I) const {
 
   // Try to avoid emitting a bit operation when we only need to touch half of
   // the 64-bit pointer.
-  APInt MaskOnes = KnownBits->getKnownOnes(MaskReg).zextOrSelf(64);
+  APInt MaskOnes = KnownBits->getKnownOnes(MaskReg).zext(64);
   const APInt MaskHi32 = APInt::getHighBitsSet(64, 32);
   const APInt MaskLo32 = APInt::getLowBitsSet(64, 32);
 
@@ -3347,6 +3348,9 @@ bool AMDGPUInstructionSelector::select(MachineInstr &I) {
   case TargetOpcode::G_UADDE:
   case TargetOpcode::G_USUBE:
     return selectG_UADDO_USUBO_UADDE_USUBE(I);
+  case AMDGPU::G_AMDGPU_MAD_U64_U32:
+  case AMDGPU::G_AMDGPU_MAD_I64_I32:
+    return selectG_AMDGPU_MAD_64_32(I);
   case TargetOpcode::G_INTTOPTR:
   case TargetOpcode::G_BITCAST:
   case TargetOpcode::G_PTRTOINT:

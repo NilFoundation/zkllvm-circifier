@@ -2566,8 +2566,7 @@ static SDValue emitStrictFPComparison(SDValue LHS, SDValue RHS, const SDLoc &dl,
   EVT VT = LHS.getValueType();
   assert(VT != MVT::f128);
 
-  const bool FullFP16 =
-      static_cast<const AArch64Subtarget &>(DAG.getSubtarget()).hasFullFP16();
+  const bool FullFP16 = DAG.getSubtarget<AArch64Subtarget>().hasFullFP16();
 
   if (VT == MVT::f16 && !FullFP16) {
     LHS = DAG.getNode(ISD::STRICT_FP_EXTEND, dl, {MVT::f32, MVT::Other},
@@ -2585,8 +2584,7 @@ static SDValue emitStrictFPComparison(SDValue LHS, SDValue RHS, const SDLoc &dl,
 static SDValue emitComparison(SDValue LHS, SDValue RHS, ISD::CondCode CC,
                               const SDLoc &dl, SelectionDAG &DAG) {
   EVT VT = LHS.getValueType();
-  const bool FullFP16 =
-    static_cast<const AArch64Subtarget &>(DAG.getSubtarget()).hasFullFP16();
+  const bool FullFP16 = DAG.getSubtarget<AArch64Subtarget>().hasFullFP16();
 
   if (VT.isFloatingPoint()) {
     assert(VT != MVT::f128);
@@ -2694,8 +2692,7 @@ static SDValue emitConditionalComparison(SDValue LHS, SDValue RHS,
                                          AArch64CC::CondCode OutCC,
                                          const SDLoc &DL, SelectionDAG &DAG) {
   unsigned Opcode = 0;
-  const bool FullFP16 =
-    static_cast<const AArch64Subtarget &>(DAG.getSubtarget()).hasFullFP16();
+  const bool FullFP16 = DAG.getSubtarget<AArch64Subtarget>().hasFullFP16();
 
   if (LHS.getValueType().isFloatingPoint()) {
     assert(LHS.getValueType() != MVT::f128);
@@ -3593,17 +3590,14 @@ AArch64TargetLowering::LowerVectorFP_TO_INT_SAT(SDValue Op,
   SDValue Sat;
   if (Op.getOpcode() == ISD::FP_TO_SINT_SAT) {
     SDValue MinC = DAG.getConstant(
-        APInt::getSignedMaxValue(SatWidth).sextOrSelf(SrcElementWidth), DL,
-        IntVT);
+        APInt::getSignedMaxValue(SatWidth).sext(SrcElementWidth), DL, IntVT);
     SDValue Min = DAG.getNode(ISD::SMIN, DL, IntVT, NativeCvt, MinC);
     SDValue MaxC = DAG.getConstant(
-        APInt::getSignedMinValue(SatWidth).sextOrSelf(SrcElementWidth), DL,
-        IntVT);
+        APInt::getSignedMinValue(SatWidth).sext(SrcElementWidth), DL, IntVT);
     Sat = DAG.getNode(ISD::SMAX, DL, IntVT, Min, MaxC);
   } else {
     SDValue MinC = DAG.getConstant(
-        APInt::getAllOnesValue(SatWidth).zextOrSelf(SrcElementWidth), DL,
-        IntVT);
+        APInt::getAllOnesValue(SatWidth).zext(SrcElementWidth), DL, IntVT);
     Sat = DAG.getNode(ISD::UMIN, DL, IntVT, NativeCvt, MinC);
   }
 
@@ -3652,14 +3646,14 @@ SDValue AArch64TargetLowering::LowerFP_TO_INT_SAT(SDValue Op,
   SDValue Sat;
   if (Op.getOpcode() == ISD::FP_TO_SINT_SAT) {
     SDValue MinC = DAG.getConstant(
-        APInt::getSignedMaxValue(SatWidth).sextOrSelf(DstWidth), DL, DstVT);
+        APInt::getSignedMaxValue(SatWidth).sext(DstWidth), DL, DstVT);
     SDValue Min = DAG.getNode(ISD::SMIN, DL, DstVT, NativeCvt, MinC);
     SDValue MaxC = DAG.getConstant(
-        APInt::getSignedMinValue(SatWidth).sextOrSelf(DstWidth), DL, DstVT);
+        APInt::getSignedMinValue(SatWidth).sext(DstWidth), DL, DstVT);
     Sat = DAG.getNode(ISD::SMAX, DL, DstVT, Min, MaxC);
   } else {
     SDValue MinC = DAG.getConstant(
-        APInt::getAllOnesValue(SatWidth).zextOrSelf(DstWidth), DL, DstVT);
+        APInt::getAllOnesValue(SatWidth).zext(DstWidth), DL, DstVT);
     Sat = DAG.getNode(ISD::UMIN, DL, DstVT, NativeCvt, MinC);
   }
 
@@ -4523,13 +4517,19 @@ bool AArch64TargetLowering::shouldExtendGSIndex(EVT VT, EVT &EltTy) const {
   return false;
 }
 
-bool AArch64TargetLowering::shouldRemoveExtendFromGSIndex(EVT VT) const {
-  if (VT.getVectorElementType() == MVT::i32 &&
-      VT.getVectorElementCount().getKnownMinValue() >= 4 &&
-      !VT.isFixedLengthVector())
-    return true;
+bool AArch64TargetLowering::shouldRemoveExtendFromGSIndex(EVT IndexVT,
+                                                          EVT DataVT) const {
+  // SVE only supports implicit extension of 32-bit indices.
+  if (!Subtarget->hasSVE() || IndexVT.getVectorElementType() != MVT::i32)
+    return false;
 
-  return false;
+  // Indices cannot be smaller than the main data type.
+  if (IndexVT.getScalarSizeInBits() < DataVT.getScalarSizeInBits())
+    return false;
+
+  // Scalable vectors with "vscale * 2" or fewer elements sit within a 64-bit
+  // element container type, which would violate the previous clause.
+  return DataVT.isFixedLengthVector() || DataVT.getVectorMinNumElements() > 2;
 }
 
 bool AArch64TargetLowering::isVectorLoadExtDesirable(SDValue ExtVal) const {
@@ -4699,6 +4699,56 @@ SDValue AArch64TargetLowering::LowerMGATHER(SDValue Op,
                                MGT->getMemOperand(), IndexType, ExtType);
   }
 
+  // Lower fixed length gather to a scalable equivalent.
+  if (VT.isFixedLengthVector()) {
+    assert(Subtarget->useSVEForFixedLengthVectors() &&
+           "Cannot lower when not using SVE for fixed vectors!");
+
+    // NOTE: Handle floating-point as if integer then bitcast the result.
+    EVT DataVT = VT.changeVectorElementTypeToInteger();
+    MemVT = MemVT.changeVectorElementTypeToInteger();
+
+    // Find the smallest integer fixed length vector we can use for the gather.
+    EVT PromotedVT = VT.changeVectorElementType(MVT::i32);
+    if (DataVT.getVectorElementType() == MVT::i64 ||
+        Index.getValueType().getVectorElementType() == MVT::i64 ||
+        Mask.getValueType().getVectorElementType() == MVT::i64)
+      PromotedVT = VT.changeVectorElementType(MVT::i64);
+
+    // Promote vector operands except for passthrough, which we know is either
+    // undef or zero, and thus best constructed directly.
+    unsigned ExtOpcode = IsSigned ? ISD::SIGN_EXTEND : ISD::ZERO_EXTEND;
+    Index = DAG.getNode(ExtOpcode, DL, PromotedVT, Index);
+    Mask = DAG.getNode(ISD::SIGN_EXTEND, DL, PromotedVT, Mask);
+
+    // A promoted result type forces the need for an extending load.
+    if (PromotedVT != DataVT && ExtType == ISD::NON_EXTLOAD)
+      ExtType = ISD::EXTLOAD;
+
+    EVT ContainerVT = getContainerForFixedLengthVector(DAG, PromotedVT);
+
+    // Convert fixed length vector operands to scalable.
+    MemVT = ContainerVT.changeVectorElementType(MemVT.getVectorElementType());
+    Index = convertToScalableVector(DAG, ContainerVT, Index);
+    Mask = convertFixedMaskToScalableVector(Mask, DAG);
+    PassThru = PassThru->isUndef() ? DAG.getUNDEF(ContainerVT)
+                                   : DAG.getConstant(0, DL, ContainerVT);
+
+    // Emit equivalent scalable vector gather.
+    SDValue Ops[] = {Chain, PassThru, Mask, BasePtr, Index, Scale};
+    SDValue Load =
+        DAG.getMaskedGather(DAG.getVTList(ContainerVT, MVT::Other), MemVT, DL,
+                            Ops, MGT->getMemOperand(), IndexType, ExtType);
+
+    // Extract fixed length data then convert to the required result type.
+    SDValue Result = convertFromScalableVector(DAG, PromotedVT, Load);
+    Result = DAG.getNode(ISD::TRUNCATE, DL, DataVT, Result);
+    if (VT.isFloatingPoint())
+      Result = DAG.getNode(ISD::BITCAST, DL, VT, Result);
+
+    return DAG.getMergeValues({Result, Load.getValue(1)}, DL);
+  }
+
   bool IdxNeedsExtend =
       getGatherScatterIndexIsExtended(Index) ||
       Index.getSimpleValueType().getVectorElementType() == MVT::i32;
@@ -4706,26 +4756,8 @@ SDValue AArch64TargetLowering::LowerMGATHER(SDValue Op,
   EVT IndexVT = Index.getSimpleValueType();
   SDValue InputVT = DAG.getValueType(MemVT);
 
-  bool IsFixedLength = MGT->getMemoryVT().isFixedLengthVector();
-
-  if (IsFixedLength) {
-    assert(Subtarget->useSVEForFixedLengthVectors() &&
-           "Cannot lower when not using SVE for fixed vectors");
-    if (MemVT.getScalarSizeInBits() <= IndexVT.getScalarSizeInBits()) {
-      IndexVT = getContainerForFixedLengthVector(DAG, IndexVT);
-      MemVT = IndexVT.changeVectorElementType(MemVT.getVectorElementType());
-    } else {
-      MemVT = getContainerForFixedLengthVector(DAG, MemVT);
-      IndexVT = MemVT.changeTypeToInteger();
-    }
-    InputVT = DAG.getValueType(MemVT.changeTypeToInteger());
-    Mask = DAG.getNode(
-        ISD::SIGN_EXTEND, DL,
-        VT.changeVectorElementType(IndexVT.getVectorElementType()), Mask);
-  }
-
   // Handle FP data by using an integer gather and casting the result.
-  if (VT.isFloatingPoint() && !IsFixedLength)
+  if (VT.isFloatingPoint())
     InputVT = DAG.getValueType(MemVT.changeVectorElementTypeToInteger());
 
   SDVTList VTs = DAG.getVTList(IndexVT, MVT::Other);
@@ -4740,25 +4772,11 @@ SDValue AArch64TargetLowering::LowerMGATHER(SDValue Op,
   if (ExtType == ISD::SEXTLOAD)
     Opcode = getSignExtendedGatherOpcode(Opcode);
 
-  if (IsFixedLength) {
-    if (Index.getSimpleValueType().isFixedLengthVector())
-      Index = convertToScalableVector(DAG, IndexVT, Index);
-    if (BasePtr.getSimpleValueType().isFixedLengthVector())
-      BasePtr = convertToScalableVector(DAG, IndexVT, BasePtr);
-    Mask = convertFixedMaskToScalableVector(Mask, DAG);
-  }
-
   SDValue Ops[] = {Chain, Mask, BasePtr, Index, InputVT};
   SDValue Result = DAG.getNode(Opcode, DL, VTs, Ops);
   Chain = Result.getValue(1);
 
-  if (IsFixedLength) {
-    Result = convertFromScalableVector(
-        DAG, VT.changeVectorElementType(IndexVT.getVectorElementType()),
-        Result);
-    Result = DAG.getNode(ISD::TRUNCATE, DL, VT.changeTypeToInteger(), Result);
-    Result = DAG.getNode(ISD::BITCAST, DL, VT, Result);
-  } else if (VT.isFloatingPoint())
+  if (VT.isFloatingPoint())
     Result = getSVESafeBitCast(VT, Result, DAG);
 
   return DAG.getMergeValues({Result, Chain}, DL);
@@ -4778,6 +4796,7 @@ SDValue AArch64TargetLowering::LowerMSCATTER(SDValue Op,
   EVT VT = StoreVal.getValueType();
   EVT MemVT = MSC->getMemoryVT();
   ISD::MemIndexType IndexType = MSC->getIndexType();
+  bool Truncating = MSC->isTruncatingStore();
 
   bool IsScaled = MSC->isIndexScaled();
   bool IsSigned = MSC->isIndexSigned();
@@ -4794,42 +4813,60 @@ SDValue AArch64TargetLowering::LowerMSCATTER(SDValue Op,
 
     SDValue Ops[] = {Chain, StoreVal, Mask, BasePtr, Index, Scale};
     return DAG.getMaskedScatter(MSC->getVTList(), MemVT, DL, Ops,
-                                MSC->getMemOperand(), IndexType,
-                                MSC->isTruncatingStore());
+                                MSC->getMemOperand(), IndexType, Truncating);
+  }
+
+  // Lower fixed length scatter to a scalable equivalent.
+  if (VT.isFixedLengthVector()) {
+    assert(Subtarget->useSVEForFixedLengthVectors() &&
+           "Cannot lower when not using SVE for fixed vectors!");
+
+    // Once bitcast we treat floating-point scatters as if integer.
+    if (VT.isFloatingPoint()) {
+      VT = VT.changeVectorElementTypeToInteger();
+      MemVT = MemVT.changeVectorElementTypeToInteger();
+      StoreVal = DAG.getNode(ISD::BITCAST, DL, VT, StoreVal);
+    }
+
+    // Find the smallest integer fixed length vector we can use for the scatter.
+    EVT PromotedVT = VT.changeVectorElementType(MVT::i32);
+    if (VT.getVectorElementType() == MVT::i64 ||
+        Index.getValueType().getVectorElementType() == MVT::i64 ||
+        Mask.getValueType().getVectorElementType() == MVT::i64)
+      PromotedVT = VT.changeVectorElementType(MVT::i64);
+
+    // Promote vector operands.
+    unsigned ExtOpcode = IsSigned ? ISD::SIGN_EXTEND : ISD::ZERO_EXTEND;
+    Index = DAG.getNode(ExtOpcode, DL, PromotedVT, Index);
+    Mask = DAG.getNode(ISD::SIGN_EXTEND, DL, PromotedVT, Mask);
+    StoreVal = DAG.getNode(ISD::ANY_EXTEND, DL, PromotedVT, StoreVal);
+
+    // A promoted value type forces the need for a truncating store.
+    if (PromotedVT != VT)
+      Truncating = true;
+
+    EVT ContainerVT = getContainerForFixedLengthVector(DAG, PromotedVT);
+
+    // Convert fixed length vector operands to scalable.
+    MemVT = ContainerVT.changeVectorElementType(MemVT.getVectorElementType());
+    Index = convertToScalableVector(DAG, ContainerVT, Index);
+    Mask = convertFixedMaskToScalableVector(Mask, DAG);
+    StoreVal = convertToScalableVector(DAG, ContainerVT, StoreVal);
+
+    // Emit equivalent scalable vector scatter.
+    SDValue Ops[] = {Chain, StoreVal, Mask, BasePtr, Index, Scale};
+    return DAG.getMaskedScatter(MSC->getVTList(), MemVT, DL, Ops,
+                                MSC->getMemOperand(), IndexType, Truncating);
   }
 
   bool NeedsExtend =
       getGatherScatterIndexIsExtended(Index) ||
       Index.getSimpleValueType().getVectorElementType() == MVT::i32;
 
-  EVT IndexVT = Index.getSimpleValueType();
   SDVTList VTs = DAG.getVTList(MVT::Other);
   SDValue InputVT = DAG.getValueType(MemVT);
 
-  bool IsFixedLength = MSC->getMemoryVT().isFixedLengthVector();
-
-  if (IsFixedLength) {
-    assert(Subtarget->useSVEForFixedLengthVectors() &&
-           "Cannot lower when not using SVE for fixed vectors");
-    if (MemVT.getScalarSizeInBits() <= IndexVT.getScalarSizeInBits()) {
-      IndexVT = getContainerForFixedLengthVector(DAG, IndexVT);
-      MemVT = IndexVT.changeVectorElementType(MemVT.getVectorElementType());
-    } else {
-      MemVT = getContainerForFixedLengthVector(DAG, MemVT);
-      IndexVT = MemVT.changeTypeToInteger();
-    }
-    InputVT = DAG.getValueType(MemVT.changeTypeToInteger());
-
-    StoreVal =
-        DAG.getNode(ISD::BITCAST, DL, VT.changeTypeToInteger(), StoreVal);
-    StoreVal = DAG.getNode(
-        ISD::ANY_EXTEND, DL,
-        VT.changeVectorElementType(IndexVT.getVectorElementType()), StoreVal);
-    StoreVal = convertToScalableVector(DAG, IndexVT, StoreVal);
-    Mask = DAG.getNode(
-        ISD::SIGN_EXTEND, DL,
-        VT.changeVectorElementType(IndexVT.getVectorElementType()), Mask);
-  } else if (VT.isFloatingPoint()) {
+  if (VT.isFloatingPoint()) {
     // Handle FP data by casting the data so an integer scatter can be used.
     EVT StoreValVT = getPackedSVEVectorVT(VT.getVectorElementCount());
     StoreVal = getSVESafeBitCast(StoreValVT, StoreVal, DAG);
@@ -4842,14 +4879,6 @@ SDValue AArch64TargetLowering::LowerMSCATTER(SDValue Op,
   unsigned Opcode = getScatterVecOpcode(IsScaled, IsSigned, NeedsExtend);
   selectGatherScatterAddrMode(BasePtr, Index, IsScaled, MemVT, Opcode,
                               /*isGather=*/false, DAG);
-
-  if (IsFixedLength) {
-    if (Index.getSimpleValueType().isFixedLengthVector())
-      Index = convertToScalableVector(DAG, IndexVT, Index);
-    if (BasePtr.getSimpleValueType().isFixedLengthVector())
-      BasePtr = convertToScalableVector(DAG, IndexVT, BasePtr);
-    Mask = convertFixedMaskToScalableVector(Mask, DAG);
-  }
 
   SDValue Ops[] = {Chain, StoreVal, Mask, BasePtr, Index, InputVT};
   return DAG.getNode(Opcode, DL, VTs, Ops);
@@ -5435,6 +5464,36 @@ bool AArch64TargetLowering::useSVEForFixedLengthVectorVT(
 //===----------------------------------------------------------------------===//
 //                      Calling Convention Implementation
 //===----------------------------------------------------------------------===//
+
+static unsigned getIntrinsicID(const SDNode *N) {
+  unsigned Opcode = N->getOpcode();
+  switch (Opcode) {
+  default:
+    return Intrinsic::not_intrinsic;
+  case ISD::INTRINSIC_WO_CHAIN: {
+    unsigned IID = cast<ConstantSDNode>(N->getOperand(0))->getZExtValue();
+    if (IID < Intrinsic::num_intrinsics)
+      return IID;
+    return Intrinsic::not_intrinsic;
+  }
+  }
+}
+
+bool AArch64TargetLowering::isReassocProfitable(SelectionDAG &DAG, SDValue N0,
+                                                SDValue N1) const {
+  if (!N0.hasOneUse())
+    return false;
+
+  unsigned IID = getIntrinsicID(N1.getNode());
+  // Avoid reassociating expressions that can be lowered to smlal/umlal.
+  if (IID == Intrinsic::aarch64_neon_umull ||
+      N1.getOpcode() == AArch64ISD::UMULL ||
+      IID == Intrinsic::aarch64_neon_smull ||
+      N1.getOpcode() == AArch64ISD::SMULL)
+    return N0.getOpcode() != ISD::ADD;
+
+  return true;
+}
 
 /// Selects the correct CCAssignFn for a given CallingConvention value.
 CCAssignFn *AArch64TargetLowering::CCAssignFnForCall(CallingConv::ID CC,
@@ -9942,16 +10001,10 @@ static SDValue GenerateTBL(SDValue Op, ArrayRef<int> ShuffleMask,
     Swap = true;
   }
 
-  SmallVector<SDValue, 8> TBLMask;
-  for (int Val : ShuffleMask) {
-    for (unsigned Byte = 0; Byte < BytesPerElt; ++Byte) {
-      unsigned Offset = Byte + Val * BytesPerElt;
-      if (Swap)
-        Offset = Offset < 16 ? Offset + 16 : Offset - 16;
-      TBLMask.push_back(DAG.getConstant(Offset, DL, MVT::i32));
-    }
-  }
-
+  // If the V2 source is undef or zero then we can use a tbl1, as tbl1 will fill
+  // out of range values with 0s. We do need to make sure that any out-of-range
+  // values are really out-of-range for a v16i8 vector.
+  bool IsUndefOrZero = V2.isUndef() || isZerosVector(V2.getNode());
   MVT IndexVT = MVT::v8i8;
   unsigned IndexLen = 8;
   if (Op.getValueSizeInBits() == 128) {
@@ -9959,13 +10012,23 @@ static SDValue GenerateTBL(SDValue Op, ArrayRef<int> ShuffleMask,
     IndexLen = 16;
   }
 
+  SmallVector<SDValue, 8> TBLMask;
+  for (int Val : ShuffleMask) {
+    for (unsigned Byte = 0; Byte < BytesPerElt; ++Byte) {
+      unsigned Offset = Byte + Val * BytesPerElt;
+      if (Swap)
+        Offset = Offset < IndexLen ? Offset + IndexLen : Offset - IndexLen;
+      if (IsUndefOrZero && Offset >= IndexLen)
+        Offset = 255;
+      TBLMask.push_back(DAG.getConstant(Offset, DL, MVT::i32));
+    }
+  }
+
   SDValue V1Cst = DAG.getNode(ISD::BITCAST, DL, IndexVT, V1);
   SDValue V2Cst = DAG.getNode(ISD::BITCAST, DL, IndexVT, V2);
 
   SDValue Shuffle;
-  // If the V2 source is undef or zero then we can use a tbl1, as tbl1 will fill
-  // out of range values with 0s.
-  if (V2.isUndef() || isZerosVector(V2.getNode())) {
+  if (IsUndefOrZero) {
     if (IndexLen == 8)
       V1Cst = DAG.getNode(ISD::CONCAT_VECTORS, DL, MVT::v16i8, V1Cst, V1Cst);
     Shuffle = DAG.getNode(
@@ -10654,20 +10717,6 @@ static bool isAllConstantBuildVector(const SDValue &PotentialBVec,
       return false;
   ConstVal = FirstElt->getZExtValue();
   return true;
-}
-
-static unsigned getIntrinsicID(const SDNode *N) {
-  unsigned Opcode = N->getOpcode();
-  switch (Opcode) {
-  default:
-    return Intrinsic::not_intrinsic;
-  case ISD::INTRINSIC_WO_CHAIN: {
-    unsigned IID = cast<ConstantSDNode>(N->getOperand(0))->getZExtValue();
-    if (IID < Intrinsic::num_intrinsics)
-      return IID;
-    return Intrinsic::not_intrinsic;
-  }
-  }
 }
 
 // Attempt to form a vector S[LR]I from (or (and X, BvecC1), (lsl Y, C2)),
@@ -11813,8 +11862,7 @@ SDValue AArch64TargetLowering::LowerVSETCC(SDValue Op,
     return DAG.getSExtOrTrunc(Cmp, dl, Op.getValueType());
   }
 
-  const bool FullFP16 =
-    static_cast<const AArch64Subtarget &>(DAG.getSubtarget()).hasFullFP16();
+  const bool FullFP16 = DAG.getSubtarget<AArch64Subtarget>().hasFullFP16();
 
   // Make v4f16 (only) fcmp operations utilise vector instructions
   // v8f16 support will be a litle more complicated
@@ -11948,7 +11996,7 @@ SDValue AArch64TargetLowering::LowerVECREDUCE(SDValue Op,
 
 SDValue AArch64TargetLowering::LowerATOMIC_LOAD_SUB(SDValue Op,
                                                     SelectionDAG &DAG) const {
-  auto &Subtarget = static_cast<const AArch64Subtarget &>(DAG.getSubtarget());
+  auto &Subtarget = DAG.getSubtarget<AArch64Subtarget>();
   if (!Subtarget.hasLSE() && !Subtarget.outlineAtomics())
     return SDValue();
 
@@ -11965,7 +12013,7 @@ SDValue AArch64TargetLowering::LowerATOMIC_LOAD_SUB(SDValue Op,
 
 SDValue AArch64TargetLowering::LowerATOMIC_LOAD_AND(SDValue Op,
                                                     SelectionDAG &DAG) const {
-  auto &Subtarget = static_cast<const AArch64Subtarget &>(DAG.getSubtarget());
+  auto &Subtarget = DAG.getSubtarget<AArch64Subtarget>();
   if (!Subtarget.hasLSE() && !Subtarget.outlineAtomics())
     return SDValue();
 
@@ -12061,8 +12109,8 @@ SDValue AArch64TargetLowering::LowerVSCALE(SDValue Op,
 
   SDLoc DL(Op);
   APInt MulImm = cast<ConstantSDNode>(Op.getOperand(0))->getAPIntValue();
-  return DAG.getZExtOrTrunc(DAG.getVScale(DL, MVT::i64, MulImm.sextOrSelf(64)),
-                            DL, VT);
+  return DAG.getZExtOrTrunc(DAG.getVScale(DL, MVT::i64, MulImm.sext(64)), DL,
+                            VT);
 }
 
 /// Set the IntrinsicInfo for the `aarch64_sve_st<N>` intrinsics.
@@ -12497,6 +12545,11 @@ bool AArch64TargetLowering::shouldSinkOperands(
       }
       LLVM_FALLTHROUGH;
 
+    case Intrinsic::fma:
+      if (cast<VectorType>(I->getType())->getElementType()->isHalfTy() &&
+          !Subtarget->hasFullFP16())
+        return false;
+      LLVM_FALLTHROUGH;
     case Intrinsic::aarch64_neon_sqdmull:
     case Intrinsic::aarch64_neon_sqdmulh:
     case Intrinsic::aarch64_neon_sqrdmulh:
@@ -12520,7 +12573,6 @@ bool AArch64TargetLowering::shouldSinkOperands(
       Ops.push_back(&II->getArgOperandUse(0));
       Ops.push_back(&II->getArgOperandUse(1));
       return true;
-
     default:
       return false;
     }
@@ -14745,8 +14797,7 @@ performExtractVectorEltCombine(SDNode *N, TargetLowering::DAGCombinerInfo &DCI,
   ConstantSDNode *ConstantN1 = dyn_cast<ConstantSDNode>(N1);
 
   EVT VT = N->getValueType(0);
-  const bool FullFP16 =
-      static_cast<const AArch64Subtarget &>(DAG.getSubtarget()).hasFullFP16();
+  const bool FullFP16 = DAG.getSubtarget<AArch64Subtarget>().hasFullFP16();
   bool IsStrict = N0->isStrictFPOpcode();
 
   // Rewrite for pairwise fadd pattern
@@ -15073,7 +15124,7 @@ static SDValue tryCombineFixedPointConvert(SDNode *N,
   else if (Vec.getValueType() == MVT::v2i64)
     VecResTy = MVT::v2f64;
   else
-    llvm_unreachable("unexpected vector type!");
+    return SDValue();
 
   SDValue Convert =
       DAG.getNode(ISD::INTRINSIC_WO_CHAIN, DL, VecResTy, IID, Vec, Shift);
@@ -15957,8 +16008,7 @@ static bool isAllActivePredicate(SelectionDAG &DAG, SDValue N) {
   // If we're compiling for a specific vector-length, we can check if the
   // pattern's VL equals that of the scalable vector at runtime.
   if (N.getOpcode() == AArch64ISD::PTRUE) {
-    const auto &Subtarget =
-        static_cast<const AArch64Subtarget &>(DAG.getSubtarget());
+    const auto &Subtarget = DAG.getSubtarget<AArch64Subtarget>();
     unsigned MinSVESize = Subtarget.getMinSVEVectorSizeInBits();
     unsigned MaxSVESize = Subtarget.getMaxSVEVectorSizeInBits();
     if (MaxSVESize && MinSVESize == MaxSVESize) {
@@ -17179,8 +17229,7 @@ static bool findMoreOptimalIndexType(const MaskedGatherScatterSDNode *N,
       Stride > std::numeric_limits<int32_t>::max())
     return Changed;
 
-  const auto &Subtarget =
-      static_cast<const AArch64Subtarget &>(DAG.getSubtarget());
+  const auto &Subtarget = DAG.getSubtarget<AArch64Subtarget>();
   unsigned MaxVScale =
       Subtarget.getMaxSVEVectorSizeInBits() / AArch64::SVEBitsPerBlock;
   int64_t LastElementOffset =
@@ -17690,6 +17739,47 @@ static SDValue performBRCONDCombine(SDNode *N,
   return SDValue();
 }
 
+static SDValue foldCSELofCTTZ(SDNode *N, SelectionDAG &DAG) {
+  unsigned CC = N->getConstantOperandVal(2);
+  SDValue SUBS = N->getOperand(3);
+  SDValue Zero, CTTZ;
+
+  if (CC == AArch64CC::EQ && SUBS.getOpcode() == AArch64ISD::SUBS) {
+    Zero = N->getOperand(0);
+    CTTZ = N->getOperand(1);
+  } else if (CC == AArch64CC::NE && SUBS.getOpcode() == AArch64ISD::SUBS) {
+    Zero = N->getOperand(1);
+    CTTZ = N->getOperand(0);
+  } else
+    return SDValue();
+
+  if ((CTTZ.getOpcode() != ISD::CTTZ && CTTZ.getOpcode() != ISD::TRUNCATE) ||
+      (CTTZ.getOpcode() == ISD::TRUNCATE &&
+       CTTZ.getOperand(0).getOpcode() != ISD::CTTZ))
+    return SDValue();
+
+  assert((CTTZ.getValueType() == MVT::i32 || CTTZ.getValueType() == MVT::i64) &&
+         "Illegal type in CTTZ folding");
+
+  if (!isNullConstant(Zero) || !isNullConstant(SUBS.getOperand(1)))
+    return SDValue();
+
+  SDValue X = CTTZ.getOpcode() == ISD::TRUNCATE
+                  ? CTTZ.getOperand(0).getOperand(0)
+                  : CTTZ.getOperand(0);
+
+  if (X != SUBS.getOperand(0))
+    return SDValue();
+
+  unsigned BitWidth = CTTZ.getOpcode() == ISD::TRUNCATE
+                          ? CTTZ.getOperand(0).getValueSizeInBits()
+                          : CTTZ.getValueSizeInBits();
+  SDValue BitWidthMinusOne =
+      DAG.getConstant(BitWidth - 1, SDLoc(N), CTTZ.getValueType());
+  return DAG.getNode(ISD::AND, SDLoc(N), CTTZ.getValueType(), CTTZ,
+                     BitWidthMinusOne);
+}
+
 // Optimize CSEL instructions
 static SDValue performCSELCombine(SDNode *N,
                                   TargetLowering::DAGCombinerInfo &DCI,
@@ -17697,6 +17787,11 @@ static SDValue performCSELCombine(SDNode *N,
   // CSEL x, x, cc -> x
   if (N->getOperand(0) == N->getOperand(1))
     return N->getOperand(0);
+
+  // CSEL 0, cttz(X), eq(X, 0) -> AND cttz bitwidth-1
+  // CSEL cttz(X), 0, ne(X, 0) -> AND cttz bitwidth-1
+  if (SDValue Folded = foldCSELofCTTZ(N, DAG))
+		return Folded;
 
   return performCONDCombine(N, DCI, DAG, 2, 3);
 }
@@ -20121,8 +20216,7 @@ static SDValue getPredicateForFixedLengthVector(SelectionDAG &DAG, SDLoc &DL,
   // For vectors that are exactly getMaxSVEVectorSizeInBits big, we can use
   // AArch64SVEPredPattern::all, which can enable the use of unpredicated
   // variants of instructions when available.
-  const auto &Subtarget =
-      static_cast<const AArch64Subtarget &>(DAG.getSubtarget());
+  const auto &Subtarget = DAG.getSubtarget<AArch64Subtarget>();
   unsigned MinSVESize = Subtarget.getMinSVEVectorSizeInBits();
   unsigned MaxSVESize = Subtarget.getMaxSVEVectorSizeInBits();
   if (MaxSVESize && MinSVESize == MaxSVESize &&

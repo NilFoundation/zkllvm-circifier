@@ -424,12 +424,8 @@ def warn_ignoring_verify_debuginfo_preserve_export : Warning<
   "ignoring -fverify-debuginfo-preserve-export=%0 because "
   "-fverify-debuginfo-preserve wasn't enabled">,
   InGroup<UnusedCommandLineArgument>;
-def err_invalid_branch_protection: Error <
-  "invalid branch protection option '%0' in '%1'">;
 def warn_unsupported_branch_protection: Warning <
   "invalid branch protection option '%0' in '%1'">, InGroup<BranchProtection>;
-def err_invalid_sls_hardening : Error<
-  "invalid sls hardening option '%0' in '%1'">;
 def err_sls_hardening_arm_not_supported : Error<
   "-mharden-sls is only supported on armv7-a or later">;
 
@@ -546,8 +542,8 @@ def warn_drv_unable_to_find_directory_expected : Warning<
   "unable to find %0 directory, expected to be in '%1'">,
   InGroup<InvalidOrNonExistentDirectory>, DefaultIgnore;
 
-def warn_drv_ps4_force_pic : Warning<
-  "option '%0' was ignored by the PS4 toolchain, using '-fPIC'">,
+def warn_drv_ps_force_pic : Warning<
+  "option '%0' was ignored by the %1 toolchain, using '-fPIC'">,
   InGroup<OptionIgnored>;
 
 def warn_drv_ps_sdk_dir : Warning<

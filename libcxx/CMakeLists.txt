@@ -221,12 +221,6 @@ endif()
 
 set(LIBCXX_SUPPORTED_ABI_LIBRARIES none libcxxabi system-libcxxabi libcxxrt libstdc++ libsupc++ vcruntime)
 set(LIBCXX_CXX_ABI "${LIBCXX_DEFAULT_ABI_LIBRARY}" CACHE STRING "Specify C++ ABI library to use. Supported values are ${LIBCXX_SUPPORTED_ABI_LIBRARIES}.")
-
-# Temporary to still accept existing CMake caches that contain "default" as the value
-if (LIBCXX_CXX_ABI STREQUAL "default")
-  set(LIBCXX_CXX_ABI "${LIBCXX_DEFAULT_ABI_LIBRARY}")
-endif()
-
 if (NOT "${LIBCXX_CXX_ABI}" IN_LIST LIBCXX_SUPPORTED_ABI_LIBRARIES)
   message(FATAL_ERROR "Unsupported C++ ABI library: '${LIBCXX_CXX_ABI}'. Supported values are ${LIBCXX_SUPPORTED_ABI_LIBRARIES}.")
 endif()
@@ -237,11 +231,11 @@ option(LIBCXX_ENABLE_STATIC_ABI_LIBRARY
 
 cmake_dependent_option(LIBCXX_STATICALLY_LINK_ABI_IN_STATIC_LIBRARY
   "Statically link the ABI library to static library" ON
-  "LIBCXX_ENABLE_STATIC_ABI_LIBRARY;LIBCXX_ENABLE_STATIC" OFF)
+  "LIBCXX_ENABLE_STATIC_ABI_LIBRARY" OFF)
 
 cmake_dependent_option(LIBCXX_STATICALLY_LINK_ABI_IN_SHARED_LIBRARY
   "Statically link the ABI library to shared library" ON
-  "LIBCXX_ENABLE_STATIC_ABI_LIBRARY;LIBCXX_ENABLE_SHARED" OFF)
+  "LIBCXX_ENABLE_STATIC_ABI_LIBRARY" OFF)
 
 # Generate and install a linker script inplace of libc++.so. The linker script
 # will link libc++ to the correct ABI library. This option is on by default
@@ -315,8 +309,12 @@ endif()
 option(LIBCXX_CONFIGURE_IDE "Configure libcxx for use within an IDE"
       ${LIBCXX_CONFIGURE_IDE_DEFAULT})
 
+set(LIBCXX_HERMETIC_STATIC_LIBRARY_DEFAULT OFF)
+if (WIN32)
+  set(LIBCXX_HERMETIC_STATIC_LIBRARY_DEFAULT ON)
+endif()
 option(LIBCXX_HERMETIC_STATIC_LIBRARY
-  "Do not export any symbols from the static library." OFF)
+  "Do not export any symbols from the static library." ${LIBCXX_HERMETIC_STATIC_LIBRARY_DEFAULT})
 
 #===============================================================================
 # Check option configurations
@@ -629,9 +627,6 @@ function(cxx_add_warning_flags target)
   endif()
   if (LIBCXX_ENABLE_PEDANTIC)
     target_add_compile_flags_if_supported(${target} PRIVATE -pedantic)
-  endif()
-  if (LIBCXX_DISABLE_MACRO_CONFLICT_WARNINGS)
-    target_compile_definitions(${target} PRIVATE -D_LIBCPP_DISABLE_MACRO_CONFLICT_WARNINGS)
   endif()
 endfunction()
 

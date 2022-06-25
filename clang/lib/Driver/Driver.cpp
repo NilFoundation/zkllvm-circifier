@@ -6023,6 +6023,9 @@ const ToolChain &Driver::getToolChain(const ArgList &Args,
       case llvm::Triple::wasm64:
         TC = std::make_unique<toolchains::WebAssembly>(*this, Target, Args);
         break;
+      case llvm::Triple::evm:
+        TC = std::make_unique<toolchains::EVM>(*this, Target, Args);
+        break;
       case llvm::Triple::avr:
         TC = std::make_unique<toolchains::AVRToolChain>(*this, Target, Args);
         break;

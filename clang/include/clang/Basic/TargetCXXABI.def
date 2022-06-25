@@ -103,6 +103,9 @@ ITANIUM_CXXABI(GenericMIPS, "mips")
 /// of these details is necessarily final yet.
 ITANIUM_CXXABI(WebAssembly, "webassembly")
 
+/// TODO: copied from wasm
+ITANIUM_CXXABI(EVM, "evm")
+
 /// The Fuchsia ABI is a modified version of the Itanium ABI.
 ///
 /// The relevant changes from the Itanium ABI are:

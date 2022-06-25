@@ -984,21 +984,15 @@ public:
 
 // EVM target
 template <typename Target>
-class LLVM_LIBRARY_VISIBILITY EVMOSTargetInfo
-    : public OSTargetInfo<Target> {
+class LLVM_LIBRARY_VISIBILITY EVMOSTargetInfo : public OSTargetInfo<Target> {
 protected:
   void getOSDefines(const LangOptions &Opts, const llvm::Triple &Triple,
                     MacroBuilder &Builder) const override {
   }
 
 public:
-  explicit EVMOSTargetInfo(const llvm::Triple &Triple,
-                                   const TargetOptions &Opts)
-      : OSTargetInfo<Target>(Triple, Opts) {
-    this->MCountName = "__mcount";
-    this->TheCXXABI.set(TargetCXXABI::EVM);
-    this->HasFloat128 = true;
-  }
+  EVMOSTargetInfo(const llvm::Triple &Triple, const TargetOptions &Opts)
+      : OSTargetInfo<Target>(Triple, Opts) {}
 };
 
 } // namespace targets

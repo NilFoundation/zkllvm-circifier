@@ -50,6 +50,7 @@
 #include "ToolChains/TCE.h"
 #include "ToolChains/VEToolchain.h"
 #include "ToolChains/WebAssembly.h"
+#include "ToolChains/EVM.h"
 #include "ToolChains/XCore.h"
 #include "ToolChains/ZOS.h"
 #include "clang/Basic/TargetID.h"

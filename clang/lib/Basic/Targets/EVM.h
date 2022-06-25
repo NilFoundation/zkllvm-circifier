@@ -82,6 +82,11 @@ public:
 
   ArrayRef<Builtin::Info> getTargetBuiltins() const override;
 
+  bool validateAsmConstraint(const char *&Name,
+                             TargetInfo::ConstraintInfo &Info) const final {
+    return false;
+  }
+  
   const char *getClobbers() const override { return ""; }
 
   BuiltinVaListKind getBuiltinVaListKind() const override {

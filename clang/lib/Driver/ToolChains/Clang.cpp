@@ -323,7 +323,7 @@ static void getWebAssemblyTargetFeatures(const ArgList &Args,
 
 static void getEVMTargetFeatures(const ArgList &Args,
                                          std::vector<StringRef> &Features) {
-  handleTargetFeaturesGroup(Args, Features, options::OPT_m_evm_Features_Group);
+  // handleTargetFeaturesGroup(Args, Features, options::OPT_m_evm_Features_Group);
 }
 
 static void getTargetFeatures(const Driver &D, const llvm::Triple &Triple,

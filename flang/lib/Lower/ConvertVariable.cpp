@@ -22,10 +22,10 @@
 #include "flang/Lower/StatementContext.h"
 #include "flang/Lower/Support/Utils.h"
 #include "flang/Lower/SymbolMap.h"
-#include "flang/Lower/Todo.h"
 #include "flang/Optimizer/Builder/Character.h"
 #include "flang/Optimizer/Builder/FIRBuilder.h"
 #include "flang/Optimizer/Builder/Runtime/Derived.h"
+#include "flang/Optimizer/Builder/Todo.h"
 #include "flang/Optimizer/Dialect/FIRAttr.h"
 #include "flang/Optimizer/Dialect/FIRDialect.h"
 #include "flang/Optimizer/Dialect/FIROps.h"
@@ -460,12 +460,21 @@ static fir::GlobalOp defineGlobal(Fortran::lower::AbstractConverter &converter,
     TODO(loc, "global"); // Procedure pointer or something else
   }
   // Creates undefined initializer for globals without initializers
-  if (!globalIsInitialized(global))
+  if (!globalIsInitialized(global)) {
+    // TODO: Is it really required to add the undef init if the Public
+    // visibility is set ? We need to make sure the global is not optimized out
+    // by LLVM if unused in the current compilation unit, but at least for
+    // BIND(C) variables, an initial value may be given in another compilation
+    // unit (on the C side), and setting an undef init here creates linkage
+    // conflicts.
+    if (sym.attrs().test(Fortran::semantics::Attr::BIND_C))
+      TODO(loc, "BIND(C) module variable linkage");
     createGlobalInitialization(
         builder, global, [&](fir::FirOpBuilder &builder) {
           builder.create<fir::HasValueOp>(
               loc, builder.create<fir::UndefOp>(loc, symTy));
         });
+  }
   // Set public visibility to prevent global definition to be optimized out
   // even if they have no initializer and are unused in this compilation unit.
   global.setVisibility(mlir::SymbolTable::Visibility::Public);
@@ -1090,7 +1099,7 @@ static mlir::Value computeExtent(fir::FirOpBuilder &builder, mlir::Location loc,
   auto diff = builder.create<mlir::arith::SubIOp>(loc, idxTy, ub, lb);
   mlir::Value one = builder.createIntegerConstant(loc, idxTy, 1);
   auto rawExtent = builder.create<mlir::arith::AddIOp>(loc, idxTy, diff, one);
-  return Fortran::lower::genMaxWithZero(builder, loc, rawExtent);
+  return fir::factory::genMaxWithZero(builder, loc, rawExtent);
 }
 
 /// Lower explicit lower bounds into \p result. Does nothing if this is not an
@@ -1145,7 +1154,7 @@ lowerExplicitExtents(Fortran::lower::AbstractConverter &converter,
       mlir::Value ub = builder.createConvert(
           loc, idxTy, genScalarValue(converter, loc, expr, symMap, stmtCtx));
       if (lowerBounds.empty())
-        result.emplace_back(Fortran::lower::genMaxWithZero(builder, loc, ub));
+        result.emplace_back(fir::factory::genMaxWithZero(builder, loc, ub));
       else
         result.emplace_back(
             computeExtent(builder, loc, lowerBounds[spec.index()], ub));
@@ -1173,7 +1182,7 @@ lowerExplicitCharLen(Fortran::lower::AbstractConverter &converter,
   if (llvm::Optional<Fortran::lower::SomeExpr> lenExpr = box.getCharLenExpr())
     // If the length expression is negative, the length is zero. See F2018
     // 7.4.4.2 point 5.
-    return Fortran::lower::genMaxWithZero(
+    return fir::factory::genMaxWithZero(
         builder, loc,
         genScalarValue(converter, loc, *lenExpr, symMap, stmtCtx));
   return mlir::Value{};
@@ -1338,7 +1347,7 @@ void Fortran::lower::mapSymbolAttributes(
         Fortran::lower::SomeExpr highEx{*high};
         mlir::Value ub = genValue(highEx);
         ub = builder.createConvert(loc, idxTy, ub);
-        shapes.emplace_back(genMaxWithZero(builder, loc, ub));
+        shapes.emplace_back(fir::factory::genMaxWithZero(builder, loc, ub));
       } else if (spec->ubound().isColon()) {
         assert(box && "assumed bounds require a descriptor");
         mlir::Value dim =
@@ -1409,7 +1418,7 @@ void Fortran::lower::mapSymbolAttributes(
     mlir::Value rawLen = genValue(*charLen);
     // If the length expression is negative, the length is zero. See
     // F2018 7.4.4.2 point 5.
-    return genMaxWithZero(builder, loc, rawLen);
+    return fir::factory::genMaxWithZero(builder, loc, rawLen);
   };
 
   ba.match(

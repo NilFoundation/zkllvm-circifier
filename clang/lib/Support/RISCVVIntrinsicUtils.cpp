@@ -213,7 +213,7 @@ void RVVType::initBuiltinStr() {
       BuiltinStr += "*";
     return;
   }
-  BuiltinStr = "q" + utostr(Scale.getValue()) + BuiltinStr;
+  BuiltinStr = "q" + utostr(*Scale) + BuiltinStr;
   // Pointer to vector types. Defined for segment load intrinsics.
   // segment load intrinsics have pointer type arguments to store the loaded
   // vector values.
@@ -228,7 +228,7 @@ void RVVType::initClangBuiltinStr() {
   ClangBuiltinStr = "__rvv_";
   switch (ScalarType) {
   case ScalarTypeKind::Boolean:
-    ClangBuiltinStr += "bool" + utostr(64 / Scale.getValue()) + "_t";
+    ClangBuiltinStr += "bool" + utostr(64 / *Scale) + "_t";
     return;
   case ScalarTypeKind::Float:
     ClangBuiltinStr += "float";
@@ -282,7 +282,7 @@ void RVVType::initTypeStr() {
     else
       // Vector bool is special case, the formulate is
       // `vbool<N>_t = MVT::nxv<64/N>i1` ex. vbool16_t = MVT::4i1
-      Str += "vbool" + utostr(64 / Scale.getValue()) + "_t";
+      Str += "vbool" + utostr(64 / *Scale) + "_t";
     break;
   case ScalarTypeKind::Float:
     if (isScalar()) {
@@ -314,7 +314,7 @@ void RVVType::initShortStr() {
   switch (ScalarType) {
   case ScalarTypeKind::Boolean:
     assert(isVector());
-    ShortStr = "b" + utostr(64 / Scale.getValue());
+    ShortStr = "b" + utostr(64 / *Scale);
     return;
   case ScalarTypeKind::Float:
     ShortStr = "f" + utostr(ElementBitwidth);
@@ -791,13 +791,13 @@ void RVVType::applyFixedLog2LMUL(int Log2LMUL, enum FixedLMULType Type) {
 
 Optional<RVVTypes>
 RVVType::computeTypes(BasicType BT, int Log2LMUL, unsigned NF,
-                      ArrayRef<PrototypeDescriptor> PrototypeSeq) {
+                      ArrayRef<PrototypeDescriptor> Prototype) {
   // LMUL x NF must be less than or equal to 8.
   if ((Log2LMUL >= 1) && (1 << Log2LMUL) * NF > 8)
     return llvm::None;
 
   RVVTypes Types;
-  for (const PrototypeDescriptor &Proto : PrototypeSeq) {
+  for (const PrototypeDescriptor &Proto : Prototype) {
     auto T = computeType(BT, Log2LMUL, Proto);
     if (!T.hasValue())
       return llvm::None;
@@ -847,8 +847,8 @@ Optional<RVVTypePtr> RVVType::computeType(BasicType BT, int Log2LMUL,
 // RVVIntrinsic implementation
 //===----------------------------------------------------------------------===//
 RVVIntrinsic::RVVIntrinsic(
-    StringRef NewName, StringRef Suffix, StringRef NewMangledName,
-    StringRef MangledSuffix, StringRef IRName, bool IsMasked,
+    StringRef NewName, StringRef Suffix, StringRef NewOverloadedName,
+    StringRef OverloadedSuffix, StringRef IRName, bool IsMasked,
     bool HasMaskedOffOperand, bool HasVL, PolicyScheme Scheme,
     bool HasUnMaskedOverloaded, bool HasBuiltinAlias, StringRef ManualCodegen,
     const RVVTypes &OutInTypes, const std::vector<int64_t> &NewIntrinsicTypes,
@@ -858,17 +858,17 @@ RVVIntrinsic::RVVIntrinsic(
       HasBuiltinAlias(HasBuiltinAlias), ManualCodegen(ManualCodegen.str()),
       NF(NF) {
 
-  // Init BuiltinName, Name and MangledName
+  // Init BuiltinName, Name and OverloadedName
   BuiltinName = NewName.str();
   Name = BuiltinName;
-  if (NewMangledName.empty())
-    MangledName = NewName.split("_").first.str();
+  if (NewOverloadedName.empty())
+    OverloadedName = NewName.split("_").first.str();
   else
-    MangledName = NewMangledName.str();
+    OverloadedName = NewOverloadedName.str();
   if (!Suffix.empty())
     Name += "_" + Suffix.str();
-  if (!MangledSuffix.empty())
-    MangledName += "_" + MangledSuffix.str();
+  if (!OverloadedSuffix.empty())
+    OverloadedName += "_" + OverloadedSuffix.str();
   if (IsMasked) {
     BuiltinName += "_m";
     Name += "_m";
@@ -926,7 +926,7 @@ std::string RVVIntrinsic::getSuffixStr(
   SmallVector<std::string> SuffixStrs;
   for (auto PD : PrototypeDescriptors) {
     auto T = RVVType::computeType(Type, Log2LMUL, PD);
-    SuffixStrs.push_back(T.getValue()->getShortStr());
+    SuffixStrs.push_back((*T)->getShortStr());
   }
   return join(SuffixStrs, "_");
 }

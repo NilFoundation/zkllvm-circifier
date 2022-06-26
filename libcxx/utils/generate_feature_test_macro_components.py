@@ -176,7 +176,6 @@ feature_test_macros = [ add_version_header(x) for x in [
     "name": "__cpp_lib_boyer_moore_searcher",
     "values": { "c++17": 201603 },
     "headers": ["functional"],
-    "unimplemented": True,
   }, {
     "name": "__cpp_lib_byte",
     "values": { "c++17": 201603 },
@@ -330,8 +329,9 @@ feature_test_macros = [ add_version_header(x) for x in [
   }, {
     "name": "__cpp_lib_hardware_interference_size",
     "values": { "c++17": 201703 },
+    "test_suite_guard": "defined(__GCC_DESTRUCTIVE_SIZE) && defined(__GCC_CONSTRUCTIVE_SIZE)",
+    "libcxx_guard": "defined(__GCC_DESTRUCTIVE_SIZE) && defined(__GCC_CONSTRUCTIVE_SIZE)",
     "headers": ["new"],
-    "unimplemented": True,
   }, {
     "name": "__cpp_lib_has_unique_object_representations",
     "values": { "c++17": 201606 },
@@ -471,10 +471,6 @@ feature_test_macros = [ add_version_header(x) for x in [
     "headers": ["memory_resource"],
     "unimplemented": True,
   }, {
-    "name": "__cpp_lib_monadic_optional",
-    "values": { "c++2b": 202110 },
-    "headers": ["optional"],
-  }, {
     "name": "__cpp_lib_move_only_function",
     "values": { "c++2b": 202110 },
     "headers": ["functional"],
@@ -497,7 +493,7 @@ feature_test_macros = [ add_version_header(x) for x in [
     "headers": ["iterator"],
   }, {
     "name": "__cpp_lib_optional",
-    "values": { "c++17": 201606 },
+    "values": { "c++17": 201606, "c++2b": 202110 },
     "headers": ["optional"],
   }, {
     "name": "__cpp_lib_out_ptr",

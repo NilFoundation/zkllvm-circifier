@@ -15,7 +15,6 @@ struct LogicalResult;
 class ModuleOp;
 
 namespace bufferization {
-struct BufferizationState;
 class OneShotAnalysisState;
 struct OneShotBufferizationOptions;
 
@@ -32,9 +31,9 @@ LogicalResult bufferizeModuleOp(ModuleOp moduleOp,
 /// function call analysis to determine which function arguments are
 /// inplaceable. Then analyzes and bufferizes FuncOps one-by-one with One-Shot
 /// Bufferize.
-LogicalResult
-runOneShotModuleBufferize(ModuleOp moduleOp,
-                          bufferization::OneShotBufferizationOptions options);
+LogicalResult runOneShotModuleBufferize(
+    ModuleOp moduleOp,
+    const bufferization::OneShotBufferizationOptions &options);
 
 } // namespace bufferization
 } // namespace mlir

@@ -83,14 +83,16 @@ static inline uint64_t checkedMul(uint64_t lhs, uint64_t rhs) {
 // to track down whether an error is coming from our code vs somewhere else
 // in MLIR.)
 #define FATAL(...)                                                             \
-  {                                                                            \
+  do {                                                                         \
     fprintf(stderr, "SparseTensorUtils: " __VA_ARGS__);                        \
     exit(1);                                                                   \
-  }
+  } while (0)
 
-// TODO: adjust this so it can be used by `openSparseTensorCOO` too.
-// That version doesn't have the permutation, and the `dimSizes` are
-// a pointer/C-array rather than `std::vector`.
+// TODO: try to unify this with `SparseTensorFile::assertMatchesShape`
+// which is used by `openSparseTensorCOO`.  It's easy enough to resolve
+// the `std::vector` vs pointer mismatch for `dimSizes`; but it's trickier
+// to resolve the presence/absence of `perm` (without introducing extra
+// overhead), so perhaps the code duplication is unavoidable.
 //
 /// Asserts that the `dimSizes` (in target-order) under the `perm` (mapping
 /// semantic-order to target-order) are a refinement of the desired `shape`
@@ -450,21 +452,21 @@ public:
                       const uint64_t *perm, const DimLevelType *sparsity,
                       const SparseTensorStorageBase &tensor);
 
-  ~SparseTensorStorage() final override = default;
+  ~SparseTensorStorage() final = default;
 
   /// Partially specialize these getter methods based on template types.
-  void getPointers(std::vector<P> **out, uint64_t d) final override {
+  void getPointers(std::vector<P> **out, uint64_t d) final {
     assert(d < getRank());
     *out = &pointers[d];
   }
-  void getIndices(std::vector<I> **out, uint64_t d) final override {
+  void getIndices(std::vector<I> **out, uint64_t d) final {
     assert(d < getRank());
     *out = &indices[d];
   }
-  void getValues(std::vector<V> **out) final override { *out = &values; }
+  void getValues(std::vector<V> **out) final { *out = &values; }
 
   /// Partially specialize lexicographical insertions based on template types.
-  void lexInsert(const uint64_t *cursor, V val) final override {
+  void lexInsert(const uint64_t *cursor, V val) final {
     // First, wrap up pending insertion path.
     uint64_t diff = 0;
     uint64_t top = 0;
@@ -481,7 +483,7 @@ public:
   /// Note that this method resets the values/filled-switch array back
   /// to all-zero/false while only iterating over the nonzero elements.
   void expInsert(uint64_t *cursor, V *values, bool *filled, uint64_t *added,
-                 uint64_t count) final override {
+                 uint64_t count) final {
     if (count == 0)
       return;
     // Sort.
@@ -507,7 +509,7 @@ public:
   }
 
   /// Finalizes lexicographic insertions.
-  void endInsert() final override {
+  void endInsert() final {
     if (values.empty())
       finalizeSegment(0);
     else
@@ -515,7 +517,7 @@ public:
   }
 
   void newEnumerator(SparseTensorEnumeratorBase<V> **out, uint64_t rank,
-                     const uint64_t *perm) const final override {
+                     const uint64_t *perm) const final {
     *out = new SparseTensorEnumerator<P, I, V>(*this, rank, perm);
   }
 
@@ -867,25 +869,25 @@ private:
     } else if (src.isCompressedDim(d)) {
       // Look up the bounds of the `d`-level segment determined by the
       // `d-1`-level position `parentPos`.
-      const std::vector<P> &pointers_d = src.pointers[d];
-      assert(parentPos + 1 < pointers_d.size() &&
+      const std::vector<P> &pointersD = src.pointers[d];
+      assert(parentPos + 1 < pointersD.size() &&
              "Parent pointer position is out of bounds");
-      const uint64_t pstart = static_cast<uint64_t>(pointers_d[parentPos]);
-      const uint64_t pstop = static_cast<uint64_t>(pointers_d[parentPos + 1]);
+      const uint64_t pstart = static_cast<uint64_t>(pointersD[parentPos]);
+      const uint64_t pstop = static_cast<uint64_t>(pointersD[parentPos + 1]);
       // Loop-invariant code for looking up the `d`-level coordinates/indices.
-      const std::vector<I> &indices_d = src.indices[d];
-      assert(pstop <= indices_d.size() && "Index position is out of bounds");
-      uint64_t &cursor_reord_d = this->cursor[this->reord[d]];
+      const std::vector<I> &indicesD = src.indices[d];
+      assert(pstop <= indicesD.size() && "Index position is out of bounds");
+      uint64_t &cursorReordD = this->cursor[this->reord[d]];
       for (uint64_t pos = pstart; pos < pstop; pos++) {
-        cursor_reord_d = static_cast<uint64_t>(indices_d[pos]);
+        cursorReordD = static_cast<uint64_t>(indicesD[pos]);
         forallElements(yield, pos, d + 1);
       }
     } else { // Dense dimension.
       const uint64_t sz = src.getDimSizes()[d];
       const uint64_t pstart = parentPos * sz;
-      uint64_t &cursor_reord_d = this->cursor[this->reord[d]];
+      uint64_t &cursorReordD = this->cursor[this->reord[d]];
       for (uint64_t i = 0; i < sz; i++) {
-        cursor_reord_d = i;
+        cursorReordD = i;
         forallElements(yield, pstart + i, d + 1);
       }
     }
@@ -1099,9 +1101,140 @@ static char *toLower(char *token) {
   return token;
 }
 
+/// This class abstracts over the information stored in file headers,
+/// as well as providing the buffers and methods for parsing those headers.
+class SparseTensorFile final {
+public:
+  enum class ValueKind {
+    kInvalid = 0,
+    kPattern = 1,
+    kReal = 2,
+    kInteger = 3,
+    kComplex = 4,
+    kUndefined = 5
+  };
+
+  explicit SparseTensorFile(char *filename) : filename(filename) {
+    assert(filename && "Received nullptr for filename");
+  }
+
+  // Disallows copying, to avoid duplicating the `file` pointer.
+  SparseTensorFile(const SparseTensorFile &) = delete;
+  SparseTensorFile &operator=(const SparseTensorFile &) = delete;
+
+  // This dtor tries to avoid leaking the `file`.  (Though it's better
+  // to call `closeFile` explicitly when possible, since there are
+  // circumstances where dtors are not called reliably.)
+  ~SparseTensorFile() { closeFile(); }
+
+  /// Opens the file for reading.
+  void openFile() {
+    if (file)
+      FATAL("Already opened file %s\n", filename);
+    file = fopen(filename, "r");
+    if (!file)
+      FATAL("Cannot find file %s\n", filename);
+  }
+
+  /// Closes the file.
+  void closeFile() {
+    if (file) {
+      fclose(file);
+      file = nullptr;
+    }
+  }
+
+  // TODO(wrengr/bixia): figure out how to reorganize the element-parsing
+  // loop of `openSparseTensorCOO` into methods of this class, so we can
+  // avoid leaking access to the `line` pointer (both for general hygiene
+  // and because we can't mark it const due to the second argument of
+  // `strtoul`/`strtoud` being `char * *restrict` rather than
+  // `char const* *restrict`).
+  //
+  /// Attempts to read a line from the file.
+  char *readLine() {
+    if (fgets(line, kColWidth, file))
+      return line;
+    FATAL("Cannot read next line of %s\n", filename);
+  }
+
+  /// Reads and parses the file's header.
+  void readHeader() {
+    assert(file && "Attempt to readHeader() before openFile()");
+    if (strstr(filename, ".mtx"))
+      readMMEHeader();
+    else if (strstr(filename, ".tns"))
+      readExtFROSTTHeader();
+    else
+      FATAL("Unknown format %s\n", filename);
+    assert(isValid() && "Failed to read the header");
+  }
+
+  ValueKind getValueKind() const { return valueKind_; }
+
+  bool isValid() const { return valueKind_ != ValueKind::kInvalid; }
+
+  /// Gets the MME "pattern" property setting.  Is only valid after
+  /// parsing the header.
+  bool isPattern() const {
+    assert(isValid() && "Attempt to isPattern() before readHeader()");
+    return valueKind_ == ValueKind::kPattern;
+  }
+
+  /// Gets the MME "symmetric" property setting.  Is only valid after
+  /// parsing the header.
+  bool isSymmetric() const {
+    assert(isValid() && "Attempt to isSymmetric() before readHeader()");
+    return isSymmetric_;
+  }
+
+  /// Gets the rank of the tensor.  Is only valid after parsing the header.
+  uint64_t getRank() const {
+    assert(isValid() && "Attempt to getRank() before readHeader()");
+    return idata[0];
+  }
+
+  /// Gets the number of non-zeros.  Is only valid after parsing the header.
+  uint64_t getNNZ() const {
+    assert(isValid() && "Attempt to getNNZ() before readHeader()");
+    return idata[1];
+  }
+
+  /// Gets the dimension-sizes array.  The pointer itself is always
+  /// valid; however, the values stored therein are only valid after
+  /// parsing the header.
+  const uint64_t *getDimSizes() const { return idata + 2; }
+
+  /// Safely gets the size of the given dimension.  Is only valid
+  /// after parsing the header.
+  uint64_t getDimSize(uint64_t d) const {
+    assert(d < getRank());
+    return idata[2 + d];
+  }
+
+  /// Asserts the shape subsumes the actual dimension sizes.  Is only
+  /// valid after parsing the header.
+  void assertMatchesShape(uint64_t rank, const uint64_t *shape) const {
+    assert(rank == getRank() && "Rank mismatch");
+    for (uint64_t r = 0; r < rank; r++)
+      assert((shape[r] == 0 || shape[r] == idata[2 + r]) &&
+             "Dimension size mismatch");
+  }
+
+private:
+  void readMMEHeader();
+  void readExtFROSTTHeader();
+
+  const char *filename;
+  FILE *file = nullptr;
+  ValueKind valueKind_ = ValueKind::kInvalid;
+  bool isSymmetric_ = false;
+  uint64_t idata[512];
+  char line[kColWidth];
+};
+
 /// Read the MME header of a general sparse matrix of type real.
-static void readMMEHeader(FILE *file, char *filename, char *line,
-                          uint64_t *idata, bool *isPattern, bool *isSymmetric) {
+void SparseTensorFile::readMMEHeader() {
   char header[64];
   char object[64];
   char format[64];
@@ -1111,20 +1244,29 @@ static void readMMEHeader(FILE *file, char *filename, char *line,
   if (fscanf(file, "%63s %63s %63s %63s %63s\n", header, object, format, field,
              symmetry) != 5)
     FATAL("Corrupt header in %s\n", filename);
-  // Set properties
-  *isPattern = (strcmp(toLower(field), "pattern") == 0);
-  *isSymmetric = (strcmp(toLower(symmetry), "symmetric") == 0);
+  // Process `field`, which specify pattern or the data type of the values.
+  if (strcmp(toLower(field), "pattern") == 0)
+    valueKind_ = ValueKind::kPattern;
+  else if (strcmp(toLower(field), "real") == 0)
+    valueKind_ = ValueKind::kReal;
+  else if (strcmp(toLower(field), "integer") == 0)
+    valueKind_ = ValueKind::kInteger;
+  else if (strcmp(toLower(field), "complex") == 0)
+    valueKind_ = ValueKind::kComplex;
+  else
+    FATAL("Unexpected header field value in %s\n", filename);
+
+  // Set properties.
+  isSymmetric_ = (strcmp(toLower(symmetry), "symmetric") == 0);
   // Make sure this is a general sparse matrix.
   if (strcmp(toLower(header), "%%matrixmarket") ||
       strcmp(toLower(object), "matrix") ||
       strcmp(toLower(format), "coordinate") ||
-      (strcmp(toLower(field), "real") && !(*isPattern)) ||
-      (strcmp(toLower(symmetry), "general") && !(*isSymmetric)))
+      (strcmp(toLower(symmetry), "general") && !isSymmetric_))
     FATAL("Cannot find a general sparse matrix in %s\n", filename);
   // Skip comments.
   while (true) {
-    if (!fgets(line, kColWidth, file))
-      FATAL("Cannot find data in %s\n", filename);
+    readLine();
     if (line[0] != '%')
       break;
   }
@@ -1139,12 +1281,10 @@ static void readMMEHeader(FILE *file, char *filename, char *line,
 /// format, we assume that the file starts with optional comments followed
 /// by two lines that define the rank, the number of nonzeros, and the
 /// dimensions sizes (one per rank) of the sparse tensor.
-static void readExtFROSTTHeader(FILE *file, char *filename, char *line,
-                                uint64_t *idata) {
+void SparseTensorFile::readExtFROSTTHeader() {
   // Skip comments.
   while (true) {
-    if (!fgets(line, kColWidth, file))
-      FATAL("Cannot find data in %s\n", filename);
+    readLine();
     if (line[0] != '#')
       break;
   }
@@ -1155,66 +1295,100 @@ static void readExtFROSTTHeader(FILE *file, char *filename, char *line,
   for (uint64_t r = 0; r < idata[0]; r++)
     if (fscanf(file, "%" PRIu64, idata + 2 + r) != 1)
       FATAL("Cannot find dimension size %s\n", filename);
-  fgets(line, kColWidth, file); // end of line
+  readLine(); // end of line
+  // The FROSTT format does not define the data type of the nonzero elements.
+  valueKind_ = ValueKind::kUndefined;
+}
+
+// Adds a value to a tensor in coordinate scheme. If is_symmetric_value is true,
+// also adds the value to its symmetric location.
+template <typename T, typename V>
+static inline void addValue(T *coo, V value,
+                            const std::vector<uint64_t> indices,
+                            bool is_symmetric_value) {
+  // TODO: <https://github.com/llvm/llvm-project/issues/54179>
+  coo->add(indices, value);
+  // We currently chose to deal with symmetric matrices by fully constructing
+  // them. In the future, we may want to make symmetry implicit for storage
+  // reasons.
+  if (is_symmetric_value)
+    coo->add({indices[1], indices[0]}, value);
+}
+
+// Reads an element of a complex type for the current indices in coordinate
+// scheme.
+template <typename V>
+static inline void readCOOValue(SparseTensorCOO<std::complex<V>> *coo,
+                                const std::vector<uint64_t> indices,
+                                char **linePtr, bool is_pattern,
+                                bool add_symmetric_value) {
+  // Read two values to make a complex. The external formats always store
+  // numerical values with the type double, but we cast these values to the
+  // sparse tensor object type. For a pattern tensor, we arbitrarily pick the
+  // value 1 for all entries.
+  V re = is_pattern ? 1.0 : strtod(*linePtr, linePtr);
+  V im = is_pattern ? 1.0 : strtod(*linePtr, linePtr);
+  std::complex<V> value = {re, im};
+  addValue(coo, value, indices, add_symmetric_value);
+}
+
+// Reads an element of a non-complex type for the current indices in coordinate
+// scheme.
+template <typename V,
+          typename std::enable_if<
+              !std::is_same<std::complex<float>, V>::value &&
+              !std::is_same<std::complex<double>, V>::value>::type * = nullptr>
+static void inline readCOOValue(SparseTensorCOO<V> *coo,
+                                const std::vector<uint64_t> indices,
+                                char **linePtr, bool is_pattern,
+                                bool is_symmetric_value) {
+  // The external formats always store these numerical values with the type
+  // double, but we cast these values to the sparse tensor object type.
+  // For a pattern tensor, we arbitrarily pick the value 1 for all entries.
+  double value = is_pattern ? 1.0 : strtod(*linePtr, linePtr);
+  addValue(coo, value, indices, is_symmetric_value);
 }
 
 /// Reads a sparse tensor with the given filename into a memory-resident
 /// sparse tensor in coordinate scheme.
 template <typename V>
-static SparseTensorCOO<V> *openSparseTensorCOO(char *filename, uint64_t rank,
-                                               const uint64_t *shape,
-                                               const uint64_t *perm) {
-  // Open the file.
-  assert(filename && "Received nullptr for filename");
-  FILE *file = fopen(filename, "r");
-  if (!file)
-    FATAL("Cannot find file %s\n", filename);
-  // Perform some file format dependent set up.
-  char line[kColWidth];
-  uint64_t idata[512];
-  bool isPattern = false;
-  bool isSymmetric = false;
-  if (strstr(filename, ".mtx")) {
-    readMMEHeader(file, filename, line, idata, &isPattern, &isSymmetric);
-  } else if (strstr(filename, ".tns")) {
-    readExtFROSTTHeader(file, filename, line, idata);
-  } else {
-    FATAL("Unknown format %s\n", filename);
+static SparseTensorCOO<V> *
+openSparseTensorCOO(char *filename, uint64_t rank, const uint64_t *shape,
+                    const uint64_t *perm, PrimaryType valTp) {
+  SparseTensorFile stfile(filename);
+  stfile.openFile();
+  stfile.readHeader();
+  // Check tensor element type against the value type in the input file.
+  SparseTensorFile::ValueKind valueKind = stfile.getValueKind();
+  bool tensorIsInteger =
+      (valTp >= PrimaryType::kI64 && valTp <= PrimaryType::kI8);
+  bool tensorIsReal = (valTp >= PrimaryType::kF64 && valTp <= PrimaryType::kI8);
+  if ((valueKind == SparseTensorFile::ValueKind::kReal && tensorIsInteger) ||
+      (valueKind == SparseTensorFile::ValueKind::kComplex && tensorIsReal)) {
+    FATAL("Tensor element type %d not compatible with values in file %s\n",
+          valTp, filename);
   }
+  stfile.assertMatchesShape(rank, shape);
   // Prepare sparse tensor object with per-dimension sizes
   // and the number of nonzeros as initial capacity.
-  assert(rank == idata[0] && "rank mismatch");
-  uint64_t nnz = idata[1];
-  for (uint64_t r = 0; r < rank; r++)
-    assert((shape[r] == 0 || shape[r] == idata[2 + r]) &&
-           "dimension size mismatch");
-  SparseTensorCOO<V> *tensor =
-      SparseTensorCOO<V>::newSparseTensorCOO(rank, idata + 2, perm, nnz);
+  uint64_t nnz = stfile.getNNZ();
+  auto *coo = SparseTensorCOO<V>::newSparseTensorCOO(rank, stfile.getDimSizes(),
+                                                     perm, nnz);
   // Read all nonzero elements.
   std::vector<uint64_t> indices(rank);
   for (uint64_t k = 0; k < nnz; k++) {
-    if (!fgets(line, kColWidth, file))
-      FATAL("Cannot find next line of data in %s\n", filename);
-    char *linePtr = line;
+    char *linePtr = stfile.readLine();
     for (uint64_t r = 0; r < rank; r++) {
       uint64_t idx = strtoul(linePtr, &linePtr, 10);
       // Add 0-based index.
       indices[perm[r]] = idx - 1;
     }
-    // The external formats always store the numerical values with the type
-    // double, but we cast these values to the sparse tensor object type.
-    // For a pattern tensor, we arbitrarily pick the value 1 for all entries.
-    double value = isPattern ? 1.0 : strtod(linePtr, &linePtr);
-    tensor->add(indices, value);
-    // We currently chose to deal with symmetric matrices by fully constructing
-    // them. In the future, we may want to make symmetry implicit for storage
-    // reasons.
-    if (isSymmetric && indices[0] != indices[1])
-      tensor->add({indices[1], indices[0]}, value);
+    readCOOValue(coo, indices, &linePtr, stfile.isPattern(),
+                 stfile.isSymmetric() && indices[0] != indices[1]);
   }
   // Close the file and return tensor.
-  fclose(file);
-  return tensor;
+  stfile.closeFile();
+  return coo;
 }
 
 /// Writes the sparse tensor to `dest` in extended FROSTT format.
@@ -1339,7 +1513,7 @@ extern "C" {
     if (action <= Action::kFromCOO) {                                          \
       if (action == Action::kFromFile) {                                       \
         char *filename = static_cast<char *>(ptr);                             \
-        coo = openSparseTensorCOO<V>(filename, rank, shape, perm);             \
+        coo = openSparseTensorCOO<V>(filename, rank, shape, perm, v);          \
       } else if (action == Action::kFromCOO) {                                 \
         coo = static_cast<SparseTensorCOO<V> *>(ptr);                          \
       } else {                                                                 \
@@ -1465,6 +1639,16 @@ _mlir_ciface_newSparseTensor(StridedMemRefType<DimLevelType, 1> *aref, // NOLINT
   CASE(OverheadType::kU8, OverheadType::kU8, PrimaryType::kF32, uint8_t,
        uint8_t, float);
 
+  // Two-byte floats with both overheads of the same type.
+  CASE_SECSAME(OverheadType::kU64, PrimaryType::kF16, uint64_t, f16);
+  CASE_SECSAME(OverheadType::kU64, PrimaryType::kBF16, uint64_t, bf16);
+  CASE_SECSAME(OverheadType::kU32, PrimaryType::kF16, uint32_t, f16);
+  CASE_SECSAME(OverheadType::kU32, PrimaryType::kBF16, uint32_t, bf16);
+  CASE_SECSAME(OverheadType::kU16, PrimaryType::kF16, uint16_t, f16);
+  CASE_SECSAME(OverheadType::kU16, PrimaryType::kBF16, uint16_t, bf16);
+  CASE_SECSAME(OverheadType::kU8, PrimaryType::kF16, uint8_t, f16);
+  CASE_SECSAME(OverheadType::kU8, PrimaryType::kBF16, uint8_t, bf16);
+
   // Integral matrices with both overheads of the same type.
   CASE_SECSAME(OverheadType::kU64, PrimaryType::kI64, uint64_t, int64_t);
   CASE_SECSAME(OverheadType::kU64, PrimaryType::kI32, uint64_t, int32_t);
@@ -1533,10 +1717,10 @@ FOREVERY_O(IMPL_SPARSEINDICES)
 #undef IMPL_GETOVERHEAD
 
 #define IMPL_ADDELT(VNAME, V)                                                  \
-  void *_mlir_ciface_addElt##VNAME(void *coo, V value,                         \
+  void *_mlir_ciface_addElt##VNAME(void *coo, StridedMemRefType<V, 0> *vref,   \
                                    StridedMemRefType<index_type, 1> *iref,     \
                                    StridedMemRefType<index_type, 1> *pref) {   \
-    assert(coo &&iref &&pref);                                                 \
+    assert(coo &&vref &&iref &&pref);                                          \
     assert(iref->strides[0] == 1 && pref->strides[0] == 1);                    \
     assert(iref->sizes[0] == pref->sizes[0]);                                  \
     const index_type *indx = iref->data + iref->offset;                        \
@@ -1545,25 +1729,12 @@ FOREVERY_O(IMPL_SPARSEINDICES)
     std::vector<index_type> indices(isize);                                    \
     for (uint64_t r = 0; r < isize; r++)                                       \
       indices[perm[r]] = indx[r];                                              \
-    static_cast<SparseTensorCOO<V> *>(coo)->add(indices, value);               \
+    V *value = vref->data + vref->offset;                                      \
+    static_cast<SparseTensorCOO<V> *>(coo)->add(indices, *value);              \
     return coo;                                                                \
   }
-FOREVERY_SIMPLEX_V(IMPL_ADDELT)
-IMPL_ADDELT(C64, complex64)
-// Marked static because it's not part of the public API.
-// NOTE: the `static` keyword confuses clang-format here, causing
-// the strange indentation of the `_mlir_ciface_addEltC32` prototype.
-// In C++11 we can add a semicolon after the call to `IMPL_ADDELT`
-// and that will correct clang-format.  Alas, this file is compiled
-// in C++98 mode where that semicolon is illegal (and there's no portable
-// macro magic to license a no-op semicolon at the top level).
-static IMPL_ADDELT(C32ABI, complex32)
+FOREVERY_V(IMPL_ADDELT)
 #undef IMPL_ADDELT
-    void *_mlir_ciface_addEltC32(void *coo, float r, float i,
-                                 StridedMemRefType<index_type, 1> *iref,
-                                 StridedMemRefType<index_type, 1> *pref) {
-  return _mlir_ciface_addEltC32ABI(coo, complex32(r, i), iref, pref);
-}
 
 #define IMPL_GETNEXT(VNAME, V)                                                 \
   bool _mlir_ciface_getNext##VNAME(void *coo,                                  \
@@ -1587,25 +1758,18 @@ FOREVERY_V(IMPL_GETNEXT)
 #undef IMPL_GETNEXT
 
 #define IMPL_LEXINSERT(VNAME, V)                                               \
-  void _mlir_ciface_lexInsert##VNAME(                                          \
-      void *tensor, StridedMemRefType<index_type, 1> *cref, V val) {           \
-    assert(tensor &&cref);                                                     \
+  void _mlir_ciface_lexInsert##VNAME(void *tensor,                             \
+                                     StridedMemRefType<index_type, 1> *cref,   \
+                                     StridedMemRefType<V, 0> *vref) {          \
+    assert(tensor &&cref &&vref);                                              \
     assert(cref->strides[0] == 1);                                             \
     index_type *cursor = cref->data + cref->offset;                            \
     assert(cursor);                                                            \
-    static_cast<SparseTensorStorageBase *>(tensor)->lexInsert(cursor, val);    \
+    V *value = vref->data + vref->offset;                                      \
+    static_cast<SparseTensorStorageBase *>(tensor)->lexInsert(cursor, *value); \
   }
-FOREVERY_SIMPLEX_V(IMPL_LEXINSERT)
-IMPL_LEXINSERT(C64, complex64)
-// Marked static because it's not part of the public API.
-// NOTE: see the note for `_mlir_ciface_addEltC32ABI`
-static IMPL_LEXINSERT(C32ABI, complex32)
+FOREVERY_V(IMPL_LEXINSERT)
 #undef IMPL_LEXINSERT
-    void _mlir_ciface_lexInsertC32(void *tensor,
-                                   StridedMemRefType<index_type, 1> *cref,
-                                   float r, float i) {
-  _mlir_ciface_lexInsertC32ABI(tensor, cref, complex32(r, i));
-}
 
 #define IMPL_EXPINSERT(VNAME, V)                                               \
   void _mlir_ciface_expInsert##VNAME(                                          \
@@ -1668,6 +1832,18 @@ char *getTensorFilename(index_type id) {
   if (!env)
     FATAL("Environment variable %s is not set\n", var);
   return env;
+}
+
+void readSparseTensorShape(char *filename, std::vector<uint64_t> *out) {
+  assert(out && "Received nullptr for out-parameter");
+  SparseTensorFile stfile(filename);
+  stfile.openFile();
+  stfile.readHeader();
+  stfile.closeFile();
+  const uint64_t rank = stfile.getRank();
+  const uint64_t *dimSizes = stfile.getDimSizes();
+  out->reserve(rank);
+  out->assign(dimSizes, dimSizes + rank);
 }
 
 // TODO: generalize beyond 64-bit indices.

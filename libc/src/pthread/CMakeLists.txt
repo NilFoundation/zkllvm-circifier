@@ -242,3 +242,40 @@ add_entrypoint_object(
     libc.include.pthread
     libc.src.__support.threads.mutex
 )
+
+add_entrypoint_object(
+  pthread_create
+  SRCS
+    pthread_create.cpp
+  HDRS
+    pthread_create.h
+  DEPENDS
+    libc.include.errno
+    libc.include.pthread
+    libc.src.__support.threads.thread
+  COMPILE_OPTIONS
+    -O3
+    -fno-omit-frame-pointer
+)
+
+add_entrypoint_object(
+  pthread_join
+  SRCS
+    pthread_join.cpp
+  HDRS
+    pthread_join.h
+  DEPENDS
+    libc.include.pthread
+    libc.src.__support.threads.thread
+)
+
+add_entrypoint_object(
+  pthread_detach
+  SRCS
+    pthread_detach.cpp
+  HDRS
+    pthread_detach.h
+  DEPENDS
+    libc.include.pthread
+    libc.src.__support.threads.thread
+)

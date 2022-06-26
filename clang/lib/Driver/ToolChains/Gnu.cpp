@@ -465,6 +465,8 @@ void tools::gnutools::Linker::ConstructJob(Compilation &C, const JobAction &JA,
     D.Diag(diag::err_target_unknown_triple) << Triple.str();
     return;
   }
+  if (Triple.isRISCV())
+    CmdArgs.push_back("-X");
 
   if (Args.hasArg(options::OPT_shared))
     CmdArgs.push_back("-shared");
@@ -475,7 +477,8 @@ void tools::gnutools::Linker::ConstructJob(Compilation &C, const JobAction &JA,
     if (Args.hasArg(options::OPT_rdynamic))
       CmdArgs.push_back("-export-dynamic");
 
-    if (!Args.hasArg(options::OPT_shared) && !IsStaticPIE) {
+    if (!Args.hasArg(options::OPT_shared) && !IsStaticPIE &&
+        !Args.hasArg(options::OPT_r)) {
       CmdArgs.push_back("-dynamic-linker");
       CmdArgs.push_back(Args.MakeArgString(Twine(D.DyldPrefix) +
                                            ToolChain.getDynamicLinker(Args)));
@@ -593,13 +596,9 @@ void tools::gnutools::Linker::ConstructJob(Compilation &C, const JobAction &JA,
   // to generate executables. As Fortran runtime depends on the C runtime,
   // these dependencies need to be listed before the C runtime below (i.e.
   // AddRuntTimeLibs).
-  //
-  // NOTE: Generating executables by Flang is considered an "experimental"
-  // feature and hence this is guarded with a command line option.
-  // TODO: Make this work unconditionally once Flang is mature enough.
-  if (D.IsFlangMode() && Args.hasArg(options::OPT_flang_experimental_exec)) {
+  if (D.IsFlangMode()) {
     addFortranRuntimeLibraryPath(ToolChain, Args, CmdArgs);
-    addFortranRuntimeLibs(CmdArgs);
+    addFortranRuntimeLibs(ToolChain, CmdArgs);
     CmdArgs.push_back("-lm");
   }
 
@@ -2130,17 +2129,31 @@ void Generic_GCC::GCCInstallationDetector::AddDefaultGCCPrefixes(
   // and gcc-toolsets.
   if (SysRoot.empty() && TargetTriple.getOS() == llvm::Triple::Linux &&
       D.getVFS().exists("/opt/rh")) {
-    Prefixes.push_back("/opt/rh/gcc-toolset-11/root/usr");
-    Prefixes.push_back("/opt/rh/gcc-toolset-10/root/usr");
-    Prefixes.push_back("/opt/rh/devtoolset-11/root/usr");
-    Prefixes.push_back("/opt/rh/devtoolset-10/root/usr");
-    Prefixes.push_back("/opt/rh/devtoolset-9/root/usr");
-    Prefixes.push_back("/opt/rh/devtoolset-8/root/usr");
-    Prefixes.push_back("/opt/rh/devtoolset-7/root/usr");
-    Prefixes.push_back("/opt/rh/devtoolset-6/root/usr");
-    Prefixes.push_back("/opt/rh/devtoolset-4/root/usr");
-    Prefixes.push_back("/opt/rh/devtoolset-3/root/usr");
-    Prefixes.push_back("/opt/rh/devtoolset-2/root/usr");
+    // Find the directory in /opt/rh/ starting with gcc-toolset-* or
+    // devtoolset-* with the highest version number and add that
+    // one to our prefixes.
+    std::string ChosenToolsetDir;
+    unsigned ChosenToolsetVersion = 0;
+    std::error_code EC;
+    for (llvm::vfs::directory_iterator LI = D.getVFS().dir_begin("/opt/rh", EC),
+                                       LE;
+         !EC && LI != LE; LI = LI.increment(EC)) {
+      StringRef ToolsetDir = llvm::sys::path::filename(LI->path());
+      unsigned ToolsetVersion;
+      if ((!ToolsetDir.startswith("gcc-toolset-") &&
+           !ToolsetDir.startswith("devtoolset-")) ||
+          ToolsetDir.substr(ToolsetDir.rfind('-') + 1)
+              .getAsInteger(10, ToolsetVersion))
+        continue;
+
+      if (ToolsetVersion > ChosenToolsetVersion) {
+        ChosenToolsetVersion = ToolsetVersion;
+        ChosenToolsetDir = "/opt/rh/" + ToolsetDir.str();
+      }
+    }
+
+    if (ChosenToolsetVersion > 0)
+      Prefixes.push_back(ChosenToolsetDir + "/root/usr");
   }
 
   // Fall back to /usr which is used by most non-Solaris systems.

@@ -86,7 +86,8 @@ Changes to the AArch64 Backend
 Changes to the AMDGPU Backend
 -----------------------------
 
-* ...
+* 8 and 16-bit atomic loads and stores are now supported
+
 
 Changes to the ARM Backend
 --------------------------
@@ -101,6 +102,8 @@ Changes to the ARM Backend
   versions.
 * Added a pass to workaround Cortex-A57 Erratum 1742098 and Cortex-A72
   Erratum 1655431. This is enabled by default when targeting either CPU.
+* Implemented generation of Windows SEH unwind information.
+* Switched the MinGW target to use SEH instead of DWARF for unwind information.
 
 Changes to the AVR Backend
 --------------------------
@@ -135,7 +138,7 @@ Changes to the WebAssembly Backend
 Changes to the X86 Backend
 --------------------------
 
-* ...
+* Support ``half`` type on SSE2 and above targets.
 
 Changes to the OCaml bindings
 -----------------------------
@@ -147,6 +150,13 @@ Changes to the C API
 * Add ``LLVMGetCastOpcode`` function to aid users of ``LLVMBuildCast`` in
   resolving the best cast operation given a source value and destination type.
   This function is a direct wrapper of ``CastInst::getCastOpcode``.
+
+* Add ``LLVMGetAggregateElement`` function as a wrapper for
+  ``Constant::getAggregateElement``, which can be used to fetch an element of a
+  constant struct, array or vector, independently of the underlying
+  representation. The ``LLVMGetElementAsConstant`` function is deprecated in
+  favor of the new function, which works on all constant aggregates, rather than
+  only instances of ``ConstantDataSequential``.
 
 Changes to the Go bindings
 --------------------------

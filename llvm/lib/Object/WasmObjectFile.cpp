@@ -1520,7 +1520,7 @@ Error WasmObjectFile::parseElemSection(ReadContext &Ctx) {
 Error WasmObjectFile::parseDataSection(ReadContext &Ctx) {
   DataSection = Sections.size();
   uint32_t Count = readVaruint32(Ctx);
-  if (DataCount && Count != DataCount.getValue())
+  if (DataCount && Count != *DataCount)
     return make_error<GenericBinaryError>(
         "number of data segments does not match DataCount section");
   DataSegments.reserve(Count);
@@ -1729,7 +1729,7 @@ Expected<StringRef> WasmObjectFile::getSectionName(DataRefImpl Sec) const {
   const WasmSection &S = Sections[Sec.d.a];
   if (S.Type == wasm::WASM_SEC_CUSTOM)
     return S.Name;
-  if (S.Type > wasm::WASM_SEC_TAG)
+  if (S.Type > wasm::WASM_SEC_LAST_KNOWN)
     return createStringError(object_error::invalid_section_index, "");
   return wasm::sectionTypeToString(S.Type);
 }

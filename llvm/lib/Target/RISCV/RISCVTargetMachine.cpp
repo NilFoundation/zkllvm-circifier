@@ -63,9 +63,7 @@ static StringRef computeDataLayout(const Triple &TT) {
 
 static Reloc::Model getEffectiveRelocModel(const Triple &TT,
                                            Optional<Reloc::Model> RM) {
-  if (!RM.hasValue())
-    return Reloc::Static;
-  return *RM;
+  return RM.value_or(Reloc::Static);
 }
 
 RISCVTargetMachine::RISCVTargetMachine(const Target &T, const Triple &TT,
@@ -182,7 +180,7 @@ bool RISCVPassConfig::addPreISel() {
 }
 
 bool RISCVPassConfig::addInstSelector() {
-  addPass(createRISCVISelDag(getRISCVTargetMachine()));
+  addPass(createRISCVISelDag(getRISCVTargetMachine(), getOptLevel()));
 
   return false;
 }

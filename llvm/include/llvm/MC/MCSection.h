@@ -48,7 +48,8 @@ public:
     SV_Wasm,
     SV_XCOFF,
     SV_SPIRV,
-    SV_EVM
+    SV_EVM,
+    SV_DXContainer
   };
 
   /// Express the state of bundle locked groups while emitting code.

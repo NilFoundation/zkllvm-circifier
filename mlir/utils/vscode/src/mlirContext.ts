@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import * as vscodelc from 'vscode-languageclient';
+import * as vscodelc from 'vscode-languageclient/node';
 
 import * as config from './config';
 import * as configWatcher from './configWatcher';
@@ -11,7 +11,7 @@ import * as configWatcher from './configWatcher';
  */
 class WorkspaceFolderContext implements vscode.Disposable {
   dispose() {
-    this.clients.forEach(client => client.stop());
+    this.clients.forEach(async client => await client.stop());
     this.clients.clear();
   }
 
@@ -229,16 +229,8 @@ export class MLIRContext implements vscode.Disposable {
 
     // Configure the server options.
     const serverOptions: vscodelc.ServerOptions = {
-      run : {
-        command : serverPath,
-        transport : vscodelc.TransportKind.stdio,
-        args : additionalServerArgs
-      },
-      debug : {
-        command : serverPath,
-        transport : vscodelc.TransportKind.stdio,
-        args : additionalServerArgs
-      }
+      command : serverPath,
+      args : additionalServerArgs
     };
 
     // Configure file patterns relative to the workspace folder.
@@ -279,7 +271,10 @@ export class MLIRContext implements vscode.Disposable {
       },
       outputChannel : outputChannel,
       workspaceFolder : workspaceFolder,
-      middleware : middleware
+      middleware : middleware,
+
+      // Don't switch to output window when the server returns output.
+      revealOutputChannelOn : vscodelc.RevealOutputChannelOn.Never,
     };
 
     // Create the language client and start the client.
@@ -354,6 +349,21 @@ export class MLIRContext implements vscode.Disposable {
     const serverPath = config.get<string>(serverSettingName, workspaceFolder);
     const defaultPath = MLIRContext.getDefaultServerFilename(serverSettingName);
     return this.resolvePath(serverPath, defaultPath, workspaceFolder);
+  }
+
+  /**
+   * Return the language client for the given language and workspace folder, or
+   * null if no client is active.
+   */
+  getLanguageClient(workspaceFolder: vscode.WorkspaceFolder,
+                    languageName: string): vscodelc.LanguageClient {
+    let workspaceFolderStr =
+        workspaceFolder ? workspaceFolder.uri.toString() : "";
+    let folderContext = this.workspaceFolders.get(workspaceFolderStr);
+    if (!folderContext) {
+      return null;
+    }
+    return folderContext.clients.get(languageName);
   }
 
   dispose() {

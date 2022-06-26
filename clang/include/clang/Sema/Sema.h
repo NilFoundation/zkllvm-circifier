@@ -758,6 +758,13 @@ public:
   /// optimizations are currently "on", this is set to an invalid location.
   SourceLocation OptimizeOffPragmaLocation;
 
+  /// The "on" or "off" argument passed by \#pragma optimize, that denotes
+  /// whether the optimizations in the list passed to the pragma should be
+  /// turned off or on. This boolean is true by default because command line
+  /// options are honored when `#pragma optimize("", on)`.
+  /// (i.e. `ModifyFnAttributeMSPragmaOptimze()` does nothing)
+  bool MSPragmaOptimizeIsOn = true;
+
   /// Set of no-builtin functions listed by \#pragma function.
   llvm::SmallSetVector<StringRef, 4> MSFunctionNoBuiltins;
 
@@ -1759,9 +1766,9 @@ public:
     template <typename T>
     friend const SemaDiagnosticBuilder &
     operator<<(const SemaDiagnosticBuilder &Diag, const T &Value) {
-      if (Diag.ImmediateDiag.hasValue())
+      if (Diag.ImmediateDiag)
         *Diag.ImmediateDiag << Value;
-      else if (Diag.PartialDiagId.hasValue())
+      else if (Diag.PartialDiagId)
         Diag.S.DeviceDeferredDiags[Diag.Fn][*Diag.PartialDiagId].second
             << Value;
       return Diag;
@@ -1773,26 +1780,26 @@ public:
     template <typename T, typename = typename std::enable_if<
                               !std::is_lvalue_reference<T>::value>::type>
     const SemaDiagnosticBuilder &operator<<(T &&V) const {
-      if (ImmediateDiag.hasValue())
+      if (ImmediateDiag)
         *ImmediateDiag << std::move(V);
-      else if (PartialDiagId.hasValue())
+      else if (PartialDiagId)
         S.DeviceDeferredDiags[Fn][*PartialDiagId].second << std::move(V);
       return *this;
     }
 
     friend const SemaDiagnosticBuilder &
     operator<<(const SemaDiagnosticBuilder &Diag, const PartialDiagnostic &PD) {
-      if (Diag.ImmediateDiag.hasValue())
+      if (Diag.ImmediateDiag)
         PD.Emit(*Diag.ImmediateDiag);
-      else if (Diag.PartialDiagId.hasValue())
+      else if (Diag.PartialDiagId)
         Diag.S.DeviceDeferredDiags[Diag.Fn][*Diag.PartialDiagId].second = PD;
       return Diag;
     }
 
     void AddFixItHint(const FixItHint &Hint) const {
-      if (ImmediateDiag.hasValue())
+      if (ImmediateDiag)
         ImmediateDiag->AddFixItHint(Hint);
-      else if (PartialDiagId.hasValue())
+      else if (PartialDiagId)
         S.DeviceDeferredDiags[Fn][*PartialDiagId].second.AddFixItHint(Hint);
     }
 
@@ -10363,6 +10370,9 @@ public:
   /// Called on well formed \#pragma clang optimize.
   void ActOnPragmaOptimize(bool On, SourceLocation PragmaLoc);
 
+  /// #pragma optimize("[optimization-list]", on | off).
+  void ActOnPragmaMSOptimize(SourceLocation Loc, bool IsOn);
+
   /// Call on well formed \#pragma function.
   void
   ActOnPragmaMSFunction(SourceLocation Loc,
@@ -10388,6 +10398,11 @@ public:
   /// are no conflicts; Loc represents the location causing the 'optnone'
   /// attribute to be added (usually because of a pragma).
   void AddOptnoneAttributeIfNoConflicts(FunctionDecl *FD, SourceLocation Loc);
+
+  /// Only called on function definitions; if there is a MSVC #pragma optimize
+  /// in scope, consider changing the function's attributes based on the
+  /// optimization list passed to the pragma.
+  void ModifyFnAttributesMSPragmaOptimize(FunctionDecl *FD);
 
   /// Only called on function definitions; if there is a pragma in scope
   /// with the effect of a range-based no_builtin, consider marking the function
@@ -11092,6 +11107,11 @@ public:
   /// Called on well-formed '\#pragma omp parallel master taskloop simd' after
   /// parsing of the associated statement.
   StmtResult ActOnOpenMPParallelMasterTaskLoopSimdDirective(
+      ArrayRef<OMPClause *> Clauses, Stmt *AStmt, SourceLocation StartLoc,
+      SourceLocation EndLoc, VarsWithInheritedDSAType &VarsWithImplicitDSA);
+  /// Called on well-formed '\#pragma omp masked taskloop' after parsing of the
+  /// associated statement.
+  StmtResult ActOnOpenMPMaskedTaskLoopDirective(
       ArrayRef<OMPClause *> Clauses, Stmt *AStmt, SourceLocation StartLoc,
       SourceLocation EndLoc, VarsWithInheritedDSAType &VarsWithImplicitDSA);
   /// Called on well-formed '\#pragma omp distribute' after parsing

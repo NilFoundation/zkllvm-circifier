@@ -183,14 +183,7 @@ Interpreter::Interpreter(std::unique_ptr<CompilerInstance> CI,
                                                    *TSCtx->getContext(), Err);
 }
 
-Interpreter::~Interpreter() {
-  if (IncrExecutor) {
-    if (llvm::Error Err = IncrExecutor->cleanUp())
-      llvm::report_fatal_error(
-          llvm::Twine("Failed to clean up IncrementalExecutor: ") +
-          toString(std::move(Err)));
-  }
-}
+Interpreter::~Interpreter() {}
 
 llvm::Expected<std::unique_ptr<Interpreter>>
 Interpreter::create(std::unique_ptr<CompilerInstance> CI) {
@@ -220,10 +213,10 @@ Interpreter::Parse(llvm::StringRef Code) {
 llvm::Error Interpreter::Execute(PartialTranslationUnit &T) {
   assert(T.TheModule);
   if (!IncrExecutor) {
-    const llvm::Triple &Triple =
-        getCompilerInstance()->getASTContext().getTargetInfo().getTriple();
+    const clang::TargetInfo &TI =
+        getCompilerInstance()->getASTContext().getTargetInfo();
     llvm::Error Err = llvm::Error::success();
-    IncrExecutor = std::make_unique<IncrementalExecutor>(*TSCtx, Err, Triple);
+    IncrExecutor = std::make_unique<IncrementalExecutor>(*TSCtx, Err, TI);
 
     if (Err)
       return Err;

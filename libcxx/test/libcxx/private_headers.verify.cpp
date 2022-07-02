@@ -143,6 +143,7 @@ END-SCRIPT
 #include <__algorithm/ranges_replace_if.h> // expected-error@*:* {{use of private header from outside its module: '__algorithm/ranges_replace_if.h'}}
 #include <__algorithm/ranges_reverse.h> // expected-error@*:* {{use of private header from outside its module: '__algorithm/ranges_reverse.h'}}
 #include <__algorithm/ranges_sort.h> // expected-error@*:* {{use of private header from outside its module: '__algorithm/ranges_sort.h'}}
+#include <__algorithm/ranges_stable_sort.h> // expected-error@*:* {{use of private header from outside its module: '__algorithm/ranges_stable_sort.h'}}
 #include <__algorithm/ranges_swap_ranges.h> // expected-error@*:* {{use of private header from outside its module: '__algorithm/ranges_swap_ranges.h'}}
 #include <__algorithm/ranges_transform.h> // expected-error@*:* {{use of private header from outside its module: '__algorithm/ranges_transform.h'}}
 #include <__algorithm/ranges_upper_bound.h> // expected-error@*:* {{use of private header from outside its module: '__algorithm/ranges_upper_bound.h'}}
@@ -320,6 +321,7 @@ END-SCRIPT
 #include <__iterator/access.h> // expected-error@*:* {{use of private header from outside its module: '__iterator/access.h'}}
 #include <__iterator/advance.h> // expected-error@*:* {{use of private header from outside its module: '__iterator/advance.h'}}
 #include <__iterator/back_insert_iterator.h> // expected-error@*:* {{use of private header from outside its module: '__iterator/back_insert_iterator.h'}}
+#include <__iterator/bounded_iter.h> // expected-error@*:* {{use of private header from outside its module: '__iterator/bounded_iter.h'}}
 #include <__iterator/common_iterator.h> // expected-error@*:* {{use of private header from outside its module: '__iterator/common_iterator.h'}}
 #include <__iterator/concepts.h> // expected-error@*:* {{use of private header from outside its module: '__iterator/concepts.h'}}
 #include <__iterator/counted_iterator.h> // expected-error@*:* {{use of private header from outside its module: '__iterator/counted_iterator.h'}}

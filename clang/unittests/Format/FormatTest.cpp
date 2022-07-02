@@ -7129,13 +7129,10 @@ TEST_F(FormatTest, BreakConstructorInitializersAfterColon) {
                "    bbbbbbbbbbbbbbbbbbbbbbbb(b) {}",
                OnePerLine);
 
-  EXPECT_EQ("Constructor() :\n"
-            "    // Comment forcing unwanted break.\n"
-            "    aaaa(aaaa) {}",
-            format("Constructor() :\n"
-                   "    // Comment forcing unwanted break.\n"
-                   "    aaaa(aaaa) {}",
-                   Style));
+  verifyFormat("Constructor() :\n"
+               "    // Comment forcing unwanted break.\n"
+               "    aaaa(aaaa) {}",
+               Style);
 
   Style.ColumnLimit = 0;
   verifyFormat("SomeClass::Constructor() :\n"
@@ -10430,6 +10427,67 @@ TEST_F(FormatTest, UnderstandsUsesOfStarAndAmp) {
       "              ::std::is_array<T>{} && ::std::is_array<T>{}>::type>\n"
       "void F();",
       getGoogleStyleWithColumns(68));
+
+  FormatStyle Style = getLLVMStyle();
+  Style.PointerAlignment = FormatStyle::PAS_Left;
+  verifyFormat("struct {\n"
+               "}* ptr;",
+               Style);
+  verifyFormat("union {\n"
+               "}* ptr;",
+               Style);
+  verifyFormat("class {\n"
+               "}* ptr;",
+               Style);
+  verifyFormat("struct {\n"
+               "}&& ptr = {};",
+               Style);
+  verifyFormat("union {\n"
+               "}&& ptr = {};",
+               Style);
+  verifyFormat("class {\n"
+               "}&& ptr = {};",
+               Style);
+
+  Style.PointerAlignment = FormatStyle::PAS_Middle;
+  verifyFormat("struct {\n"
+               "} * ptr;",
+               Style);
+  verifyFormat("union {\n"
+               "} * ptr;",
+               Style);
+  verifyFormat("class {\n"
+               "} * ptr;",
+               Style);
+  verifyFormat("struct {\n"
+               "} && ptr = {};",
+               Style);
+  verifyFormat("union {\n"
+               "} && ptr = {};",
+               Style);
+  verifyFormat("class {\n"
+               "} && ptr = {};",
+               Style);
+
+  Style.PointerAlignment = FormatStyle::PAS_Right;
+  verifyFormat("struct {\n"
+               "} *ptr;",
+               Style);
+  verifyFormat("union {\n"
+               "} *ptr;",
+               Style);
+  verifyFormat("class {\n"
+               "} *ptr;",
+               Style);
+  verifyFormat("struct {\n"
+               "} &&ptr = {};",
+               Style);
+  verifyFormat("union {\n"
+               "} &&ptr = {};",
+               Style);
+  verifyFormat("class {\n"
+               "} &&ptr = {};",
+               Style);
 
   verifyIndependentOfContext("MACRO(int *i);");
   verifyIndependentOfContext("MACRO(auto *a);");

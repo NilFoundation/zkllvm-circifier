@@ -12,6 +12,8 @@
 
 #include "IncrementalExecutor.h"
 
+#include "clang/Basic/TargetInfo.h"
+#include "clang/Basic/TargetOptions.h"
 #include "clang/Interpreter/PartialTranslationUnit.h"
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 #include "llvm/ExecutionEngine/Orc/CompileUtils.h"
@@ -28,12 +30,13 @@ namespace clang {
 
 IncrementalExecutor::IncrementalExecutor(llvm::orc::ThreadSafeContext &TSC,
                                          llvm::Error &Err,
-                                         const llvm::Triple &Triple)
+                                         const clang::TargetInfo &TI)
     : TSCtx(TSC) {
   using namespace llvm::orc;
   llvm::ErrorAsOutParameter EAO(&Err);
 
-  auto JTMB = JITTargetMachineBuilder(Triple);
+  auto JTMB = JITTargetMachineBuilder(TI.getTriple());
+  JTMB.addFeatures(TI.getTargetOpts().Features);
   if (auto JitOrErr = LLJITBuilder().setJITTargetMachineBuilder(JTMB).create())
     Jit = std::move(*JitOrErr);
   else {
@@ -52,12 +55,6 @@ IncrementalExecutor::IncrementalExecutor(llvm::orc::ThreadSafeContext &TSC,
 }
 
 IncrementalExecutor::~IncrementalExecutor() {}
-
-// Clean up the JIT instance.
-llvm::Error IncrementalExecutor::cleanUp() {
-  // This calls the global dtors of registered modules.
-  return Jit->deinitialize(Jit->getMainJITDylib());
-}
 
 llvm::Error IncrementalExecutor::addModule(PartialTranslationUnit &PTU) {
   llvm::orc::ResourceTrackerSP RT =

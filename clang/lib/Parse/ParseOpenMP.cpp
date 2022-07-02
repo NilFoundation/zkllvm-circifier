@@ -180,11 +180,15 @@ static OpenMPDirectiveKindExWrapper parseOpenMPDirectiveKind(Parser &P) {
       {OMPD_master, OMPD_taskloop, OMPD_master_taskloop},
       {OMPD_masked, OMPD_taskloop, OMPD_masked_taskloop},
       {OMPD_master_taskloop, OMPD_simd, OMPD_master_taskloop_simd},
+      {OMPD_masked_taskloop, OMPD_simd, OMPD_masked_taskloop_simd},
       {OMPD_parallel, OMPD_master, OMPD_parallel_master},
       {OMPD_parallel, OMPD_masked, OMPD_parallel_masked},
       {OMPD_parallel_master, OMPD_taskloop, OMPD_parallel_master_taskloop},
+      {OMPD_parallel_masked, OMPD_taskloop, OMPD_parallel_masked_taskloop},
       {OMPD_parallel_master_taskloop, OMPD_simd,
-       OMPD_parallel_master_taskloop_simd}};
+       OMPD_parallel_master_taskloop_simd},
+      {OMPD_parallel_masked_taskloop, OMPD_simd,
+       OMPD_parallel_masked_taskloop_simd}};
   enum { CancellationPoint = 0, DeclareReduction = 1, TargetData = 2 };
   Token Tok = P.getCurToken();
   OpenMPDirectiveKindExWrapper DKind =
@@ -957,6 +961,10 @@ static bool checkExtensionProperty(Parser &P, SourceLocation Loc,
 
   if (TIProperty.Kind ==
       TraitProperty::implementation_extension_allow_templates)
+    return true;
+
+  if (TIProperty.Kind ==
+      TraitProperty::implementation_extension_bind_to_declaration)
     return true;
 
   auto IsMatchExtension = [](OMPTraitProperty &TP) {
@@ -2313,9 +2321,9 @@ Parser::DeclGroupPtrTy Parser::ParseOpenMPDeclarativeDirectiveWithExtDecl(
     Sema::DeclareTargetContextInfo DTCI(DKind, DTLoc);
     if (HasClauses)
       ParseOMPDeclareTargetClauses(DTCI);
-    bool HasImplicitMappings =
-        DKind == OMPD_begin_declare_target || !HasClauses ||
-        (DTCI.ExplicitlyMapped.empty() && DTCI.Indirect.hasValue());
+    bool HasImplicitMappings = DKind == OMPD_begin_declare_target ||
+                               !HasClauses ||
+                               (DTCI.ExplicitlyMapped.empty() && DTCI.Indirect);
 
     // Skip the last annot_pragma_openmp_end.
     ConsumeAnyToken();
@@ -2387,6 +2395,9 @@ Parser::DeclGroupPtrTy Parser::ParseOpenMPDeclarativeDirectiveWithExtDecl(
   case OMPD_parallel_master_taskloop:
   case OMPD_parallel_master_taskloop_simd:
   case OMPD_masked_taskloop:
+  case OMPD_masked_taskloop_simd:
+  case OMPD_parallel_masked_taskloop:
+  case OMPD_parallel_masked_taskloop_simd:
   case OMPD_distribute:
   case OMPD_target_update:
   case OMPD_distribute_parallel_for:
@@ -2786,8 +2797,11 @@ StmtResult Parser::ParseOpenMPDeclarativeOrExecutableDirective(
   case OMPD_master_taskloop:
   case OMPD_masked_taskloop:
   case OMPD_master_taskloop_simd:
+  case OMPD_masked_taskloop_simd:
   case OMPD_parallel_master_taskloop:
+  case OMPD_parallel_masked_taskloop:
   case OMPD_parallel_master_taskloop_simd:
+  case OMPD_parallel_masked_taskloop_simd:
   case OMPD_distribute:
   case OMPD_distribute_parallel_for:
   case OMPD_distribute_parallel_for_simd:

@@ -34,8 +34,10 @@
 #include "llvm/Analysis/ValueTracking.h"
 #include "llvm/IR/Argument.h"
 #include "llvm/IR/Assumptions.h"
+#include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
+#include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/GlobalValue.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instruction.h"
@@ -51,7 +53,6 @@
 #include "llvm/Support/GraphWriter.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Transforms/IPO/ArgumentPromotion.h"
 #include "llvm/Transforms/Utils/Local.h"
 #include "llvm/Transforms/Utils/ValueMapper.h"
 #include <cassert>
@@ -179,6 +180,45 @@ ChangeStatus clampStateAndIndicateChange<DerefState>(DerefState &S,
 }
 
 } // namespace llvm
+
+/// Checks if a type could have padding bytes.
+static bool isDenselyPacked(Type *Ty, const DataLayout &DL) {
+  // There is no size information, so be conservative.
+  if (!Ty->isSized())
+    return false;
+
+  // If the alloc size is not equal to the storage size, then there are padding
+  // bytes. For x86_fp80 on x86-64, size: 80 alloc size: 128.
+  if (DL.getTypeSizeInBits(Ty) != DL.getTypeAllocSizeInBits(Ty))
+    return false;
+
+  // FIXME: This isn't the right way to check for padding in vectors with
+  // non-byte-size elements.
+  if (VectorType *SeqTy = dyn_cast<VectorType>(Ty))
+    return isDenselyPacked(SeqTy->getElementType(), DL);
+
+  // For array types, check for padding within members.
+  if (ArrayType *SeqTy = dyn_cast<ArrayType>(Ty))
+    return isDenselyPacked(SeqTy->getElementType(), DL);
+
+  if (!isa<StructType>(Ty))
+    return true;
+
+  // Check for padding within and between elements of a struct.
+  StructType *StructTy = cast<StructType>(Ty);
+  const StructLayout *Layout = DL.getStructLayout(StructTy);
+  uint64_t StartPos = 0;
+  for (unsigned I = 0, E = StructTy->getNumElements(); I < E; ++I) {
+    Type *ElTy = StructTy->getElementType(I);
+    if (!isDenselyPacked(ElTy, DL))
+      return false;
+    if (StartPos != Layout->getElementOffsetInBits(I))
+      return false;
+    StartPos += DL.getTypeAllocSizeInBits(ElTy);
+  }
+
+  return true;
+}
 
 /// Get pointer operand of memory accessing instruction. If \p I is
 /// not a memory accessing instruction, return nullptr. If \p AllowVolatile,
@@ -5500,7 +5540,7 @@ struct AAValueSimplifyImpl : AAValueSimplify {
   /// Return a value we can use as replacement for the associated one, or
   /// nullptr if we don't have one that makes sense.
   Value *manifestReplacementValue(Attributor &A, Instruction *CtxI) const {
-    Value *NewV = SimplifiedAssociatedValue.hasValue()
+    Value *NewV = SimplifiedAssociatedValue
                       ? SimplifiedAssociatedValue.getValue()
                       : UndefValue::get(getAssociatedType());
     if (NewV && NewV != &getAssociatedValue()) {
@@ -6202,6 +6242,17 @@ struct AAHeapToStackFunction final : public AAHeapToStack {
     Function *F = getAnchorScope();
     const auto *TLI = A.getInfoCache().getTargetLibraryInfoForFunction(*F);
 
+    LoopInfo *LI =
+        A.getInfoCache().getAnalysisResultForFunction<LoopAnalysis>(*F);
+    Optional<bool> MayContainIrreducibleControl;
+    auto IsInLoop = [&](BasicBlock &BB) {
+      if (!MayContainIrreducibleControl.has_value())
+        MayContainIrreducibleControl = mayContainIrreducibleControl(*F, LI);
+      if (MayContainIrreducibleControl.value())
+        return true;
+      return LI->getLoopFor(&BB) != nullptr;
+    };
+
     for (auto &It : AllocationInfos) {
       AllocationInfo &AI = *It.second;
       if (AI.Status == AllocationInfo::INVALID)
@@ -6243,6 +6294,10 @@ struct AAHeapToStackFunction final : public AAHeapToStack {
         Size = SizeOffsetPair.first;
       }
 
+      Instruction *IP = (!SizeAPI.has_value() || IsInLoop(*AI.CB->getParent()))
+                            ? AI.CB
+                            : &F->getEntryBlock().front();
+
       Align Alignment(1);
       if (MaybeAlign RetAlign = AI.CB->getRetAlign())
         Alignment = std::max(Alignment, *RetAlign);
@@ -6257,7 +6312,7 @@ struct AAHeapToStackFunction final : public AAHeapToStack {
       // TODO: Hoist the alloca towards the function entry.
       unsigned AS = DL.getAllocaAddrSpace();
       Instruction *Alloca = new AllocaInst(Type::getInt8Ty(F->getContext()), AS,
-                                           Size, Alignment, "", AI.CB);
+                                           Size, Alignment, "", IP);
 
       if (Alloca->getType() != AI.CB->getType())
         Alloca = BitCastInst::CreatePointerBitCastOrAddrSpaceCast(
@@ -6738,8 +6793,7 @@ struct AAPrivatizablePtrArgument final : public AAPrivatizablePtrImpl {
 
     // Avoid arguments with padding for now.
     if (!getIRPosition().hasAttr(Attribute::ByVal) &&
-        !ArgumentPromotionPass::isDenselyPacked(*PrivatizableType,
-                                                A.getInfoCache().getDL())) {
+        !isDenselyPacked(*PrivatizableType, A.getInfoCache().getDL())) {
       LLVM_DEBUG(dbgs() << "[AAPrivatizablePtr] Padding detected\n");
       return indicatePessimisticFixpoint();
     }

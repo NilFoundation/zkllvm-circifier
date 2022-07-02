@@ -57,6 +57,7 @@
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/raw_ostream.h"
 #include <cstdint>
 #include <vector>
 
@@ -138,12 +139,12 @@ struct GrammarTable;
 // It is a building block for constructing a table-based parser.
 class Grammar {
 public:
+  Grammar() = default; // Creates an invalid dummy grammar.
   explicit Grammar(std::unique_ptr<GrammarTable>);
 
   // Parses grammar from a BNF file.
   // Diagnostics emitted during parsing are stored in Diags.
-  static std::unique_ptr<Grammar> parseBNF(llvm::StringRef BNF,
-                                           std::vector<std::string> &Diags);
+  static Grammar parseBNF(llvm::StringRef BNF, std::vector<std::string> &Diags);
 
   // Returns the SymbolID of the symbol '_'.
   SymbolID underscore() const { return Underscore; };

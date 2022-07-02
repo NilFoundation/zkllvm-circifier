@@ -2471,6 +2471,12 @@ void ASTStmtWriter::VisitOMPMasterTaskLoopSimdDirective(
   Code = serialization::STMT_OMP_MASTER_TASKLOOP_SIMD_DIRECTIVE;
 }
 
+void ASTStmtWriter::VisitOMPMaskedTaskLoopSimdDirective(
+    OMPMaskedTaskLoopSimdDirective *D) {
+  VisitOMPLoopDirective(D);
+  Code = serialization::STMT_OMP_MASKED_TASKLOOP_SIMD_DIRECTIVE;
+}
+
 void ASTStmtWriter::VisitOMPParallelMasterTaskLoopDirective(
     OMPParallelMasterTaskLoopDirective *D) {
   VisitOMPLoopDirective(D);
@@ -2478,10 +2484,23 @@ void ASTStmtWriter::VisitOMPParallelMasterTaskLoopDirective(
   Code = serialization::STMT_OMP_PARALLEL_MASTER_TASKLOOP_DIRECTIVE;
 }
 
+void ASTStmtWriter::VisitOMPParallelMaskedTaskLoopDirective(
+    OMPParallelMaskedTaskLoopDirective *D) {
+  VisitOMPLoopDirective(D);
+  Record.writeBool(D->hasCancel());
+  Code = serialization::STMT_OMP_PARALLEL_MASKED_TASKLOOP_DIRECTIVE;
+}
+
 void ASTStmtWriter::VisitOMPParallelMasterTaskLoopSimdDirective(
     OMPParallelMasterTaskLoopSimdDirective *D) {
   VisitOMPLoopDirective(D);
   Code = serialization::STMT_OMP_PARALLEL_MASTER_TASKLOOP_SIMD_DIRECTIVE;
+}
+
+void ASTStmtWriter::VisitOMPParallelMaskedTaskLoopSimdDirective(
+    OMPParallelMaskedTaskLoopSimdDirective *D) {
+  VisitOMPLoopDirective(D);
+  Code = serialization::STMT_OMP_PARALLEL_MASKED_TASKLOOP_SIMD_DIRECTIVE;
 }
 
 void ASTStmtWriter::VisitOMPDistributeDirective(OMPDistributeDirective *D) {

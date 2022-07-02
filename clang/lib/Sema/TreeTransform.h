@@ -9070,11 +9070,33 @@ StmtResult TreeTransform<Derived>::TransformOMPMasterTaskLoopSimdDirective(
 }
 
 template <typename Derived>
+StmtResult TreeTransform<Derived>::TransformOMPMaskedTaskLoopSimdDirective(
+    OMPMaskedTaskLoopSimdDirective *D) {
+  DeclarationNameInfo DirName;
+  getDerived().getSema().StartOpenMPDSABlock(OMPD_masked_taskloop_simd, DirName,
+                                             nullptr, D->getBeginLoc());
+  StmtResult Res = getDerived().TransformOMPExecutableDirective(D);
+  getDerived().getSema().EndOpenMPDSABlock(Res.get());
+  return Res;
+}
+
+template <typename Derived>
 StmtResult TreeTransform<Derived>::TransformOMPParallelMasterTaskLoopDirective(
     OMPParallelMasterTaskLoopDirective *D) {
   DeclarationNameInfo DirName;
   getDerived().getSema().StartOpenMPDSABlock(
       OMPD_parallel_master_taskloop, DirName, nullptr, D->getBeginLoc());
+  StmtResult Res = getDerived().TransformOMPExecutableDirective(D);
+  getDerived().getSema().EndOpenMPDSABlock(Res.get());
+  return Res;
+}
+
+template <typename Derived>
+StmtResult TreeTransform<Derived>::TransformOMPParallelMaskedTaskLoopDirective(
+    OMPParallelMaskedTaskLoopDirective *D) {
+  DeclarationNameInfo DirName;
+  getDerived().getSema().StartOpenMPDSABlock(
+      OMPD_parallel_masked_taskloop, DirName, nullptr, D->getBeginLoc());
   StmtResult Res = getDerived().TransformOMPExecutableDirective(D);
   getDerived().getSema().EndOpenMPDSABlock(Res.get());
   return Res;
@@ -9087,6 +9109,18 @@ TreeTransform<Derived>::TransformOMPParallelMasterTaskLoopSimdDirective(
   DeclarationNameInfo DirName;
   getDerived().getSema().StartOpenMPDSABlock(
       OMPD_parallel_master_taskloop_simd, DirName, nullptr, D->getBeginLoc());
+  StmtResult Res = getDerived().TransformOMPExecutableDirective(D);
+  getDerived().getSema().EndOpenMPDSABlock(Res.get());
+  return Res;
+}
+
+template <typename Derived>
+StmtResult
+TreeTransform<Derived>::TransformOMPParallelMaskedTaskLoopSimdDirective(
+    OMPParallelMaskedTaskLoopSimdDirective *D) {
+  DeclarationNameInfo DirName;
+  getDerived().getSema().StartOpenMPDSABlock(
+      OMPD_parallel_masked_taskloop_simd, DirName, nullptr, D->getBeginLoc());
   StmtResult Res = getDerived().TransformOMPExecutableDirective(D);
   getDerived().getSema().EndOpenMPDSABlock(Res.get());
   return Res;
@@ -11086,11 +11120,15 @@ TreeTransform<Derived>::TransformMemberExpr(MemberExpr *E) {
       FoundDecl == E->getFoundDecl() &&
       !E->hasExplicitTemplateArgs()) {
 
-    // Mark it referenced in the new context regardless.
-    // FIXME: this is a bit instantiation-specific.
-    SemaRef.MarkMemberReferenced(E);
-
-    return E;
+    // Skip for member expression of (this->f), rebuilt thisi->f is needed
+    // for Openmp where the field need to be privatizized in the case.
+    if (!(isa<CXXThisExpr>(E->getBase()) &&
+          getSema().isOpenMPRebuildMemberExpr(cast<ValueDecl>(Member)))) {
+      // Mark it referenced in the new context regardless.
+      // FIXME: this is a bit instantiation-specific.
+      SemaRef.MarkMemberReferenced(E);
+      return E;
+    }
   }
 
   TemplateArgumentListInfo TransArgs;

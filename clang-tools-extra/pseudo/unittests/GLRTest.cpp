@@ -30,7 +30,7 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
 
 namespace {
 
-using Action = LRTable::Action;
+using StateID = LRTable::StateID;
 using testing::AllOf;
 using testing::ElementsAre;
 using testing::UnorderedElementsAre;
@@ -81,6 +81,14 @@ public:
     ADD_FAILURE() << "No such symbol found: " << Name;
     return 0;
   }
+  ExtensionID extensionID(llvm::StringRef AttrValueName) const {
+    for (ExtensionID EID = 0; EID < TestLang.G.table().AttributeValues.size();
+         ++EID)
+      if (TestLang.G.table().AttributeValues[EID] == AttrValueName)
+        return EID;
+    ADD_FAILURE() << "No such attribute value found: " << AttrValueName;
+    return 0;
+  }
 
   RuleID ruleFor(llvm::StringRef NonterminalName) const {
     auto RuleRange =
@@ -122,18 +130,16 @@ TEST_F(GLRTest, ShiftMergingHeads) {
                                    /*Parents=*/{GSSNode0});
 
   buildGrammar({}, {}); // Create a fake empty grammar.
-  TestLang.Table =
-      LRTable::buildForTests(TestLang.G, /*Entries=*/{
-                                 {1, tokenSymbol(tok::semi), Action::shift(4)},
-                                 {2, tokenSymbol(tok::semi), Action::shift(4)},
-                                 {3, tokenSymbol(tok::semi), Action::shift(5)},
-                             },
-                             {});
+  LRTable::Builder B(TestLang.G);
+  B.Transition[{StateID{1}, tokenSymbol(tok::semi)}] = StateID{4};
+  B.Transition[{StateID{2}, tokenSymbol(tok::semi)}] = StateID{4};
+  B.Transition[{StateID{3}, tokenSymbol(tok::semi)}] = StateID{5};
+  TestLang.Table = std::move(B).build();
 
   ForestNode &SemiTerminal = Arena.createTerminal(tok::semi, 0);
   std::vector<const GSS::Node *> NewHeads;
   glrShift({GSSNode1, GSSNode2, GSSNode3}, SemiTerminal,
-           {TestLang.G, TestLang.Table, Arena, GSStack}, NewHeads);
+           {emptyTokenStream(), Arena, GSStack}, TestLang, NewHeads);
 
   EXPECT_THAT(NewHeads,
               UnorderedElementsAre(AllOf(state(4), parsedSymbol(&SemiTerminal),
@@ -152,17 +158,12 @@ TEST_F(GLRTest, ReduceConflictsSplitting) {
   //    └--3(enum-name)     // 3 is goto(0, enum-name)
   buildGrammar({"class-name", "enum-name"},
                {"class-name := IDENTIFIER", "enum-name := IDENTIFIER"});
-
-  TestLang.Table = LRTable::buildForTests(
-      TestLang.G,
-      {
-          {/*State=*/0, id("class-name"), Action::goTo(2)},
-          {/*State=*/0, id("enum-name"), Action::goTo(3)},
-      },
-      {
-          {/*State=*/1, ruleFor("class-name")},
-          {/*State=*/1, ruleFor("enum-name")},
-      });
+  LRTable::Builder B(TestLang.G);
+  B.Transition[{StateID{0}, id("class-name")}] = StateID{2};
+  B.Transition[{StateID{0}, id("enum-name")}] = StateID{3};
+  B.Reduce[StateID{1}].insert(ruleFor("class-name"));
+  B.Reduce[StateID{1}].insert(ruleFor("enum-name"));
+  TestLang.Table = std::move(B).build();
 
   const auto *GSSNode0 =
       GSStack.addNode(/*State=*/0, /*ForestNode=*/nullptr, /*Parents=*/{});
@@ -171,7 +172,7 @@ TEST_F(GLRTest, ReduceConflictsSplitting) {
 
   std::vector<const GSS::Node *> Heads = {GSSNode1};
   glrReduce(Heads, tokenSymbol(tok::eof),
-            {TestLang.G, TestLang.Table, Arena, GSStack});
+            {emptyTokenStream(), Arena, GSStack}, TestLang);
   EXPECT_THAT(Heads, UnorderedElementsAre(
                          GSSNode1,
                          AllOf(state(2), parsedSymbolID(id("class-name")),
@@ -202,17 +203,15 @@ TEST_F(GLRTest, ReduceSplittingDueToMultipleBases) {
       /*State=*/4, &Arena.createTerminal(tok::star, /*TokenIndex=*/1),
       /*Parents=*/{GSSNode2, GSSNode3});
 
-  TestLang.Table = LRTable::buildForTests(
-      TestLang.G,
-      {
-          {/*State=*/2, id("ptr-operator"), Action::goTo(/*NextState=*/5)},
-          {/*State=*/3, id("ptr-operator"), Action::goTo(/*NextState=*/6)},
-      },
-      {
-          {/*State=*/4, ruleFor("ptr-operator")},
-      });
+  LRTable::Builder B(TestLang.G);
+  B.Transition[{StateID{2}, id("ptr-operator")}] = StateID{5};
+  B.Transition[{StateID{3}, id("ptr-operator")}] = StateID{6};
+  B.Reduce[StateID{4}].insert(ruleFor("ptr-operator"));
+  TestLang.Table = std::move(B).build();
+
   std::vector<const GSS::Node *> Heads = {GSSNode4};
-  glrReduce(Heads, tokenSymbol(tok::eof), {TestLang.G, TestLang.Table, Arena, GSStack});
+  glrReduce(Heads, tokenSymbol(tok::eof), {emptyTokenStream(), Arena, GSStack},
+            TestLang);
 
   EXPECT_THAT(Heads, UnorderedElementsAre(
                          GSSNode4,
@@ -256,18 +255,16 @@ TEST_F(GLRTest, ReduceJoiningWithMultipleBases) {
                       /*Parents=*/{GSSNode2});
 
   // FIXME: figure out a way to get rid of the hard-coded reduce RuleID!
-  TestLang.Table = LRTable::buildForTests(
-      TestLang.G,
-      {
-          {/*State=*/1, id("type-name"), Action::goTo(/*NextState=*/5)},
-          {/*State=*/2, id("type-name"), Action::goTo(/*NextState=*/5)},
-      },
-      {
-          {/*State=*/3, /* type-name := class-name */ 0},
-          {/*State=*/4, /* type-name := enum-name */ 1},
-      });
+  LRTable::Builder B(TestLang.G);
+  B.Transition[{StateID{1}, id("type-name")}] = StateID{5};
+  B.Transition[{StateID{2}, id("type-name")}] = StateID{5};
+  B.Reduce[StateID{3}].insert(/* type-name := class-name */ RuleID{0});
+  B.Reduce[StateID{4}].insert(/* type-name := enum-name */ RuleID{1});
+  TestLang.Table = std::move(B).build();
+
   std::vector<const GSS::Node *> Heads = {GSSNode3, GSSNode4};
-  glrReduce(Heads, tokenSymbol(tok::eof), {TestLang.G, TestLang.Table, Arena, GSStack});
+  glrReduce(Heads, tokenSymbol(tok::eof), {emptyTokenStream(), Arena, GSStack},
+            TestLang);
 
   // Verify that the stack heads are joint at state 5 after reduces.
   EXPECT_THAT(Heads, UnorderedElementsAre(GSSNode3, GSSNode4,
@@ -314,18 +311,15 @@ TEST_F(GLRTest, ReduceJoiningWithSameBase) {
                       /*Parents=*/{GSSNode2});
 
   // FIXME: figure out a way to get rid of the hard-coded reduce RuleID!
-  TestLang.Table =
-      LRTable::buildForTests(TestLang.G,
-                             {
-                                 {/*State=*/0, id("pointer"), Action::goTo(5)},
-                             },
-                             {
-                                 {3, /* pointer := class-name */ 0},
-                                 {4, /* pointer := enum-name */ 1},
-                             });
+  LRTable::Builder B(TestLang.G);
+  B.Transition[{StateID{0}, id("pointer")}] = StateID{5};
+  B.Reduce[StateID{3}].insert(/* pointer := class-name */ RuleID{0});
+  B.Reduce[StateID{4}].insert(/* pointer := enum-name */ RuleID{1});
+  TestLang.Table = std::move(B).build();
+
   std::vector<const GSS::Node *> Heads = {GSSNode3, GSSNode4};
   glrReduce(Heads, tokenSymbol(tok::eof),
-            {TestLang.G, TestLang.Table, Arena, GSStack});
+            {emptyTokenStream(), Arena, GSStack}, TestLang);
 
   EXPECT_THAT(
       Heads, UnorderedElementsAre(GSSNode3, GSSNode4,
@@ -345,14 +339,10 @@ TEST_F(GLRTest, ReduceJoiningWithSameBase) {
 TEST_F(GLRTest, ReduceLookahead) {
   // A term can be followed by +, but not by -.
   buildGrammar({"sum", "term"}, {"expr := term + term", "term := IDENTIFIER"});
-  TestLang.Table =
-      LRTable::buildForTests(TestLang.G,
-                             {
-                                 {/*State=*/0, id("term"), Action::goTo(2)},
-                             },
-                             {
-                                 {/*State=*/1, 0},
-                             });
+  LRTable::Builder B(TestLang.G);
+  B.Transition[{StateID{0}, id("term")}] = StateID{2};
+  B.Reduce[StateID{1}].insert(RuleID{0});
+  TestLang.Table = std::move(B).build();
 
   auto *Identifier = &Arena.createTerminal(tok::identifier, /*Start=*/0);
 
@@ -363,14 +353,16 @@ TEST_F(GLRTest, ReduceLookahead) {
 
   // When the lookahead is +, reduce is performed.
   std::vector<const GSS::Node *> Heads = {GSSNode1};
-  glrReduce(Heads, tokenSymbol(tok::plus), {TestLang.G, TestLang.Table, Arena, GSStack});
+  glrReduce(Heads, tokenSymbol(tok::plus), {emptyTokenStream(), Arena, GSStack},
+            TestLang);
   EXPECT_THAT(Heads,
               ElementsAre(GSSNode1, AllOf(state(2), parsedSymbolID(id("term")),
                                           parents(Root))));
 
   // When the lookahead is -, reduce is not performed.
   Heads = {GSSNode1};
-  glrReduce(Heads, tokenSymbol(tok::minus), {TestLang.G, TestLang.Table, Arena, GSStack});
+  glrReduce(Heads, tokenSymbol(tok::minus),
+            {emptyTokenStream(), Arena, GSStack}, TestLang);
   EXPECT_THAT(Heads, ElementsAre(GSSNode1));
 }
 
@@ -396,7 +388,7 @@ TEST_F(GLRTest, PerfectForestNodeSharing) {
   const TokenStream &Tokens = cook(lex("{ abc", LOptions), LOptions);
 
   const ForestNode &Parsed =
-      glrParse(Tokens, {TestLang.G, TestLang.Table, Arena, GSStack}, id("test"));
+      glrParse({Tokens, Arena, GSStack}, id("test"), TestLang);
   // Verify that there is no duplicated sequence node of `expr := IDENTIFIER`
   // in the forest, see the `#1` and `=#1` in the dump string.
   EXPECT_EQ(Parsed.dumpRecursive(TestLang.G),
@@ -433,7 +425,7 @@ TEST_F(GLRTest, GLRReduceOrder) {
   TestLang.Table = LRTable::buildSLR(TestLang.G);
 
   const ForestNode &Parsed =
-      glrParse(Tokens, {TestLang.G, TestLang.Table, Arena, GSStack}, id("test"));
+      glrParse({Tokens, Arena, GSStack}, id("test"), TestLang);
   EXPECT_EQ(Parsed.dumpRecursive(TestLang.G),
             "[  0, end) test := <ambiguous>\n"
             "[  0, end) ├─test := IDENTIFIER\n"
@@ -458,12 +450,42 @@ TEST_F(GLRTest, NoExplicitAccept) {
   TestLang.Table = LRTable::buildSLR(TestLang.G);
 
   const ForestNode &Parsed =
-      glrParse(Tokens, {TestLang.G, TestLang.Table, Arena, GSStack}, id("test"));
+      glrParse({Tokens, Arena, GSStack}, id("test"), TestLang);
   EXPECT_EQ(Parsed.dumpRecursive(TestLang.G),
             "[  0, end) test := IDENTIFIER test\n"
             "[  0,   1) ├─IDENTIFIER := tok[0]\n"
             "[  1, end) └─test := IDENTIFIER\n"
             "[  1, end)   └─IDENTIFIER := tok[1]\n");
+}
+
+TEST_F(GLRTest, GuardExtension) {
+  build(R"bnf(
+    _ := start
+
+    start := IDENTIFIER [guard=TestOnly]
+  )bnf");
+  TestLang.Guards.try_emplace(
+      extensionID("TestOnly"),
+      [&](llvm::ArrayRef<const ForestNode *> RHS, const TokenStream &Tokens) {
+        assert(RHS.size() == 1 &&
+               RHS.front()->symbol() == tokenSymbol(clang::tok::identifier));
+        return Tokens.tokens()[RHS.front()->startTokenIndex()].text() == "test";
+      });
+  clang::LangOptions LOptions;
+  TestLang.Table = LRTable::buildSLR(TestLang.G);
+
+  std::string Input = "test";
+  const TokenStream &Succeeded = cook(lex(Input, LOptions), LOptions);
+  EXPECT_EQ(glrParse({Succeeded, Arena, GSStack}, id("start"), TestLang)
+                .dumpRecursive(TestLang.G),
+            "[  0, end) start := IDENTIFIER [guard=TestOnly]\n"
+            "[  0, end) └─IDENTIFIER := tok[0]\n");
+
+  Input = "notest";
+  const TokenStream &Failed = cook(lex(Input, LOptions), LOptions);
+  EXPECT_EQ(glrParse({Failed, Arena, GSStack}, id("start"), TestLang)
+                .dumpRecursive(TestLang.G),
+            "[  0, end) start := <opaque>\n");
 }
 
 TEST(GSSTest, GC) {

@@ -212,7 +212,7 @@ bool EVMConvertRegToStack::runOnMachineFunction(MachineFunction &MF) {
             }
           }
 
-          else if (RegOpcode == EVM::pJUMPSUB_r || EVM::pJUMPSUBVOID_r) {
+          else if (RegOpcode == EVM::pJUMPSUB_r || RegOpcode == EVM::pJUMPSUBVOID_r) {
             // store FreeMemory Pointer to latest location:
 
             EVMMachineFunctionInfo *MFI = MF.getInfo<EVMMachineFunctionInfo>();

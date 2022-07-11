@@ -526,6 +526,10 @@ RISCVTargetLowering::RISCVTargetLowering(const TargetMachine &TM,
           {ISD::VP_FPTOSI, ISD::VP_FPTOUI, ISD::VP_TRUNCATE, ISD::VP_SETCC}, VT,
           Custom);
       setOperationAction(ISD::VECTOR_REVERSE, VT, Custom);
+
+      setOperationPromotedToType(
+          ISD::VECTOR_SPLICE, VT,
+          MVT::getVectorVT(MVT::i8, VT.getVectorElementCount()));
     }
 
     for (MVT VT : IntVecVTs) {
@@ -1155,6 +1159,30 @@ bool RISCVTargetLowering::hasBitTest(SDValue X, SDValue Y) const {
   // We can use ANDI+SEQZ/SNEZ as a bit test. Y contains the bit position.
   auto *C = dyn_cast<ConstantSDNode>(Y);
   return C && C->getAPIntValue().ule(10);
+}
+
+bool RISCVTargetLowering::shouldConvertConstantLoadToIntImm(const APInt &Imm,
+                                                            Type *Ty) const {
+  assert(Ty->isIntegerTy());
+
+  unsigned BitSize = Ty->getIntegerBitWidth();
+  if (BitSize > Subtarget.getXLen())
+    return false;
+
+  // Fast path, assume 32-bit immediates are cheap.
+  int64_t Val = Imm.getSExtValue();
+  if (isInt<32>(Val))
+    return true;
+
+  // Prefer to keep the load if it would require many instructions.
+  // This uses the same threshold we use for constant pools but doesn't
+  // check useConstantPoolForLargeInts.
+  // TODO: Should we keep the load only when we're definitely going to emit a
+  // constant pool?
+
+  RISCVMatInt::InstSeq Seq =
+      RISCVMatInt::generateInstSeq(Val, Subtarget.getFeatureBits());
+  return Seq.size() <= Subtarget.getMaxBuildIntsCost();
 }
 
 bool RISCVTargetLowering::
@@ -9864,7 +9892,7 @@ EmitLoweredCascadedSelect(MachineInstr &First, MachineInstr &Second,
   Register FLHS = First.getOperand(1).getReg();
   Register FRHS = First.getOperand(2).getReg();
   // Insert appropriate branch.
-  BuildMI(ThisMBB, DL, TII.getBrCond(FirstCC))
+  BuildMI(FirstMBB, DL, TII.getBrCond(FirstCC))
       .addReg(FLHS)
       .addReg(FRHS)
       .addMBB(SinkMBB);
@@ -9876,7 +9904,7 @@ EmitLoweredCascadedSelect(MachineInstr &First, MachineInstr &Second,
 
   auto SecondCC = static_cast<RISCVCC::CondCode>(Second.getOperand(3).getImm());
   // Insert appropriate branch.
-  BuildMI(FirstMBB, DL, TII.getBrCond(SecondCC))
+  BuildMI(ThisMBB, DL, TII.getBrCond(SecondCC))
       .addReg(SLHS)
       .addReg(SRHS)
       .addMBB(SinkMBB);
@@ -9884,9 +9912,9 @@ EmitLoweredCascadedSelect(MachineInstr &First, MachineInstr &Second,
   Register DestReg = Second.getOperand(0).getReg();
   Register Op2Reg4 = Second.getOperand(4).getReg();
   BuildMI(*SinkMBB, SinkMBB->begin(), DL, TII.get(RISCV::PHI), DestReg)
-      .addReg(Op1Reg4)
-      .addMBB(ThisMBB)
       .addReg(Op2Reg4)
+      .addMBB(ThisMBB)
+      .addReg(Op1Reg4)
       .addMBB(FirstMBB)
       .addReg(Op1Reg5)
       .addMBB(SecondMBB);

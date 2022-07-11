@@ -69,7 +69,6 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/ErrorOr.h"
-#include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
@@ -1243,6 +1242,8 @@ static AtomicRMWInst::BinOp getDecodedRMWOperation(unsigned Val) {
   case bitc::RMW_UMIN: return AtomicRMWInst::UMin;
   case bitc::RMW_FADD: return AtomicRMWInst::FAdd;
   case bitc::RMW_FSUB: return AtomicRMWInst::FSub;
+  case bitc::RMW_FMAX: return AtomicRMWInst::FMax;
+  case bitc::RMW_FMIN: return AtomicRMWInst::FMin;
   }
 }
 
@@ -1383,6 +1384,9 @@ static bool isConstExprSupported(uint8_t Opcode) {
   // These are not real constant expressions, always consider them supported.
   if (Opcode >= BitcodeConstant::FirstSpecialOpcode)
     return true;
+
+  if (Instruction::isBinaryOp(Opcode))
+    return ConstantExpr::isSupportedBinOp(Opcode);
 
   return !ExpandConstantExprs;
 }
@@ -7441,10 +7445,9 @@ class BitcodeErrorCategoryType : public std::error_category {
 
 } // end anonymous namespace
 
-static ManagedStatic<BitcodeErrorCategoryType> ErrorCategory;
-
 const std::error_category &llvm::BitcodeErrorCategory() {
-  return *ErrorCategory;
+  static BitcodeErrorCategoryType ErrorCategory;
+  return ErrorCategory;
 }
 
 static Expected<StringRef> readBlobInRecord(BitstreamCursor &Stream,

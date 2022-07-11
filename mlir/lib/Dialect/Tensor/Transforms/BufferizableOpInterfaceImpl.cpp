@@ -67,7 +67,7 @@ struct CastOpInterface
 
     // Compute the new memref type.
     Type resultMemRefType =
-        getMemRefType(resultTensorType, options, layout,
+        getMemRefType(castOp.getResult(), options, layout,
                       sourceMemRefType.getMemorySpaceAsInt());
 
     // Replace the op with a memref.cast.
@@ -200,7 +200,7 @@ struct DimOpInterface
     if (failed(v))
       return failure();
     replaceOpWithNewBufferizedOp<memref::DimOp>(rewriter, op, *v,
-                                                dimOp.index());
+                                                dimOp.getIndex());
     return success();
   }
 };
@@ -332,7 +332,7 @@ struct ExtractOpInterface
     if (failed(srcMemref))
       return failure();
     replaceOpWithNewBufferizedOp<memref::LoadOp>(rewriter, op, *srcMemref,
-                                                 extractOp.indices());
+                                                 extractOp.getIndices());
     return success();
   }
 };
@@ -780,9 +780,8 @@ struct ReshapeOpInterface
         getBuffer(rewriter, reshapeOp.getShape(), options);
     if (failed(srcBuffer) || failed(shapeBuffer))
       return failure();
-    auto resultTensorType = reshapeOp.getResult().getType().cast<TensorType>();
     auto resultMemRefType = getMemRefType(
-        resultTensorType, options, /*layout=*/{},
+        reshapeOp.getResult(), options, /*layout=*/{},
         srcBuffer->getType().cast<BaseMemRefType>().getMemorySpaceAsInt());
     replaceOpWithNewBufferizedOp<memref::ReshapeOp>(
         rewriter, op, resultMemRefType, *srcBuffer, *shapeBuffer);

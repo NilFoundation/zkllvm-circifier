@@ -3233,9 +3233,15 @@ static bool EquivalentArrayTypes(QualType Old, QualType New,
   }
 
   // Only compare size, ignore Size modifiers and CVR.
-  if (Old->isConstantArrayType() && New->isConstantArrayType())
+  if (Old->isConstantArrayType() && New->isConstantArrayType()) {
     return Ctx.getAsConstantArrayType(Old)->getSize() ==
            Ctx.getAsConstantArrayType(New)->getSize();
+  }
+
+  // Don't try to compare dependent sized array
+  if (Old->isDependentSizedArrayType() && New->isDependentSizedArrayType()) {
+    return true;
+  }
 
   return Old == New;
 }
@@ -9405,25 +9411,15 @@ Sema::ActOnFunctionDeclarator(Scope *S, Declarator &D, DeclContext *DC,
     NewFD->setLocalExternDecl();
 
   if (getLangOpts().CPlusPlus) {
-    // The rules for implicit inlines changed in C++20 for methods and friends
-    // with an in-class definition (when such a definition is not attached to
-    // the global module).  User-specified 'inline' overrides this (set when
-    // the function decl is created above).
-    bool ImplicitInlineCXX20 = !getLangOpts().CPlusPlus20 ||
-                               !NewFD->getOwningModule() ||
-                               NewFD->getOwningModule()->isGlobalModule();
     bool isInline = D.getDeclSpec().isInlineSpecified();
     bool isVirtual = D.getDeclSpec().isVirtualSpecified();
     bool hasExplicit = D.getDeclSpec().hasExplicitSpecifier();
     isFriend = D.getDeclSpec().isFriendSpecified();
     if (isFriend && !isInline && D.isFunctionDefinition()) {
-      // Pre-C++20 [class.friend]p5
+      // C++ [class.friend]p5
       //   A function can be defined in a friend declaration of a
       //   class . . . . Such a function is implicitly inline.
-      // Post C++20 [class.friend]p7
-      //   Such a function is implicitly an inline function if it is attached
-      //   to the global module.
-      NewFD->setImplicitlyInline(ImplicitInlineCXX20);
+      NewFD->setImplicitlyInline();
     }
 
     // If this is a method defined in an __interface, and is not a constructor
@@ -9706,14 +9702,11 @@ Sema::ActOnFunctionDeclarator(Scope *S, Declarator &D, DeclContext *DC,
     }
 
     if (isa<CXXMethodDecl>(NewFD) && DC == CurContext &&
-        D.isFunctionDefinition() && !isInline) {
-      // Pre C++20 [class.mfct]p2:
+        D.isFunctionDefinition()) {
+      // C++ [class.mfct]p2:
       //   A member function may be defined (8.4) in its class definition, in
       //   which case it is an inline member function (7.1.2)
-      // Post C++20 [class.mfct]p1:
-      //   If a member function is attached to the global module and is defined
-      //   in its class definition, it is inline.
-      NewFD->setImplicitlyInline(ImplicitInlineCXX20);
+      NewFD->setImplicitlyInline();
     }
 
     if (SC == SC_Static && isa<CXXMethodDecl>(NewFD) &&
@@ -15521,7 +15514,7 @@ void Sema::AddKnownFunctionAttributesForReplaceableGlobalAllocationFunction(
   //         specified by the value of this argument.
   if (AlignmentParam && !FD->hasAttr<AllocAlignAttr>()) {
     FD->addAttr(AllocAlignAttr::CreateImplicit(
-        Context, ParamIdx(AlignmentParam.getValue(), FD), FD->getLocation()));
+        Context, ParamIdx(AlignmentParam.value(), FD), FD->getLocation()));
   }
 
   // FIXME:

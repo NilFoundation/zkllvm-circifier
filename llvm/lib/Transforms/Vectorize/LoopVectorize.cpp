@@ -1677,7 +1677,8 @@ private:
 
   /// A set containing all BasicBlocks that are known to present after
   /// vectorization as a predicated block.
-  SmallPtrSet<BasicBlock *, 4> PredicatedBBsAfterVectorization;
+  DenseMap<ElementCount, SmallPtrSet<BasicBlock *, 4>>
+      PredicatedBBsAfterVectorization;
 
   /// Records whether it is allowed to have the original scalar loop execute at
   /// least once. This may be needed as a fallback loop in case runtime
@@ -1918,10 +1919,13 @@ public:
 
       auto DiffChecks = RtPtrChecking.getDiffChecks();
       if (DiffChecks) {
+        Value *RuntimeVF = nullptr;
         MemRuntimeCheckCond = addDiffRuntimeChecks(
             MemCheckBlock->getTerminator(), L, *DiffChecks, MemCheckExp,
-            [VF](IRBuilderBase &B, unsigned Bits) {
-              return getRuntimeVF(B, B.getIntNTy(Bits), VF);
+            [VF, &RuntimeVF](IRBuilderBase &B, unsigned Bits) {
+              if (!RuntimeVF)
+                RuntimeVF = getRuntimeVF(B, B.getIntNTy(Bits), VF);
+              return RuntimeVF;
             },
             IC);
       } else {
@@ -2946,11 +2950,17 @@ void InnerLoopVectorizer::emitIterationCountCheck(BasicBlock *Bypass) {
   // If tail is to be folded, vector loop takes care of all iterations.
   Type *CountTy = Count->getType();
   Value *CheckMinIters = Builder.getFalse();
-  auto CreateStep = [&]() {
+  auto CreateStep = [&]() -> Value * {
     // Create step with max(MinProTripCount, UF * VF).
-    if (UF * VF.getKnownMinValue() < MinProfitableTripCount.getKnownMinValue())
-      return createStepForVF(Builder, CountTy, MinProfitableTripCount, 1);
-    return createStepForVF(Builder, CountTy, VF, UF);
+    if (UF * VF.getKnownMinValue() >= MinProfitableTripCount.getKnownMinValue())
+      return createStepForVF(Builder, CountTy, VF, UF);
+
+    Value *MinProfTC =
+        createStepForVF(Builder, CountTy, MinProfitableTripCount, 1);
+    if (!VF.isScalable())
+      return MinProfTC;
+    return Builder.CreateBinaryIntrinsic(
+        Intrinsic::umax, MinProfTC, createStepForVF(Builder, CountTy, VF, UF));
   };
 
   if (!Cost->foldTailByMasking())
@@ -4865,7 +4875,7 @@ LoopVectorizationCostModel::getMaxLegalScalableVF(unsigned MaxSafeElements) {
     MaxVScale =
         TheFunction->getFnAttribute(Attribute::VScaleRange).getVScaleRangeMax();
   MaxScalableVF = ElementCount::getScalable(
-      MaxVScale ? (MaxSafeElements / MaxVScale.getValue()) : 0);
+      MaxVScale ? (MaxSafeElements / MaxVScale.value()) : 0);
   if (!MaxScalableVF)
     reportVectorizationInfo(
         "Max legal vector width too small, scalable vectorization "
@@ -5260,9 +5270,9 @@ bool LoopVectorizationCostModel::isMoreProfitable(
   unsigned EstimatedWidthB = B.Width.getKnownMinValue();
   if (Optional<unsigned> VScale = getVScaleForTuning()) {
     if (A.Width.isScalable())
-      EstimatedWidthA *= VScale.getValue();
+      EstimatedWidthA *= VScale.value();
     if (B.Width.isScalable())
-      EstimatedWidthB *= VScale.getValue();
+      EstimatedWidthB *= VScale.value();
   }
 
   // Assume vscale may be larger than 1 (or the value being tuned for),
@@ -5405,7 +5415,7 @@ VectorizationFactor LoopVectorizationCostModel::selectVectorizationFactor(
   }
 
   LLVM_DEBUG(if (ForceVectorization && !ChosenFactor.Width.isScalar() &&
-                 ChosenFactor.Cost >= ScalarCost.Cost) dbgs()
+                 !isMoreProfitable(ChosenFactor, ScalarCost)) dbgs()
              << "LV: Vectorization seems to be not beneficial, "
              << "but was forced by a user.\n");
   LLVM_DEBUG(dbgs() << "LV: Selecting VF: " << ChosenFactor.Width << ".\n");
@@ -6088,6 +6098,8 @@ void LoopVectorizationCostModel::collectInstsToScalarize(ElementCount VF) {
   // map will indicate that we've analyzed it already.
   ScalarCostsTy &ScalarCostsVF = InstsToScalarize[VF];
 
+  PredicatedBBsAfterVectorization[VF].clear();
+
   // Find all the instructions that are scalar with predication in the loop and
   // determine if it would be better to not if-convert the blocks they are in.
   // If so, we also record the instructions to scalarize.
@@ -6105,7 +6117,7 @@ void LoopVectorizationCostModel::collectInstsToScalarize(ElementCount VF) {
             computePredInstDiscount(&I, ScalarCosts, VF) >= 0)
           ScalarCostsVF.insert(ScalarCosts.begin(), ScalarCosts.end());
         // Remember that BB will remain after vectorization.
-        PredicatedBBsAfterVectorization.insert(BB);
+        PredicatedBBsAfterVectorization[VF].insert(BB);
       }
   }
 }
@@ -6970,8 +6982,8 @@ LoopVectorizationCostModel::getInstructionCost(Instruction *I, ElementCount VF,
     bool ScalarPredicatedBB = false;
     BranchInst *BI = cast<BranchInst>(I);
     if (VF.isVector() && BI->isConditional() &&
-        (PredicatedBBsAfterVectorization.count(BI->getSuccessor(0)) ||
-         PredicatedBBsAfterVectorization.count(BI->getSuccessor(1))))
+        (PredicatedBBsAfterVectorization[VF].count(BI->getSuccessor(0)) ||
+         PredicatedBBsAfterVectorization[VF].count(BI->getSuccessor(1))))
       ScalarPredicatedBB = true;
 
     if (ScalarPredicatedBB) {
@@ -7622,7 +7634,7 @@ void LoopVectorizationPlanner::executePlan(ElementCount BestVF, unsigned BestUF,
       BestVPlan.getVectorLoopRegion()->getEntryBasicBlock();
   Loop *L = LI->getLoopFor(State.CFG.VPBB2IRBB[HeaderVPBB]);
   if (VectorizedLoopID)
-    L->setLoopID(VectorizedLoopID.getValue());
+    L->setLoopID(VectorizedLoopID.value());
   else {
     // Keep all loop hints from the original loop on the vector loop (we'll
     // replace the vectorizer-specific hints below).
@@ -8441,9 +8453,8 @@ VPBasicBlock *VPRecipeBuilder::handleReplication(
   return RegSucc;
 }
 
-VPRegionBlock *VPRecipeBuilder::createReplicateRegion(Instruction *Instr,
-                                                      VPRecipeBase *PredRecipe,
-                                                      VPlanPtr &Plan) {
+VPRegionBlock *VPRecipeBuilder::createReplicateRegion(
+    Instruction *Instr, VPReplicateRecipe *PredRecipe, VPlanPtr &Plan) {
   // Instructions marked for predication are replicated and placed under an
   // if-then construct to prevent side-effects.
 
@@ -8457,7 +8468,7 @@ VPRegionBlock *VPRecipeBuilder::createReplicateRegion(Instruction *Instr,
   auto *Entry = new VPBasicBlock(Twine(RegionName) + ".entry", BOMRecipe);
   auto *PHIRecipe = Instr->getType()->isVoidTy()
                         ? nullptr
-                        : new VPPredInstPHIRecipe(Plan->getOrAddVPValue(Instr));
+                        : new VPPredInstPHIRecipe(PredRecipe);
   if (PHIRecipe) {
     Plan->removeVPValueFor(Instr);
     Plan->addVPValue(Instr, PHIRecipe);
@@ -9155,7 +9166,9 @@ void LoopVectorizationPlanner::adjustRecipesForReductions(
       WidenRecipe->getVPSingleValue()->replaceAllUsesWith(RedRecipe);
       Plan->removeVPValueFor(R);
       Plan->addVPValue(R, RedRecipe);
-      WidenRecipe->getParent()->insert(RedRecipe, WidenRecipe->getIterator());
+      // Append the recipe to the end of the VPBasicBlock because we need to
+      // ensure that it comes after all of it's inputs, including CondOp.
+      WidenRecipe->getParent()->appendRecipe(RedRecipe);
       WidenRecipe->getVPSingleValue()->replaceAllUsesWith(RedRecipe);
       WidenRecipe->eraseFromParent();
 
@@ -9486,45 +9499,6 @@ void VPScalarIVStepsRecipe::execute(VPTransformState &State) {
   }
 }
 
-void VPBlendRecipe::execute(VPTransformState &State) {
-  State.setDebugLocFromInst(Phi);
-  // We know that all PHIs in non-header blocks are converted into
-  // selects, so we don't have to worry about the insertion order and we
-  // can just use the builder.
-  // At this point we generate the predication tree. There may be
-  // duplications since this is a simple recursive scan, but future
-  // optimizations will clean it up.
-
-  unsigned NumIncoming = getNumIncomingValues();
-
-  // Generate a sequence of selects of the form:
-  // SELECT(Mask3, In3,
-  //        SELECT(Mask2, In2,
-  //               SELECT(Mask1, In1,
-  //                      In0)))
-  // Note that Mask0 is never used: lanes for which no path reaches this phi and
-  // are essentially undef are taken from In0.
-  InnerLoopVectorizer::VectorParts Entry(State.UF);
-  for (unsigned In = 0; In < NumIncoming; ++In) {
-    for (unsigned Part = 0; Part < State.UF; ++Part) {
-      // We might have single edge PHIs (blocks) - use an identity
-      // 'select' for the first PHI operand.
-      Value *In0 = State.get(getIncomingValue(In), Part);
-      if (In == 0)
-        Entry[Part] = In0; // Initialize with the first incoming value.
-      else {
-        // Select between the current value and the previous incoming edge
-        // based on the incoming mask.
-        Value *Cond = State.get(getMask(In), Part);
-        Entry[Part] =
-            State.Builder.CreateSelect(Cond, In0, Entry[Part], "predphi");
-      }
-    }
-  }
-  for (unsigned Part = 0; Part < State.UF; ++Part)
-    State.set(this, Entry[Part], Part);
-}
-
 void VPInterleaveRecipe::execute(VPTransformState &State) {
   assert(!State.Instance && "Interleave group being replicated.");
   State.ILV->vectorizeInterleaveGroup(IG, definedValues(), State, getAddr(),
@@ -9610,78 +9584,6 @@ void VPReplicateRecipe::execute(VPTransformState &State) {
       State.ILV->scalarizeInstruction(getUnderlyingInstr(), this,
                                       VPIteration(Part, Lane), IsPredicated,
                                       State);
-}
-
-void VPBranchOnMaskRecipe::execute(VPTransformState &State) {
-  assert(State.Instance && "Branch on Mask works only on single instance.");
-
-  unsigned Part = State.Instance->Part;
-  unsigned Lane = State.Instance->Lane.getKnownLane();
-
-  Value *ConditionBit = nullptr;
-  VPValue *BlockInMask = getMask();
-  if (BlockInMask) {
-    ConditionBit = State.get(BlockInMask, Part);
-    if (ConditionBit->getType()->isVectorTy())
-      ConditionBit = State.Builder.CreateExtractElement(
-          ConditionBit, State.Builder.getInt32(Lane));
-  } else // Block in mask is all-one.
-    ConditionBit = State.Builder.getTrue();
-
-  // Replace the temporary unreachable terminator with a new conditional branch,
-  // whose two destinations will be set later when they are created.
-  auto *CurrentTerminator = State.CFG.PrevBB->getTerminator();
-  assert(isa<UnreachableInst>(CurrentTerminator) &&
-         "Expected to replace unreachable terminator with conditional branch.");
-  auto *CondBr = BranchInst::Create(State.CFG.PrevBB, nullptr, ConditionBit);
-  CondBr->setSuccessor(0, nullptr);
-  ReplaceInstWithInst(CurrentTerminator, CondBr);
-}
-
-void VPPredInstPHIRecipe::execute(VPTransformState &State) {
-  assert(State.Instance && "Predicated instruction PHI works per instance.");
-  Instruction *ScalarPredInst =
-      cast<Instruction>(State.get(getOperand(0), *State.Instance));
-  BasicBlock *PredicatedBB = ScalarPredInst->getParent();
-  BasicBlock *PredicatingBB = PredicatedBB->getSinglePredecessor();
-  assert(PredicatingBB && "Predicated block has no single predecessor.");
-  assert(isa<VPReplicateRecipe>(getOperand(0)) &&
-         "operand must be VPReplicateRecipe");
-
-  // By current pack/unpack logic we need to generate only a single phi node: if
-  // a vector value for the predicated instruction exists at this point it means
-  // the instruction has vector users only, and a phi for the vector value is
-  // needed. In this case the recipe of the predicated instruction is marked to
-  // also do that packing, thereby "hoisting" the insert-element sequence.
-  // Otherwise, a phi node for the scalar value is needed.
-  unsigned Part = State.Instance->Part;
-  if (State.hasVectorValue(getOperand(0), Part)) {
-    Value *VectorValue = State.get(getOperand(0), Part);
-    InsertElementInst *IEI = cast<InsertElementInst>(VectorValue);
-    PHINode *VPhi = State.Builder.CreatePHI(IEI->getType(), 2);
-    VPhi->addIncoming(IEI->getOperand(0), PredicatingBB); // Unmodified vector.
-    VPhi->addIncoming(IEI, PredicatedBB); // New vector with inserted element.
-    if (State.hasVectorValue(this, Part))
-      State.reset(this, VPhi, Part);
-    else
-      State.set(this, VPhi, Part);
-    // NOTE: Currently we need to update the value of the operand, so the next
-    // predicated iteration inserts its generated value in the correct vector.
-    State.reset(getOperand(0), VPhi, Part);
-  } else {
-    Type *PredInstType = getOperand(0)->getUnderlyingValue()->getType();
-    PHINode *Phi = State.Builder.CreatePHI(PredInstType, 2);
-    Phi->addIncoming(PoisonValue::get(ScalarPredInst->getType()),
-                     PredicatingBB);
-    Phi->addIncoming(ScalarPredInst, PredicatedBB);
-    if (State.hasScalarValue(this, *State.Instance))
-      State.reset(this, Phi, *State.Instance);
-    else
-      State.set(this, Phi, *State.Instance);
-    // NOTE: Currently we need to update the value of the operand, so the next
-    // predicated iteration inserts its generated value in the correct vector.
-    State.reset(getOperand(0), Phi, *State.Instance);
-  }
 }
 
 void VPWidenMemoryInstructionRecipe::execute(VPTransformState &State) {
@@ -10522,7 +10424,7 @@ bool LoopVectorizePass::processLoop(Loop *L) {
       makeFollowupLoopID(OrigLoopID, {LLVMLoopVectorizeFollowupAll,
                                       LLVMLoopVectorizeFollowupEpilogue});
   if (RemainderLoopID) {
-    L->setLoopID(RemainderLoopID.getValue());
+    L->setLoopID(RemainderLoopID.value());
   } else {
     if (DisableRuntimeUnroll)
       AddRuntimeUnrollDisableMetaData(L);

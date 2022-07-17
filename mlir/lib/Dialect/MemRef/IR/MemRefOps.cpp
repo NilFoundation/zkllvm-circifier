@@ -1300,8 +1300,8 @@ LogicalResult GlobalOp::verify() {
 
   // Verify that the initial value, if present, is either a unit attribute or
   // an elements attribute.
-  if (getInitialValue().hasValue()) {
-    Attribute initValue = getInitialValue().getValue();
+  if (getInitialValue().has_value()) {
+    Attribute initValue = getInitialValue().value();
     if (!initValue.isa<UnitAttr>() && !initValue.isa<ElementsAttr>())
       return emitOpError("initial value should be a unit or elements "
                          "attribute, but got ")
@@ -1332,8 +1332,8 @@ LogicalResult GlobalOp::verify() {
 
 ElementsAttr GlobalOp::getConstantInitValue() {
   auto initVal = getInitialValue();
-  if (getConstant() && initVal.hasValue())
-    return initVal.getValue().cast<ElementsAttr>();
+  if (getConstant() && initVal.has_value())
+    return initVal.value().cast<ElementsAttr>();
   return {};
 }
 
@@ -2164,7 +2164,7 @@ Type SubViewOp::inferRankReducedResultType(ArrayRef<int64_t> resultShape,
   // Compute which dimensions are dropped.
   Optional<llvm::SmallDenseSet<unsigned>> dimsToProject =
       computeRankReductionMask(inferredType.getShape(), resultShape);
-  assert(dimsToProject.hasValue() && "invalid rank reduction");
+  assert(dimsToProject.has_value() && "invalid rank reduction");
   llvm::SmallBitVector dimsToProjectVector(inferredType.getRank());
   for (unsigned dim : *dimsToProject)
     dimsToProjectVector.set(dim);
@@ -2487,14 +2487,14 @@ static bool isTrivialSubViewOp(SubViewOp subViewOp) {
   // Check offsets are zero.
   if (llvm::any_of(mixedOffsets, [](OpFoldResult ofr) {
         Optional<int64_t> intValue = getConstantIntValue(ofr);
-        return !intValue || intValue.getValue() != 0;
+        return !intValue || intValue.value() != 0;
       }))
     return false;
 
   // Check strides are one.
   if (llvm::any_of(mixedStrides, [](OpFoldResult ofr) {
         Optional<int64_t> intValue = getConstantIntValue(ofr);
-        return !intValue || intValue.getValue() != 1;
+        return !intValue || intValue.value() != 1;
       }))
     return false;
 

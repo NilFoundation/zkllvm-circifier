@@ -999,7 +999,13 @@ class MDNode : public Metadata {
              alignTo(getAllocSize(), alignof(uint64_t));
     }
 
-    void *getLargePtr() const;
+    void *getLargePtr() const {
+      static_assert(alignof(LargeStorageVector) <= alignof(Header),
+                    "LargeStorageVector too strongly aligned");
+      return reinterpret_cast<char *>(const_cast<Header *>(this)) -
+             sizeof(LargeStorageVector);
+    }
+
     void *getSmallPtr();
 
     LargeStorageVector &getLarge() {
@@ -1031,6 +1037,12 @@ class MDNode : public Metadata {
         return getLarge();
       return makeArrayRef(reinterpret_cast<const MDOperand *>(this) - SmallSize,
                           SmallNumOps);
+    }
+
+    unsigned getNumOperands() const {
+      if (!IsLarge)
+        return SmallNumOps;
+      return getLarge().size();
     }
   };
 
@@ -1275,7 +1287,7 @@ public:
     return const_cast<MDNode *>(this)->mutable_end();
   }
 
-  op_range operands() const { return op_range(op_begin(), op_end()); }
+  ArrayRef<MDOperand> operands() const { return getHeader().operands(); }
 
   const MDOperand &getOperand(unsigned I) const {
     assert(I < getNumOperands() && "Out of range");
@@ -1283,7 +1295,7 @@ public:
   }
 
   /// Return number of MDNode operands.
-  unsigned getNumOperands() const { return getHeader().operands().size(); }
+  unsigned getNumOperands() const { return getHeader().getNumOperands(); }
 
   /// Methods for support type inquiry through isa, cast, and dyn_cast:
   static bool classof(const Metadata *MD) {
@@ -1333,7 +1345,9 @@ class MDTuple : public MDNode {
                           StorageType Storage, bool ShouldCreate = true);
 
   TempMDTuple cloneImpl() const {
-    return getTemporary(getContext(), SmallVector<Metadata *, 4>(operands()));
+    ArrayRef<MDOperand> Operands = operands();
+    return getTemporary(getContext(), SmallVector<Metadata *, 4>(
+                                          Operands.begin(), Operands.end()));
   }
 
 public:

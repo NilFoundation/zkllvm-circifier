@@ -171,7 +171,7 @@ struct AffineIfCondition {
       fromCmpIOp(condDef);
   }
 
-  bool hasIntegerSet() const { return integerSet.hasValue(); }
+  bool hasIntegerSet() const { return integerSet.has_value(); }
 
   mlir::IntegerSet getIntegerSet() const {
     assert(hasIntegerSet() && "integer set is missing");
@@ -189,7 +189,7 @@ private:
   MaybeAffineExpr affineBinaryOp(mlir::AffineExprKind kind, MaybeAffineExpr lhs,
                                  MaybeAffineExpr rhs) {
     if (lhs && rhs)
-      return mlir::getAffineBinaryOpExpr(kind, lhs.getValue(), rhs.getValue());
+      return mlir::getAffineBinaryOpExpr(kind, *lhs, *rhs);
     return {};
   }
 

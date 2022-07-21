@@ -1,8 +1,8 @@
-; RUN: llc-mtriple=evm -filetype=asm | FileCheck %s
+; RUN: llc < %s -mtriple=evm -filetype=asm | FileCheck %s
 
-define i256 @foo__(i256 %b, i256 %c) nounwind readnone ssp {
-; CHECK-LABEL: foo__
+define i256 @foo(i256 %b, i256 %c) nounwind readnone ssp {
 entry:
+; CHECK-LABEL: foo
   %mul = sub i256 0, %b
   %tobool = icmp eq i256 %c, 0
   %b.mul = select i1 %tobool, i256 %b, i256 %mul
@@ -10,8 +10,8 @@ entry:
   ret i256 %add
 }
 
-define i256 @foo3__(i256 %b, i256 %c) nounwind readnone ssp {
-; CHECK-LABEL: foo3__
+define i256 @foo3(i256 %b, i256 %c) nounwind readnone ssp {
+; CHECK-LABEL: foo3
 entry:
   %not.tobool = icmp ne i256 %c, 0
   %xor = sext i1 %not.tobool to i256
@@ -20,8 +20,8 @@ entry:
   ret i256 %add
 }
 
-define i256 @foo4__(i256 %a) nounwind ssp {
-; CHECK-LABEL: foo4__
+define i256 @foo4(i256 %a) nounwind ssp {
+; CHECK-LABEL: foo4
   %cmp = icmp sgt i256 %a, -1
   %neg = sub nsw i256 0, %a
   %cond = select i1 %cmp, i256 %a, i256 %neg
@@ -40,7 +40,7 @@ entry:
 
 ; make sure we can handle branch instruction in optimizeCompare.
 define i256 @foo6(i256 %a, i256 %b) nounwind ssp {
-; CHECK-LABEL: foo6__
+; CHECK-LABEL: foo6
   %sub = sub nsw i256 %a, %b
   %cmp = icmp sgt i256 %sub, 0
   br i1 %cmp, label %l.if, label %l.else
@@ -54,7 +54,7 @@ l.else:
 
 define i256 @foo7(i256 %a, i256 %b) nounwind {
 entry:
-; CHECK-LABEL: foo7__:
+; CHECK-LABEL: foo7:
   %sub = sub nsw i256 %a, %b
   %cmp = icmp sgt i256 %sub, -1
   %sub3 = sub nsw i256 0, %sub
@@ -72,7 +72,7 @@ if.else:
 
 define i256 @foo8(i256 %v, i256 %a, i256 %b) nounwind readnone ssp {
 entry:
-; CHECK-LABEL: foo8__:
+; CHECK-LABEL: foo8:
   %tobool = icmp eq i256 %v, 0
   %neg = xor i256 -1, %b
   %cond = select i1 %tobool, i256 %neg, i256 %a
@@ -81,7 +81,7 @@ entry:
 
 define i256 @foo9(i256 %v) nounwind readnone optsize ssp {
 entry:
-; CHECK-LABEL: foo9__:
+; CHECK-LABEL: foo9:
   %tobool = icmp ne i256 %v, 0
   %cond = select i1 %tobool, i256 4, i256 -5
   ret i256 %cond
@@ -89,7 +89,7 @@ entry:
 
 define i256 @foo11(i256 %v) nounwind readnone optsize ssp {
 entry:
-; CHECK-LABEL: foo11__:
+; CHECK-LABEL: foo11:
   %tobool = icmp ne i256 %v, 0
   %cond = select i1 %tobool, i256 4, i256 -4
   ret i256 %cond
@@ -97,7 +97,7 @@ entry:
 
 define i256 @foo13(i256 %v, i256 %a, i256 %b) nounwind readnone optsize ssp {
 entry:
-; CHECK-LABEL: foo13__:
+; CHECK-LABEL: foo13:
   %tobool = icmp eq i256 %v, 0
   %sub = sub i256 0, %b
   %cond = select i1 %tobool, i256 %sub, i256 %a
@@ -106,7 +106,7 @@ entry:
 
 define i64 @foo14(i64 %v, i64 %a, i64 %b) nounwind readnone optsize ssp {
 entry:
-; CHECK-LABEL: foo14__:
+; CHECK-LABEL: foo14:
 ; CHECK: cmp x0, #0
 ; CHECK: csneg x0, x1, x2, ne
   %tobool = icmp eq i64 %v, 0
@@ -115,7 +115,7 @@ entry:
   ret i64 %cond
 }
 
-define i256 @foo15__(i256 %a, i256 %b) nounwind readnone optsize ssp {
+define i256 @foo15(i256 %a, i256 %b) nounwind readnone optsize ssp {
 entry:
 ; CHECK-LABEL: foo15:
   %cmp = icmp sgt i256 %a, %b
@@ -125,21 +125,21 @@ entry:
 
 define i256 @foo16(i256 %a, i256 %b) nounwind readnone optsize ssp {
 entry:
-; CHECK-LABEL: foo16__:
+; CHECK-LABEL: foo16:
   %cmp = icmp sgt i256 %a, %b
   %. = select i1 %cmp, i256 1, i256 2
   ret i256 %.
 }
 
 define i256 @foo20(i256 %x) {
-; CHECK-LABEL: foo20__:
+; CHECK-LABEL: foo20:
   %cmp = icmp eq i256 %x, 5
   %res = select i1 %cmp, i256 6, i256 1
   ret i256 %res
 }
 
 define i256 @foo22(i256 %x) {
-; CHECK-LABEL: foo22__:
+; CHECK-LABEL: foo22:
   %cmp = icmp eq i256 %x, 5
   %res = select i1 %cmp, i256 1, i256 6
   ret i256 %res

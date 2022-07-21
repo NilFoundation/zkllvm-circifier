@@ -1006,6 +1006,14 @@ bool AMDGPUInstructionSelector::selectG_INTRINSIC(MachineInstr &I) const {
   case Intrinsic::amdgcn_smfmac_f32_32x32x16_bf16:
   case Intrinsic::amdgcn_smfmac_i32_16x16x64_i8:
   case Intrinsic::amdgcn_smfmac_i32_32x32x32_i8:
+  case Intrinsic::amdgcn_smfmac_f32_16x16x64_bf8_bf8:
+  case Intrinsic::amdgcn_smfmac_f32_16x16x64_bf8_fp8:
+  case Intrinsic::amdgcn_smfmac_f32_16x16x64_fp8_bf8:
+  case Intrinsic::amdgcn_smfmac_f32_16x16x64_fp8_fp8:
+  case Intrinsic::amdgcn_smfmac_f32_32x32x32_bf8_bf8:
+  case Intrinsic::amdgcn_smfmac_f32_32x32x32_bf8_fp8:
+  case Intrinsic::amdgcn_smfmac_f32_32x32x32_fp8_bf8:
+  case Intrinsic::amdgcn_smfmac_f32_32x32x32_fp8_fp8:
     return selectSMFMACIntrin(I);
   default:
     return selectImpl(I, *CoverageInfo);
@@ -3237,6 +3245,8 @@ static Register matchZeroExtendFromS32(MachineRegisterInfo &MRI, Register Reg) {
   if (Def->getOpcode() != AMDGPU::G_MERGE_VALUES)
     return Register();
 
+  assert(Def->getNumOperands() == 3 &&
+         MRI.getType(Def->getOperand(0).getReg()) == LLT::scalar(64));
   if (mi_match(Def->getOperand(2).getReg(), MRI, m_ZeroInt())) {
     return Def->getOperand(1).getReg();
   }
@@ -3353,6 +3363,30 @@ bool AMDGPUInstructionSelector::selectSMFMACIntrin(MachineInstr &MI) const {
     break;
   case Intrinsic::amdgcn_smfmac_i32_32x32x32_i8:
     Opc = AMDGPU::V_SMFMAC_I32_32X32X32_I8_e64;
+    break;
+  case Intrinsic::amdgcn_smfmac_f32_16x16x64_bf8_bf8:
+    Opc = AMDGPU::V_SMFMAC_F32_16X16X64_BF8_BF8_e64;
+    break;
+  case Intrinsic::amdgcn_smfmac_f32_16x16x64_bf8_fp8:
+    Opc = AMDGPU::V_SMFMAC_F32_16X16X64_BF8_FP8_e64;
+    break;
+  case Intrinsic::amdgcn_smfmac_f32_16x16x64_fp8_bf8:
+    Opc = AMDGPU::V_SMFMAC_F32_16X16X64_FP8_BF8_e64;
+    break;
+  case Intrinsic::amdgcn_smfmac_f32_16x16x64_fp8_fp8:
+    Opc = AMDGPU::V_SMFMAC_F32_16X16X64_FP8_FP8_e64;
+    break;
+  case Intrinsic::amdgcn_smfmac_f32_32x32x32_bf8_bf8:
+    Opc = AMDGPU::V_SMFMAC_F32_32X32X32_BF8_BF8_e64;
+    break;
+  case Intrinsic::amdgcn_smfmac_f32_32x32x32_bf8_fp8:
+    Opc = AMDGPU::V_SMFMAC_F32_32X32X32_BF8_FP8_e64;
+    break;
+  case Intrinsic::amdgcn_smfmac_f32_32x32x32_fp8_bf8:
+    Opc = AMDGPU::V_SMFMAC_F32_32X32X32_FP8_BF8_e64;
+    break;
+  case Intrinsic::amdgcn_smfmac_f32_32x32x32_fp8_fp8:
+    Opc = AMDGPU::V_SMFMAC_F32_32X32X32_FP8_FP8_e64;
     break;
   default:
     llvm_unreachable("unhandled smfmac intrinsic");

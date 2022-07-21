@@ -16,22 +16,14 @@
 #include "mlir/Dialect/PDL/IR/PDLTypes.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
+#include "mlir/Interfaces/TilingInterface.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "llvm/ADT/StringSet.h"
 
 using namespace mlir;
 using namespace mlir::linalg;
 using namespace mlir::transform;
-
-/// Extracts a vector of int64_t from an array attribute. Asserts if the
-/// attribute contains values other than integers.
-static SmallVector<int64_t> extractI64Array(ArrayAttr attr) {
-  SmallVector<int64_t> result;
-  result.reserve(attr.size());
-  for (APInt value : attr.getAsValueRange<IntegerAttr>())
-    result.push_back(value.getSExtValue());
-  return result;
-}
 
 /// Extracts a vector of unsigned from an array attribute. Asserts if the
 /// attribute contains values other than intergers. May truncate.
@@ -160,7 +152,8 @@ static ParseResult parseTileLikeOp(OpAsmParser &parser, OperationState &result,
            << "'" << sizesAttrName << "' attribute must be an array";
   Type pdlOpType = parser.getBuilder().getType<pdl::OperationType>();
   size_t numExpectedLoops =
-      sizesArrayAttr.size() - llvm::count(extractI64Array(sizesArrayAttr), 0);
+      sizesArrayAttr.size() -
+      llvm::count(extractFromI64ArrayAttr(sizesArrayAttr), 0);
   result.addTypes(SmallVector<Type>(numExpectedLoops + 1, pdlOpType));
   if (parser.resolveOperand(targetOperand, pdlOpType, result.operands))
     return failure();
@@ -171,8 +164,8 @@ DiagnosedSilenceableFailure
 transform::FuseOp::apply(mlir::transform::TransformResults &transformResults,
                          mlir::transform::TransformState &state) {
   LinalgTilingAndFusionOptions fusionOptions;
-  fusionOptions.tileSizes = extractI64Array(getTileSizes());
-  fusionOptions.tileInterchange = extractI64Array(getTileInterchange());
+  fusionOptions.tileSizes = extractFromI64ArrayAttr(getTileSizes());
+  fusionOptions.tileInterchange = extractFromI64ArrayAttr(getTileInterchange());
 
   LogicalResult result = applyTilingToAll(
       getOperation(), state.getPayloadOps(getTarget()),
@@ -209,7 +202,8 @@ void transform::FuseOp::print(OpAsmPrinter &p) {
 }
 
 LogicalResult transform::FuseOp::verify() {
-  SmallVector<int64_t> permutation = extractI64Array(getTileInterchange());
+  SmallVector<int64_t> permutation =
+      extractFromI64ArrayAttr(getTileInterchange());
   auto sequence = llvm::to_vector(llvm::seq<int64_t>(0, permutation.size()));
   if (!std::is_permutation(sequence.begin(), sequence.end(),
                            permutation.begin(), permutation.end())) {
@@ -279,6 +273,114 @@ LogicalResult transform::InterchangeOp::verify() {
 }
 
 //===---------------------------------------------------------------------===//
+// MatchOp
+//===---------------------------------------------------------------------===//
+
+LogicalResult transform::MatchOp::verify() {
+  bool opXorIface = getOps().hasValue() ^ getInterface().hasValue();
+  if (!opXorIface)
+    return this->emitOpError(
+        "requires a either a match_op or a match_interface attribute (but not "
+        "both)");
+  return success();
+}
+
+DiagnosedSilenceableFailure
+transform::MatchOp::apply(transform::TransformResults &results,
+                          transform::TransformState &state) {
+  llvm::StringSet<> strs;
+  if (getOps().hasValue())
+    strs.insert(getOps()->getAsValueRange<StringAttr>().begin(),
+                getOps()->getAsValueRange<StringAttr>().end());
+
+  ArrayRef<Operation *> payloadOps = state.getPayloadOps(getTarget());
+  if (payloadOps.size() != 1)
+    return DiagnosedSilenceableFailure(
+        this->emitOpError("requires exactly one target handle"));
+
+  SmallVector<Operation *> res;
+
+  auto matchFun = [&](Operation *op) {
+    if (strs.contains(op->getName().getStringRef()))
+      res.push_back(op);
+    // Interfaces cannot be matched by name, just by ID.
+    // So we specifically encode the interfaces we care about for this op.
+    if (getInterface().hasValue()) {
+      auto iface = getInterface().getValue();
+      if (iface == transform::MatchInterfaceEnum::LinalgOp &&
+          isa<linalg::LinalgOp>(op))
+        res.push_back(op);
+      if (iface == transform::MatchInterfaceEnum::TilingInterface &&
+          isa<TilingInterface>(op))
+        res.push_back(op);
+    }
+  };
+
+  payloadOps.front()->walk(matchFun);
+  results.set(getResult().cast<OpResult>(), res);
+  return DiagnosedSilenceableFailure(success());
+}
+
+ParseResult transform::MatchOp::parse(OpAsmParser &parser,
+                                      OperationState &result) {
+  // Parse 'match_op' or 'interface' clause.
+  if (succeeded(parser.parseOptionalKeyword("ops"))) {
+    ArrayAttr opsAttr;
+    if (parser.parseLBrace() ||
+        parser.parseCustomAttributeWithFallback(
+            opsAttr, parser.getBuilder().getType<NoneType>(), "ops",
+            result.attributes) ||
+        parser.parseRBrace())
+      return failure();
+  } else if (succeeded(parser.parseOptionalKeyword("interface"))) {
+    if (parser.parseLBrace())
+      return failure();
+    StringRef attrStr;
+    auto loc = parser.getCurrentLocation();
+    if (parser.parseKeyword(&attrStr))
+      return failure();
+    auto interfaceEnum = transform::symbolizeMatchInterfaceEnum(attrStr);
+    if (!interfaceEnum)
+      return parser.emitError(loc, "invalid ")
+             << "match_interface attribute specification: \"" << attrStr << '"';
+    transform::MatchInterfaceEnumAttr match_interfaceAttr =
+        transform::MatchInterfaceEnumAttr::get(parser.getBuilder().getContext(),
+                                               interfaceEnum.value());
+    result.addAttribute("interface", match_interfaceAttr);
+    if (parser.parseRBrace())
+      return failure();
+  } else {
+    auto loc = parser.getCurrentLocation();
+    return parser.emitError(loc, "expected ops or interface");
+  }
+
+  OpAsmParser::UnresolvedOperand targetRawOperands[1];
+  ArrayRef<OpAsmParser::UnresolvedOperand> targetOperands(targetRawOperands);
+  if (parser.parseKeyword("in") || parser.parseOperand(targetRawOperands[0]) ||
+      parser.parseOptionalAttrDict(result.attributes))
+    return failure();
+  Type pdlOpType = parser.getBuilder().getType<pdl::OperationType>();
+  result.addTypes(pdlOpType);
+  if (parser.resolveOperands(targetOperands, pdlOpType, result.operands))
+    return failure();
+  return success();
+}
+
+void transform::MatchOp::print(OpAsmPrinter &p) {
+  if ((*this)->getAttr("ops")) {
+    p << " ops{";
+    p.printAttributeWithoutType(getOpsAttr());
+    p << "}";
+  }
+  if ((*this)->getAttr("interface")) {
+    p << " interface{" << stringifyMatchInterfaceEnum(*getInterface()) << "}";
+  }
+  p << " in " << getTarget();
+  p.printOptionalAttrDict((*this)->getAttrs(),
+                          /*elidedAttrs=*/{"ops", "interface"});
+}
+
+//===---------------------------------------------------------------------===//
 // MultiTileSizesOp
 //===---------------------------------------------------------------------===//
 
@@ -327,7 +429,7 @@ transform::PadOp::applyToOne(linalg::LinalgOp target,
                              transform::TransformState &state) {
   // Convert the integer packing flags to booleans.
   SmallVector<bool> packPaddings;
-  for (int64_t packPadding : extractI64Array(getPackPaddings()))
+  for (int64_t packPadding : extractFromI64ArrayAttr(getPackPaddings()))
     packPaddings.push_back(static_cast<bool>(packPadding));
 
   // Convert the padding values to attributes.
@@ -362,13 +464,14 @@ transform::PadOp::applyToOne(linalg::LinalgOp target,
   SmallVector<SmallVector<int64_t>> transposePaddings;
   for (Attribute transposeVector : getTransposePaddings().cast<ArrayAttr>())
     transposePaddings.push_back(
-        extractI64Array(transposeVector.cast<ArrayAttr>()));
+        extractFromI64ArrayAttr(transposeVector.cast<ArrayAttr>()));
 
   LinalgPaddingOptions paddingOptions;
   paddingOptions.setPaddingValues(paddingValues);
-  paddingOptions.setPaddingDimensions(extractI64Array(getPaddingDimensions()));
+  paddingOptions.setPaddingDimensions(
+      extractFromI64ArrayAttr(getPaddingDimensions()));
   paddingOptions.setPackPaddings(packPaddings);
-  paddingOptions.setHoistPaddings(extractI64Array(getHoistPaddings()));
+  paddingOptions.setHoistPaddings(extractFromI64ArrayAttr(getHoistPaddings()));
   paddingOptions.setTransposePaddings(transposePaddings);
 
   FailureOr<LinalgOp> result =
@@ -383,7 +486,8 @@ transform::PadOp::applyToOne(linalg::LinalgOp target,
 }
 
 LogicalResult transform::PadOp::verify() {
-  SmallVector<int64_t> packPaddings = extractI64Array(getPackPaddings());
+  SmallVector<int64_t> packPaddings =
+      extractFromI64ArrayAttr(getPackPaddings());
   if (any_of(packPaddings, [](int64_t packPadding) {
         return packPadding != 0 && packPadding != 1;
       })) {
@@ -393,7 +497,7 @@ LogicalResult transform::PadOp::verify() {
   }
 
   SmallVector<int64_t> paddingDimensions =
-      extractI64Array(getPaddingDimensions());
+      extractFromI64ArrayAttr(getPaddingDimensions());
   if (any_of(paddingDimensions,
              [](int64_t paddingDimension) { return paddingDimension < 0; })) {
     return emitOpError()
@@ -401,7 +505,8 @@ LogicalResult transform::PadOp::verify() {
            << getPaddingDimensions();
   }
 
-  SmallVector<int64_t> hoistPaddings = extractI64Array(getHoistPaddings());
+  SmallVector<int64_t> hoistPaddings =
+      extractFromI64ArrayAttr(getHoistPaddings());
   if (any_of(hoistPaddings,
              [](int64_t hoistPadding) { return hoistPadding < 0; })) {
     return emitOpError()
@@ -657,7 +762,7 @@ DiagnosedSilenceableFailure
 transform::TileOp::apply(TransformResults &transformResults,
                          TransformState &state) {
   LinalgTilingOptions tilingOptions;
-  SmallVector<int64_t> tileSizes = extractI64Array(getStaticSizes());
+  SmallVector<int64_t> tileSizes = extractFromI64ArrayAttr(getStaticSizes());
 
   ArrayRef<Operation *> targets = state.getPayloadOps(getTarget());
   SmallVector<ArrayRef<Operation *>> dynamicSizeProducers;
@@ -743,7 +848,7 @@ transform::TileOp::apply(TransformResults &transformResults,
 
 SmallVector<OpFoldResult> transform::TileOp::getMixedSizes() {
   ValueRange dynamic = getDynamicSizes();
-  SmallVector<int64_t> tileSizes = extractI64Array(getStaticSizes());
+  SmallVector<int64_t> tileSizes = extractFromI64ArrayAttr(getStaticSizes());
   SmallVector<OpFoldResult> results;
   results.reserve(tileSizes.size());
   unsigned dynamicPos = 0;
@@ -773,7 +878,7 @@ ParseResult transform::TileOp::parse(OpAsmParser &parser,
 
   result.addAttribute(getStaticSizesAttrName(result.name), staticSizes);
   size_t numExpectedLoops =
-      staticSizes.size() - llvm::count(extractI64Array(staticSizes), 0);
+      staticSizes.size() - llvm::count(extractFromI64ArrayAttr(staticSizes), 0);
   result.addTypes(SmallVector<Type>(numExpectedLoops + 1, pdlOperationType));
   return success();
 }
@@ -792,6 +897,37 @@ void transform::TileOp::getEffects(
   producesHandle(getTiledLinalgOp(), effects);
   producesHandle(getLoops(), effects);
   modifiesPayload(effects);
+}
+
+//===----------------------------------------------------------------------===//
+// TileToForeachThreadOp
+//===----------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure transform::TileToForeachThreadOp::applyToOne(
+    TilingInterface target, SmallVectorImpl<Operation *> &results,
+    transform::TransformState &state) {
+  IRRewriter rewriter(getContext());
+  rewriter.setInsertionPoint(target);
+  auto maybeThreadDimMappingAttr = getThreadDimMapping();
+  auto dimMapping =
+      llvm::to_vector(maybeThreadDimMappingAttr
+                          ? extractFromI64ArrayAttr(*maybeThreadDimMappingAttr)
+                          : ArrayRef<int64_t>{});
+
+  FailureOr<ForeachThreadTilingResult> tilingResult = failure();
+  if (Optional<ArrayAttr> numThreads = getNumThreads())
+    tilingResult = linalg::tileToForeachThreadOp(
+        rewriter, target, getAsOpFoldResult(*numThreads), dimMapping);
+
+  if (Optional<ArrayAttr> tileSizes = getTileSizes())
+    tilingResult = linalg::tileToForeachThreadOpUsingTileSizes(
+        rewriter, target, getAsOpFoldResult(*tileSizes), dimMapping);
+
+  if (failed(tilingResult))
+    return emitDefaultSilenceableFailure(target);
+  rewriter.replaceOp(target, tilingResult->tileOp->getResults());
+  results.assign({tilingResult->tileOp, tilingResult->tiledOp});
+  return DiagnosedSilenceableFailure(success());
 }
 
 //===----------------------------------------------------------------------===//
@@ -853,6 +989,8 @@ public:
   }
 };
 } // namespace
+
+#include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOpsEnums.cpp.inc"
 
 #define GET_OP_CLASSES
 #include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.cpp.inc"

@@ -496,6 +496,7 @@ def Math_LogOp : Math_FloatUnaryOp<"log"> {
     %y = math.log %x : f64
     ```
   }];
+  let hasFolder = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -541,6 +542,7 @@ def Math_Log1pOp : Math_FloatUnaryOp<"log1p"> {
     %y = math.log1p %x : f64
     ```
   }];
+  let hasFolder = 1;
 }
 
 //===----------------------------------------------------------------------===//

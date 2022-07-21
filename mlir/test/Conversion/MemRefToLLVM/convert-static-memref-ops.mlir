@@ -6,7 +6,7 @@ func.func @zero_d_alloc() -> memref<f32> {
 // CHECK: %[[null:.*]] = llvm.mlir.null : !llvm.ptr<f32>
 // CHECK: %[[gep:.*]] = llvm.getelementptr %[[null]][%[[one]]] : (!llvm.ptr<f32>, i64) -> !llvm.ptr<f32>
 // CHECK: %[[size_bytes:.*]] = llvm.ptrtoint %[[gep]] : !llvm.ptr<f32> to i64
-// CHECK: llvm.call @_mlir_alloc(%[[size_bytes]]) : (i64) -> !llvm.ptr<i8>
+// CHECK: llvm.call @malloc(%[[size_bytes]]) : (i64) -> !llvm.ptr<i8>
 // CHECK: %[[ptr:.*]] = llvm.bitcast %{{.*}} : !llvm.ptr<i8> to !llvm.ptr<f32>
 // CHECK: llvm.mlir.undef : !llvm.struct<(ptr<f32>, ptr<f32>, i64)>
 // CHECK: llvm.insertvalue %[[ptr]], %{{.*}}[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64)>
@@ -26,7 +26,7 @@ func.func @zero_d_dealloc(%arg0: memref<f32>) {
 // CHECK: unrealized_conversion_cast
 // CHECK: %[[ptr:.*]] = llvm.extractvalue %{{.*}}[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64)>
 // CHECK: %[[bc:.*]] = llvm.bitcast %[[ptr]] : !llvm.ptr<f32> to !llvm.ptr<i8>
-// CHECK: llvm.call @_mlir_free(%[[bc]]) : (!llvm.ptr<i8>) -> ()
+// CHECK: llvm.call @free(%[[bc]]) : (!llvm.ptr<i8>) -> ()
 
   memref.dealloc %arg0 : memref<f32>
   return
@@ -43,7 +43,7 @@ func.func @aligned_1d_alloc() -> memref<42xf32> {
 // CHECK: %[[size_bytes:.*]] = llvm.ptrtoint %[[gep]] : !llvm.ptr<f32> to i64
 // CHECK: %[[alignment:.*]] = llvm.mlir.constant(8 : index) : i64
 // CHECK: %[[allocsize:.*]] = llvm.add %[[size_bytes]], %[[alignment]] : i64
-// CHECK: %[[allocated:.*]] = llvm.call @_mlir_alloc(%[[allocsize]]) : (i64) -> !llvm.ptr<i8>
+// CHECK: %[[allocated:.*]] = llvm.call @malloc(%[[allocsize]]) : (i64) -> !llvm.ptr<i8>
 // CHECK: %[[ptr:.*]] = llvm.bitcast %{{.*}} : !llvm.ptr<i8> to !llvm.ptr<f32>
 // CHECK: %[[allocatedAsInt:.*]] = llvm.ptrtoint %[[ptr]] : !llvm.ptr<f32> to i64
 // CHECK: %[[one_1:.*]] = llvm.mlir.constant(1 : index) : i64
@@ -69,7 +69,7 @@ func.func @static_alloc() -> memref<32x18xf32> {
 // CHECK: %[[null:.*]] = llvm.mlir.null : !llvm.ptr<f32>
 // CHECK: %[[gep:.*]] = llvm.getelementptr %[[null]][%[[num_elems]]] : (!llvm.ptr<f32>, i64) -> !llvm.ptr<f32>
 // CHECK: %[[size_bytes:.*]] = llvm.ptrtoint %[[gep]] : !llvm.ptr<f32> to i64
-// CHECK: %[[allocated:.*]] = llvm.call @_mlir_alloc(%[[size_bytes]]) : (i64) -> !llvm.ptr<i8>
+// CHECK: %[[allocated:.*]] = llvm.call @malloc(%[[size_bytes]]) : (i64) -> !llvm.ptr<i8>
 // CHECK: llvm.bitcast %[[allocated]] : !llvm.ptr<i8> to !llvm.ptr<f32>
  %0 = memref.alloc() : memref<32x18xf32>
  return %0 : memref<32x18xf32>
@@ -106,7 +106,7 @@ func.func @static_alloca() -> memref<32x18xf32> {
 func.func @static_dealloc(%static: memref<10x8xf32>) {
 // CHECK: %[[ptr:.*]] = llvm.extractvalue %{{.*}}[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
 // CHECK: %[[bc:.*]] = llvm.bitcast %[[ptr]] : !llvm.ptr<f32> to !llvm.ptr<i8>
-// CHECK: llvm.call @_mlir_free(%[[bc]]) : (!llvm.ptr<i8>) -> ()
+// CHECK: llvm.call @free(%[[bc]]) : (!llvm.ptr<i8>) -> ()
   memref.dealloc %static : memref<10x8xf32>
   return
 }
@@ -206,7 +206,7 @@ module attributes { dlti.dl_spec = #dlti.dl_spec<#dlti.dl_entry<index, 32>> } {
     // CHECK: llvm.ptrtoint %{{.*}} : !llvm.ptr<{{.*}}> to i32
     // CHECK: llvm.ptrtoint %{{.*}} : !llvm.ptr<{{.*}}> to i32
     // CHECK: llvm.add %{{.*}} : i32
-    // CHECK: llvm.call @_mlir_alloc(%{{.*}}) : (i32) -> !llvm.ptr
+    // CHECK: llvm.call @malloc(%{{.*}}) : (i32) -> !llvm.ptr
     // CHECK: llvm.ptrtoint %{{.*}} : !llvm.ptr<{{.*}}> to i32
     // CHECK: llvm.sub {{.*}} : i32
     // CHECK: llvm.add {{.*}} : i32
@@ -305,4 +305,36 @@ func.func @memref.reshape.dynamic.dim(%arg: memref<?x?x?xf32>, %shape: memref<4x
 
   return %0 : memref<?x?x12x32xf32>
   // CHECK: return %[[result_cast]] : memref<?x?x12x32xf32>
+}
+
+// -----
+
+// CHECK-LABEL: func @memref.reshape_index
+// CHECK-SAME:    %[[arg:.*]]: memref<?x?xi32>, %[[shape:.*]]: memref<1xindex>
+func.func @memref.reshape_index(%arg0: memref<?x?xi32>, %shape: memref<1xindex>) ->  memref<?xi32> {
+  // CHECK: %[[arg_cast:.*]] = builtin.unrealized_conversion_cast %[[arg]] : memref<?x?xi32> to !llvm.struct<(ptr<i32>, ptr<i32>, i64, array<2 x i64>, array<2 x i64>)>
+  // CHECK: %[[shape_cast:.*]] = builtin.unrealized_conversion_cast %[[shape]] : memref<1xindex> to !llvm.struct<(ptr<i64>, ptr<i64>, i64, array<1 x i64>, array<1 x i64>)>
+  // CHECK: %[[undef:.*]] = llvm.mlir.undef : !llvm.struct<(ptr<i32>, ptr<i32>, i64, array<1 x i64>, array<1 x i64>)>
+  // CHECK: %[[alloc_ptr:.*]] = llvm.extractvalue %[[arg_cast]][0] : !llvm.struct<(ptr<i32>, ptr<i32>, i64, array<2 x i64>, array<2 x i64>)>
+  // CHECK: %[[align_ptr:.*]] = llvm.extractvalue %[[arg_cast]][1] : !llvm.struct<(ptr<i32>, ptr<i32>, i64, array<2 x i64>, array<2 x i64>)>
+  // CHECK: %[[insert0:.*]] = llvm.insertvalue %[[alloc_ptr]], %[[undef:.*]][0] : !llvm.struct<(ptr<i32>, ptr<i32>, i64, array<1 x i64>, array<1 x i64>)>
+  // CHECK: %[[insert1:.*]] = llvm.insertvalue %[[align_ptr]], %[[insert0:.*]][1] : !llvm.struct<(ptr<i32>, ptr<i32>, i64, array<1 x i64>, array<1 x i64>)>
+
+  // CHECK: %[[zero0:.*]] = llvm.mlir.constant(0 : index) : i64
+  // CHECK: %[[insert2:.*]] = llvm.insertvalue %[[zero0]], %[[insert1:.*]][2] : !llvm.struct<(ptr<i32>, ptr<i32>, i64, array<1 x i64>, array<1 x i64>)>
+
+  // CHECK: %[[one0:.*]] = llvm.mlir.constant(1 : index) : i64
+  // CHECK: %[[zero1:.*]] = llvm.mlir.constant(0 : index) : i64
+
+  // CHECK: %[[shape_ptr0:.*]] = llvm.extractvalue %[[shape_cast:.*]][1] : !llvm.struct<(ptr<i64>, ptr<i64>, i64, array<1 x i64>, array<1 x i64>)>
+  // CHECK: %[[shape_gep0:.*]] = llvm.getelementptr %[[shape_ptr0:.*]][%[[zero1:.*]]] : (!llvm.ptr<i64>, i64) -> !llvm.ptr<i64>
+  // CHECK: %[[shape_load0:.*]] = llvm.load %[[shape_gep0:.*]] : !llvm.ptr<i64>
+  // CHECK: %[[insert3:.*]] = llvm.insertvalue %[[shape_load0:.*]], %[[insert2:.*]][3, 0] : !llvm.struct<(ptr<i32>, ptr<i32>, i64, array<1 x i64>, array<1 x i64>)>
+  // CHECK: %[[insert4:.*]] = llvm.insertvalue %[[one0:.*]], %[[insert3:.*]][4, 0] : !llvm.struct<(ptr<i32>, ptr<i32>, i64, array<1 x i64>, array<1 x i64>)>
+
+  // CHECK: %[[result_cast:.*]] = builtin.unrealized_conversion_cast %[[insert4:.*]] : !llvm.struct<(ptr<i32>, ptr<i32>, i64, array<1 x i64>, array<1 x i64>)> to memref<?xi32>
+  // CHECK: return %[[result_cast:.*]] : memref<?xi32>
+
+  %1 = memref.reshape %arg0(%shape) : (memref<?x?xi32>, memref<1xindex>) -> memref<?xi32>
+  return %1 : memref<?xi32>
 }

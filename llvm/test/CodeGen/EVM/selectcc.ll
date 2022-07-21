@@ -1,4 +1,4 @@
-; RUN: llc < %s -mtriple=evm -filetype=asm | FileCheck %s
+; RUN: llc < %s -march=evm -filetype=asm | FileCheck %s
 
 define i256 @foo(i256 %b, i256 %c) nounwind readnone ssp {
 entry:

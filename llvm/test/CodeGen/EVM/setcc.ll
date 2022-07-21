@@ -1,4 +1,4 @@
-; RUN: llvm-as < %s | llc -mtriple=evm -filetype=asm | FileCheck %s
+; RUN: llvm-as < %s | llc -march=evm -filetype=asm | FileCheck %s
 
 define i256 @icmpeqop(i256 %a, i256 %b) nounwind {
 ; CHECK-LABEL: icmpeqop:

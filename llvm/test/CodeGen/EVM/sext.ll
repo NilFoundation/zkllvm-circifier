@@ -1,4 +1,4 @@
-; RUN: llc < %s -mtriple=evm -filetype=asm | FileCheck %s
+; RUN: llc < %s -march=evm -filetype=asm | FileCheck %s
 
 define i256 @sext1(i8 %x, i8 %y) {
 ; CHECK-LABEL: sext1:

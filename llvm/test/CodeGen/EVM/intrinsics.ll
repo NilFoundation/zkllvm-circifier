@@ -270,10 +270,10 @@ entry:
 
 declare i256 @llvm.evm.gas() #1
 
-;define void @int_log0(i256 %a, i256 %b) {
+define void @int_log0(i256 %a, i256 %b) {
 entry:
-; CHECK-LABEL: int_log0
   call void @llvm.evm.log0(i256 %a, i256 %b)
+; CHECK-LABEL: int_log0
 ; CHECK: log0
   ret void
 }

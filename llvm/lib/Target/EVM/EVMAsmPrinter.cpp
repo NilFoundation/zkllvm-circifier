@@ -113,10 +113,10 @@ void EVMAsmPrinter::emitInstruction(const MachineInstr *MI) {
   MCInst TmpInst;
   MCInstLowering.Lower(MI, TmpInst);
 
-  bool commented = emitEVMComments(MI, OutStreamer->GetCommentOS());
+  bool commented = emitEVMComments(MI, OutStreamer->getCommentOS());
   EmitToStreamer(*OutStreamer, TmpInst);
   if (commented) {
-    OutStreamer->AddBlankLine();
+    OutStreamer->addBlankLine();
   }
 }
 

@@ -4507,7 +4507,8 @@ enum RTLDependenceKindTy {
   DepIn = 0x01,
   DepInOut = 0x3,
   DepMutexInOutSet = 0x4,
-  DepInOutSet = 0x8
+  DepInOutSet = 0x8,
+  DepOmpAllMem = 0x80,
 };
 /// Fields ids in kmp_depend_info record.
 enum RTLDependInfoFieldsTy { BaseAddr, Len, Flags };
@@ -4531,9 +4532,13 @@ static RTLDependenceKindTy translateDependencyKind(OpenMPDependClauseKind K) {
   case OMPC_DEPEND_inoutset:
     DepKind = DepInOutSet;
     break;
+  case OMPC_DEPEND_outallmemory:
+    DepKind = DepOmpAllMem;
+    break;
   case OMPC_DEPEND_source:
   case OMPC_DEPEND_sink:
   case OMPC_DEPEND_depobj:
+  case OMPC_DEPEND_inoutallmemory:
   case OMPC_DEPEND_unknown:
     llvm_unreachable("Unknown task dependence type");
   }
@@ -4600,12 +4605,21 @@ static void emitDependData(CodeGenFunction &CGF, QualType &KmpDependInfoTy,
   for (const Expr *E : Data.DepExprs) {
     llvm::Value *Addr;
     llvm::Value *Size;
-    std::tie(Addr, Size) = getPointerAndSize(CGF, E);
+
+    // The expression will be a nullptr in the 'omp_all_memory' case.
+    if (E) {
+      std::tie(Addr, Size) = getPointerAndSize(CGF, E);
+      Addr = CGF.Builder.CreatePtrToInt(Addr, CGF.IntPtrTy);
+    } else {
+      Addr = llvm::ConstantInt::get(CGF.IntPtrTy, 0);
+      Size = llvm::ConstantInt::get(CGF.SizeTy, 0);
+    }
     LValue Base;
     if (unsigned *P = Pos.dyn_cast<unsigned *>()) {
       Base = CGF.MakeAddrLValue(
           CGF.Builder.CreateConstGEP(DependenciesArray, *P), KmpDependInfoTy);
     } else {
+      assert(E && "Expected a non-null expression");
       LValue &PosLVal = *Pos.get<LValue *>();
       llvm::Value *Idx = CGF.EmitLoadOfScalar(PosLVal, E->getExprLoc());
       Base = CGF.MakeAddrLValue(
@@ -4614,8 +4628,7 @@ static void emitDependData(CodeGenFunction &CGF, QualType &KmpDependInfoTy,
     // deps[i].base_addr = &<Dependencies[i].second>;
     LValue BaseAddrLVal = CGF.EmitLValueForField(
         Base, *std::next(KmpDependInfoRD->field_begin(), BaseAddr));
-    CGF.EmitStoreOfScalar(CGF.Builder.CreatePtrToInt(Addr, CGF.IntPtrTy),
-                          BaseAddrLVal);
+    CGF.EmitStoreOfScalar(Addr, BaseAddrLVal);
     // deps[i].len = sizeof(<Dependencies[i].second>);
     LValue LenLVal = CGF.EmitLValueForField(
         Base, *std::next(KmpDependInfoRD->field_begin(), Len));
@@ -6704,11 +6717,9 @@ llvm::Value *CGOpenMPRuntime::emitNumTeamsForTargetDirective(
     default:
       break;
     }
-  } else if (DefaultNT == -1) {
-    return nullptr;
   }
 
-  return Bld.getInt32(DefaultNT);
+  return llvm::ConstantInt::get(CGF.Int32Ty, DefaultNT);
 }
 
 static llvm::Value *getNumThreads(CodeGenFunction &CGF, const CapturedStmt *CS,
@@ -10176,9 +10187,8 @@ llvm::Function *CGOpenMPRuntime::getOrCreateUserDefinedMapperFunc(
   return UDMMap.lookup(D);
 }
 
-void CGOpenMPRuntime::emitTargetNumIterationsCall(
+llvm::Value *CGOpenMPRuntime::emitTargetNumIterationsCall(
     CodeGenFunction &CGF, const OMPExecutableDirective &D,
-    llvm::Value *DeviceID,
     llvm::function_ref<llvm::Value *(CodeGenFunction &CGF,
                                      const OMPLoopDirective &D)>
         SizeEmitter) {
@@ -10188,20 +10198,12 @@ void CGOpenMPRuntime::emitTargetNumIterationsCall(
   if (!isOpenMPDistributeDirective(Kind) || !isOpenMPTeamsDirective(Kind))
     TD = getNestedDistributeDirective(CGM.getContext(), D);
   if (!TD)
-    return;
+    return llvm::ConstantInt::get(CGF.Int64Ty, 0);
+
   const auto *LD = cast<OMPLoopDirective>(TD);
-  auto &&CodeGen = [LD, DeviceID, SizeEmitter, &D, this](CodeGenFunction &CGF,
-                                                         PrePostActionTy &) {
-    if (llvm::Value *NumIterations = SizeEmitter(CGF, *LD)) {
-      llvm::Value *RTLoc = emitUpdateLocation(CGF, D.getBeginLoc());
-      llvm::Value *Args[] = {RTLoc, DeviceID, NumIterations};
-      CGF.EmitRuntimeCall(
-          OMPBuilder.getOrCreateRuntimeFunction(
-              CGM.getModule(), OMPRTL___kmpc_push_target_tripcount_mapper),
-          Args);
-    }
-  };
-  emitInlinedDirective(CGF, OMPD_unknown, CodeGen);
+  if (llvm::Value *NumIterations = SizeEmitter(CGF, *LD))
+    return NumIterations;
+  return llvm::ConstantInt::get(CGF.Int64Ty, 0);
 }
 
 void CGOpenMPRuntime::emitTargetCall(
@@ -10220,7 +10222,8 @@ void CGOpenMPRuntime::emitTargetCall(
   assert((OffloadingMandatory || OutlinedFn) && "Invalid outlined function!");
 
   const bool RequiresOuterTask = D.hasClausesOfKind<OMPDependClause>() ||
-                                 D.hasClausesOfKind<OMPNowaitClause>();
+                                 D.hasClausesOfKind<OMPNowaitClause>() ||
+                                 D.hasClausesOfKind<OMPInReductionClause>();
   llvm::SmallVector<llvm::Value *, 16> CapturedVars;
   const CapturedStmt &CS = *D.getCapturedStmt(OMPD_target);
   auto &&ArgsCodegen = [&CS, &CapturedVars](CodeGenFunction &CGF,
@@ -10294,26 +10297,34 @@ void CGOpenMPRuntime::emitTargetCall(
     // Source location for the ident struct
     llvm::Value *RTLoc = emitUpdateLocation(CGF, D.getBeginLoc());
 
-    // Emit tripcount for the target loop-based directive.
-    emitTargetNumIterationsCall(CGF, D, DeviceID, SizeEmitter);
+    // Get tripcount for the target loop-based directive.
+    llvm::Value *NumIterations =
+        emitTargetNumIterationsCall(CGF, D, SizeEmitter);
 
-    bool HasNowait = D.hasClausesOfKind<OMPNowaitClause>();
+    // Arguments for the target kernel.
+    SmallVector<llvm::Value *> KernelArgs{
+        CGF.Builder.getInt32(/* Version */ 1),
+        PointerNum,
+        InputInfo.BasePointersArray.getPointer(),
+        InputInfo.PointersArray.getPointer(),
+        InputInfo.SizesArray.getPointer(),
+        MapTypesArray,
+        MapNamesArray,
+        InputInfo.MappersArray.getPointer(),
+        NumIterations};
+
+    // Arguments passed to the 'nowait' variant.
+    SmallVector<llvm::Value *> NoWaitKernelArgs{
+        CGF.Builder.getInt32(0),
+        llvm::ConstantPointerNull::get(CGM.VoidPtrTy),
+        CGF.Builder.getInt32(0),
+        llvm::ConstantPointerNull::get(CGM.VoidPtrTy),
+    };
+
+    bool HasNoWait = D.hasClausesOfKind<OMPNowaitClause>();
+
     // The target region is an outlined function launched by the runtime
-    // via calls __tgt_target() or __tgt_target_teams().
-    //
-    // __tgt_target() launches a target region with one team and one thread,
-    // executing a serial region.  This master thread may in turn launch
-    // more threads within its team upon encountering a parallel region,
-    // however, no additional teams can be launched on the device.
-    //
-    // __tgt_target_teams() launches a target region with one or more teams,
-    // each with one or more threads.  This call is required for target
-    // constructs such as:
-    //  'target teams'
-    //  'target' / 'teams'
-    //  'target teams distribute parallel for'
-    //  'target parallel'
-    // and so on.
+    // via calls to __tgt_target_kernel().
     //
     // Note that on the host and CPU targets, the runtime implementation of
     // these calls simply call the outlined function without forking threads.
@@ -10324,70 +10335,15 @@ void CGOpenMPRuntime::emitTargetCall(
     // In contrast, on the NVPTX target, the implementation of
     // __tgt_target_teams() launches a GPU kernel with the requested number
     // of teams and threads so no additional calls to the runtime are required.
-    if (NumTeams) {
-      // If we have NumTeams defined this means that we have an enclosed teams
-      // region. Therefore we also expect to have NumThreads defined. These two
-      // values should be defined in the presence of a teams directive,
-      // regardless of having any clauses associated. If the user is using teams
-      // but no clauses, these two values will be the default that should be
-      // passed to the runtime library - a 32-bit integer with the value zero.
-      assert(NumThreads && "Thread limit expression should be available along "
-                           "with number of teams.");
-      SmallVector<llvm::Value *> OffloadingArgs = {
-          RTLoc,
-          DeviceID,
-          OutlinedFnID,
-          PointerNum,
-          InputInfo.BasePointersArray.getPointer(),
-          InputInfo.PointersArray.getPointer(),
-          InputInfo.SizesArray.getPointer(),
-          MapTypesArray,
-          MapNamesArray,
-          InputInfo.MappersArray.getPointer(),
-          NumTeams,
-          NumThreads};
-      if (HasNowait) {
-        // Add int32_t depNum = 0, void *depList = nullptr, int32_t
-        // noAliasDepNum = 0, void *noAliasDepList = nullptr.
-        OffloadingArgs.push_back(CGF.Builder.getInt32(0));
-        OffloadingArgs.push_back(llvm::ConstantPointerNull::get(CGM.VoidPtrTy));
-        OffloadingArgs.push_back(CGF.Builder.getInt32(0));
-        OffloadingArgs.push_back(llvm::ConstantPointerNull::get(CGM.VoidPtrTy));
-      }
-      Return = CGF.EmitRuntimeCall(
-          OMPBuilder.getOrCreateRuntimeFunction(
-              CGM.getModule(), HasNowait
-                                   ? OMPRTL___tgt_target_teams_nowait_mapper
-                                   : OMPRTL___tgt_target_teams_mapper),
-          OffloadingArgs);
-    } else {
-      SmallVector<llvm::Value *> OffloadingArgs = {
-          RTLoc,
-          DeviceID,
-          OutlinedFnID,
-          PointerNum,
-          InputInfo.BasePointersArray.getPointer(),
-          InputInfo.PointersArray.getPointer(),
-          InputInfo.SizesArray.getPointer(),
-          MapTypesArray,
-          MapNamesArray,
-          InputInfo.MappersArray.getPointer()};
-      if (HasNowait) {
-        // Add int32_t depNum = 0, void *depList = nullptr, int32_t
-        // noAliasDepNum = 0, void *noAliasDepList = nullptr.
-        OffloadingArgs.push_back(CGF.Builder.getInt32(0));
-        OffloadingArgs.push_back(llvm::ConstantPointerNull::get(CGM.VoidPtrTy));
-        OffloadingArgs.push_back(CGF.Builder.getInt32(0));
-        OffloadingArgs.push_back(llvm::ConstantPointerNull::get(CGM.VoidPtrTy));
-      }
-      Return = CGF.EmitRuntimeCall(
-          OMPBuilder.getOrCreateRuntimeFunction(
-              CGM.getModule(), HasNowait ? OMPRTL___tgt_target_nowait_mapper
-                                         : OMPRTL___tgt_target_mapper),
-          OffloadingArgs);
-    }
-
     // Check the error code and execute the host version if required.
+    CGF.Builder.restoreIP(
+        HasNoWait ? OMPBuilder.emitTargetKernel(
+                        CGF.Builder, Return, RTLoc, DeviceID, NumTeams,
+                        NumThreads, OutlinedFnID, KernelArgs, NoWaitKernelArgs)
+                  : OMPBuilder.emitTargetKernel(CGF.Builder, Return, RTLoc,
+                                                DeviceID, NumTeams, NumThreads,
+                                                OutlinedFnID, KernelArgs));
+
     llvm::BasicBlock *OffloadFailedBlock =
         CGF.createBasicBlock("omp_offload.failed");
     llvm::BasicBlock *OffloadContBlock =
@@ -10775,7 +10731,7 @@ void CGOpenMPRuntime::registerTargetGlobalVariable(const VarDecl *VD,
   // If we have host/nohost variables, they do not need to be registered.
   Optional<OMPDeclareTargetDeclAttr::DevTypeTy> DevTy =
       OMPDeclareTargetDeclAttr::getDeviceType(VD);
-  if (DevTy && DevTy.getValue() != OMPDeclareTargetDeclAttr::DT_Any)
+  if (DevTy && *DevTy != OMPDeclareTargetDeclAttr::DT_Any)
     return;
 
   llvm::Optional<OMPDeclareTargetDeclAttr::MapTypeTy> Res =
@@ -11506,7 +11462,9 @@ static std::string mangleVectorParameters(ArrayRef<ParamAttrTy> ParamAttrs) {
              ParamAttr.Kind == LinearUVal || ParamAttr.Kind == LinearVal) {
       // Don't print the step value if it is not present or if it is
       // equal to 1.
-      if (ParamAttr.StrideOrArg != 1)
+      if (ParamAttr.StrideOrArg < 0)
+        Out << 'n' << -ParamAttr.StrideOrArg;
+      else if (ParamAttr.StrideOrArg != 1)
         Out << ParamAttr.StrideOrArg;
     }
 
@@ -12170,25 +12128,14 @@ static llvm::Value *getAllocatorVal(CodeGenFunction &CGF,
   return AllocVal;
 }
 
-/// Given the allocate directive list item type and align clause value,
-/// return appropriate alignment.
-static llvm::Value *getAlignmentValue(CodeGenFunction &CGF, QualType ListItemTy,
-                                      const Expr *Alignment) {
-  if (!Alignment)
+/// Return the alignment from an allocate directive if present.
+static llvm::Value *getAlignmentValue(CodeGenModule &CGM, const VarDecl *VD) {
+  llvm::Optional<CharUnits> AllocateAlignment = CGM.getOMPAllocateAlignment(VD);
+
+  if (!AllocateAlignment)
     return nullptr;
 
-  unsigned UserAlign =
-      Alignment->EvaluateKnownConstInt(CGF.getContext()).getExtValue();
-  CharUnits NaturalAlign = CGF.CGM.getNaturalTypeAlignment(ListItemTy);
-
-  // OpenMP5.1 pg 185 lines 7-10
-  //   Each item in the align modifier list must be aligned to the maximum
-  //   of the specified alignment and the type's natural alignment.
-  //
-  // If no alignment specified then use the natural alignment.
-  return llvm::ConstantInt::get(
-      CGF.CGM.SizeTy,
-      std::max<unsigned>(UserAlign, NaturalAlign.getQuantity()));
+  return llvm::ConstantInt::get(CGM.SizeTy, AllocateAlignment->getQuantity());
 }
 
 Address CGOpenMPRuntime::getAddressOfLocalVariable(CodeGenFunction &CGF,
@@ -12229,8 +12176,7 @@ Address CGOpenMPRuntime::getAddressOfLocalVariable(CodeGenFunction &CGF,
     const auto *AA = CVD->getAttr<OMPAllocateDeclAttr>();
     const Expr *Allocator = AA->getAllocator();
     llvm::Value *AllocVal = getAllocatorVal(CGF, Allocator);
-    llvm::Value *Alignment = getAlignmentValue(
-        CGF, VD->getType().getNonReferenceType(), AA->getAlignment());
+    llvm::Value *Alignment = getAlignmentValue(CGM, CVD);
     SmallVector<llvm::Value *, 4> Args;
     Args.push_back(ThreadID);
     if (Alignment)

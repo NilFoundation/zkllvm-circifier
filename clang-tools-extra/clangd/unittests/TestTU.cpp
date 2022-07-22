@@ -109,6 +109,7 @@ TestTU::preamble(PreambleParsedCallback PreambleCallback) const {
 ParsedAST TestTU::build() const {
   MockFS FS;
   auto Inputs = inputs(FS);
+  Inputs.Opts = ParseOpts;
   StoreDiags Diags;
   auto CI = buildCompilerInvocation(Inputs, Diags);
   assert(CI && "Failed to build compilation invocation.");
@@ -122,7 +123,7 @@ ParsedAST TestTU::build() const {
                                                /*PreambleCallback=*/nullptr);
   auto AST = ParsedAST::build(testPath(Filename), Inputs, std::move(CI),
                               Diags.take(), Preamble);
-  if (!AST.hasValue()) {
+  if (!AST) {
     llvm::errs() << "Failed to build code:\n" << Code;
     std::abort();
   }

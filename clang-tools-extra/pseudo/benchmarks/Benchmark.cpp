@@ -10,22 +10,24 @@
 // important pieces of the pseudoparser (grammar compliation, LR table build
 // etc).
 //
-// Note: make sure we build it in Relase mode.
+// Note: make sure to build the benchmark in Release mode.
 //
 // Usage:
 //   tools/clang/tools/extra/pseudo/benchmarks/ClangPseudoBenchmark \
-//      --grammar=/path/to/cxx.bnf --source=/patch/to/source-to-parse.cpp \
-//      --benchmark_filter=runParseOverall
+//      --grammar=../clang-tools-extra/pseudo/lib/cxx.bnf \
+//      --source=../clang/lib/Sema/SemaDecl.cpp
 //
 //===----------------------------------------------------------------------===//
 
 #include "benchmark/benchmark.h"
+#include "clang-pseudo/Bracket.h"
 #include "clang-pseudo/DirectiveTree.h"
 #include "clang-pseudo/Forest.h"
 #include "clang-pseudo/GLR.h"
-#include "clang-pseudo/Grammar.h"
-#include "clang-pseudo/LRTable.h"
 #include "clang-pseudo/Token.h"
+#include "clang-pseudo/cli/CLI.h"
+#include "clang-pseudo/grammar/Grammar.h"
+#include "clang-pseudo/grammar/LRTable.h"
 #include "clang/Basic/LangOptions.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/CommandLine.h"
@@ -35,23 +37,20 @@
 #include <string>
 
 using llvm::cl::desc;
-using llvm::cl::init;
 using llvm::cl::opt;
+using llvm::cl::Required;
 
-static opt<std::string> GrammarFile("grammar",
-                                    desc("Parse and check a BNF grammar file."),
-                                    init(""));
-static opt<std::string> Source("source", desc("Source file"));
+static opt<std::string> Source("source", desc("Source file"), Required);
 
 namespace clang {
 namespace pseudo {
+namespace bench {
 namespace {
 
-const std::string *GrammarText = nullptr;
 const std::string *SourceText = nullptr;
-const Grammar *G = nullptr;
+const Language *Lang = nullptr;
 
-void setupGrammarAndSource() {
+void setup() {
   auto ReadFile = [](llvm::StringRef FilePath) -> std::string {
     llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> GrammarText =
         llvm::MemoryBuffer::getFile(FilePath);
@@ -62,78 +61,96 @@ void setupGrammarAndSource() {
     }
     return GrammarText.get()->getBuffer().str();
   };
-  GrammarText = new std::string(ReadFile(GrammarFile));
   SourceText = new std::string(ReadFile(Source));
-  std::vector<std::string> Diags;
-  G = Grammar::parseBNF(*GrammarText, Diags).release();
+  Lang = &getLanguageFromFlags();
 }
 
-static void runParseBNFGrammar(benchmark::State &State) {
-  std::vector<std::string> Diags;
+static void buildSLR(benchmark::State &State) {
   for (auto _ : State)
-    Grammar::parseBNF(*GrammarText, Diags);
+    LRTable::buildSLR(Lang->G);
 }
-BENCHMARK(runParseBNFGrammar);
+BENCHMARK(buildSLR);
 
-static void runBuildLR(benchmark::State &State) {
-  for (auto _ : State)
-    clang::pseudo::LRTable::buildSLR(*G);
-}
-BENCHMARK(runBuildLR);
-
-TokenStream parseableTokenStream() {
+TokenStream lexAndPreprocess() {
   clang::LangOptions LangOpts = genericLangOpts();
-  TokenStream RawStream = clang::pseudo::lex(*SourceText, LangOpts);
+  TokenStream RawStream = pseudo::lex(*SourceText, LangOpts);
   auto DirectiveStructure = DirectiveTree::parse(RawStream);
-  clang::pseudo::chooseConditionalBranches(DirectiveStructure, RawStream);
+  chooseConditionalBranches(DirectiveStructure, RawStream);
   TokenStream Cook =
       cook(DirectiveStructure.stripDirectives(RawStream), LangOpts);
-  return clang::pseudo::stripComments(Cook);
+  auto Stream = stripComments(Cook);
+  pairBrackets(Stream);
+  return Stream;
 }
 
-static void runPreprocessTokens(benchmark::State &State) {
+static void lex(benchmark::State &State) {
+  clang::LangOptions LangOpts = genericLangOpts();
   for (auto _ : State)
-    parseableTokenStream();
+    clang::pseudo::lex(*SourceText, LangOpts);
   State.SetBytesProcessed(static_cast<uint64_t>(State.iterations()) *
                           SourceText->size());
 }
-BENCHMARK(runPreprocessTokens);
+BENCHMARK(lex);
 
-static void runGLRParse(benchmark::State &State) {
+static void pairBrackets(benchmark::State &State) {
   clang::LangOptions LangOpts = genericLangOpts();
-  LRTable Table = clang::pseudo::LRTable::buildSLR(*G);
-  TokenStream ParseableStream = parseableTokenStream();
+  auto Stream = clang::pseudo::lex(*SourceText, LangOpts);
+  for (auto _ : State)
+    pairBrackets(Stream);
+  State.SetBytesProcessed(static_cast<uint64_t>(State.iterations()) *
+                          SourceText->size());
+}
+BENCHMARK(pairBrackets);
+
+static void preprocess(benchmark::State &State) {
+  clang::LangOptions LangOpts = genericLangOpts();
+  TokenStream RawStream = clang::pseudo::lex(*SourceText, LangOpts);
   for (auto _ : State) {
-    pseudo::ForestArena Forest;
-    pseudo::GSS GSS;
-    glrParse(ParseableStream, ParseParams{*G, Table, Forest, GSS});
+    auto DirectiveStructure = DirectiveTree::parse(RawStream);
+    chooseConditionalBranches(DirectiveStructure, RawStream);
+    stripComments(
+        cook(DirectiveStructure.stripDirectives(RawStream), LangOpts));
   }
   State.SetBytesProcessed(static_cast<uint64_t>(State.iterations()) *
                           SourceText->size());
 }
-BENCHMARK(runGLRParse);
+BENCHMARK(preprocess);
 
-static void runParseOverall(benchmark::State &State) {
-  clang::LangOptions LangOpts = genericLangOpts();
-  LRTable Table = clang::pseudo::LRTable::buildSLR(*G);
+static void glrParse(benchmark::State &State) {
+  SymbolID StartSymbol = *Lang->G.findNonterminal("translation-unit");
+  TokenStream Stream = lexAndPreprocess();
   for (auto _ : State) {
     pseudo::ForestArena Forest;
     pseudo::GSS GSS;
-    glrParse(parseableTokenStream(), ParseParams{*G, Table, Forest, GSS});
+    pseudo::glrParse(ParseParams{Stream, Forest, GSS}, StartSymbol, *Lang);
   }
   State.SetBytesProcessed(static_cast<uint64_t>(State.iterations()) *
                           SourceText->size());
 }
-BENCHMARK(runParseOverall);
+BENCHMARK(glrParse);
+
+static void full(benchmark::State &State) {
+  SymbolID StartSymbol = *Lang->G.findNonterminal("translation-unit");
+  for (auto _ : State) {
+    TokenStream Stream = lexAndPreprocess();
+    pseudo::ForestArena Forest;
+    pseudo::GSS GSS;
+    pseudo::glrParse(ParseParams{Stream, Forest, GSS}, StartSymbol, *Lang);
+  }
+  State.SetBytesProcessed(static_cast<uint64_t>(State.iterations()) *
+                          SourceText->size());
+}
+BENCHMARK(full);
 
 } // namespace
+} // namespace bench
 } // namespace pseudo
 } // namespace clang
 
 int main(int argc, char *argv[]) {
   benchmark::Initialize(&argc, argv);
   llvm::cl::ParseCommandLineOptions(argc, argv);
-  clang::pseudo::setupGrammarAndSource();
+  clang::pseudo::bench::setup();
   benchmark::RunSpecifiedBenchmarks();
   return 0;
 }

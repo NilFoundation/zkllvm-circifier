@@ -898,6 +898,13 @@ enum NodeType {
   STRICT_FP16_TO_FP,
   STRICT_FP_TO_FP16,
 
+  /// BF16_TO_FP, FP_TO_BF16 - These operators are used to perform promotions
+  /// and truncation for bfloat16. These nodes form a semi-softened interface
+  /// for dealing with bf16 (as an i16), which is often a storage-only type but
+  /// has native conversions.
+  BF16_TO_FP,
+  FP_TO_BF16,
+
   /// Perform various unary floating-point operations inspired by libm. For
   /// FPOWI, the result is undefined if if the integer operand doesn't fit into
   /// sizeof(int).
@@ -1188,6 +1195,8 @@ enum NodeType {
   ATOMIC_LOAD_UMAX,
   ATOMIC_LOAD_FADD,
   ATOMIC_LOAD_FSUB,
+  ATOMIC_LOAD_FMAX,
+  ATOMIC_LOAD_FMIN,
 
   // Masked load and store - consecutive vector load and store operations
   // with additional mask operand that prevents memory accesses to the
@@ -1278,6 +1287,17 @@ enum NodeType {
   VECREDUCE_UMAX,
   VECREDUCE_UMIN,
 
+  // The `llvm.experimental.stackmap` intrinsic.
+  // Operands: input chain, glue, <id>, <numShadowBytes>, [live0[, live1...]]
+  // Outputs: output chain, glue
+  STACKMAP,
+
+  // The `llvm.experimental.patchpoint.*` intrinsic.
+  // Operands: input chain, [glue], reg-mask, <id>, <numShadowBytes>, callee,
+  //   <numArgs>, cc, ...
+  // Outputs: [rv], output chain, glue
+  PATCHPOINT,
+
 // Vector Predication
 #define BEGIN_REGISTER_VP_SDNODE(VPSDID, ...) VPSDID,
 #include "llvm/IR/VPIntrinsics.def"
@@ -1358,37 +1378,17 @@ static const int LAST_INDEXED_MODE = POST_DEC + 1;
 /// MemIndexType enum - This enum defines how to interpret MGATHER/SCATTER's
 /// index parameter when calculating addresses.
 ///
-/// SIGNED_SCALED     Addr = Base + ((signed)Index * sizeof(element))
-/// SIGNED_UNSCALED   Addr = Base + (signed)Index
-/// UNSIGNED_SCALED   Addr = Base + ((unsigned)Index * sizeof(element))
-/// UNSIGNED_UNSCALED Addr = Base + (unsigned)Index
-enum MemIndexType {
-  SIGNED_SCALED = 0,
-  SIGNED_UNSCALED,
-  UNSIGNED_SCALED,
-  UNSIGNED_UNSCALED
-};
+/// SIGNED_SCALED     Addr = Base + ((signed)Index * Scale)
+/// UNSIGNED_SCALED   Addr = Base + ((unsigned)Index * Scale)
+///
+/// NOTE: The value of Scale is typically only known to the node owning the
+/// IndexType, with a value of 1 the equivalent of being unscaled.
+enum MemIndexType { SIGNED_SCALED = 0, UNSIGNED_SCALED };
 
-static const int LAST_MEM_INDEX_TYPE = UNSIGNED_UNSCALED + 1;
-
-inline bool isIndexTypeScaled(MemIndexType IndexType) {
-  return IndexType == SIGNED_SCALED || IndexType == UNSIGNED_SCALED;
-}
+static const int LAST_MEM_INDEX_TYPE = UNSIGNED_SCALED + 1;
 
 inline bool isIndexTypeSigned(MemIndexType IndexType) {
-  return IndexType == SIGNED_SCALED || IndexType == SIGNED_UNSCALED;
-}
-
-inline MemIndexType getSignedIndexType(MemIndexType IndexType) {
-  return isIndexTypeScaled(IndexType) ? SIGNED_SCALED : SIGNED_UNSCALED;
-}
-
-inline MemIndexType getUnsignedIndexType(MemIndexType IndexType) {
-  return isIndexTypeScaled(IndexType) ? UNSIGNED_SCALED : UNSIGNED_UNSCALED;
-}
-
-inline MemIndexType getUnscaledIndexType(MemIndexType IndexType) {
-  return isIndexTypeSigned(IndexType) ? SIGNED_UNSCALED : UNSIGNED_UNSCALED;
+  return IndexType == SIGNED_SCALED;
 }
 
 //===--------------------------------------------------------------------===//

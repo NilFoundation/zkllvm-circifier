@@ -15,8 +15,8 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/MC/MCAsmInfo.h"
 #include "llvm/MC/MCContext.h"
+#include "llvm/MC/MCDecoderOps.h"
 #include "llvm/MC/MCDisassembler/MCDisassembler.h"
-#include "llvm/MC/MCFixedLenDisassembler.h"
 #include "llvm/MC/MCInst.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/MC/TargetRegistry.h"
@@ -129,7 +129,7 @@ DecodeStatus EVMDisassembler::getInstruction(MCInst &Instr, uint64_t &Size,
                                              uint64_t Address,
                                              raw_ostream &CStream) const {
                           
-  uint8_t insn;
+  uint8_t insn = '\0';
   DecodeStatus Result = decodeInstruction(DecoderTable8, Instr, insn, Address, this, STI);
   Size = 1;
 

@@ -103,7 +103,7 @@ DECLARE_REAL_AND_INTERCEPTOR(void, free, void *)
   do {                                                                         \
     if (asan_init_is_running)                                                  \
       return REAL(func)(__VA_ARGS__);                                          \
-    if (SANITIZER_MAC && UNLIKELY(!asan_inited))                               \
+    if (SANITIZER_APPLE && UNLIKELY(!asan_inited))                               \
       return REAL(func)(__VA_ARGS__);                                          \
     ENSURE_ASAN_INITED();                                                      \
   } while (false)
@@ -245,13 +245,12 @@ DEFINE_REAL_PTHREAD_FUNCTIONS
 static void ClearShadowMemoryForContextStack(uptr stack, uptr ssize) {
   // Align to page size.
   uptr PageSize = GetPageSizeCached();
-  uptr bottom = stack & ~(PageSize - 1);
+  uptr bottom = RoundDownTo(stack, PageSize);
   ssize += stack - bottom;
   ssize = RoundUpTo(ssize, PageSize);
   static const uptr kMaxSaneContextStackSize = 1 << 22;  // 4 Mb
-  if (AddrIsInMem(bottom) && ssize && ssize <= kMaxSaneContextStackSize) {
+  if (AddrIsInMem(bottom) && ssize && ssize <= kMaxSaneContextStackSize)
     PoisonShadow(bottom, ssize, 0);
-  }
 }
 
 INTERCEPTOR(int, swapcontext, struct ucontext_t *oucp,
@@ -267,15 +266,14 @@ INTERCEPTOR(int, swapcontext, struct ucontext_t *oucp,
   uptr stack, ssize;
   ReadContextStack(ucp, &stack, &ssize);
   ClearShadowMemoryForContextStack(stack, ssize);
-#if __has_attribute(__indirect_return__) && \
-    (defined(__x86_64__) || defined(__i386__))
+#    if __has_attribute(__indirect_return__) && \
+        (defined(__x86_64__) || defined(__i386__))
   int (*real_swapcontext)(struct ucontext_t *, struct ucontext_t *)
-    __attribute__((__indirect_return__))
-    = REAL(swapcontext);
+      __attribute__((__indirect_return__)) = REAL(swapcontext);
   int res = real_swapcontext(oucp, ucp);
-#else
+#    else
   int res = REAL(swapcontext)(oucp, ucp);
-#endif
+#    endif
   // swapcontext technically does not return, but program may swap context to
   // "oucp" later, that would look as if swapcontext() returned 0.
   // We need to clear shadow for ucp once again, as it may be in arbitrary
@@ -355,7 +353,7 @@ INTERCEPTOR(_Unwind_Reason_Code, _Unwind_SjLj_RaiseException,
 INTERCEPTOR(char*, index, const char *string, int c)
   ALIAS(WRAPPER_NAME(strchr));
 # else
-#  if SANITIZER_MAC
+#  if SANITIZER_APPLE
 DECLARE_REAL(char*, index, const char *string, int c)
 OVERRIDE_FUNCTION(index, strchr);
 #  else
@@ -409,7 +407,7 @@ INTERCEPTOR(char*, strncat, char *to, const char *from, uptr size) {
 INTERCEPTOR(char *, strcpy, char *to, const char *from) {
   void *ctx;
   ASAN_INTERCEPTOR_ENTER(ctx, strcpy);
-#if SANITIZER_MAC
+#if SANITIZER_APPLE
   if (UNLIKELY(!asan_inited))
     return REAL(strcpy)(to, from);
 #endif
@@ -489,7 +487,7 @@ INTERCEPTOR(long, strtol, const char *nptr, char **endptr, int base) {
 INTERCEPTOR(int, atoi, const char *nptr) {
   void *ctx;
   ASAN_INTERCEPTOR_ENTER(ctx, atoi);
-#if SANITIZER_MAC
+#if SANITIZER_APPLE
   if (UNLIKELY(!asan_inited)) return REAL(atoi)(nptr);
 #endif
   ENSURE_ASAN_INITED();
@@ -510,7 +508,7 @@ INTERCEPTOR(int, atoi, const char *nptr) {
 INTERCEPTOR(long, atol, const char *nptr) {
   void *ctx;
   ASAN_INTERCEPTOR_ENTER(ctx, atol);
-#if SANITIZER_MAC
+#if SANITIZER_APPLE
   if (UNLIKELY(!asan_inited)) return REAL(atol)(nptr);
 #endif
   ENSURE_ASAN_INITED();
@@ -563,7 +561,7 @@ static void AtCxaAtexit(void *unused) {
 #if ASAN_INTERCEPT___CXA_ATEXIT
 INTERCEPTOR(int, __cxa_atexit, void (*func)(void *), void *arg,
             void *dso_handle) {
-#if SANITIZER_MAC
+#if SANITIZER_APPLE
   if (UNLIKELY(!asan_inited)) return REAL(__cxa_atexit)(func, arg, dso_handle);
 #endif
   ENSURE_ASAN_INITED();

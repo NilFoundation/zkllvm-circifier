@@ -19,7 +19,7 @@ define i256 @u256_add(i256 %x, i256 %y) {
 ; CHECK-NEXT:    adds x0, x0, x4
 ; CHECK-NEXT:    adcs x1, x1, x5
 ; CHECK-NEXT:    adcs x2, x2, x6
-; CHECK-NEXT:    adcs x3, x3, x7
+; CHECK-NEXT:    adc x3, x3, x7
 ; CHECK-NEXT:    ret
   %1 = add i256 %x, %y
   ret i256 %1
@@ -87,7 +87,7 @@ define i256 @u256_sub(i256 %x, i256 %y) {
 ; CHECK-NEXT:    subs x0, x0, x4
 ; CHECK-NEXT:    sbcs x1, x1, x5
 ; CHECK-NEXT:    sbcs x2, x2, x6
-; CHECK-NEXT:    sbcs x3, x3, x7
+; CHECK-NEXT:    sbc x3, x3, x7
 ; CHECK-NEXT:    ret
   %1 = sub i256 %x, %y
   ret i256 %1
@@ -98,11 +98,7 @@ define { i256, i8 } @u256_checked_sub(i256 %x, i256 %y) {
 ; CHECK:       // %bb.0:
 ; CHECK-NEXT:    subs x0, x0, x4
 ; CHECK-NEXT:    sbcs x1, x1, x5
-; CHECK-NEXT:    cset w8, lo
-; CHECK-NEXT:    cmp wzr, w8
 ; CHECK-NEXT:    sbcs x2, x2, x6
-; CHECK-NEXT:    cset w8, lo
-; CHECK-NEXT:    cmp wzr, w8
 ; CHECK-NEXT:    sbcs x3, x3, x7
 ; CHECK-NEXT:    cset w8, lo
 ; CHECK-NEXT:    eor w4, w8, #0x1
@@ -122,11 +118,7 @@ define { i256, i8 } @u256_overflowing_sub(i256 %x, i256 %y) {
 ; CHECK:       // %bb.0:
 ; CHECK-NEXT:    subs x0, x0, x4
 ; CHECK-NEXT:    sbcs x1, x1, x5
-; CHECK-NEXT:    cset w8, lo
-; CHECK-NEXT:    cmp wzr, w8
 ; CHECK-NEXT:    sbcs x2, x2, x6
-; CHECK-NEXT:    cset w8, lo
-; CHECK-NEXT:    cmp wzr, w8
 ; CHECK-NEXT:    sbcs x3, x3, x7
 ; CHECK-NEXT:    cset w4, lo
 ; CHECK-NEXT:    ret
@@ -163,7 +155,7 @@ define i256 @i256_add(i256 %x, i256 %y) {
 ; CHECK-NEXT:    adds x0, x0, x4
 ; CHECK-NEXT:    adcs x1, x1, x5
 ; CHECK-NEXT:    adcs x2, x2, x6
-; CHECK-NEXT:    adcs x3, x3, x7
+; CHECK-NEXT:    adc x3, x3, x7
 ; CHECK-NEXT:    ret
   %1 = add i256 %x, %y
   ret i256 %1
@@ -233,7 +225,7 @@ define i256 @i256_sub(i256 %x, i256 %y) {
 ; CHECK-NEXT:    subs x0, x0, x4
 ; CHECK-NEXT:    sbcs x1, x1, x5
 ; CHECK-NEXT:    sbcs x2, x2, x6
-; CHECK-NEXT:    sbcs x3, x3, x7
+; CHECK-NEXT:    sbc x3, x3, x7
 ; CHECK-NEXT:    ret
   %1 = sub i256 %x, %y
   ret i256 %1
@@ -244,11 +236,7 @@ define { i256, i8 } @i256_checked_sub(i256 %x, i256 %y) {
 ; CHECK:       // %bb.0:
 ; CHECK-NEXT:    subs x0, x0, x4
 ; CHECK-NEXT:    sbcs x1, x1, x5
-; CHECK-NEXT:    cset w8, lo
-; CHECK-NEXT:    cmp wzr, w8
 ; CHECK-NEXT:    sbcs x2, x2, x6
-; CHECK-NEXT:    cset w8, lo
-; CHECK-NEXT:    cmp wzr, w8
 ; CHECK-NEXT:    sbcs x3, x3, x7
 ; CHECK-NEXT:    cset w8, vs
 ; CHECK-NEXT:    eor w4, w8, #0x1
@@ -268,11 +256,7 @@ define { i256, i8 } @i256_overflowing_sub(i256 %x, i256 %y) {
 ; CHECK:       // %bb.0:
 ; CHECK-NEXT:    subs x0, x0, x4
 ; CHECK-NEXT:    sbcs x1, x1, x5
-; CHECK-NEXT:    cset w8, lo
-; CHECK-NEXT:    cmp wzr, w8
 ; CHECK-NEXT:    sbcs x2, x2, x6
-; CHECK-NEXT:    cset w8, lo
-; CHECK-NEXT:    cmp wzr, w8
 ; CHECK-NEXT:    sbcs x3, x3, x7
 ; CHECK-NEXT:    cset w4, vs
 ; CHECK-NEXT:    ret

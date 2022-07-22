@@ -1,0 +1,3 @@
+[submodule "soll"]
+	path = soll
+	url = git@github.com:nilfoundation/zkllvm-soll.git

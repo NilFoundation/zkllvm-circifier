@@ -31,6 +31,7 @@
 #include "clang/Basic/TargetInfo.h"
 #include "clang/Lex/Lexer.h"
 #include "clang/Lex/LiteralSupport.h"
+#include "clang/Lex/Preprocessor.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Format.h"
 #include "llvm/Support/raw_ostream.h"
@@ -1022,7 +1023,7 @@ unsigned StringLiteral::mapCharByteWidth(TargetInfo const &Target,
                                          StringKind SK) {
   unsigned CharByteWidth = 0;
   switch (SK) {
-  case Ascii:
+  case Ordinary:
   case UTF8:
     CharByteWidth = Target.getCharWidth();
     break;
@@ -1122,7 +1123,8 @@ StringLiteral *StringLiteral::CreateEmpty(const ASTContext &Ctx,
 
 void StringLiteral::outputString(raw_ostream &OS) const {
   switch (getKind()) {
-  case Ascii: break; // no prefix.
+  case Ordinary:
+    break; // no prefix.
   case Wide:  OS << 'L'; break;
   case UTF8:  OS << "u8"; break;
   case UTF16: OS << 'u'; break;
@@ -1230,7 +1232,7 @@ StringLiteral::getLocationOfByte(unsigned ByteNo, const SourceManager &SM,
                                  const LangOptions &Features,
                                  const TargetInfo &Target, unsigned *StartToken,
                                  unsigned *StartTokenByteOffset) const {
-  assert((getKind() == StringLiteral::Ascii ||
+  assert((getKind() == StringLiteral::Ordinary ||
           getKind() == StringLiteral::UTF8) &&
          "Only narrow string literals are currently supported");
 
@@ -1519,6 +1521,11 @@ const Attr *CallExpr::getUnusedResultAttr(const ASTContext &Ctx) const {
   // then return the return type attribute.
   if (const TagDecl *TD = getCallReturnType(Ctx)->getAsTagDecl())
     if (const auto *A = TD->getAttr<WarnUnusedResultAttr>())
+      return A;
+
+  for (const auto *TD = getCallReturnType(Ctx)->getAs<TypedefType>(); TD;
+       TD = TD->desugar()->getAs<TypedefType>())
+    if (const auto *A = TD->getDecl()->getAttr<WarnUnusedResultAttr>())
       return A;
 
   // Otherwise, see if the callee is marked nodiscard and return that attribute
@@ -2189,7 +2196,8 @@ APValue SourceLocExpr::EvaluateInContext(const ASTContext &Ctx,
   switch (getIdentKind()) {
   case SourceLocExpr::File: {
     SmallString<256> Path(PLoc.getFilename());
-    Ctx.getLangOpts().remapPathPrefix(Path);
+    clang::Preprocessor::processPathForFileMacro(Path, Ctx.getLangOpts(),
+                                                 Ctx.getTargetInfo());
     return MakeStringLiteral(Path);
   }
   case SourceLocExpr::Function: {
@@ -2222,7 +2230,8 @@ APValue SourceLocExpr::EvaluateInContext(const ASTContext &Ctx,
       StringRef Name = F->getName();
       if (Name == "_M_file_name") {
         SmallString<256> Path(PLoc.getFilename());
-        Ctx.getLangOpts().remapPathPrefix(Path);
+        clang::Preprocessor::processPathForFileMacro(Path, Ctx.getLangOpts(),
+                                                     Ctx.getTargetInfo());
         Value.getStructField(F->getFieldIndex()) = MakeStringLiteral(Path);
       } else if (Name == "_M_function_name") {
         // Note: this emits the PrettyFunction name -- different than what

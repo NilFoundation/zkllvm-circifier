@@ -97,6 +97,28 @@ void f(int (&g)[]) {
   foo(c, p);
 }
 
+struct A {
+  #pragma omp declare simd linear(a:X)
+  template<int X, typename T>
+  T infunc(T a) { return a * 2; }
+
+  template<int Y, typename U>
+  U outfunc(U *a);
+};
+
+#pragma omp declare simd linear(a:Y)
+template<int Y, typename U>
+U A::outfunc(U *a) { return *a * 2; }
+
+void test_member_template()
+{
+  struct A a;
+  int i = 32;
+  float f = 1.0;
+  int t = a.infunc<8, int>(i);
+  float u = a.outfunc<4, float>(&f);
+}
+
 #pragma omp declare simd
 #pragma omp declare simd notinbranch aligned(a : 32)
 int bar(VV v, float *a) { return 0; }
@@ -155,6 +177,14 @@ double Five(int a, short &b, short &c, short &d, short &e, short &f, short &g,
   return a + int(b);
 }
 
+// Test negative strides
+#pragma omp declare simd simdlen(4) linear(a:-2) linear(b:-8) \
+                                    linear(uval(c):-4) linear(ref(d):-16) \
+                                    linear(e:-1) linear(f:-1) linear(g:0)
+double Six(int a, float *b, int &c, int *&d, char e, char *f, short g) {
+ return a + int(*b) + c + *d + e + *f + g;
+}
+
 // CHECK-DAG: define {{.+}}@_Z5add_1Pf(
 // CHECK-DAG: define {{.+}}@_Z1hIiEvPT_S1_S1_S1_(
 // CHECK-DAG: define {{.+}}@_Z1hIfEvPT_S1_S1_S1_(
@@ -165,6 +195,8 @@ double Five(int a, short &b, short &c, short &d, short &e, short &f, short &g,
 // CHECK-DAG: define {{.+}}@_ZN3TVVILi16EfE6taddpfEPfRS1_(
 // CHECK-DAG: define {{.+}}@_ZN3TVVILi16EfE4taddEi(
 // CHECK-DAG: define {{.+}}@_Z3fooILi64EEvRAT__iRPf(
+// CHECK-DAG: define {{.+}}@_ZN1A6infuncILi8EiEET0_S1_
+// CHECK-DAG: define {{.+}}@_ZN1A7outfuncILi4EfEET0_PS1_
 // CHECK-DAG: define {{.+}}@_Z3bar2VVPf(
 // CHECK-DAG: define {{.+}}@_Z3baz2VVPi(
 // CHECK-DAG: define {{.+}}@_Z3bay2VVRPd(
@@ -178,6 +210,7 @@ double Five(int a, short &b, short &c, short &d, short &e, short &f, short &g,
 // CHECK-DAG: define {{.+}}@_Z5ThreeRiS_
 // CHECK-DAG: define {{.+}}@_Z4FourRiS_
 // CHECK-DAG: define {{.+}}@_Z4FiveiRsS_S_S_S_S_S_S_
+// CHECK-DAG: define {{.+}}@_Z3SixiPfRiRPicPcs
 
 // CHECK-DAG: "_ZGVbM4l32__Z5add_1Pf"
 // CHECK-DAG: "_ZGVbN4l32__Z5add_1Pf"
@@ -301,6 +334,24 @@ double Five(int a, short &b, short &c, short &d, short &e, short &f, short &g,
 // CHECK-DAG: "_ZGVeM64va128U64__Z3fooILi64EEvRAT__iRPf"
 // CHECK-DAG: "_ZGVeN64va128U64__Z3fooILi64EEvRAT__iRPf"
 
+// CHECK-DAG: "_ZGVbM4vl8__ZN1A6infuncILi8EiEET0_S1_"
+// CHECK-DAG: "_ZGVbN4vl8__ZN1A6infuncILi8EiEET0_S1_"
+// CHECK-DAG: "_ZGVcM8vl8__ZN1A6infuncILi8EiEET0_S1_"
+// CHECK-DAG: "_ZGVcN8vl8__ZN1A6infuncILi8EiEET0_S1_"
+// CHECK-DAG: "_ZGVdM8vl8__ZN1A6infuncILi8EiEET0_S1_"
+// CHECK-DAG: "_ZGVdN8vl8__ZN1A6infuncILi8EiEET0_S1_"
+// CHECK-DAG: "_ZGVeM16vl8__ZN1A6infuncILi8EiEET0_S1_"
+// CHECK-DAG: "_ZGVeN16vl8__ZN1A6infuncILi8EiEET0_S1_"
+
+// CHECK-DAG: "_ZGVbM4vl16__ZN1A7outfuncILi4EfEET0_PS1_"
+// CHECK-DAG: "_ZGVbN4vl16__ZN1A7outfuncILi4EfEET0_PS1_"
+// CHECK-DAG: "_ZGVcM8vl16__ZN1A7outfuncILi4EfEET0_PS1_"
+// CHECK-DAG: "_ZGVcN8vl16__ZN1A7outfuncILi4EfEET0_PS1_"
+// CHECK-DAG: "_ZGVdM8vl16__ZN1A7outfuncILi4EfEET0_PS1_"
+// CHECK-DAG: "_ZGVdN8vl16__ZN1A7outfuncILi4EfEET0_PS1_"
+// CHECK-DAG: "_ZGVeM16vl16__ZN1A7outfuncILi4EfEET0_PS1_"
+// CHECK-DAG: "_ZGVeN16vl16__ZN1A7outfuncILi4EfEET0_PS1_"
+
 // CHECK-DAG: "_ZGVbM4vv__Z3bar2VVPf"
 // CHECK-DAG: "_ZGVbN4vv__Z3bar2VVPf"
 // CHECK-DAG: "_ZGVcM8vv__Z3bar2VVPf"
@@ -399,6 +450,8 @@ double Five(int a, short &b, short &c, short &d, short &e, short &f, short &g,
 // CHECK-DAG: "_ZGVbN4R8R4__Z4FourRiS_"
 // CHECK-DAG: "_ZGVbM4uL2Ls0L4Ls0U8Us0R32Rs0__Z4FiveiRsS_S_S_S_S_S_S_"
 // CHECK-DAG: "_ZGVbN4uL2Ls0L4Ls0U8Us0R32Rs0__Z4FiveiRsS_S_S_S_S_S_S_"
+// CHECK-DAG: "_ZGVbM4ln2ln32Un4Rn128ln1ln1l0__Z3SixiPfRiRPicPcs"
+// CHECK-DAG: "_ZGVbN4ln2ln32Un4Rn128ln1ln1l0__Z3SixiPfRiRPicPcs"
 
 // CHECK-NOT: "_ZGV{{.+}}__Z1fRA_i
 

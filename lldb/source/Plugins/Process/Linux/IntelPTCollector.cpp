@@ -21,6 +21,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <fcntl.h>
 #include <fstream>
 #include <linux/perf_event.h>
 #include <sstream>
@@ -32,111 +33,23 @@ using namespace lldb_private;
 using namespace process_linux;
 using namespace llvm;
 
-/// IntelPTThreadTraceCollection
+IntelPTCollector::IntelPTCollector(NativeProcessProtocol &process)
+    : m_process(process) {}
 
-bool IntelPTThreadTraceCollection::TracesThread(lldb::tid_t tid) const {
-  return m_thread_traces.count(tid);
-}
-
-Error IntelPTThreadTraceCollection::TraceStop(lldb::tid_t tid) {
-  auto it = m_thread_traces.find(tid);
-  if (it == m_thread_traces.end())
-    return createStringError(inconvertibleErrorCode(),
-                             "Thread %" PRIu64 " not currently traced", tid);
-  m_total_buffer_size -= it->second->GetTraceBufferSize();
-  m_thread_traces.erase(tid);
-  return Error::success();
-}
-
-Error IntelPTThreadTraceCollection::TraceStart(
-    lldb::tid_t tid, const TraceIntelPTStartRequest &request) {
-  if (TracesThread(tid))
-    return createStringError(inconvertibleErrorCode(),
-                             "Thread %" PRIu64 " already traced", tid);
-
-  Expected<IntelPTSingleBufferTraceUP> trace_up =
-      IntelPTSingleBufferTrace::Start(request, tid);
-  if (!trace_up)
-    return trace_up.takeError();
-
-  m_total_buffer_size += (*trace_up)->GetTraceBufferSize();
-  m_thread_traces.try_emplace(tid, std::move(*trace_up));
-  return Error::success();
-}
-
-size_t IntelPTThreadTraceCollection::GetTotalBufferSize() const {
-  return m_total_buffer_size;
-}
-
-std::vector<TraceThreadState>
-IntelPTThreadTraceCollection::GetThreadStates() const {
-  std::vector<TraceThreadState> states;
-  for (const auto &it : m_thread_traces)
-    states.push_back({static_cast<int64_t>(it.first),
-                      {TraceBinaryData{IntelPTDataKinds::kTraceBuffer,
-                                       static_cast<int64_t>(
-                                           it.second->GetTraceBufferSize())}}});
-  return states;
-}
-
-Expected<const IntelPTSingleBufferTrace &>
-IntelPTThreadTraceCollection::GetTracedThread(lldb::tid_t tid) const {
-  auto it = m_thread_traces.find(tid);
-  if (it == m_thread_traces.end())
-    return createStringError(inconvertibleErrorCode(),
-                             "Thread %" PRIu64 " not currently traced", tid);
-  return *it->second.get();
-}
-
-void IntelPTThreadTraceCollection::Clear() {
-  m_thread_traces.clear();
-  m_total_buffer_size = 0;
-}
-
-/// IntelPTProcessTrace
-
-bool IntelPTProcessTrace::TracesThread(lldb::tid_t tid) const {
-  return m_thread_traces.TracesThread(tid);
-}
-
-Error IntelPTProcessTrace::TraceStop(lldb::tid_t tid) {
-  return m_thread_traces.TraceStop(tid);
-}
-
-Error IntelPTProcessTrace::TraceStart(lldb::tid_t tid) {
-  if (m_thread_traces.GetTotalBufferSize() +
-          m_tracing_params.trace_buffer_size >
-      static_cast<size_t>(*m_tracing_params.process_buffer_size_limit))
-    return createStringError(
-        inconvertibleErrorCode(),
-        "Thread %" PRIu64 " can't be traced as the process trace size limit "
-        "has been reached. Consider retracing with a higher "
-        "limit.",
-        tid);
-
-  return m_thread_traces.TraceStart(tid, m_tracing_params);
-}
-
-const IntelPTThreadTraceCollection &
-IntelPTProcessTrace::GetThreadTraces() const {
-  return m_thread_traces;
-}
-
-/// IntelPTCollector
-
-IntelPTCollector::IntelPTCollector() {
+llvm::Expected<LinuxPerfZeroTscConversion &>
+IntelPTCollector::FetchPerfTscConversionParameters() {
   if (Expected<LinuxPerfZeroTscConversion> tsc_conversion =
           LoadPerfTscConversionParameters())
-    m_tsc_conversion =
-        std::make_unique<LinuxPerfZeroTscConversion>(*tsc_conversion);
+    return *tsc_conversion;
   else
-    LLDB_LOG_ERROR(GetLog(POSIXLog::Trace), tsc_conversion.takeError(),
-                   "unable to load TSC to wall time conversion: {0}");
+    return createStringError(inconvertibleErrorCode(),
+                             "Unable to load TSC to wall time conversion: %s",
+                             toString(tsc_conversion.takeError()).c_str());
 }
 
 Error IntelPTCollector::TraceStop(lldb::tid_t tid) {
-  if (IsProcessTracingEnabled() && m_process_trace->TracesThread(tid))
-    return m_process_trace->TraceStop(tid);
+  if (m_process_trace_up && m_process_trace_up->TracesThread(tid))
+    return m_process_trace_up->TraceStop(tid);
   return m_thread_traces.TraceStop(tid);
 }
 
@@ -153,94 +66,192 @@ Error IntelPTCollector::TraceStop(const TraceStopRequest &request) {
   }
 }
 
-Error IntelPTCollector::TraceStart(
-    const TraceIntelPTStartRequest &request,
-    const std::vector<lldb::tid_t> &process_threads) {
+/// \return
+///   some file descriptor in /sys/fs/ associated with the cgroup of the given
+///   pid, or \a llvm::None if the pid is not part of a cgroup.
+static Optional<int> GetCGroupFileDescriptor(lldb::pid_t pid) {
+  static Optional<int> fd;
+  if (fd)
+    return fd;
+
+  std::ifstream ifile;
+  ifile.open(formatv("/proc/{0}/cgroup", pid));
+  if (!ifile)
+    return None;
+
+  std::string line;
+  while (std::getline(ifile, line)) {
+    if (line.find("0:") != 0)
+      continue;
+
+    std::string slice = line.substr(line.find_first_of("/"));
+    if (slice.empty())
+      return None;
+    std::string cgroup_file = formatv("/sys/fs/cgroup/{0}", slice);
+    // This cgroup should for the duration of the target, so we don't need to
+    // invoke close ourselves.
+    int maybe_fd = open(cgroup_file.c_str(), O_RDONLY);
+    if (maybe_fd != -1) {
+      fd = maybe_fd;
+      return fd;
+    }
+  }
+  return None;
+}
+
+Error IntelPTCollector::TraceStart(const TraceIntelPTStartRequest &request) {
   if (request.IsProcessTracing()) {
-    if (IsProcessTracingEnabled()) {
+    if (m_process_trace_up) {
       return createStringError(
           inconvertibleErrorCode(),
           "Process currently traced. Stop process tracing first");
     }
-    if (request.per_core_tracing.getValueOr(false)) {
-      return createStringError(inconvertibleErrorCode(),
-                               "Per-core tracing is not supported.");
-    }
-    m_process_trace = IntelPTProcessTrace(request);
+    if (request.IsPerCpuTracing()) {
+      if (m_thread_traces.GetTracedThreadsCount() > 0)
+        return createStringError(
+            inconvertibleErrorCode(),
+            "Threads currently traced. Stop tracing them first.");
+      // CPU tracing is useless if we can't convert tsc to nanos.
+      Expected<LinuxPerfZeroTscConversion &> tsc_conversion =
+          FetchPerfTscConversionParameters();
+      if (!tsc_conversion)
+        return tsc_conversion.takeError();
 
-    Error error = Error::success();
-    for (lldb::tid_t tid : process_threads)
-      error = joinErrors(std::move(error), m_process_trace->TraceStart(tid));
-    return error;
+      // We force the enablement of TSCs, which is needed for correlating the
+      // cpu traces.
+      TraceIntelPTStartRequest effective_request = request;
+      effective_request.enable_tsc = true;
+
+      // We try to use cgroup filtering whenever possible
+      Optional<int> cgroup_fd;
+      if (!request.disable_cgroup_filtering.value_or(false))
+        cgroup_fd = GetCGroupFileDescriptor(m_process.GetID());
+
+      if (Expected<IntelPTProcessTraceUP> trace =
+              IntelPTMultiCoreTrace::StartOnAllCores(effective_request,
+                                                     m_process, cgroup_fd)) {
+        m_process_trace_up = std::move(*trace);
+        return Error::success();
+      } else {
+        return trace.takeError();
+      }
+    } else {
+      std::vector<lldb::tid_t> process_threads;
+      for (NativeThreadProtocol &thread : m_process.Threads())
+        process_threads.push_back(thread.GetID());
+
+      // per-thread process tracing
+      if (Expected<IntelPTProcessTraceUP> trace =
+              IntelPTPerThreadProcessTrace::Start(request, process_threads)) {
+        m_process_trace_up = std::move(trace.get());
+        return Error::success();
+      } else {
+        return trace.takeError();
+      }
+    }
   } else {
+    // individual thread tracing
     Error error = Error::success();
-    for (int64_t tid : *request.tids)
-      error = joinErrors(std::move(error),
-                         m_thread_traces.TraceStart(tid, request));
+    for (int64_t tid : *request.tids) {
+      if (m_process_trace_up && m_process_trace_up->TracesThread(tid))
+        error = joinErrors(
+            std::move(error),
+            createStringError(inconvertibleErrorCode(),
+                              formatv("Thread with tid {0} is currently "
+                                      "traced. Stop tracing it first.",
+                                      tid)
+                                  .str()
+                                  .c_str()));
+      else
+        error = joinErrors(std::move(error),
+                           m_thread_traces.TraceStart(tid, request));
+    }
     return error;
   }
 }
 
+void IntelPTCollector::ProcessWillResume() {
+  if (m_process_trace_up)
+    m_process_trace_up->ProcessWillResume();
+}
+
+void IntelPTCollector::ProcessDidStop() {
+  if (m_process_trace_up)
+    m_process_trace_up->ProcessDidStop();
+}
+
 Error IntelPTCollector::OnThreadCreated(lldb::tid_t tid) {
-  if (!IsProcessTracingEnabled())
-    return Error::success();
-  return m_process_trace->TraceStart(tid);
+  if (m_process_trace_up)
+    return m_process_trace_up->TraceStart(tid);
+
+  return Error::success();
 }
 
 Error IntelPTCollector::OnThreadDestroyed(lldb::tid_t tid) {
-  if (IsProcessTracingEnabled() && m_process_trace->TracesThread(tid))
-    return m_process_trace->TraceStop(tid);
+  if (m_process_trace_up && m_process_trace_up->TracesThread(tid))
+    return m_process_trace_up->TraceStop(tid);
   else if (m_thread_traces.TracesThread(tid))
     return m_thread_traces.TraceStop(tid);
   return Error::success();
 }
 
-Expected<json::Value> IntelPTCollector::GetState() const {
+Expected<json::Value> IntelPTCollector::GetState() {
   Expected<ArrayRef<uint8_t>> cpu_info = GetProcfsCpuInfo();
   if (!cpu_info)
     return cpu_info.takeError();
 
-  TraceGetStateResponse state;
-  state.processBinaryData.push_back({IntelPTDataKinds::kProcFsCpuInfo,
-                                     static_cast<int64_t>(cpu_info->size())});
+  TraceIntelPTGetStateResponse state;
+  if (m_process_trace_up)
+    state = m_process_trace_up->GetState();
 
-  std::vector<TraceThreadState> thread_states =
-      m_thread_traces.GetThreadStates();
-  state.tracedThreads.insert(state.tracedThreads.end(), thread_states.begin(),
-                             thread_states.end());
+  state.process_binary_data.push_back(
+      {IntelPTDataKinds::kProcFsCpuInfo, cpu_info->size()});
 
-  if (IsProcessTracingEnabled()) {
-    thread_states = m_process_trace->GetThreadTraces().GetThreadStates();
-    state.tracedThreads.insert(state.tracedThreads.end(), thread_states.begin(),
-                               thread_states.end());
-  }
+  m_thread_traces.ForEachThread(
+      [&](lldb::tid_t tid, const IntelPTSingleBufferTrace &thread_trace) {
+        state.traced_threads.push_back(
+            {tid,
+             {{IntelPTDataKinds::kIptTrace, thread_trace.GetIptTraceSize()}}});
+      });
+
+  if (Expected<LinuxPerfZeroTscConversion &> tsc_conversion =
+          FetchPerfTscConversionParameters())
+    state.tsc_perf_zero_conversion = *tsc_conversion;
+  else
+    state.AddWarning(toString(tsc_conversion.takeError()));
   return toJSON(state);
 }
 
-Expected<const IntelPTSingleBufferTrace &>
-IntelPTCollector::GetTracedThread(lldb::tid_t tid) const {
-  if (IsProcessTracingEnabled() && m_process_trace->TracesThread(tid))
-    return m_process_trace->GetThreadTraces().GetTracedThread(tid);
-  return m_thread_traces.GetTracedThread(tid);
-}
-
 Expected<std::vector<uint8_t>>
-IntelPTCollector::GetBinaryData(const TraceGetBinaryDataRequest &request) const {
-  if (request.kind == IntelPTDataKinds::kTraceBuffer) {
-    if (Expected<const IntelPTSingleBufferTrace &> trace =
-            GetTracedThread(*request.tid))
-      return trace->GetTraceBuffer(request.offset, request.size);
-    else
-      return trace.takeError();
-  } else if (request.kind == IntelPTDataKinds::kProcFsCpuInfo) {
+IntelPTCollector::GetBinaryData(const TraceGetBinaryDataRequest &request) {
+  if (request.kind == IntelPTDataKinds::kProcFsCpuInfo)
     return GetProcfsCpuInfo();
-  }
-  return createStringError(inconvertibleErrorCode(),
-                           "Unsuported trace binary data kind: %s",
-                           request.kind.c_str());
-}
 
-void IntelPTCollector::ClearProcessTracing() { m_process_trace = None; }
+  if (m_process_trace_up) {
+    Expected<Optional<std::vector<uint8_t>>> data =
+        m_process_trace_up->TryGetBinaryData(request);
+    if (!data)
+      return data.takeError();
+    if (*data)
+      return **data;
+  }
+
+  {
+    Expected<Optional<std::vector<uint8_t>>> data =
+        m_thread_traces.TryGetBinaryData(request);
+    if (!data)
+      return data.takeError();
+    if (*data)
+      return **data;
+  }
+
+  return createStringError(
+      inconvertibleErrorCode(),
+      formatv("Can't fetch data kind {0} for cpu_id {1}, tid {2} and "
+              "\"process tracing\" mode {3}",
+              request.kind, request.cpu_id, request.tid,
+              m_process_trace_up ? "enabled" : "not enabled"));
+}
 
 bool IntelPTCollector::IsSupported() {
   if (Expected<uint32_t> intel_pt_type = GetIntelPTOSEventType()) {
@@ -251,11 +262,7 @@ bool IntelPTCollector::IsSupported() {
   }
 }
 
-bool IntelPTCollector::IsProcessTracingEnabled() const {
-  return (bool)m_process_trace;
-}
-
 void IntelPTCollector::Clear() {
-  ClearProcessTracing();
+  m_process_trace_up.reset();
   m_thread_traces.Clear();
 }

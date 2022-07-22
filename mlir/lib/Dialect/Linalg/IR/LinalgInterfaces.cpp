@@ -10,6 +10,7 @@
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/AffineExprVisitor.h"
@@ -22,6 +23,20 @@ using namespace mlir::linalg;
 
 /// Include the definitions of the copy operation interface.
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.cpp.inc"
+
+//===----------------------------------------------------------------------===//
+// Interface utility functions
+//===----------------------------------------------------------------------===//
+bool linalg::detail::canOpOperandsBeDroppedImpl(
+    linalg::LinalgOp linalgOp, ArrayRef<OpOperand *> droppedOperands) {
+  SmallVector<AffineMap> indexingMaps;
+  for (auto *opOperand : linalgOp.getInputAndOutputOperands()) {
+    if (llvm::is_contained(droppedOperands, opOperand))
+      continue;
+    indexingMaps.push_back(linalgOp.getTiedIndexingMap(opOperand));
+  }
+  return inversePermutation(concatAffineMaps(indexingMaps)) != AffineMap();
+}
 
 //===----------------------------------------------------------------------===//
 // ContractionOpInterface implementation
@@ -105,7 +120,7 @@ static MatchContractionResult isContractionInterfaceImpl(Operation *op) {
     return MatchContractionResult::NotLinalgOp;
   if (linalgOp.getNumInputs() != 2 || linalgOp.getNumOutputs() != 1)
     return MatchContractionResult::WrongNumOperands;
-  auto mapRange = linalgOp.indexing_maps().getAsValueRange<AffineMapAttr>();
+  auto mapRange = linalgOp.getIndexingMapsArray();
   if (linalgOp.getNumReductionLoops() == 0)
     return MatchContractionResult::NoReduction;
   if (llvm::any_of(mapRange,
@@ -113,7 +128,10 @@ static MatchContractionResult isContractionInterfaceImpl(Operation *op) {
     return MatchContractionResult::NotProjectedPermutations;
   // TODO: more fields than add/mul.
   if (!isAddMul<arith::AddFOp, arith::MulFOp>(linalgOp->getRegion(0).front()) &&
-      !isAddMul<arith::AddIOp, arith::MulIOp>(linalgOp->getRegion(0).front()))
+      !isAddMul<arith::AddIOp, arith::MulIOp>(linalgOp->getRegion(0).front()) &&
+      !isAddMul<complex::AddOp, complex::MulOp>(
+          linalgOp->getRegion(0).front()) &&
+      !isAddMul<arith::OrIOp, arith::AndIOp>(linalgOp->getRegion(0).front()))
     return MatchContractionResult::NotAddMul;
   return MatchContractionResult::Success;
 }
@@ -262,7 +280,7 @@ static MatchConvolutionResult isConvolutionInterfaceImpl(Operation *op) {
   if (linalgOp.getNumInputs() < 2 || linalgOp.getNumOutputs() != 1)
     return MatchConvolutionResult::WrongNumOperands;
 
-  auto indexingMaps = linalgOp.getIndexingMaps();
+  auto indexingMaps = linalgOp.getIndexingMapsArray();
 
   // Check the input indexing map has the right form.
   ConvAccessExprWalker inputExprWalker;
@@ -627,10 +645,10 @@ LogicalResult mlir::linalg::detail::verifyStructuredOpInterface(Operation *op) {
       return failure();
 
   // All input/output operands must be indexed.
-  if (static_cast<int64_t>(linalgOp.indexing_maps().size()) !=
+  if (static_cast<int64_t>(linalgOp.getIndexingMapsArray().size()) !=
       linalgOp.getNumInputsAndOutputs())
     return op->emitOpError("expected the number of indexing_map (")
-           << linalgOp.indexing_maps().size()
+           << linalgOp.getIndexingMapsArray().size()
            << ") to be equal to the number of input/output operands ("
            << linalgOp.getNumInputsAndOutputs() << ")";
 

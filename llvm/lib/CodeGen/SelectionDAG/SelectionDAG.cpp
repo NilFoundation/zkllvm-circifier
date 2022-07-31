@@ -2459,48 +2459,6 @@ SDValue SelectionDAG::FoldSetCC(EVT VT, SDValue N1, SDValue N2,
   return SDValue();
 }
 
-/// See if the specified operand can be simplified with the knowledge that only
-/// the bits specified by DemandedBits are used.
-/// TODO: really we should be making this into the DAG equivalent of
-/// SimplifyMultipleUseDemandedBits and not generate any new nodes.
-SDValue SelectionDAG::GetDemandedBits(SDValue V, const APInt &DemandedBits) {
-  EVT VT = V.getValueType();
-
-  if (VT.isScalableVector())
-    return SDValue();
-
-  switch (V.getOpcode()) {
-  default:
-    return TLI->SimplifyMultipleUseDemandedBits(V, DemandedBits, *this);
-  case ISD::Constant: {
-    const APInt &CVal = cast<ConstantSDNode>(V)->getAPIntValue();
-    APInt NewVal = CVal & DemandedBits;
-    if (NewVal != CVal)
-      return getConstant(NewVal, SDLoc(V), V.getValueType());
-    break;
-  }
-  case ISD::SRL:
-    // Only look at single-use SRLs.
-    if (!V.getNode()->hasOneUse())
-      break;
-    if (auto *RHSC = dyn_cast<ConstantSDNode>(V.getOperand(1))) {
-      // See if we can recursively simplify the LHS.
-      unsigned Amt = RHSC->getZExtValue();
-
-      // Watch out for shift count overflow though.
-      if (Amt >= DemandedBits.getBitWidth())
-        break;
-      APInt SrcDemandedBits = DemandedBits << Amt;
-      if (SDValue SimplifyLHS = TLI->SimplifyMultipleUseDemandedBits(
-              V.getOperand(0), SrcDemandedBits, *this))
-        return getNode(ISD::SRL, SDLoc(V), V.getValueType(), SimplifyLHS,
-                       V.getOperand(1));
-    }
-    break;
-  }
-  return SDValue();
-}
-
 /// SignBitIsZero - Return true if the sign bit of Op is known to be zero.  We
 /// use this predicate to simplify operations downstream.
 bool SelectionDAG::SignBitIsZero(SDValue Op, unsigned Depth) const {
@@ -2529,8 +2487,7 @@ bool SelectionDAG::MaskedValueIsZero(SDValue V, const APInt &Mask,
 /// DemandedElts.  We use this predicate to simplify operations downstream.
 bool SelectionDAG::MaskedVectorIsZero(SDValue V, const APInt &DemandedElts,
                                       unsigned Depth /* = 0 */) const {
-  APInt Mask = APInt::getAllOnes(V.getScalarValueSizeInBits());
-  return Mask.isSubsetOf(computeKnownBits(V, DemandedElts, Depth).Zero);
+  return computeKnownBits(V, DemandedElts, Depth).isZero();
 }
 
 /// MaskedValueIsAllOnes - Return true if '(Op & Mask) == Mask'.
@@ -3336,13 +3293,11 @@ KnownBits SelectionDAG::computeKnownBits(SDValue Op, const APInt &DemandedElts,
     assert((Op.getResNo() == 0 || Op.getResNo() == 1) && "Unknown result");
 
     // Collect lo/hi source values and concatenate.
-    // TODO: Would a KnownBits::concatBits helper be useful?
     unsigned LoBits = Op.getOperand(0).getScalarValueSizeInBits();
     unsigned HiBits = Op.getOperand(1).getScalarValueSizeInBits();
     Known = computeKnownBits(Op.getOperand(0), DemandedElts, Depth + 1);
     Known2 = computeKnownBits(Op.getOperand(1), DemandedElts, Depth + 1);
-    Known = Known.anyext(LoBits + HiBits);
-    Known.insertBits(Known2, LoBits);
+    Known = Known2.concat(Known);
 
     // Collect shift amount.
     Known2 = computeKnownBits(Op.getOperand(2), DemandedElts, Depth + 1);
@@ -3507,7 +3462,7 @@ KnownBits SelectionDAG::computeKnownBits(SDValue Op, const APInt &DemandedElts,
   case ISD::AssertZext: {
     EVT VT = cast<VTSDNode>(Op.getOperand(1))->getVT();
     APInt InMask = APInt::getLowBitsSet(BitWidth, VT.getSizeInBits());
-    Known = computeKnownBits(Op.getOperand(0), Depth+1);
+    Known = computeKnownBits(Op.getOperand(0), DemandedElts, Depth + 1);
     Known.Zero |= (~InMask);
     Known.One  &= (~Known.Zero);
     break;
@@ -9089,6 +9044,15 @@ SDValue SelectionDAG::getNode(unsigned Opcode, const SDLoc &DL, SDVTList VTList,
     }
     break;
   }
+  case ISD::SMUL_LOHI:
+  case ISD::UMUL_LOHI: {
+    assert(VTList.NumVTs == 2 && Ops.size() == 2 && "Invalid mul lo/hi op!");
+    assert(VTList.VTs[0].isInteger() && VTList.VTs[0] == VTList.VTs[1] &&
+           VTList.VTs[0] == Ops[0].getValueType() &&
+           VTList.VTs[0] == Ops[1].getValueType() &&
+           "Binary operator types must match!");
+    break;
+  }
   case ISD::STRICT_FP_EXTEND:
     assert(VTList.NumVTs == 2 && Ops.size() == 2 &&
            "Invalid STRICT_FP_EXTEND!");
@@ -11680,6 +11644,35 @@ bool BuildVectorSDNode::isConstant() const {
       return false;
   }
   return true;
+}
+
+Optional<std::pair<APInt, APInt>>
+BuildVectorSDNode::isConstantSequence() const {
+  unsigned NumOps = getNumOperands();
+  if (NumOps < 2)
+    return None;
+
+  if (!isa<ConstantSDNode>(getOperand(0)) ||
+      !isa<ConstantSDNode>(getOperand(1)))
+    return None;
+
+  unsigned EltSize = getValueType(0).getScalarSizeInBits();
+  APInt Start = getConstantOperandAPInt(0).trunc(EltSize);
+  APInt Stride = getConstantOperandAPInt(1).trunc(EltSize) - Start;
+
+  if (Stride.isZero())
+    return None;
+
+  for (unsigned i = 2; i < NumOps; ++i) {
+    if (!isa<ConstantSDNode>(getOperand(i)))
+      return None;
+
+    APInt Val = getConstantOperandAPInt(i).trunc(EltSize);
+    if (Val != (Start + (Stride * i)))
+      return None;
+  }
+
+  return std::make_pair(Start, Stride);
 }
 
 bool ShuffleVectorSDNode::isSplatMask(const int *Mask, EVT VT) {

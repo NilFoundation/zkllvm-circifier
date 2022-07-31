@@ -768,7 +768,7 @@ void ObjFile::parseRelocations(ArrayRef<SectionHeader> sectionHeaders,
 template <class NList>
 static macho::Symbol *createDefined(const NList &sym, StringRef name,
                                     InputSection *isec, uint64_t value,
-                                    uint64_t size) {
+                                    uint64_t size, bool forceHidden) {
   // Symbol scope is determined by sym.n_type & (N_EXT | N_PEXT):
   // N_EXT: Global symbols. These go in the symbol table during the link,
   //        and also in the export table of the output so that the dynamic
@@ -787,7 +787,10 @@ static macho::Symbol *createDefined(const NList &sym, StringRef name,
       (sym.n_desc & (N_WEAK_DEF | N_WEAK_REF)) == (N_WEAK_DEF | N_WEAK_REF);
 
   if (sym.n_type & N_EXT) {
-    bool isPrivateExtern = sym.n_type & N_PEXT;
+    // -load_hidden makes us treat global symbols as linkage unit scoped.
+    // Duplicates are reported but the symbol does not go in the export trie.
+    bool isPrivateExtern = sym.n_type & N_PEXT || forceHidden;
+
     // lld's behavior for merging symbols is slightly different from ld64:
     // ld64 picks the winning symbol based on several criteria (see
     // pickBetweenRegularAtoms() in ld64's SymbolTable.cpp), while lld
@@ -844,11 +847,12 @@ static macho::Symbol *createDefined(const NList &sym, StringRef name,
 // InputSection. They cannot be weak.
 template <class NList>
 static macho::Symbol *createAbsolute(const NList &sym, InputFile *file,
-                                     StringRef name) {
+                                     StringRef name, bool forceHidden) {
   if (sym.n_type & N_EXT) {
+    bool isPrivateExtern = sym.n_type & N_PEXT || forceHidden;
     return symtab->addDefined(
         name, file, nullptr, sym.n_value, /*size=*/0,
-        /*isWeakDef=*/false, sym.n_type & N_PEXT, sym.n_desc & N_ARM_THUMB_DEF,
+        /*isWeakDef=*/false, isPrivateExtern, sym.n_desc & N_ARM_THUMB_DEF,
         /*isReferencedDynamically=*/false, sym.n_desc & N_NO_DEAD_STRIP,
         /*isWeakDefCanBeHidden=*/false);
   }
@@ -864,15 +868,16 @@ template <class NList>
 macho::Symbol *ObjFile::parseNonSectionSymbol(const NList &sym,
                                               StringRef name) {
   uint8_t type = sym.n_type & N_TYPE;
+  bool isPrivateExtern = sym.n_type & N_PEXT || forceHidden;
   switch (type) {
   case N_UNDF:
     return sym.n_value == 0
                ? symtab->addUndefined(name, this, sym.n_desc & N_WEAK_REF)
                : symtab->addCommon(name, this, sym.n_value,
                                    1 << GET_COMM_ALIGN(sym.n_desc),
-                                   sym.n_type & N_PEXT);
+                                   isPrivateExtern);
   case N_ABS:
-    return createAbsolute(sym, this, name);
+    return createAbsolute(sym, this, name, forceHidden);
   case N_PBUD:
   case N_INDR:
     error("TODO: support symbols of type " + std::to_string(type));
@@ -944,7 +949,8 @@ void ObjFile::parseSymbols(ArrayRef<typename LP::section> sectionHeaders,
                 " at misaligned offset");
           continue;
         }
-        symbols[symIndex] = createDefined(sym, name, isec, 0, isec->getSize());
+        symbols[symIndex] =
+            createDefined(sym, name, isec, 0, isec->getSize(), forceHidden);
       }
       continue;
     }
@@ -979,8 +985,8 @@ void ObjFile::parseSymbols(ArrayRef<typename LP::section> sectionHeaders,
       //   4. If we have a literal section (e.g. __cstring and __literal4).
       if (!subsectionsViaSymbols || symbolOffset == 0 ||
           sym.n_desc & N_ALT_ENTRY || !isa<ConcatInputSection>(isec)) {
-        symbols[symIndex] =
-            createDefined(sym, name, isec, symbolOffset, symbolSize);
+        symbols[symIndex] = createDefined(sym, name, isec, symbolOffset,
+                                          symbolSize, forceHidden);
         continue;
       }
       auto *concatIsec = cast<ConcatInputSection>(isec);
@@ -998,8 +1004,8 @@ void ObjFile::parseSymbols(ArrayRef<typename LP::section> sectionHeaders,
 
       // By construction, the symbol will be at offset zero in the new
       // subsection.
-      symbols[symIndex] =
-          createDefined(sym, name, nextIsec, /*value=*/0, symbolSize);
+      symbols[symIndex] = createDefined(sym, name, nextIsec, /*value=*/0,
+                                        symbolSize, forceHidden);
       // TODO: ld64 appears to preserve the original alignment as well as each
       // subsection's offset from the last aligned address. We should consider
       // emulating that behavior.
@@ -1036,8 +1042,8 @@ OpaqueFile::OpaqueFile(MemoryBufferRef mb, StringRef segName,
 }
 
 ObjFile::ObjFile(MemoryBufferRef mb, uint32_t modTime, StringRef archiveName,
-                 bool lazy)
-    : InputFile(ObjKind, mb, lazy), modTime(modTime) {
+                 bool lazy, bool forceHidden)
+    : InputFile(ObjKind, mb, lazy), modTime(modTime), forceHidden(forceHidden) {
   this->archiveName = std::string(archiveName);
   if (lazy) {
     if (target->wordSize == 8)
@@ -1061,8 +1067,11 @@ template <class LP> void ObjFile::parse() {
   auto *buf = reinterpret_cast<const uint8_t *>(mb.getBufferStart());
   auto *hdr = reinterpret_cast<const Header *>(mb.getBufferStart());
 
-  Architecture arch = getArchitectureFromCpuType(hdr->cputype, hdr->cpusubtype);
-  if (arch != config->arch()) {
+  uint32_t cpuType;
+  std::tie(cpuType, std::ignore) = getCPUTypeFromArchitecture(config->arch());
+  if (hdr->cputype != cpuType) {
+    Architecture arch =
+        getArchitectureFromCpuType(hdr->cputype, hdr->cpusubtype);
     auto msg = config->errorForArchMismatch
                    ? static_cast<void (*)(const Twine &)>(error)
                    : warn;
@@ -1859,6 +1868,36 @@ static bool skipPlatformCheckForCatalyst(const InterfaceFile &interface,
                       MachO::Target(config->arch(), PLATFORM_MACOS));
 }
 
+static bool isArchABICompatible(ArchitectureSet archSet,
+                                Architecture targetArch) {
+  uint32_t cpuType;
+  uint32_t targetCpuType;
+  std::tie(targetCpuType, std::ignore) = getCPUTypeFromArchitecture(targetArch);
+
+  return llvm::any_of(archSet, [&](const auto &p) {
+    std::tie(cpuType, std::ignore) = getCPUTypeFromArchitecture(p);
+    return cpuType == targetCpuType;
+  });
+}
+
+static bool isTargetPlatformArchCompatible(
+    InterfaceFile::const_target_range interfaceTargets, Target target) {
+  if (is_contained(interfaceTargets, target))
+    return true;
+
+  if (config->forceExactCpuSubtypeMatch)
+    return false;
+
+  ArchitectureSet archSet;
+  for (const auto &p : interfaceTargets)
+    if (p.Platform == target.Platform)
+      archSet.set(p.Arch);
+  if (archSet.empty())
+    return false;
+
+  return isArchABICompatible(archSet, target.Arch);
+}
+
 DylibFile::DylibFile(const InterfaceFile &interface, DylibFile *umbrella,
                      bool isBundleLoader, bool explicitlyLinked)
     : InputFile(DylibKind, interface), refState(RefState::Unreferenced),
@@ -1878,7 +1917,8 @@ DylibFile::DylibFile(const InterfaceFile &interface, DylibFile *umbrella,
   inputFiles.insert(this);
 
   if (!is_contained(skipPlatformChecks, installName) &&
-      !is_contained(interface.targets(), config->platformInfo.target) &&
+      !isTargetPlatformArchCompatible(interface.targets(),
+                                      config->platformInfo.target) &&
       !skipPlatformCheckForCatalyst(interface, explicitlyLinked)) {
     error(toString(this) + " is incompatible with " +
           std::string(config->platformInfo.target));
@@ -1901,7 +1941,7 @@ DylibFile::DylibFile(const InterfaceFile &interface, DylibFile *umbrella,
   std::vector<const llvm::MachO::Symbol *> normalSymbols;
   normalSymbols.reserve(interface.symbolsCount());
   for (const auto *symbol : interface.symbols()) {
-    if (!symbol->getArchitectures().has(config->arch()))
+    if (!isArchABICompatible(symbol->getArchitectures(), config->arch()))
       continue;
     if (handleLDSymbol(symbol->getName()))
       continue;
@@ -1938,15 +1978,56 @@ DylibFile::DylibFile(const InterfaceFile &interface, DylibFile *umbrella,
   }
 }
 
+DylibFile::DylibFile(DylibFile *umbrella)
+    : InputFile(DylibKind, MemoryBufferRef{}), refState(RefState::Unreferenced),
+      explicitlyLinked(false), isBundleLoader(false) {
+  if (umbrella == nullptr)
+    umbrella = this;
+  this->umbrella = umbrella;
+}
+
 void DylibFile::parseReexports(const InterfaceFile &interface) {
   const InterfaceFile *topLevel =
       interface.getParent() == nullptr ? &interface : interface.getParent();
   for (const InterfaceFileRef &intfRef : interface.reexportedLibraries()) {
     InterfaceFile::const_target_range targets = intfRef.targets();
     if (is_contained(skipPlatformChecks, intfRef.getInstallName()) ||
-        is_contained(targets, config->platformInfo.target))
+        isTargetPlatformArchCompatible(targets, config->platformInfo.target))
       loadReexport(intfRef.getInstallName(), exportingFile, topLevel);
   }
+}
+
+bool DylibFile::isExplicitlyLinked() const {
+  if (!explicitlyLinked)
+    return false;
+
+  // If this dylib was explicitly linked, but at least one of the symbols
+  // of the synthetic dylibs it created via $ld$previous symbols is
+  // referenced, then that synthetic dylib fulfils the explicit linkedness
+  // and we can deadstrip this dylib if it's unreferenced.
+  for (const auto *dylib : extraDylibs)
+    if (dylib->isReferenced())
+      return false;
+
+  return true;
+}
+
+DylibFile *DylibFile::getSyntheticDylib(StringRef installName,
+                                        uint32_t currentVersion,
+                                        uint32_t compatVersion) {
+  for (DylibFile *dylib : extraDylibs)
+    if (dylib->installName == installName) {
+      // FIXME: Check what to do if different $ld$previous symbols
+      // request the same dylib, but with different versions.
+      return dylib;
+    }
+
+  auto *dylib = make<DylibFile>(umbrella == this ? nullptr : umbrella);
+  dylib->installName = saver().save(installName);
+  dylib->currentVersion = currentVersion;
+  dylib->compatibilityVersion = compatVersion;
+  extraDylibs.push_back(dylib);
+  return dylib;
 }
 
 // $ld$ symbols modify the properties/behavior of the library (e.g. its install
@@ -1984,10 +2065,9 @@ void DylibFile::handleLDPreviousSymbol(StringRef name, StringRef originalName) {
   std::tie(platformStr, name) = name.split('$');
   std::tie(startVersion, name) = name.split('$');
   std::tie(endVersion, name) = name.split('$');
-  std::tie(symbolName, rest) = name.split('$');
-  // TODO: ld64 contains some logic for non-empty symbolName as well.
-  if (!symbolName.empty())
-    return;
+  std::tie(symbolName, rest) = name.rsplit('$');
+
+  // FIXME: Does this do the right thing for zippered files?
   unsigned platform;
   if (platformStr.getAsInteger(10, platform) ||
       platform != static_cast<unsigned>(config->platform()))
@@ -2008,8 +2088,9 @@ void DylibFile::handleLDPreviousSymbol(StringRef name, StringRef originalName) {
       config->platformInfo.minimum >= end)
     return;
 
-  this->installName = saver().save(installName);
-
+  // Initialized to compatibilityVersion for the symbolName branch below.
+  uint32_t newCompatibilityVersion = compatibilityVersion;
+  uint32_t newCurrentVersionForSymbol = currentVersion;
   if (!compatVersion.empty()) {
     VersionTuple cVersion;
     if (cVersion.tryParse(compatVersion)) {
@@ -2017,8 +2098,32 @@ void DylibFile::handleLDPreviousSymbol(StringRef name, StringRef originalName) {
            "' ignored");
       return;
     }
-    compatibilityVersion = encodeVersion(cVersion);
+    newCompatibilityVersion = encodeVersion(cVersion);
+    newCurrentVersionForSymbol = newCompatibilityVersion;
   }
+
+  if (!symbolName.empty()) {
+    // A $ld$previous$ symbol with symbol name adds a symbol with that name to
+    // a dylib with given name and version.
+    auto *dylib = getSyntheticDylib(installName, newCurrentVersionForSymbol,
+                                    newCompatibilityVersion);
+
+    // The tbd file usually contains the $ld$previous symbol for an old version,
+    // and then the symbol itself later, for newer deployment targets, like so:
+    //    symbols: [
+    //      '$ld$previous$/Another$$1$3.0$14.0$_zzz$',
+    //      _zzz,
+    //    ]
+    // Since the symbols are sorted, adding them to the symtab in the given
+    // order means the $ld$previous version of _zzz will prevail, as desired.
+    dylib->symbols.push_back(symtab->addDylib(
+        saver().save(symbolName), dylib, /*isWeakDef=*/false, /*isTlv=*/false));
+    return;
+  }
+
+  // A $ld$previous$ symbol without symbol name modifies the dylib it's in.
+  this->installName = saver().save(installName);
+  this->compatibilityVersion = newCompatibilityVersion;
 }
 
 void DylibFile::handleLDInstallNameSymbol(StringRef name,
@@ -2061,26 +2166,27 @@ void DylibFile::checkAppExtensionSafety(bool dylibIsAppExtensionSafe) const {
     warn("using '-application_extension' with unsafe dylib: " + toString(this));
 }
 
-ArchiveFile::ArchiveFile(std::unique_ptr<object::Archive> &&f)
-    : InputFile(ArchiveKind, f->getMemoryBufferRef()), file(std::move(f)) {}
+ArchiveFile::ArchiveFile(std::unique_ptr<object::Archive> &&f, bool forceHidden)
+    : InputFile(ArchiveKind, f->getMemoryBufferRef()), file(std::move(f)),
+      forceHidden(forceHidden) {}
 
 void ArchiveFile::addLazySymbols() {
   for (const object::Archive::Symbol &sym : file->symbols())
     symtab->addLazyArchive(sym.getName(), this, sym);
 }
 
-static Expected<InputFile *> loadArchiveMember(MemoryBufferRef mb,
-                                               uint32_t modTime,
-                                               StringRef archiveName,
-                                               uint64_t offsetInArchive) {
+static Expected<InputFile *>
+loadArchiveMember(MemoryBufferRef mb, uint32_t modTime, StringRef archiveName,
+                  uint64_t offsetInArchive, bool forceHidden) {
   if (config->zeroModTime)
     modTime = 0;
 
   switch (identify_magic(mb.getBuffer())) {
   case file_magic::macho_object:
-    return make<ObjFile>(mb, modTime, archiveName);
+    return make<ObjFile>(mb, modTime, archiveName, /*lazy=*/false, forceHidden);
   case file_magic::bitcode:
-    return make<BitcodeFile>(mb, archiveName, offsetInArchive);
+    return make<BitcodeFile>(mb, archiveName, offsetInArchive, /*lazy=*/false,
+                             forceHidden);
   default:
     return createStringError(inconvertibleErrorCode(),
                              mb.getBufferIdentifier() +
@@ -2104,8 +2210,8 @@ Error ArchiveFile::fetch(const object::Archive::Child &c, StringRef reason) {
   if (!modTime)
     return modTime.takeError();
 
-  Expected<InputFile *> file =
-      loadArchiveMember(*mb, toTimeT(*modTime), getName(), c.getChildOffset());
+  Expected<InputFile *> file = loadArchiveMember(
+      *mb, toTimeT(*modTime), getName(), c.getChildOffset(), forceHidden);
 
   if (!file)
     return file.takeError();
@@ -2153,7 +2259,8 @@ static macho::Symbol *createBitcodeSymbol(const lto::InputFile::Symbol &objSym,
   case GlobalValue::DefaultVisibility:
     break;
   }
-  isPrivateExtern = isPrivateExtern || objSym.canBeOmittedFromSymbolTable();
+  isPrivateExtern = isPrivateExtern || objSym.canBeOmittedFromSymbolTable() ||
+                    file.forceHidden;
 
   if (objSym.isCommon())
     return symtab->addCommon(name, &file, objSym.getCommonSize(),
@@ -2168,8 +2275,8 @@ static macho::Symbol *createBitcodeSymbol(const lto::InputFile::Symbol &objSym,
 }
 
 BitcodeFile::BitcodeFile(MemoryBufferRef mb, StringRef archiveName,
-                         uint64_t offsetInArchive, bool lazy)
-    : InputFile(BitcodeKind, mb, lazy) {
+                         uint64_t offsetInArchive, bool lazy, bool forceHidden)
+    : InputFile(BitcodeKind, mb, lazy), forceHidden(forceHidden) {
   this->archiveName = std::string(archiveName);
   std::string path = mb.getBufferIdentifier().str();
   // ThinLTO assumes that all MemoryBufferRefs given to it have a unique

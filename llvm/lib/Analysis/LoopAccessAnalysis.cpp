@@ -27,6 +27,7 @@
 #include "llvm/Analysis/AliasSetTracker.h"
 #include "llvm/Analysis/LoopAnalysisManager.h"
 #include "llvm/Analysis/LoopInfo.h"
+#include "llvm/Analysis/LoopIterator.h"
 #include "llvm/Analysis/MemoryLocation.h"
 #include "llvm/Analysis/OptimizationRemarkEmitter.h"
 #include "llvm/Analysis/ScalarEvolution.h"
@@ -1500,9 +1501,7 @@ bool llvm::sortPtrAccesses(ArrayRef<Value *> VL, Type *ElemTy,
   Value *Ptr0 = VL[0];
 
   using DistOrdPair = std::pair<int64_t, int>;
-  auto Compare = [](const DistOrdPair &L, const DistOrdPair &R) {
-    return L.first < R.first;
-  };
+  auto Compare = llvm::less_first();
   std::set<DistOrdPair, decltype(Compare)> Offsets(Compare);
   Offsets.emplace(0, 0);
   int Cnt = 1;
@@ -2129,8 +2128,11 @@ void LoopAccessInfo::analyzeLoop(AAResults *AA, LoopInfo *LI,
       EnableMemAccessVersioning &&
       !TheLoop->getHeader()->getParent()->hasOptSize();
 
-  // For each block.
-  for (BasicBlock *BB : TheLoop->blocks()) {
+  // Traverse blocks in fixed RPOT order, regardless of their storage in the
+  // loop info, as it may be arbitrary.
+  LoopBlocksRPO RPOT(TheLoop);
+  RPOT.perform(LI);
+  for (BasicBlock *BB : RPOT) {
     // Scan the BB and collect legal loads and stores. Also detect any
     // convergent instructions.
     for (Instruction &I : *BB) {

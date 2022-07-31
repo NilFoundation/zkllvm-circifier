@@ -888,13 +888,11 @@ public:
   bool validateCFG() const;
 
   BinaryBasicBlock *getBasicBlockForLabel(const MCSymbol *Label) {
-    auto I = LabelToBB.find(Label);
-    return I == LabelToBB.end() ? nullptr : I->second;
+    return LabelToBB.lookup(Label);
   }
 
   const BinaryBasicBlock *getBasicBlockForLabel(const MCSymbol *Label) const {
-    auto I = LabelToBB.find(Label);
-    return I == LabelToBB.end() ? nullptr : I->second;
+    return LabelToBB.lookup(Label);
   }
 
   /// Retrieve the landing pad BB associated with invoke instruction \p Invoke
@@ -996,7 +994,7 @@ public:
   bool hasName(const std::string &FunctionName) const {
     auto Res =
         forEachName([&](StringRef Name) { return Name == FunctionName; });
-    return Res.hasValue();
+    return Res.has_value();
   }
 
   /// Check if any of function names matches the given regex.
@@ -1654,7 +1652,6 @@ public:
     }
     OffsetToCFI.emplace(Offset, FrameInstructions.size());
     FrameInstructions.emplace_back(std::forward<MCCFIInstruction>(Inst));
-    return;
   }
 
   BinaryBasicBlock::iterator addCFIInstruction(BinaryBasicBlock *BB,

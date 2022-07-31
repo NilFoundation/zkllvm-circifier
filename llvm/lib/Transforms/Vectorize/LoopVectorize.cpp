@@ -798,8 +798,7 @@ public:
 
   // Override this function to handle the more complex control flow around the
   // three loops.
-  std::pair<BasicBlock *, Value *>
-  createVectorizedLoopSkeleton() final override {
+  std::pair<BasicBlock *, Value *> createVectorizedLoopSkeleton() final {
     return createEpilogueVectorizedLoopSkeleton();
   }
 
@@ -835,8 +834,7 @@ public:
                                        EPI, LVL, CM, BFI, PSI, Check) {}
   /// Implements the interface for creating a vectorized skeleton using the
   /// *main loop* strategy (ie the first pass of vplan execution).
-  std::pair<BasicBlock *, Value *>
-  createEpilogueVectorizedLoopSkeleton() final override;
+  std::pair<BasicBlock *, Value *> createEpilogueVectorizedLoopSkeleton() final;
 
 protected:
   /// Emits an iteration count bypass check once for the main loop (when \p
@@ -866,8 +864,7 @@ public:
   }
   /// Implements the interface for creating a vectorized skeleton using the
   /// *epilogue loop* strategy (ie the second pass of vplan execution).
-  std::pair<BasicBlock *, Value *>
-  createEpilogueVectorizedLoopSkeleton() final override;
+  std::pair<BasicBlock *, Value *> createEpilogueVectorizedLoopSkeleton() final;
 
 protected:
   /// Emits an iteration count bypass check after the main vector loop has
@@ -1454,8 +1451,14 @@ public:
     // don't need to mark it as a predicated instruction. Tail folding may
     // introduce additional predication, but we're guaranteed to always have
     // at least one active lane.  We call Legal->blockNeedsPredication here
-    // because it doesn't query tail-folding.
-    if (Legal->isUniformMemOp(*I) && isa<LoadInst>(I) &&
+    // because it doesn't query tail-folding.  For stores, we need to prove
+    // both speculation safety (which follows from the same argument as loads),
+    // but also must prove the value being stored is correct.  The easiest
+    // form of the later is to require that all values stored are the same.
+    if (Legal->isUniformMemOp(*I) &&
+        (isa<LoadInst>(I) ||
+         (isa<StoreInst>(I) &&
+          TheLoop->isLoopInvariant(cast<StoreInst>(I)->getValueOperand()))) &&
         !Legal->blockNeedsPredication(I->getParent()))
       return false;
     if (!blockNeedsPredicationForAnyReason(I->getParent()))

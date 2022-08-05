@@ -22,7 +22,7 @@ module {
                       -> tensor<?xcomplex<f32>, #SparseVector> {
     %c = arith.constant 0 : index
     %d = tensor.dim %arga, %c : tensor<?xcomplex<f32>, #SparseVector>
-    %xv = sparse_tensor.init [%d] : tensor<?xcomplex<f32>, #SparseVector>
+    %xv = bufferization.alloc_tensor(%d) : tensor<?xcomplex<f32>, #SparseVector>
     %0 = linalg.generic #trait_op
        ins(%arga, %argb: tensor<?xcomplex<f32>, #SparseVector>,
                          tensor<?xcomplex<f32>, #SparseVector>)
@@ -39,7 +39,7 @@ module {
                       -> tensor<?xcomplex<f32>, #SparseVector> {
     %c = arith.constant 0 : index
     %d = tensor.dim %arga, %c : tensor<?xcomplex<f32>, #SparseVector>
-    %xv = sparse_tensor.init [%d] : tensor<?xcomplex<f32>, #SparseVector>
+    %xv = bufferization.alloc_tensor(%d) : tensor<?xcomplex<f32>, #SparseVector>
     %0 = linalg.generic #trait_op
        ins(%arga, %argb: tensor<?xcomplex<f32>, #SparseVector>,
                          tensor<?xcomplex<f32>, #SparseVector>)
@@ -107,10 +107,10 @@ module {
     call @dump(%1, %d2) : (tensor<?xcomplex<f32>, #SparseVector>, index) -> ()
 
     // Release the resources.
-    sparse_tensor.release %sv1 : tensor<?xcomplex<f32>, #SparseVector>
-    sparse_tensor.release %sv2 : tensor<?xcomplex<f32>, #SparseVector>
-    sparse_tensor.release %0 : tensor<?xcomplex<f32>, #SparseVector>
-    sparse_tensor.release %1 : tensor<?xcomplex<f32>, #SparseVector>
+    bufferization.dealloc_tensor %sv1 : tensor<?xcomplex<f32>, #SparseVector>
+    bufferization.dealloc_tensor %sv2 : tensor<?xcomplex<f32>, #SparseVector>
+    bufferization.dealloc_tensor %0 : tensor<?xcomplex<f32>, #SparseVector>
+    bufferization.dealloc_tensor %1 : tensor<?xcomplex<f32>, #SparseVector>
     return
   }
 }

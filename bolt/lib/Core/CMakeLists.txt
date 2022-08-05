@@ -2,6 +2,7 @@ set(LLVM_LINK_COMPONENTS
   DebugInfoDWARF
   Demangle
   MC
+  MCDisassembler
   Object
   Support
   )
@@ -17,6 +18,7 @@ add_llvm_library(LLVMBOLTCore
   DebugData.cpp
   DynoStats.cpp
   Exceptions.cpp
+  FunctionLayout.cpp
   JumpTable.cpp
   MCPlusBuilder.cpp
   ParallelUtilities.cpp

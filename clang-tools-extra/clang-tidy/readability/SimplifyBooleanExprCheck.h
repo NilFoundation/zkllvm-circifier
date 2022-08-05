@@ -19,7 +19,7 @@ namespace readability {
 /// them to use the appropriate boolean expression directly.
 ///
 /// For the user-facing documentation see:
-/// http://clang.llvm.org/extra/clang-tidy/checks/readability-simplify-boolean-expr.html
+/// http://clang.llvm.org/extra/clang-tidy/checks/readability/simplify-boolean-expr.html
 class SimplifyBooleanExprCheck : public ClangTidyCheck {
 public:
   SimplifyBooleanExprCheck(StringRef Name, ClangTidyContext *Context);
@@ -55,7 +55,12 @@ private:
 
   void replaceCompoundReturnWithCondition(const ASTContext &Context,
                                           const ReturnStmt *Ret, bool Negated,
-                                          const IfStmt *If);
+                                          const IfStmt *If,
+                                          const Expr *ThenReturn);
+
+  bool reportDeMorgan(const ASTContext &Context, const UnaryOperator *Outer,
+                      const BinaryOperator *Inner, bool TryOfferFix,
+                      const Stmt *Parent, const ParenExpr *Parens);
 
   void issueDiag(const ASTContext &Result, SourceLocation Loc,
                  StringRef Description, SourceRange ReplacementRange,
@@ -63,6 +68,8 @@ private:
 
   const bool ChainedConditionalReturn;
   const bool ChainedConditionalAssignment;
+  const bool SimplifyDeMorgan;
+  const bool SimplifyDeMorganRelaxed;
 };
 
 } // namespace readability

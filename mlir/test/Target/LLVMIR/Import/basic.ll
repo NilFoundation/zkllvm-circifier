@@ -122,8 +122,13 @@ define internal void @func_internal() {
 ; CHECK: llvm.func @fe(i32) -> f32
 declare float @fe(i32)
 
+; CHECK: llvm.func internal spir_funccc @spir_func_internal()
+define internal spir_func void @spir_func_internal() {
+  ret void
+}
+
 ; FIXME: function attributes.
-; CHECK-LABEL: llvm.func internal @f1(%arg0: i64) -> i32 {
+; CHECK-LABEL: llvm.func internal @f1(%arg0: i64) -> i32 attributes {dso_local} {
 ; CHECK-DAG: %[[c2:[0-9]+]] = llvm.mlir.constant(2 : i32) : i32
 ; CHECK-DAG: %[[c42:[0-9]+]] = llvm.mlir.constant(42 : i32) : i32
 ; CHECK-DAG: %[[c1:[0-9]+]] = llvm.mlir.constant(true) : i1
@@ -278,6 +283,10 @@ define void @FPArithmetic(float %a, float %b, double %c, double %d) {
   %10 = frem float %a, %b
   ; CHECK: %[[a13:[0-9]+]] = llvm.frem %arg2, %arg3 : f64
   %11 = frem double %c, %d
+  ; CHECK: %{{.+}} = llvm.fneg %{{.+}} : f32
+  %12 = fneg float %a
+  ; CHECK: %{{.+}} = llvm.fneg %{{.+}} : f64
+  %13 = fneg double %c
   ret void
 }
 
@@ -604,4 +613,50 @@ define <4 x half> @insert_element(<4 x half>* %vec, half %v, i32 %idx) {
   %r = insertelement <4 x half> %val0, half %v, i32 %idx
   ; CHECK: llvm.return %[[V1]]
   ret <4 x half> %r
+}
+
+; Select
+; CHECK-LABEL: llvm.func @select_inst
+define void @select_inst(i32 %arg0, i32 %arg1, i1 %pred) {
+  ; CHECK: %{{.+}} = llvm.select %{{.+}}, %{{.+}}, %{{.+}} : i1, i32
+  %1 = select i1 %pred, i32 %arg0, i32 %arg1
+  ret void
+}
+
+; Unreachable
+; CHECK-LABEL: llvm.func @unreachable_inst
+define void @unreachable_inst() {
+  ; CHECK: llvm.unreachable
+  unreachable
+}
+
+; Varadic function definition
+%struct.va_list = type { i8* }
+
+declare void @llvm.va_start(i8*)
+declare void @llvm.va_copy(i8*, i8*)
+declare void @llvm.va_end(i8*)
+
+; CHECK-LABEL: llvm.func @variadic_function
+define void @variadic_function(i32 %X, ...) {
+  ; CHECK: %[[ALLOCA0:.+]] = llvm.alloca %{{.*}} x !llvm.struct<"struct.va_list", (ptr<i8>)> {{.*}} : (i32) -> !llvm.ptr<struct<"struct.va_list", (ptr<i8>)>>
+  %ap = alloca %struct.va_list
+  ; CHECK: %[[CAST0:.+]] = llvm.bitcast %[[ALLOCA0]] : !llvm.ptr<struct<"struct.va_list", (ptr<i8>)>> to !llvm.ptr<i8>
+  %ap2 = bitcast %struct.va_list* %ap to i8*
+  ; CHECK: llvm.intr.vastart %[[CAST0]]
+  call void @llvm.va_start(i8* %ap2)
+
+  ; CHECK: %[[ALLOCA1:.+]] = llvm.alloca %{{.*}} x !llvm.ptr<i8> {{.*}} : (i32) -> !llvm.ptr<ptr<i8>>
+  %aq = alloca i8*
+  ; CHECK: %[[CAST1:.+]] = llvm.bitcast %[[ALLOCA1]] : !llvm.ptr<ptr<i8>> to !llvm.ptr<i8>
+  %aq2 = bitcast i8** %aq to i8*
+  ; CHECK: llvm.intr.vacopy %[[CAST0]] to %[[CAST1]]
+  call void @llvm.va_copy(i8* %aq2, i8* %ap2)
+  ; CHECK: llvm.intr.vaend %[[CAST1]]
+  call void @llvm.va_end(i8* %aq2)
+
+  ; CHECK: llvm.intr.vaend %[[CAST0]]
+  call void @llvm.va_end(i8* %ap2)
+  ; CHECK: llvm.return
+  ret void
 }

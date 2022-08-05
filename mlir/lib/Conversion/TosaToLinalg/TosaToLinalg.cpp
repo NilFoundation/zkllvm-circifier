@@ -14,7 +14,7 @@
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Math/IR/Math.h"
-#include "mlir/Dialect/SCF/SCF.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/Dialect/Tosa/IR/TosaOps.h"
@@ -147,10 +147,8 @@ createLinalgBodyCalculationForElementwiseOp(Operation *op, ValueRange args,
       cast<tosa::NegateOp>(op).quantization_info()) {
     auto quantizationInfo = cast<tosa::NegateOp>(op).quantization_info();
     int32_t inputBitWidth = elementTy.getIntOrFloatBitWidth();
-    int64_t inZp =
-        quantizationInfo.getValue().input_zp().getValue().getSExtValue();
-    int64_t outZp =
-        quantizationInfo.getValue().output_zp().getValue().getSExtValue();
+    int64_t inZp = quantizationInfo.value().getInputZp();
+    int64_t outZp = quantizationInfo.value().getOutputZp();
 
     // Compute the maximum value that can occur in the intermediate buffer.
     int64_t zpAdd = inZp + outZp;
@@ -371,10 +369,17 @@ createLinalgBodyCalculationForElementwiseOp(Operation *op, ValueRange args,
 
   // tosa::ClampOp
   if (isa<tosa::ClampOp>(op) && elementTy.isa<FloatType>()) {
-    auto min = rewriter.create<arith::ConstantOp>(loc, elementTy,
-                                                  op->getAttr("min_fp"));
-    auto max = rewriter.create<arith::ConstantOp>(loc, elementTy,
-                                                  op->getAttr("max_fp"));
+    bool losesInfo = false;
+    APFloat min_apf = op->getAttr("min_fp").cast<FloatAttr>().getValue();
+    APFloat max_apf = op->getAttr("max_fp").cast<FloatAttr>().getValue();
+    min_apf.convert(elementTy.cast<FloatType>().getFloatSemantics(),
+                    APFloat::rmNearestTiesToEven, &losesInfo);
+    max_apf.convert(elementTy.cast<FloatType>().getFloatSemantics(),
+                    APFloat::rmNearestTiesToEven, &losesInfo);
+    auto min = rewriter.create<arith::ConstantOp>(
+        loc, elementTy, rewriter.getFloatAttr(elementTy, min_apf));
+    auto max = rewriter.create<arith::ConstantOp>(
+        loc, elementTy, rewriter.getFloatAttr(elementTy, max_apf));
     return clampHelper<arith::CmpFOp>(loc, args[0], min, max,
                                       arith::CmpFPredicate::OLT, rewriter);
   }
@@ -412,8 +417,12 @@ createLinalgBodyCalculationForElementwiseOp(Operation *op, ValueRange args,
   if (isa<tosa::ReluNOp>(op) && elementTy.isa<FloatType>()) {
     auto zero =
         rewriter.create<arith::ConstantOp>(loc, FloatAttr::get(elementTy, 0));
-    auto n = rewriter.create<arith::ConstantOp>(loc, elementTy,
-                                                op->getAttr("max_fp"));
+    bool losesInfo = false;
+    APFloat max_apf = op->getAttr("max_fp").cast<FloatAttr>().getValue();
+    max_apf.convert(elementTy.cast<FloatType>().getFloatSemantics(),
+                    APFloat::rmNearestTiesToEven, &losesInfo);
+    auto n = rewriter.create<arith::ConstantOp>(
+        loc, elementTy, rewriter.getFloatAttr(elementTy, max_apf));
     return clampHelper<arith::CmpFOp>(loc, args[0], zero, n,
                                       arith::CmpFPredicate::OLT, rewriter);
   }
@@ -946,7 +955,7 @@ static bool createReassociationMapsForCollapse(
 
   // If both iterators didn't reach the end, we have leftover dimentions which
   // implies that we have a mismatch in shape.
-  return !(currSrcDim != srcShape.size() || currDstDim != dstShape.size());
+  return currSrcDim == srcShape.size() && currDstDim == dstShape.size();
 }
 
 namespace {
@@ -1155,9 +1164,9 @@ public:
 
     auto dynamicDimsOr =
         checkHasDynamicBatchDims(rewriter, op, {input, op.output()});
-    if (!dynamicDimsOr.hasValue())
+    if (!dynamicDimsOr.has_value())
       return failure();
-    SmallVector<Value> dynamicDims = dynamicDimsOr.getValue();
+    SmallVector<Value> dynamicDims = dynamicDimsOr.value();
 
     // The shift and multiplier values.
     SmallVector<int32_t> multiplierValues;
@@ -1347,9 +1356,9 @@ public:
 
     auto dynamicDimsOr =
         checkHasDynamicBatchDims(rewriter, op, {input, op.output()});
-    if (!dynamicDimsOr.hasValue())
+    if (!dynamicDimsOr.has_value())
       return failure();
-    SmallVector<Value> dynamicDims = dynamicDimsOr.getValue();
+    SmallVector<Value> dynamicDims = dynamicDimsOr.value();
 
     if (op.mode() != "NEAREST_NEIGHBOR" && op.mode() != "BILINEAR")
       return failure();
@@ -1844,13 +1853,13 @@ public:
           loc, padOp.pad_const(), ValueRange({}));
     } else {
       Attribute constantAttr;
-      if (elementTy.isa<FloatType>())
+      if (elementTy.isa<FloatType>()) {
         constantAttr = rewriter.getFloatAttr(elementTy, 0.0);
-      else if (elementTy.isa<IntegerType>() && !padOp.quantization_info())
+      } else if (elementTy.isa<IntegerType>() && !padOp.quantization_info()) {
         constantAttr = rewriter.getIntegerAttr(elementTy, 0);
-      else if (elementTy.isa<IntegerType>() && padOp.quantization_info()) {
-        auto value = padOp.quantization_info().getValue().input_zp().getValue();
-        constantAttr = rewriter.getIntegerAttr(elementTy, value.getZExtValue());
+      } else if (elementTy.isa<IntegerType>() && padOp.quantization_info()) {
+        int64_t value = padOp.quantization_info()->getInputZp();
+        constantAttr = rewriter.getIntegerAttr(elementTy, value);
       }
       if (constantAttr)
         padConstant = rewriter.create<arith::ConstantOp>(loc, constantAttr);
@@ -2042,9 +2051,9 @@ public:
 
     auto dynamicDimsOr =
         checkHasDynamicBatchDims(rewriter, op, {input, indices, op.output()});
-    if (!dynamicDimsOr.hasValue())
+    if (!dynamicDimsOr.has_value())
       return failure();
-    SmallVector<Value> dynamicDims = dynamicDimsOr.getValue();
+    SmallVector<Value> dynamicDims = dynamicDimsOr.value();
 
     auto resultElementTy = resultTy.getElementType();
 

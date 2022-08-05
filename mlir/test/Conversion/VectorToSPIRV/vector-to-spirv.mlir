@@ -1,6 +1,6 @@
 // RUN: mlir-opt -split-input-file -convert-vector-to-spirv -verify-diagnostics %s -o - | FileCheck %s
 
-module attributes { spv.target_env = #spv.target_env<#spv.vce<v1.0, [Float16], []>, {}> } {
+module attributes { spv.target_env = #spv.target_env<#spv.vce<v1.0, [Float16], []>, #spv.resource_limits<>> } {
 
 // CHECK-LABEL: @bitcast
 //  CHECK-SAME: %[[ARG0:.+]]: vector<2xf32>, %[[ARG1:.+]]: vector<2xf16>
@@ -163,10 +163,19 @@ func.func @insert_size1_vector(%arg0 : vector<1xf32>, %arg1: vector<3xf32>) -> v
 
 // CHECK-LABEL: @fma
 //  CHECK-SAME: %[[A:.*]]: vector<4xf32>, %[[B:.*]]: vector<4xf32>, %[[C:.*]]: vector<4xf32>
-//       CHECK:   spv.GLSL.Fma %[[A]], %[[B]], %[[C]] : vector<4xf32>
+//       CHECK:   spv.GL.Fma %[[A]], %[[B]], %[[C]] : vector<4xf32>
 func.func @fma(%a: vector<4xf32>, %b: vector<4xf32>, %c: vector<4xf32>) -> vector<4xf32> {
   %0 = vector.fma %a, %b, %c: vector<4xf32>
   return %0 : vector<4xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @fma_size1_vector
+//       CHECK:   spv.GL.Fma %{{.+}} : f32
+func.func @fma_size1_vector(%a: vector<1xf32>, %b: vector<1xf32>, %c: vector<1xf32>) -> vector<1xf32> {
+  %0 = vector.fma %a, %b, %c: vector<1xf32>
+  return %0 : vector<1xf32>
 }
 
 // -----
@@ -178,6 +187,17 @@ func.func @fma(%a: vector<4xf32>, %b: vector<4xf32>, %c: vector<4xf32>) -> vecto
 func.func @splat(%f : f32) -> vector<4xf32> {
   %splat = vector.splat %f : vector<4xf32>
   return %splat : vector<4xf32>
+}
+
+// -----
+
+// CHECK-LABEL: func @splat_size1_vector
+//  CHECK-SAME: (%[[A:.+]]: f32)
+//       CHECK:   %[[VAL:.+]] = builtin.unrealized_conversion_cast %[[A]]
+//       CHECK:   return %[[VAL]]
+func.func @splat_size1_vector(%f : f32) -> vector<1xf32> {
+  %splat = vector.splat %f : vector<1xf32>
+  return %splat : vector<1xf32>
 }
 
 // -----

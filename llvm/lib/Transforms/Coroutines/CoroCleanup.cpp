@@ -11,7 +11,7 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/PassManager.h"
-#include "llvm/Pass.h"
+#include "llvm/IR/Function.h"
 #include "llvm/Transforms/Scalar/SimplifyCFG.h"
 
 using namespace llvm;
@@ -45,8 +45,7 @@ static void lowerSubFn(IRBuilder<> &Builder, CoroSubFnInst *SubFn) {
 }
 
 bool Lowerer::lower(Function &F) {
-  bool IsPrivateAndUnprocessed =
-      F.hasFnAttribute(CORO_PRESPLIT_ATTR) && F.hasLocalLinkage();
+  bool IsPrivateAndUnprocessed = F.isPresplitCoroutine() && F.hasLocalLinkage();
   bool Changed = false;
 
   for (Instruction &I : llvm::make_early_inc_range(instructions(F))) {
@@ -113,8 +112,8 @@ static bool declaresCoroCleanupIntrinsics(const Module &M) {
   return coro::declaresIntrinsics(
       M, {"llvm.coro.alloc", "llvm.coro.begin", "llvm.coro.subfn.addr",
           "llvm.coro.free", "llvm.coro.id", "llvm.coro.id.retcon",
-          "llvm.coro.id.retcon.once", "llvm.coro.async.size.replace",
-          "llvm.coro.async.resume"});
+          "llvm.coro.id.async", "llvm.coro.id.retcon.once",
+          "llvm.coro.async.size.replace", "llvm.coro.async.resume"});
 }
 
 PreservedAnalyses CoroCleanupPass::run(Module &M,

@@ -87,6 +87,12 @@
 #define KMP_GROUP_AFFINITY 0
 #endif
 
+#if (KMP_OS_LINUX || (KMP_OS_FREEBSD && __FreeBSD_version >= 1301000))
+#define KMP_HAVE_SCHED_GETCPU 1
+#else
+#define KMP_HAVE_SCHED_GETCPU 0
+#endif
+
 /* Check for quad-precision extension. */
 #define KMP_HAVE_QUAD 0
 #if KMP_ARCH_X86 || KMP_ARCH_X86_64
@@ -339,6 +345,9 @@ extern "C" {
 // Use a function like macro to imply that it must be followed by a semicolon
 #if __cplusplus > 201402L && __has_cpp_attribute(fallthrough)
 #define KMP_FALLTHROUGH() [[fallthrough]]
+// icc cannot properly tell this attribute is absent so force off
+#elif KMP_COMPILER_ICC
+#define KMP_FALLTHROUGH() ((void)0)
 #elif __has_cpp_attribute(clang::fallthrough)
 #define KMP_FALLTHROUGH() [[clang::fallthrough]]
 #elif __has_attribute(fallthrough) || __GNUC__ >= 7

@@ -340,6 +340,7 @@ public:
 
   Kind kind() const { return (Kind)Format; }
   bool isThin() const { return IsThin; }
+  static object::Archive::Kind getDefaultKindForHost();
 
   child_iterator child_begin(Error &Err, bool SkipInternal = true) const;
   child_iterator child_end() const;
@@ -378,10 +379,10 @@ protected:
   uint64_t getArchiveMagicLen() const;
   void setFirstRegular(const Child &C);
 
-private:
   StringRef SymbolTable;
   StringRef StringTable;
 
+private:
   StringRef FirstRegularData;
   uint16_t FirstRegularStartOfFile = -1;
 

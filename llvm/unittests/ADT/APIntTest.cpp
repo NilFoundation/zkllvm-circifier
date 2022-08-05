@@ -2663,9 +2663,6 @@ TEST(APIntTest, trunc) {
   APInt val(32, 0xFFFFFFFF);
   EXPECT_EQ(0xFFFF, val.trunc(16));
   EXPECT_EQ(0xFFFFFFFF, val.trunc(32));
-  EXPECT_EQ(0xFFFF, val.truncOrSelf(16));
-  EXPECT_EQ(0xFFFFFFFF, val.truncOrSelf(32));
-  EXPECT_EQ(0xFFFFFFFF, val.truncOrSelf(64));
 }
 
 TEST(APIntTest, concat) {
@@ -2900,7 +2897,7 @@ TEST(APIntTest, SolveQuadraticEquationWrap) {
           Optional<APInt> S = APIntOps::SolveQuadraticEquationWrap(
                                 APInt(Width, A), APInt(Width, B),
                                 APInt(Width, C), Width);
-          if (S.hasValue())
+          if (S)
             Validate(A, B, C, Width, S->getSExtValue());
         }
       }
@@ -2981,7 +2978,7 @@ TEST(APIntTest, GetMostSignificantDifferentBitExaustive) {
         auto Bit = APIntOps::GetMostSignificantDifferentBit(A, B);
         EXPECT_EQ(Bit, GetHighestDifferentBitBruteforce(A, B));
 
-        if (!Bit.hasValue())
+        if (!Bit)
           EXPECT_EQ(A, B);
         else {
           EXPECT_NE(A, B);
@@ -3118,6 +3115,15 @@ TEST(APIntTest, ScaleBitMask) {
             APInt::getAllOnes(256));
   EXPECT_EQ(APIntOps::ScaleBitMask(APInt::getOneBitSet(4096, 32), 256),
             APInt::getOneBitSet(256, 2));
+
+  EXPECT_EQ(APIntOps::ScaleBitMask(APInt(2, 0x00), 8, true), APInt(8, 0x00));
+  EXPECT_EQ(APIntOps::ScaleBitMask(APInt(2, 0x01), 8, true), APInt(8, 0x0F));
+  EXPECT_EQ(APIntOps::ScaleBitMask(APInt(2, 0x02), 8, true), APInt(8, 0xF0));
+  EXPECT_EQ(APIntOps::ScaleBitMask(APInt(2, 0x03), 8, true), APInt(8, 0xFF));
+
+  EXPECT_EQ(APIntOps::ScaleBitMask(APInt(8, 0x00), 4, true), APInt(4, 0x00));
+  EXPECT_EQ(APIntOps::ScaleBitMask(APInt(8, 0xFF), 4, true), APInt(4, 0x0F));
+  EXPECT_EQ(APIntOps::ScaleBitMask(APInt(8, 0xE4), 4, true), APInt(4, 0x08));
 }
 
 } // end anonymous namespace

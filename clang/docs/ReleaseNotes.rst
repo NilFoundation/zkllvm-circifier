@@ -68,6 +68,16 @@ Major New Features
 
       Randomizing structure layout is a C-only feature.
 
+- Clang now supports the ``-fstrict-flex-arrays=<arg>`` option to control which
+  array bounds lead to flexible array members. The option yields more accurate
+  ``__builtin_object_size`` and ``__builtin_dynamic_object_size`` results in
+  most cases but may be overly conservative for some legacy code.
+- Experimental support for HLSL has been added. The implementation is
+  incomplete and highly experimental. For more information about the ongoing
+  work to support HLSL see the `documentation
+  <https://clang.llvm.org/docs/HLSLSupport.html>`_, or the `GitHub project
+  <https://github.com/orgs/llvm/projects/4>`_.
+
 Bug Fixes
 ---------
 - ``CXXNewExpr::getArraySize()`` previously returned a ``llvm::Optional``
@@ -110,12 +120,12 @@ Bug Fixes
   `51414 <https://github.com/llvm/llvm-project/issues/51414>`_,
   `51416 <https://github.com/llvm/llvm-project/issues/51416>`_,
   and `51641 <https://github.com/llvm/llvm-project/issues/51641>`_.
-- The builtin function __builtin_dump_struct would crash clang when the target 
+- The builtin function __builtin_dump_struct would crash clang when the target
   struct contains a bitfield. It now correctly handles bitfields.
   This fixes Issue `Issue 54462 <https://github.com/llvm/llvm-project/issues/54462>`_.
 - Statement expressions are now disabled in default arguments in general.
   This fixes Issue `Issue 53488 <https://github.com/llvm/llvm-project/issues/53488>`_.
-- According to `CWG 1394 <https://wg21.link/cwg1394>`_ and 
+- According to `CWG 1394 <https://wg21.link/cwg1394>`_ and
   `C++20 [dcl.fct.def.general]p2 <https://timsong-cpp.github.io/cppwp/n4868/dcl.fct.def#general-2.sentence-3>`_,
   Clang should not diagnose incomplete types in function definitions if the function body is "= delete;".
   This fixes Issue `Issue 52802 <https://github.com/llvm/llvm-project/issues/52802>`_.
@@ -149,9 +159,41 @@ Bug Fixes
   because there is no way to fully qualify the enumerator name, so this
   "extension" was unintentional and useless. This fixes
   `Issue 42372 <https://github.com/llvm/llvm-project/issues/42372>`_.
-- Clang shouldn't lookup allocation function in global scope for coroutines
-  in case it found the allocation function name in the promise_type body.
+- Clang will now find and emit a call to an allocation function in a
+  promise_type body for coroutines if there is any allocation function
+  declaration in the scope of promise_type. Additionally, to implement CWG2585,
+  a coroutine will no longer generate a call to a global allocation function
+  with the signature (std::size_t, p0, ..., pn).
   This fixes Issue `Issue 54881 <https://github.com/llvm/llvm-project/issues/54881>`_.
+- Implement `CWG 2394 <https://wg21.link/cwg2394>`_: Const class members
+  may be initialized with a defaulted default constructor under the same
+  conditions it would be allowed for a const object elsewhere.
+- ``__has_unique_object_representations`` no longer reports that ``_BitInt`` types
+  have unique object representations if they have padding bits.
+- Unscoped and scoped enumeration types can no longer be initialized from a
+  brace-init-list containing a single element of a different scoped enumeration
+  type.
+- Allow use of an elaborated type specifier as a ``_Generic`` selection
+  association in C++ mode. This fixes
+  `Issue 55562 <https://github.com/llvm/llvm-project/issues/55562>`_.
+- Clang will allow calling a ``consteval`` function in a default argument. This
+  fixes `Issue 48230 <https://github.com/llvm/llvm-project/issues/48230>`_.
+- Fixed memory leak due to ``VarTemplateSpecializationDecl`` using
+  ``TemplateArgumentListInfo`` instead of ``ASTTemplateArgumentListInfo``.
+- An initializer for a static variable declaration, which is nested
+  inside a statement expression in an aggregate initializer, is now
+  emitted as a dynamic initializer. Previously the variable would
+  incorrectly be zero-initialized. In contexts where a dynamic
+  initializer is not allowed this is now diagnosed as an error.
+- Clang now correctly emits symbols for implicitly instantiated constexpr
+  template function. Fixes `Issue 55560 <https://github.com/llvm/llvm-project/issues/55560>`_.
+- Clang now checks ODR violations when merging concepts from different modules.
+  Note that this may possibly break existing code, and is done so intentionally.
+  Fixes `Issue 56310 <https://github.com/llvm/llvm-project/issues/56310>`_.
+- Clang will now look through type sugar when checking a member function is a
+  move assignment operator. Fixes `Issue 56456 <https://github.com/llvm/llvm-project/issues/56456>`_.
+- Fixed a crash when a variable with a bool enum type that has no definition
+  used in comparison operators. Fixes `Issue 56560 <https://github.com/llvm/llvm-project/issues/56560>`_.
 
 Improvements to Clang's diagnostics
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -235,6 +277,26 @@ Improvements to Clang's diagnostics
   suggest ``#else`` as an alternative. ``#elifdef`` and ``#elifndef`` are only
   suggested when in C2x or C++2b mode. Fixes
   `Issue 51598 <https://github.com/llvm/llvm-project/issues/51598>`_.
+- The ``-Wdeprecated`` diagnostic will now warn on out-of-line ``constexpr``
+  declarations downgraded to definitions in C++1z, in addition to the
+  existing warning on out-of-line ``const`` declarations.
+- ``-Wshift-overflow`` will not warn for signed left shifts in C++20 mode
+  (and newer), as it will always wrap and never overflow. This fixes
+  `Issue 52873 <https://github.com/llvm/llvm-project/issues/52873>`_.
+- When using class templates without arguments, clang now tells developers
+  that template arguments are missing in certain contexts.
+  This fixes `Issue 55962 <https://github.com/llvm/llvm-project/issues/55962>`_.
+- Printable Unicode characters within `static_assert` messages are no longer
+  escaped.
+- The ``-Winfinite-recursion`` diagnostic no longer warns about
+  unevaluated operands of a ``typeid`` expression, as they are now
+  modeled correctly in the CFG. This fixes
+  `Issue 21668 <https://github.com/llvm/llvm-project/issues/21668>`_.
+- ``-Wself-assign``, ``-Wself-assign-overloaded`` and ``-Wself-move`` will
+  suggest a fix if the decl being assigned is a parameter that shadows a data
+  member of the contained class.
+- Added ``-Winvalid-utf8`` which diagnoses invalid UTF-8 code unit sequences in
+  comments.
 
 Non-comprehensive list of changes in this release
 -------------------------------------------------
@@ -258,6 +320,10 @@ Non-comprehensive list of changes in this release
   - ASAN_OPTIONS=detect_stack_use_after_return=1 (only on Linux).
   - MSAN_OPTIONS=poison_in_dtor=1.
 
+- Some type-trait builtins, such as ``__has_trivial_assign``, have been documented
+  as deprecated for a while because their semantics don't mix well with post-C++11 type-traits.
+  Clang now emits deprecation warnings for them under the flag ``-Wdeprecated-builtins``.
+
 New Compiler Flags
 ------------------
 - Added the ``-fno-knr-functions`` flag to allow users to opt into the C2x
@@ -265,6 +331,23 @@ New Compiler Flags
   the parameter list were ``void``. There is no ``-fknr-functions`` or
   ``-fno-no-knr-functions`` flag; this feature cannot be disabled in language
   modes where it is required, such as C++ or C2x.
+- A new ARM pass to workaround Cortex-A57 Erratum 1742098 and Cortex-A72 Erratum
+  1655431 can be enabled using ``-mfix-cortex-a57-aes-1742098`` or
+  ``-mfix-cortex-a72-aes-1655431``. The pass is enabled when using either of
+  these cpus with ``-mcpu=`` and can be disabled using
+  ``-mno-fix-cortex-a57-aes-1742098`` or ``-mno-fix-cortex-a72-aes-1655431``.
+- Added the ``-fexperimental-max-bitint-width=`` option to increase the maximum
+  allowed bit width of ``_BitInt`` types beyond the default of 128 bits. Some
+  operations, such as division or float-to-integer conversion, on ``_BitInt``
+  types with more than 128 bits currently crash clang. This option will be
+  removed in the future once clang supports all such operations.
+- Added the ``-print-diagnostic-options`` option, which prints a list of
+  warnings the compiler supports.
+- Added the ``-Warray-parameter`` warning. It diagnoses differences between
+  array parameters between function redeclarations (arrays of different extents,
+  etc). This flag is related to the same flag in GCC, but is different in that
+  it does not accept an explicitly- specified warning level and use of this flag
+  has no effect on ``-Warray-bounds``.
 
 Deprecated Compiler Flags
 -------------------------
@@ -287,6 +370,10 @@ New Pragmas in Clang
 - Added support for MSVC's ``#pragma alloc_text``. The pragma names the code
   section functions are placed in. The pragma only applies to functions with
   C linkage.
+- Added support for an empty optimization list for MSVC's ``#pragma optimize``.
+  The pragma takes a list of optimizations to turn on or off which applies to
+  all functions following the pragma. At the moment, only an empty list is
+  supported.
 
 - ...
 
@@ -313,6 +400,28 @@ Attribute Changes in Clang
 - The ``__declspec(naked)`` attribute can no longer be written on a member
   function in Microsoft compatibility mode, matching the behavior of cl.exe.
 
+- Attribute ``no_builtin`` should now affect the generated code. It now disables
+  builtins (corresponding to the specific names listed in the attribute) in the
+  body of the function the attribute is on.
+
+- When the ``weak`` attribute is applied to a const qualified variable clang no longer
+  tells the backend it is allowed to optimize based on initializer value.
+
+- Added the ``clang::annotate_type`` attribute, which can be used to add
+  annotations to types (see documentation for details).
+
+- Added half float to types that can be represented by ``__attribute__((mode(XX)))``.
+
+- The ``format`` attribute can now be applied to non-variadic functions. The
+  format string must correctly format the fixed parameter types of the function.
+  Using the attribute this way emits a GCC compatibility diagnostic.
+
+- Support was added for ``__attribute__((function_return("thunk-extern")))``
+  to X86 to replace ``ret`` instructions with ``jmp __x86_return_thunk``. The
+  corresponding attribute to disable this,
+  ``__attribute__((function_return("keep")))`` was added. This is intended to
+  be used by the Linux kernel to mitigate RETBLEED.
+
 Windows Support
 ---------------
 
@@ -321,6 +430,11 @@ Windows Support
   turned on. With this addition, clang-cl can be used in Visual Studio for the
   JustMyCode feature. Note, you may need to manually add ``/JMC`` as additional
   compile options in the Visual Studio since it currently assumes clang-cl does not support ``/JMC``.
+
+- Implemented generation of SEH unwind information on ARM. (C++ exception
+  handling in MSVC mode is still unimplemented though.)
+
+- Switched MinGW mode on ARM to use SEH instead of DWARF for unwind information.
 
 AIX Support
 -----------
@@ -331,7 +445,6 @@ AIX Support
   when libraries depend on visibility to hide non-ABI facing entities). The
   ``-mignore-xcoff-visibility`` option can be manually specified on the
   command-line to recover the previous behavior if desired.
-
 
 C Language Changes in Clang
 ---------------------------
@@ -386,12 +499,21 @@ C++20 Feature Support
   that can be used for such compatibility. The demangler now demangles
   symbols with named module attachment.
 
+- As per "Conditionally Trivial Special Member Functions" (P0848), it is
+  now possible to overload destructors using concepts. Note that the rest
+  of the paper about other special member functions is not yet implemented.
+
 C++2b Feature Support
 ^^^^^^^^^^^^^^^^^^^^^
 
 - Implemented `P2128R6: Multidimensional subscript operator <https://wg21.link/P2128R6>`_.
 - Implemented `P0849R8: auto(x): decay-copy in the language <https://wg21.link/P0849R8>`_.
 - Implemented `P2242R3: Non-literal variables (and labels and gotos) in constexpr functions	<https://wg21.link/P2242R3>`_.
+- Implemented `LWG3659: Consider ATOMIC_FLAG_INIT undeprecation <https://wg21.link/LWG3659>`_.
+- Implemented `P2290 Delimited escape sequences <https://wg21.link/P2290R3>`_.
+  This feature is available as an extension in all C and C++ language modes.
+- Implemented `P2071 Named universal character escapes <https://wg21.link/P2290R2>`_.
+  This feature is available as an extension in all C and C++ language modes.
 
 CUDA/HIP Language Changes in Clang
 ----------------------------------
@@ -410,6 +532,29 @@ OpenCL C Language Changes in Clang
 ABI Changes in Clang
 --------------------
 
+- GCC doesn't pack non-POD members in packed structs unless the packed
+  attribute is also specified on the member. Clang historically did perform
+  such packing. Clang now matches the gcc behavior (except on Darwin and PS4).
+  You can switch back to the old ABI behavior with the flag:
+  ``-fclang-abi-compat=14.0``.
+- When compiling C for ARM or AArch64, a zero-length bitfield in a ``struct``
+  (e.g. ``int : 0``) no longer prevents the structure from being considered a
+  homogeneous floating-point or vector aggregate. The new behavior agrees with
+  the AAPCS specification, and matches the similar bug fix in GCC 12.1.
+- Targeting AArch64, since D127209 LLVM now only preserves the z8-z23
+  and p4-p15 registers across a call if the registers z0-z7 or p0-p3 are
+  used to pass data into or out of a subroutine. The new behavior
+  matches the AAPCS. Previously LLVM preserved z8-z23 and p4-p15 across
+  a call if the callee had an SVE type anywhere in its signature. This
+  would cause an incorrect use of the caller-preserved z8-z23 and p4-p15
+  ABI for example if the 9th argument or greater were the first SVE type
+  in the signature of a function.
+- All copy constructors can now be trivial if they are not user-provided,
+  regardless of the type qualifiers of the argument of the defaulted constructor,
+  fixing dr2171.
+  You can switch back to the old ABI behavior with the flag:
+  ``-fclang-abi-compat=14.0``.
+
 OpenMP Support in Clang
 -----------------------
 
@@ -423,11 +568,36 @@ CUDA Support in Clang
 X86 Support in Clang
 --------------------
 
+- Support ``-mharden-sls=[none|all|return|indirect-jmp]`` for straight-line
+  speculation hardening.
+- Support for the ``_Float16`` type has been added for all targets with SSE2.
+  When AVX512-FP16 is not available, arithmetic on ``_Float16`` is emulated
+  using ``float``.
+- Added the ``-m[no-]rdpru`` flag to enable/disable the RDPRU instruction
+  provided by AMD Zen2 and later processors. Defined intrinsics for using
+  this instruction (see rdpruintrin.h).
+- Support ``-mstack-protector-guard-symbol=[SymbolName]`` to use the given
+  symbol for addressing the stack protector guard.
+- ``-mfunction-return=thunk-extern`` support was added to clang for x86. This
+  will be used by Linux kernel mitigations for RETBLEED. The corresponding flag
+  ``-mfunction-return=keep`` may be appended to disable the feature.
+
 DWARF Support in Clang
 ----------------------
 
+- clang now adds DWARF information for inline strings in C/C++ programs,
+  allowing ``line:column`` symbolization of strings. Some debugging programs may
+  require updating, as this takes advantage of DWARF ``DW_TAG_variable``
+  structures *without* a ``DW_AT_name`` field, which is valid DWARF, but may be
+  handled incorrectly by some software (e.g. new failures with incorrect
+  assertions).
+
 Arm and AArch64 Support in Clang
 --------------------------------
+
+- clang now supports the Cortex-M85 CPU, which can be chosen with
+  `-mcpu=cortex-m85`. By default, this has PACBTI turned on, but it can be
+  disabled with `-mcpu=cortex-m85+nopacbti`.
 
 Floating Point Support in Clang
 -------------------------------
@@ -458,6 +628,9 @@ AST Matchers
 - Added ``forEachTemplateArgument`` matcher which creates a match every
   time a ``templateArgument`` matches the matcher supplied to it.
 
+- Added ``objcStringLiteral`` matcher which matches ObjectiveC String
+  literal expressions.
+
 clang-format
 ------------
 
@@ -472,6 +645,13 @@ clang-format
 - Option ``InsertBraces`` has been added to insert optional braces after control
   statements.
 
+clang-extdef-mapping
+--------------------
+
+- clang-extdef-mapping now accepts .ast files as input. This is faster than to
+  recompile the files from sources when extracting method definitons. This can
+  be really beneficial when creating .ast files for input to the clang-static-analyzer.
+
 libclang
 --------
 
@@ -479,11 +659,28 @@ libclang
 
 Static Analyzer
 ---------------
+- `New CTU implementation
+  <https://discourse.llvm.org/t/rfc-much-faster-cross-translation-unit-ctu-analysis-implementation/61728>`_
+  that keeps the slow-down around 2x compared to the single-TU analysis, even
+  in case of complex C++ projects. Still, it finds the majority of the "old"
+  CTU findings. Besides, not more than ~3% of the bug reports are lost compared
+  to single-TU analysis, the lost reports are highly likely to be false
+  positives.
 
 - Added a new checker ``alpha.unix.cstring.UninitializedRead`` this will check for uninitialized reads
   from common memory copy/manipulation functions such as ``memcpy``, ``mempcpy``, ``memmove``, ``memcmp``, `
-  `strcmp``, ``strncmp``, ``strcpy``, ``strlen``, ``strsep`` and many more. Although 
+  `strcmp``, ``strncmp``, ``strcpy``, ``strlen``, ``strsep`` and many more. Although
   this checker currently is in list of alpha checkers due to a false positive.
+
+- Added a new checker ``alpha.unix.Errno``. This can find the first read
+  of ``errno`` after successful standard function calls, such use of ``errno``
+  could be unsafe.
+
+- Deprecate the ``-analyzer-store region`` and
+  ``-analyzer-opt-analyze-nested-blocks`` analyzer flags.
+  These flags are still accepted, but a warning will be displayed.
+  These flags will be rejected, thus turned into a hard error starting with
+  ``clang-16``.
 
 .. _release-notes-ubsan:
 
@@ -521,5 +718,5 @@ this release by going into the "``clang/docs/``" directory in the Clang
 tree.
 
 If you have any questions or comments about Clang, please feel free to
-contact us via the `mailing
-list <https://lists.llvm.org/mailman/listinfo/cfe-dev>`_.
+contact us on the Discourse forums (Clang Frontend category)
+<https://discourse.llvm.org/c/clang/6>`_.

@@ -131,7 +131,6 @@ list(REMOVE_DUPLICATES LLVM_CONFIG_LIBRARY_DIRS)
 
 set(LLVM_CONFIG_BINARY_DIR "\${LLVM_INSTALL_PREFIX}")
 extend_path(LLVM_CONFIG_CMAKE_DIR "\${LLVM_INSTALL_PREFIX}" "${LLVM_INSTALL_PACKAGE_DIR}")
-extend_path(LLVM_CONFIG_TOOLS_BINARY_DIR "\${LLVM_INSTALL_PREFIX}" "${LLVM_TOOLS_INSTALL_DIR}")
 
 # Generate a default location for lit
 if (LLVM_INSTALL_UTILS AND LLVM_BUILD_UTILS)
@@ -173,7 +172,8 @@ if (NOT LLVM_INSTALL_TOOLCHAIN_ONLY)
     PATTERN LLVMConfigExtensions.cmake EXCLUDE
     PATTERN LLVMConfigVersion.cmake EXCLUDE
     PATTERN LLVM-Config.cmake EXCLUDE
-    PATTERN GetHostTriple.cmake EXCLUDE)
+    PATTERN GetHostTriple.cmake EXCLUDE
+    PATTERN llvm-driver-template.cpp.in)
 
   if (NOT LLVM_ENABLE_IDE)
     # Add a dummy target so this can be used with LLVM_DISTRIBUTION_COMPONENTS

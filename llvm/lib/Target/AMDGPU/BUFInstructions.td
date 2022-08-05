@@ -35,11 +35,6 @@ class MUBUFAddr64Table <bit is_addr64, string Name> {
   string OpName = Name;
 }
 
-class MUBUFLdsTable <bit is_lds, string Name> {
-  bit IsLds = is_lds;
-  string OpName = Name;
-}
-
 class MTBUFAddr64Table <bit is_addr64, string Name> {
   bit IsAddr64 = is_addr64;
   string OpName = Name;
@@ -1417,10 +1412,12 @@ defm : MUBUF_StoreIntrinsicPat<SIbuffer_store_short, i32, "BUFFER_STORE_SHORT">;
 multiclass BufferAtomicPat<string OpPrefix, ValueType vt, string Inst, bit isIntr = 0> {
   foreach RtnMode = ["ret", "noret"] in {
 
-  defvar Op = !cast<SDPatternOperator>(OpPrefix # "_" # RtnMode
+  defvar Op = !cast<SDPatternOperator>(OpPrefix
+                                       # !if(!eq(RtnMode, "ret"), "", "_noret")
                                        # !if(isIntr, "", "_" # vt.Size));
   defvar InstSuffix = !if(!eq(RtnMode, "ret"), "_RTN", "");
 
+  let AddedComplexity = !if(!eq(RtnMode, "ret"), 0, 1) in {
   def : GCNPat<
     (vt (Op (MUBUFOffset v4i32:$srsrc, i32:$soffset, i16:$offset), vt:$vdata_in)),
     (!cast<MUBUF_Pseudo>(Inst # "_OFFSET" # InstSuffix) getVregSrcForVT<vt>.ret:$vdata_in,
@@ -1433,6 +1430,7 @@ multiclass BufferAtomicPat<string OpPrefix, ValueType vt, string Inst, bit isInt
     (!cast<MUBUF_Pseudo>(Inst # "_ADDR64" # InstSuffix) getVregSrcForVT<vt>.ret:$vdata_in,
       VReg_64:$vaddr, SReg_128:$srsrc, SCSrc_b32:$soffset, offset:$offset)
   >;
+  } // end let AddedComplexity
 
   } // end foreach RtnMode
 }
@@ -1444,10 +1442,12 @@ multiclass BufferAtomicIntrPat<string OpPrefix, ValueType vt, string Inst> {
 multiclass BufferAtomicCmpSwapPat<ValueType vt, ValueType data_vt, string Inst> {
   foreach RtnMode = ["ret", "noret"] in {
 
-  defvar Op = !cast<SDPatternOperator>("AMDGPUatomic_cmp_swap_global_" # RtnMode
+  defvar Op = !cast<SDPatternOperator>("AMDGPUatomic_cmp_swap_global"
+                                       # !if(!eq(RtnMode, "ret"), "", "_noret")
                                        # "_" # vt.Size);
   defvar InstSuffix = !if(!eq(RtnMode, "ret"), "_RTN", "");
 
+  let AddedComplexity = !if(!eq(RtnMode, "ret"), 0, 1) in {
   defvar OffsetResDag = (!cast<MUBUF_Pseudo>(Inst # "_OFFSET" # InstSuffix)
     getVregSrcForVT<data_vt>.ret:$vdata_in, SReg_128:$srsrc, SCSrc_b32:$soffset,
     offset:$offset);
@@ -1470,6 +1470,7 @@ multiclass BufferAtomicCmpSwapPat<ValueType vt, ValueType data_vt, string Inst> 
         !if(!eq(vt, i32), sub0, sub0_sub1)),
       Addr64ResDag)
   >;
+  } // end let AddedComplexity
 
   } // end foreach RtnMode
 }
@@ -1500,13 +1501,14 @@ multiclass SIBufferAtomicPat<string OpPrefix, ValueType vt, string Inst,
                              list<string> RtnModes = ["ret", "noret"]> {
   foreach RtnMode = RtnModes in {
 
-  defvar Op = !cast<SDPatternOperator>(!if(!eq(RtnMode, "none"),
-    OpPrefix, OpPrefix # "_" # RtnMode));
-  defvar InstSuffix = !if(!or(!eq(RtnMode, "none"), !eq(RtnMode, "ret")),
-    "_RTN", "");
-  defvar CachePolicy = !if(!or(!eq(RtnMode, "none"), !eq(RtnMode, "ret")),
+  defvar Op = !cast<SDPatternOperator>(OpPrefix
+                                       # !if(!eq(RtnMode, "ret"), "", "_noret"));
+
+  defvar InstSuffix = !if(!eq(RtnMode, "ret"), "_RTN", "");
+  defvar CachePolicy = !if(!eq(RtnMode, "ret"),
     (set_glc $cachepolicy), (timm:$cachepolicy));
 
+  let AddedComplexity = !if(!eq(RtnMode, "ret"), 0, 1) in {
   def : GCNPat<
     (vt (Op vt:$vdata_in, v4i32:$rsrc, 0, 0, i32:$soffset,
               timm:$offset, timm:$cachepolicy, 0)),
@@ -1539,6 +1541,7 @@ multiclass SIBufferAtomicPat<string OpPrefix, ValueType vt, string Inst,
       (REG_SEQUENCE VReg_64, VGPR_32:$vindex, sub0, VGPR_32:$voffset, sub1),
         SReg_128:$rsrc, SCSrc_b32:$soffset, (as_i16timm $offset), CachePolicy)
   >;
+  } // end let AddedComplexity
 
   } // end foreach RtnMode
 }
@@ -1556,7 +1559,7 @@ defm : SIBufferAtomicPat<"SIbuffer_atomic_or", i32, "BUFFER_ATOMIC_OR">;
 defm : SIBufferAtomicPat<"SIbuffer_atomic_xor", i32, "BUFFER_ATOMIC_XOR">;
 defm : SIBufferAtomicPat<"SIbuffer_atomic_inc", i32, "BUFFER_ATOMIC_INC">;
 defm : SIBufferAtomicPat<"SIbuffer_atomic_dec", i32, "BUFFER_ATOMIC_DEC">;
-defm : SIBufferAtomicPat<"SIbuffer_atomic_csub", i32, "BUFFER_ATOMIC_CSUB", ["none"]>;
+defm : SIBufferAtomicPat<"SIbuffer_atomic_csub", i32, "BUFFER_ATOMIC_CSUB", ["ret"]>;
 defm : SIBufferAtomicPat<"SIbuffer_atomic_swap", i64, "BUFFER_ATOMIC_SWAP_X2">;
 defm : SIBufferAtomicPat<"SIbuffer_atomic_add", i64,  "BUFFER_ATOMIC_ADD_X2">;
 defm : SIBufferAtomicPat<"SIbuffer_atomic_sub", i64, "BUFFER_ATOMIC_SUB_X2">;
@@ -1639,7 +1642,6 @@ let SubtargetPredicate = isGFX90APlus in {
   defm : BufferAtomicIntrPat<"int_amdgcn_global_atomic_fadd", f64, "BUFFER_ATOMIC_ADD_F64">;
   defm : BufferAtomicIntrPat<"int_amdgcn_global_atomic_fmin", f64, "BUFFER_ATOMIC_MIN_F64">;
   defm : BufferAtomicIntrPat<"int_amdgcn_global_atomic_fmax", f64, "BUFFER_ATOMIC_MAX_F64">;
-  defm : SIBufferAtomicPat<"SIbuffer_atomic_fadd", f32,   "BUFFER_ATOMIC_ADD_F32">;
   defm : SIBufferAtomicPat<"SIbuffer_atomic_fadd", v2f16, "BUFFER_ATOMIC_PK_ADD_F16">;
 
   defm : SIBufferAtomicPat<"SIbuffer_atomic_fadd", f64, "BUFFER_ATOMIC_ADD_F64">;
@@ -1649,7 +1651,8 @@ let SubtargetPredicate = isGFX90APlus in {
 
 foreach RtnMode = ["ret", "noret"] in {
 
-defvar Op = !cast<SDPatternOperator>(SIbuffer_atomic_cmpswap # "_" # RtnMode);
+defvar Op = !cast<SDPatternOperator>(SIbuffer_atomic_cmpswap
+                                     # !if(!eq(RtnMode, "ret"), "", "_noret"));
 defvar InstSuffix = !if(!eq(RtnMode, "ret"), "_RTN", "");
 defvar CachePolicy = !if(!eq(RtnMode, "ret"), (set_glc $cachepolicy),
   (timm:$cachepolicy));
@@ -2258,23 +2261,15 @@ let AssemblerPredicate = isGFX10Only, DecoderNamespace = "GFX10" in {
       MUBUF_Real_gfx10<op, !cast<MUBUF_Pseudo>(NAME#"_OFFSET")>;
   }
   multiclass MUBUF_Real_AllAddr_Lds_gfx10<bits<8> op> {
-    def _OFFSET_gfx10 : MUBUF_Real_gfx10<op, !cast<MUBUF_Pseudo>(NAME#"_OFFSET")>,
-                        MUBUFLdsTable<0, NAME # "_OFFSET_gfx10">;
-    def _OFFEN_gfx10  : MUBUF_Real_gfx10<op, !cast<MUBUF_Pseudo>(NAME#"_OFFEN")>,
-                        MUBUFLdsTable<0, NAME # "_OFFEN_gfx10">;
-    def _IDXEN_gfx10  : MUBUF_Real_gfx10<op, !cast<MUBUF_Pseudo>(NAME#"_IDXEN")>,
-                        MUBUFLdsTable<0, NAME # "_IDXEN_gfx10">;
-    def _BOTHEN_gfx10 : MUBUF_Real_gfx10<op, !cast<MUBUF_Pseudo>(NAME#"_BOTHEN")>,
-                        MUBUFLdsTable<0, NAME # "_BOTHEN_gfx10">;
+    def _OFFSET_gfx10 : MUBUF_Real_gfx10<op, !cast<MUBUF_Pseudo>(NAME#"_OFFSET")>;
+    def _OFFEN_gfx10  : MUBUF_Real_gfx10<op, !cast<MUBUF_Pseudo>(NAME#"_OFFEN")>;
+    def _IDXEN_gfx10  : MUBUF_Real_gfx10<op, !cast<MUBUF_Pseudo>(NAME#"_IDXEN")>;
+    def _BOTHEN_gfx10 : MUBUF_Real_gfx10<op, !cast<MUBUF_Pseudo>(NAME#"_BOTHEN")>;
 
-    def _LDS_OFFSET_gfx10 : MUBUF_Real_gfx10<op, !cast<MUBUF_Pseudo>(NAME#"_LDS_OFFSET")>,
-                            MUBUFLdsTable<1, NAME # "_OFFSET_gfx10">;
-    def _LDS_OFFEN_gfx10  : MUBUF_Real_gfx10<op, !cast<MUBUF_Pseudo>(NAME#"_LDS_OFFEN")>,
-                            MUBUFLdsTable<1, NAME # "_OFFEN_gfx10">;
-    def _LDS_IDXEN_gfx10  : MUBUF_Real_gfx10<op, !cast<MUBUF_Pseudo>(NAME#"_LDS_IDXEN")>,
-                            MUBUFLdsTable<1, NAME # "_IDXEN_gfx10">;
-    def _LDS_BOTHEN_gfx10 : MUBUF_Real_gfx10<op, !cast<MUBUF_Pseudo>(NAME#"_LDS_BOTHEN")>,
-                            MUBUFLdsTable<1, NAME # "_BOTHEN_gfx10">;
+    def _LDS_OFFSET_gfx10 : MUBUF_Real_gfx10<op, !cast<MUBUF_Pseudo>(NAME#"_LDS_OFFSET")>;
+    def _LDS_OFFEN_gfx10  : MUBUF_Real_gfx10<op, !cast<MUBUF_Pseudo>(NAME#"_LDS_OFFEN")>;
+    def _LDS_IDXEN_gfx10  : MUBUF_Real_gfx10<op, !cast<MUBUF_Pseudo>(NAME#"_LDS_IDXEN")>;
+    def _LDS_BOTHEN_gfx10 : MUBUF_Real_gfx10<op, !cast<MUBUF_Pseudo>(NAME#"_LDS_BOTHEN")>;
   }
   multiclass MUBUF_Real_Atomics_RTN_gfx10<bits<8> op> {
     def _BOTHEN_RTN_gfx10 :
@@ -2362,27 +2357,17 @@ let AssemblerPredicate = isGFX6GFX7, DecoderNamespace = "GFX6GFX7" in {
       MUBUF_Real_gfx6_gfx7<op, !cast<MUBUF_Pseudo>(NAME#"_OFFSET")>;
   }
   multiclass MUBUF_Real_AllAddr_Lds_gfx6_gfx7<bits<8> op> {
-    def _OFFSET_gfx6_gfx7 : MUBUF_Real_gfx6_gfx7<op, !cast<MUBUF_Pseudo>(NAME#"_OFFSET")>,
-                            MUBUFLdsTable<0, NAME # "_OFFSET_gfx6_gfx7">;
-    def _ADDR64_gfx6_gfx7 : MUBUF_Real_gfx6_gfx7<op, !cast<MUBUF_Pseudo>(NAME#"_ADDR64")>,
-                            MUBUFLdsTable<0, NAME # "_ADDR64_gfx6_gfx7">;
-    def _OFFEN_gfx6_gfx7  : MUBUF_Real_gfx6_gfx7<op, !cast<MUBUF_Pseudo>(NAME#"_OFFEN")>,
-                            MUBUFLdsTable<0, NAME # "_OFFEN_gfx6_gfx7">;
-    def _IDXEN_gfx6_gfx7  : MUBUF_Real_gfx6_gfx7<op, !cast<MUBUF_Pseudo>(NAME#"_IDXEN")>,
-                            MUBUFLdsTable<0, NAME # "_IDXEN_gfx6_gfx7">;
-    def _BOTHEN_gfx6_gfx7 : MUBUF_Real_gfx6_gfx7<op, !cast<MUBUF_Pseudo>(NAME#"_BOTHEN")>,
-                            MUBUFLdsTable<0, NAME # "_BOTHEN_gfx6_gfx7">;
+    def _OFFSET_gfx6_gfx7 : MUBUF_Real_gfx6_gfx7<op, !cast<MUBUF_Pseudo>(NAME#"_OFFSET")>;
+    def _ADDR64_gfx6_gfx7 : MUBUF_Real_gfx6_gfx7<op, !cast<MUBUF_Pseudo>(NAME#"_ADDR64")>;
+    def _OFFEN_gfx6_gfx7  : MUBUF_Real_gfx6_gfx7<op, !cast<MUBUF_Pseudo>(NAME#"_OFFEN")>;
+    def _IDXEN_gfx6_gfx7  : MUBUF_Real_gfx6_gfx7<op, !cast<MUBUF_Pseudo>(NAME#"_IDXEN")>;
+    def _BOTHEN_gfx6_gfx7 : MUBUF_Real_gfx6_gfx7<op, !cast<MUBUF_Pseudo>(NAME#"_BOTHEN")>;
 
-    def _LDS_OFFSET_gfx6_gfx7 : MUBUF_Real_gfx6_gfx7<op, !cast<MUBUF_Pseudo>(NAME#"_LDS_OFFSET")>,
-                                MUBUFLdsTable<1, NAME # "_OFFSET_gfx6_gfx7">;
-    def _LDS_ADDR64_gfx6_gfx7 : MUBUF_Real_gfx6_gfx7<op, !cast<MUBUF_Pseudo>(NAME#"_LDS_ADDR64")>,
-                                MUBUFLdsTable<1, NAME # "_ADDR64_gfx6_gfx7">;
-    def _LDS_OFFEN_gfx6_gfx7  : MUBUF_Real_gfx6_gfx7<op, !cast<MUBUF_Pseudo>(NAME#"_LDS_OFFEN")>,
-                                MUBUFLdsTable<1, NAME # "_OFFEN_gfx6_gfx7">;
-    def _LDS_IDXEN_gfx6_gfx7  : MUBUF_Real_gfx6_gfx7<op, !cast<MUBUF_Pseudo>(NAME#"_LDS_IDXEN")>,
-                                MUBUFLdsTable<1, NAME # "_IDXEN_gfx6_gfx7">;
-    def _LDS_BOTHEN_gfx6_gfx7 : MUBUF_Real_gfx6_gfx7<op, !cast<MUBUF_Pseudo>(NAME#"_LDS_BOTHEN")>,
-                                MUBUFLdsTable<1, NAME # "_BOTHEN_gfx6_gfx7">;
+    def _LDS_OFFSET_gfx6_gfx7 : MUBUF_Real_gfx6_gfx7<op, !cast<MUBUF_Pseudo>(NAME#"_LDS_OFFSET")>;
+    def _LDS_ADDR64_gfx6_gfx7 : MUBUF_Real_gfx6_gfx7<op, !cast<MUBUF_Pseudo>(NAME#"_LDS_ADDR64")>;
+    def _LDS_OFFEN_gfx6_gfx7  : MUBUF_Real_gfx6_gfx7<op, !cast<MUBUF_Pseudo>(NAME#"_LDS_OFFEN")>;
+    def _LDS_IDXEN_gfx6_gfx7  : MUBUF_Real_gfx6_gfx7<op, !cast<MUBUF_Pseudo>(NAME#"_LDS_IDXEN")>;
+    def _LDS_BOTHEN_gfx6_gfx7 : MUBUF_Real_gfx6_gfx7<op, !cast<MUBUF_Pseudo>(NAME#"_LDS_BOTHEN")>;
   }
   multiclass MUBUF_Real_Atomics_gfx6_gfx7<bits<8> op> {
     def _ADDR64_gfx6_gfx7 :
@@ -2728,41 +2713,25 @@ multiclass MUBUF_Real_AllAddr_vi<bits<7> op> {
 
 multiclass MUBUF_Real_AllAddr_Lds_vi<bits<7> op> {
 
-  def _OFFSET_vi : MUBUF_Real_vi <op, !cast<MUBUF_Pseudo>(NAME#"_OFFSET")>,
-                   MUBUFLdsTable<0, NAME # "_OFFSET_vi">;
-  def _OFFEN_vi  : MUBUF_Real_vi <op, !cast<MUBUF_Pseudo>(NAME#"_OFFEN")>,
-                   MUBUFLdsTable<0, NAME # "_OFFEN_vi">;
-  def _IDXEN_vi  : MUBUF_Real_vi <op, !cast<MUBUF_Pseudo>(NAME#"_IDXEN")>,
-                   MUBUFLdsTable<0, NAME # "_IDXEN_vi">;
-  def _BOTHEN_vi : MUBUF_Real_vi <op, !cast<MUBUF_Pseudo>(NAME#"_BOTHEN")>,
-                   MUBUFLdsTable<0, NAME # "_BOTHEN_vi">;
+  def _OFFSET_vi : MUBUF_Real_vi <op, !cast<MUBUF_Pseudo>(NAME#"_OFFSET")>;
+  def _OFFEN_vi  : MUBUF_Real_vi <op, !cast<MUBUF_Pseudo>(NAME#"_OFFEN")>;
+  def _IDXEN_vi  : MUBUF_Real_vi <op, !cast<MUBUF_Pseudo>(NAME#"_IDXEN")>;
+  def _BOTHEN_vi : MUBUF_Real_vi <op, !cast<MUBUF_Pseudo>(NAME#"_BOTHEN")>;
 
-  def _LDS_OFFSET_vi : MUBUF_Real_vi <op, !cast<MUBUF_Pseudo>(NAME#"_LDS_OFFSET")>,
-                       MUBUFLdsTable<1, NAME # "_OFFSET_vi">;
-  def _LDS_OFFEN_vi  : MUBUF_Real_vi <op, !cast<MUBUF_Pseudo>(NAME#"_LDS_OFFEN")>,
-                       MUBUFLdsTable<1, NAME # "_OFFEN_vi">;
-  def _LDS_IDXEN_vi  : MUBUF_Real_vi <op, !cast<MUBUF_Pseudo>(NAME#"_LDS_IDXEN")>,
-                       MUBUFLdsTable<1, NAME # "_IDXEN_vi">;
-  def _LDS_BOTHEN_vi : MUBUF_Real_vi <op, !cast<MUBUF_Pseudo>(NAME#"_LDS_BOTHEN")>,
-                       MUBUFLdsTable<1, NAME # "_BOTHEN_vi">;
+  def _LDS_OFFSET_vi : MUBUF_Real_vi <op, !cast<MUBUF_Pseudo>(NAME#"_LDS_OFFSET")>;
+  def _LDS_OFFEN_vi  : MUBUF_Real_vi <op, !cast<MUBUF_Pseudo>(NAME#"_LDS_OFFEN")>;
+  def _LDS_IDXEN_vi  : MUBUF_Real_vi <op, !cast<MUBUF_Pseudo>(NAME#"_LDS_IDXEN")>;
+  def _LDS_BOTHEN_vi : MUBUF_Real_vi <op, !cast<MUBUF_Pseudo>(NAME#"_LDS_BOTHEN")>;
 
-  def _OFFSET_gfx90a : MUBUF_Real_gfx90a <op, !cast<MUBUF_Pseudo>(NAME#"_OFFSET")>,
-                   MUBUFLdsTable<0, NAME # "_OFFSET_gfx90a">;
-  def _OFFEN_gfx90a  : MUBUF_Real_gfx90a <op, !cast<MUBUF_Pseudo>(NAME#"_OFFEN")>,
-                   MUBUFLdsTable<0, NAME # "_OFFEN_gfx90a">;
-  def _IDXEN_gfx90a  : MUBUF_Real_gfx90a <op, !cast<MUBUF_Pseudo>(NAME#"_IDXEN")>,
-                   MUBUFLdsTable<0, NAME # "_IDXEN_gfx90a">;
-  def _BOTHEN_gfx90a : MUBUF_Real_gfx90a <op, !cast<MUBUF_Pseudo>(NAME#"_BOTHEN")>,
-                   MUBUFLdsTable<0, NAME # "_BOTHEN_gfx90a">;
+  def _OFFSET_gfx90a : MUBUF_Real_gfx90a <op, !cast<MUBUF_Pseudo>(NAME#"_OFFSET")>;
+  def _OFFEN_gfx90a  : MUBUF_Real_gfx90a <op, !cast<MUBUF_Pseudo>(NAME#"_OFFEN")>;
+  def _IDXEN_gfx90a  : MUBUF_Real_gfx90a <op, !cast<MUBUF_Pseudo>(NAME#"_IDXEN")>;
+  def _BOTHEN_gfx90a : MUBUF_Real_gfx90a <op, !cast<MUBUF_Pseudo>(NAME#"_BOTHEN")>;
 
-  def _LDS_OFFSET_gfx90a : MUBUF_Real_gfx90a <op, !cast<MUBUF_Pseudo>(NAME#"_LDS_OFFSET")>,
-                       MUBUFLdsTable<1, NAME # "_OFFSET_gfx90a">;
-  def _LDS_OFFEN_gfx90a  : MUBUF_Real_gfx90a <op, !cast<MUBUF_Pseudo>(NAME#"_LDS_OFFEN")>,
-                       MUBUFLdsTable<1, NAME # "_OFFEN_gfx90a">;
-  def _LDS_IDXEN_gfx90a  : MUBUF_Real_gfx90a <op, !cast<MUBUF_Pseudo>(NAME#"_LDS_IDXEN")>,
-                       MUBUFLdsTable<1, NAME # "_IDXEN_gfx90a">;
-  def _LDS_BOTHEN_gfx90a : MUBUF_Real_gfx90a <op, !cast<MUBUF_Pseudo>(NAME#"_LDS_BOTHEN")>,
-                       MUBUFLdsTable<1, NAME # "_BOTHEN_gfx90a">;
+  def _LDS_OFFSET_gfx90a : MUBUF_Real_gfx90a <op, !cast<MUBUF_Pseudo>(NAME#"_LDS_OFFSET")>;
+  def _LDS_OFFEN_gfx90a  : MUBUF_Real_gfx90a <op, !cast<MUBUF_Pseudo>(NAME#"_LDS_OFFEN")>;
+  def _LDS_IDXEN_gfx90a  : MUBUF_Real_gfx90a <op, !cast<MUBUF_Pseudo>(NAME#"_LDS_IDXEN")>;
+  def _LDS_BOTHEN_gfx90a : MUBUF_Real_gfx90a <op, !cast<MUBUF_Pseudo>(NAME#"_LDS_BOTHEN")>;
 }
 
 class MUBUF_Real_gfx80 <bits<7> op, MUBUF_Pseudo ps> :

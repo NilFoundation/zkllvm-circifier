@@ -83,6 +83,33 @@ add_libc_unittest(
     libc.src.stdio.snprintf
 )
 
+add_libc_unittest(
+  fprintf_test
+  SUITE
+    libc_stdio_unittests
+  SRCS
+    fprintf_test.cpp
+  DEPENDS
+    libc.src.stdio.fprintf
+    libc.src.stdio.fclose
+    libc.src.stdio.ferror
+    libc.src.stdio.fopen
+    libc.src.stdio.fread
+)
+
+
+add_libc_unittest(
+  printf_test
+  SUITE
+    libc_stdio_unittests
+  SRCS
+    printf_test.cpp
+  DEPENDS
+    libc.src.stdio.printf
+    libc.src.fenv.fesetround
+    libc.src.__support.FPUtil.fputil
+)
+
 add_subdirectory(printf_core)
 
 add_subdirectory(testdata)

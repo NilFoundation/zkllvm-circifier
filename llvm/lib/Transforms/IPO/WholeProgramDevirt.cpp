@@ -144,13 +144,12 @@ static cl::opt<std::string> ClWriteSummary(
 
 static cl::opt<unsigned>
     ClThreshold("wholeprogramdevirt-branch-funnel-threshold", cl::Hidden,
-                cl::init(10), cl::ZeroOrMore,
+                cl::init(10),
                 cl::desc("Maximum number of call targets per "
                          "call site to enable branch funnels"));
 
 static cl::opt<bool>
     PrintSummaryDevirt("wholeprogramdevirt-print-index-based", cl::Hidden,
-                       cl::init(false), cl::ZeroOrMore,
                        cl::desc("Print index-based devirtualization messages"));
 
 /// Provide a way to force enable whole program visibility in tests.
@@ -158,22 +157,20 @@ static cl::opt<bool>
 /// !vcall_visibility metadata (the mere presense of type tests
 /// previously implied hidden visibility).
 static cl::opt<bool>
-    WholeProgramVisibility("whole-program-visibility", cl::init(false),
-                           cl::Hidden, cl::ZeroOrMore,
+    WholeProgramVisibility("whole-program-visibility", cl::Hidden,
                            cl::desc("Enable whole program visibility"));
 
 /// Provide a way to force disable whole program for debugging or workarounds,
 /// when enabled via the linker.
 static cl::opt<bool> DisableWholeProgramVisibility(
-    "disable-whole-program-visibility", cl::init(false), cl::Hidden,
-    cl::ZeroOrMore,
+    "disable-whole-program-visibility", cl::Hidden,
     cl::desc("Disable whole program visibility (overrides enabling options)"));
 
 /// Provide way to prevent certain function from being devirtualized
 static cl::list<std::string>
     SkipFunctionNames("wholeprogramdevirt-skip",
                       cl::desc("Prevent function(s) from being devirtualized"),
-                      cl::Hidden, cl::ZeroOrMore, cl::CommaSeparated);
+                      cl::Hidden, cl::CommaSeparated);
 
 /// Mechanism to add runtime checking of devirtualization decisions, optionally
 /// trapping or falling back to indirect call on any that are not correct.
@@ -182,7 +179,7 @@ static cl::list<std::string>
 /// visibility may be compromised.
 enum WPDCheckMode { None, Trap, Fallback };
 static cl::opt<WPDCheckMode> DevirtCheckMode(
-    "wholeprogramdevirt-check", cl::Hidden, cl::ZeroOrMore,
+    "wholeprogramdevirt-check", cl::Hidden,
     cl::desc("Type of checking for incorrect devirtualizations"),
     cl::values(clEnumValN(WPDCheckMode::None, "none", "No checking"),
                clEnumValN(WPDCheckMode::Trap, "trap", "Trap when incorrect"),
@@ -750,77 +747,7 @@ struct DevirtIndex {
 
   void run();
 };
-
-struct WholeProgramDevirt : public ModulePass {
-  static char ID;
-
-  bool UseCommandLine = false;
-
-  ModuleSummaryIndex *ExportSummary = nullptr;
-  const ModuleSummaryIndex *ImportSummary = nullptr;
-
-  WholeProgramDevirt() : ModulePass(ID), UseCommandLine(true) {
-    initializeWholeProgramDevirtPass(*PassRegistry::getPassRegistry());
-  }
-
-  WholeProgramDevirt(ModuleSummaryIndex *ExportSummary,
-                     const ModuleSummaryIndex *ImportSummary)
-      : ModulePass(ID), ExportSummary(ExportSummary),
-        ImportSummary(ImportSummary) {
-    initializeWholeProgramDevirtPass(*PassRegistry::getPassRegistry());
-  }
-
-  bool runOnModule(Module &M) override {
-    if (skipModule(M))
-      return false;
-
-    // In the new pass manager, we can request the optimization
-    // remark emitter pass on a per-function-basis, which the
-    // OREGetter will do for us.
-    // In the old pass manager, this is harder, so we just build
-    // an optimization remark emitter on the fly, when we need it.
-    std::unique_ptr<OptimizationRemarkEmitter> ORE;
-    auto OREGetter = [&](Function *F) -> OptimizationRemarkEmitter & {
-      ORE = std::make_unique<OptimizationRemarkEmitter>(F);
-      return *ORE;
-    };
-
-    auto LookupDomTree = [this](Function &F) -> DominatorTree & {
-      return this->getAnalysis<DominatorTreeWrapperPass>(F).getDomTree();
-    };
-
-    if (UseCommandLine)
-      return DevirtModule::runForTesting(M, LegacyAARGetter(*this), OREGetter,
-                                         LookupDomTree);
-
-    return DevirtModule(M, LegacyAARGetter(*this), OREGetter, LookupDomTree,
-                        ExportSummary, ImportSummary)
-        .run();
-  }
-
-  void getAnalysisUsage(AnalysisUsage &AU) const override {
-    AU.addRequired<AssumptionCacheTracker>();
-    AU.addRequired<TargetLibraryInfoWrapperPass>();
-    AU.addRequired<DominatorTreeWrapperPass>();
-  }
-};
-
 } // end anonymous namespace
-
-INITIALIZE_PASS_BEGIN(WholeProgramDevirt, "wholeprogramdevirt",
-                      "Whole program devirtualization", false, false)
-INITIALIZE_PASS_DEPENDENCY(AssumptionCacheTracker)
-INITIALIZE_PASS_DEPENDENCY(TargetLibraryInfoWrapperPass)
-INITIALIZE_PASS_DEPENDENCY(DominatorTreeWrapperPass)
-INITIALIZE_PASS_END(WholeProgramDevirt, "wholeprogramdevirt",
-                    "Whole program devirtualization", false, false)
-char WholeProgramDevirt::ID = 0;
-
-ModulePass *
-llvm::createWholeProgramDevirtPass(ModuleSummaryIndex *ExportSummary,
-                                   const ModuleSummaryIndex *ImportSummary) {
-  return new WholeProgramDevirt(ExportSummary, ImportSummary);
-}
 
 PreservedAnalyses WholeProgramDevirtPass::run(Module &M,
                                               ModuleAnalysisManager &AM) {
@@ -2018,7 +1945,7 @@ void DevirtModule::scanTypeCheckedLoadUsers(Function *TypeCheckedLoadFunc) {
     // (although this is unlikely). In that case, explicitly build a pair and
     // RAUW it.
     if (!CI->use_empty()) {
-      Value *Pair = UndefValue::get(CI->getType());
+      Value *Pair = PoisonValue::get(CI->getType());
       IRBuilder<> B(CI);
       Pair = B.CreateInsertValue(Pair, LoadedValue, {0});
       Pair = B.CreateInsertValue(Pair, TypeTestCall, {1});

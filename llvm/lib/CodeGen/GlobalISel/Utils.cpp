@@ -18,7 +18,6 @@
 #include "llvm/CodeGen/GlobalISel/GenericMachineInstrs.h"
 #include "llvm/CodeGen/GlobalISel/LostDebugLocObserver.h"
 #include "llvm/CodeGen/GlobalISel/MIPatternMatch.h"
-#include "llvm/CodeGen/GlobalISel/MachineIRBuilder.h"
 #include "llvm/CodeGen/MachineInstr.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
 #include "llvm/CodeGen/MachineOptimizationRemarkEmitter.h"
@@ -229,7 +228,7 @@ bool llvm::isTriviallyDead(const MachineInstr &MI,
     return false;
 
   // Instructions without side-effects are dead iff they only define dead vregs.
-  for (auto &MO : MI.operands()) {
+  for (const auto &MO : MI.operands()) {
     if (!MO.isReg() || !MO.isDef())
       continue;
 

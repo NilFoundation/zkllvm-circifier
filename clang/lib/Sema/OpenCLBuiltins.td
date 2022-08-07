@@ -1185,7 +1185,7 @@ let MinVersion = CL20 in {
       defvar extension_fp64 = !cast<FunctionExtension>("FuncExtFloatAtomicsFp64" # addrspace # "Add");
 
       defm : BuiltinAtomicExplicit<"atomic_fetch_" # ModOp,
-          [Half, PointerType<VolatileType<AtomicFloat>, addrspace>, Half], extension_fp16>;
+          [Half, PointerType<VolatileType<AtomicHalf>, addrspace>, Half], extension_fp16>;
       defm : BuiltinAtomicExplicit<"atomic_fetch_" # ModOp,
           [Float, PointerType<VolatileType<AtomicFloat>, addrspace>, Float], extension_fp32>;
       defm : BuiltinAtomicExplicit<"atomic_fetch_" # ModOp,
@@ -1843,6 +1843,12 @@ let Extension = FunctionExtension<"__opencl_c_integer_dot_product_input_4x8bit_p
   def : Builtin<"dot_acc_sat_4x8packed_ss_int", [Int, UInt, UInt, Int], Attr.Const>;
   def : Builtin<"dot_acc_sat_4x8packed_us_int", [Int, UInt, UInt, Int], Attr.Const>;
   def : Builtin<"dot_acc_sat_4x8packed_su_int", [Int, UInt, UInt, Int], Attr.Const>;
+}
+
+// Section 48.3 - cl_khr_subgroup_rotate
+let Extension = FunctionExtension<"cl_khr_subgroup_rotate"> in {
+  def : Builtin<"sub_group_rotate", [AGenType1, AGenType1, Int], Attr.Convergent>;
+  def : Builtin<"sub_group_clustered_rotate", [AGenType1, AGenType1, Int, UInt], Attr.Convergent>;
 }
 
 //--------------------------------------------------------------------

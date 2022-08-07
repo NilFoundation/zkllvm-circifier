@@ -297,7 +297,7 @@ define void @foo1(i32* nocapture %A, i32* nocapture readonly %B, i32* nocapture 
 ; AVX512-NEXT:    br i1 [[TMP63]], label [[VEC_EPILOG_MIDDLE_BLOCK:%.*]], label [[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP2:![0-9]+]]
 ; AVX512:       vec.epilog.middle.block:
 ; AVX512-NEXT:    [[CMP_N11:%.*]] = icmp eq i64 10000, 10000
-; AVX512-NEXT:    br i1 [[CMP_N11]], label [[FOR_END_LOOPEXIT:%.*]], label [[VEC_EPILOG_SCALAR_PH]]
+; AVX512-NEXT:    br i1 [[CMP_N11]], label [[FOR_END]], label [[VEC_EPILOG_SCALAR_PH]]
 ; AVX512:       vec.epilog.scalar.ph:
 ; AVX512-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ 10000, [[VEC_EPILOG_MIDDLE_BLOCK]] ], [ 9984, [[VEC_EPILOG_ITER_CHECK]] ], [ 0, [[VECTOR_MEMCHECK]] ], [ 0, [[ITER_CHECK:%.*]] ]
 ; AVX512-NEXT:    br label [[FOR_BODY:%.*]]
@@ -317,9 +317,7 @@ define void @foo1(i32* nocapture %A, i32* nocapture readonly %B, i32* nocapture 
 ; AVX512:       for.inc:
 ; AVX512-NEXT:    [[INDVARS_IV_NEXT]] = add nuw nsw i64 [[INDVARS_IV]], 1
 ; AVX512-NEXT:    [[EXITCOND:%.*]] = icmp eq i64 [[INDVARS_IV_NEXT]], 10000
-; AVX512-NEXT:    br i1 [[EXITCOND]], label [[FOR_END_LOOPEXIT]], label [[FOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
-; AVX512:       for.end.loopexit:
-; AVX512-NEXT:    br label [[FOR_END]]
+; AVX512-NEXT:    br i1 [[EXITCOND]], label [[FOR_END]], label [[FOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; AVX512:       for.end:
 ; AVX512-NEXT:    ret void
 ;
@@ -632,7 +630,7 @@ define void @foo1_addrspace1(i32 addrspace(1)* nocapture %A, i32 addrspace(1)* n
 ; AVX512-NEXT:    br i1 [[TMP63]], label [[VEC_EPILOG_MIDDLE_BLOCK:%.*]], label [[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
 ; AVX512:       vec.epilog.middle.block:
 ; AVX512-NEXT:    [[CMP_N11:%.*]] = icmp eq i64 10000, 10000
-; AVX512-NEXT:    br i1 [[CMP_N11]], label [[FOR_END_LOOPEXIT:%.*]], label [[VEC_EPILOG_SCALAR_PH]]
+; AVX512-NEXT:    br i1 [[CMP_N11]], label [[FOR_END]], label [[VEC_EPILOG_SCALAR_PH]]
 ; AVX512:       vec.epilog.scalar.ph:
 ; AVX512-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ 10000, [[VEC_EPILOG_MIDDLE_BLOCK]] ], [ 9984, [[VEC_EPILOG_ITER_CHECK]] ], [ 0, [[VECTOR_MEMCHECK]] ], [ 0, [[ITER_CHECK:%.*]] ]
 ; AVX512-NEXT:    br label [[FOR_BODY:%.*]]
@@ -652,9 +650,7 @@ define void @foo1_addrspace1(i32 addrspace(1)* nocapture %A, i32 addrspace(1)* n
 ; AVX512:       for.inc:
 ; AVX512-NEXT:    [[INDVARS_IV_NEXT]] = add nuw nsw i64 [[INDVARS_IV]], 1
 ; AVX512-NEXT:    [[EXITCOND:%.*]] = icmp eq i64 [[INDVARS_IV_NEXT]], 10000
-; AVX512-NEXT:    br i1 [[EXITCOND]], label [[FOR_END_LOOPEXIT]], label [[FOR_BODY]], !llvm.loop [[LOOP7:![0-9]+]]
-; AVX512:       for.end.loopexit:
-; AVX512-NEXT:    br label [[FOR_END]]
+; AVX512-NEXT:    br i1 [[EXITCOND]], label [[FOR_END]], label [[FOR_BODY]], !llvm.loop [[LOOP7:![0-9]+]]
 ; AVX512:       for.end:
 ; AVX512-NEXT:    ret void
 ;
@@ -988,7 +984,7 @@ define void @foo2(float* nocapture %A, float* nocapture readonly %B, i32* nocapt
 ; AVX512-NEXT:    br i1 [[TMP68]], label [[VEC_EPILOG_MIDDLE_BLOCK:%.*]], label [[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP9:![0-9]+]]
 ; AVX512:       vec.epilog.middle.block:
 ; AVX512-NEXT:    [[CMP_N11:%.*]] = icmp eq i64 10000, 10000
-; AVX512-NEXT:    br i1 [[CMP_N11]], label [[FOR_END_LOOPEXIT:%.*]], label [[VEC_EPILOG_SCALAR_PH]]
+; AVX512-NEXT:    br i1 [[CMP_N11]], label [[FOR_END]], label [[VEC_EPILOG_SCALAR_PH]]
 ; AVX512:       vec.epilog.scalar.ph:
 ; AVX512-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ 10000, [[VEC_EPILOG_MIDDLE_BLOCK]] ], [ 9984, [[VEC_EPILOG_ITER_CHECK]] ], [ 0, [[VECTOR_MEMCHECK]] ], [ 0, [[ITER_CHECK:%.*]] ]
 ; AVX512-NEXT:    br label [[FOR_BODY:%.*]]
@@ -1009,9 +1005,7 @@ define void @foo2(float* nocapture %A, float* nocapture readonly %B, i32* nocapt
 ; AVX512:       for.inc:
 ; AVX512-NEXT:    [[INDVARS_IV_NEXT]] = add nuw nsw i64 [[INDVARS_IV]], 1
 ; AVX512-NEXT:    [[EXITCOND:%.*]] = icmp eq i64 [[INDVARS_IV_NEXT]], 10000
-; AVX512-NEXT:    br i1 [[EXITCOND]], label [[FOR_END_LOOPEXIT]], label [[FOR_BODY]], !llvm.loop [[LOOP10:![0-9]+]]
-; AVX512:       for.end.loopexit:
-; AVX512-NEXT:    br label [[FOR_END]]
+; AVX512-NEXT:    br i1 [[EXITCOND]], label [[FOR_END]], label [[FOR_BODY]], !llvm.loop [[LOOP10:![0-9]+]]
 ; AVX512:       for.end:
 ; AVX512-NEXT:    ret void
 ;
@@ -1457,74 +1451,6 @@ for.end:                                          ; preds = %for.inc
 
 @a = common global [1 x i32*] zeroinitializer, align 8
 @c = common global i32* null, align 8
-
-; The loop here should not be vectorized due to trapping
-; constant expression
-
-define void @foo5(i32* nocapture %A, i32* nocapture readnone %B, i32* nocapture readonly %trigger) local_unnamed_addr #0 {
-; AVX-LABEL: @foo5(
-; AVX-NEXT:  entry:
-; AVX-NEXT:    br label [[FOR_BODY:%.*]]
-; AVX:       for.body:
-; AVX-NEXT:    [[INDVARS_IV:%.*]] = phi i64 [ 0, [[ENTRY:%.*]] ], [ [[INDVARS_IV_NEXT:%.*]], [[FOR_INC:%.*]] ]
-; AVX-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds i32, i32* [[TRIGGER:%.*]], i64 [[INDVARS_IV]]
-; AVX-NEXT:    [[TMP0:%.*]] = load i32, i32* [[ARRAYIDX]], align 4
-; AVX-NEXT:    [[CMP1:%.*]] = icmp slt i32 [[TMP0]], 100
-; AVX-NEXT:    br i1 [[CMP1]], label [[IF_THEN:%.*]], label [[FOR_INC]]
-; AVX:       if.then:
-; AVX-NEXT:    [[ARRAYIDX7:%.*]] = getelementptr inbounds i32, i32* [[A:%.*]], i64 [[INDVARS_IV]]
-; AVX-NEXT:    store i32 sdiv (i32 1, i32 zext (i1 icmp eq (i32** getelementptr inbounds ([1 x i32*], [1 x i32*]* @a, i64 1, i64 0), i32** @c) to i32)), i32* [[ARRAYIDX7]], align 4
-; AVX-NEXT:    br label [[FOR_INC]]
-; AVX:       for.inc:
-; AVX-NEXT:    [[INDVARS_IV_NEXT]] = add nuw nsw i64 [[INDVARS_IV]], 1
-; AVX-NEXT:    [[EXITCOND:%.*]] = icmp eq i64 [[INDVARS_IV_NEXT]], 10000
-; AVX-NEXT:    br i1 [[EXITCOND]], label [[FOR_END:%.*]], label [[FOR_BODY]]
-; AVX:       for.end:
-; AVX-NEXT:    ret void
-;
-; AVX512-LABEL: @foo5(
-; AVX512-NEXT:  entry:
-; AVX512-NEXT:    br label [[FOR_BODY:%.*]]
-; AVX512:       for.body:
-; AVX512-NEXT:    [[INDVARS_IV:%.*]] = phi i64 [ 0, [[ENTRY:%.*]] ], [ [[INDVARS_IV_NEXT:%.*]], [[FOR_INC:%.*]] ]
-; AVX512-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds i32, i32* [[TRIGGER:%.*]], i64 [[INDVARS_IV]]
-; AVX512-NEXT:    [[TMP0:%.*]] = load i32, i32* [[ARRAYIDX]], align 4
-; AVX512-NEXT:    [[CMP1:%.*]] = icmp slt i32 [[TMP0]], 100
-; AVX512-NEXT:    br i1 [[CMP1]], label [[IF_THEN:%.*]], label [[FOR_INC]]
-; AVX512:       if.then:
-; AVX512-NEXT:    [[ARRAYIDX7:%.*]] = getelementptr inbounds i32, i32* [[A:%.*]], i64 [[INDVARS_IV]]
-; AVX512-NEXT:    store i32 sdiv (i32 1, i32 zext (i1 icmp eq (i32** getelementptr inbounds ([1 x i32*], [1 x i32*]* @a, i64 1, i64 0), i32** @c) to i32)), i32* [[ARRAYIDX7]], align 4
-; AVX512-NEXT:    br label [[FOR_INC]]
-; AVX512:       for.inc:
-; AVX512-NEXT:    [[INDVARS_IV_NEXT]] = add nuw nsw i64 [[INDVARS_IV]], 1
-; AVX512-NEXT:    [[EXITCOND:%.*]] = icmp eq i64 [[INDVARS_IV_NEXT]], 10000
-; AVX512-NEXT:    br i1 [[EXITCOND]], label [[FOR_END:%.*]], label [[FOR_BODY]]
-; AVX512:       for.end:
-; AVX512-NEXT:    ret void
-;
-entry:
-  br label %for.body
-
-for.body:                                         ; preds = %for.inc, %entry
-  %indvars.iv = phi i64 [ 0, %entry ], [ %indvars.iv.next, %for.inc ]
-  %arrayidx = getelementptr inbounds i32, i32* %trigger, i64 %indvars.iv
-  %0 = load i32, i32* %arrayidx, align 4
-  %cmp1 = icmp slt i32 %0, 100
-  br i1 %cmp1, label %if.then, label %for.inc
-
-if.then:                                          ; preds = %for.body
-  %arrayidx7 = getelementptr inbounds i32, i32* %A, i64 %indvars.iv
-  store i32 sdiv (i32 1, i32 zext (i1 icmp eq (i32** getelementptr inbounds ([1 x i32*], [1 x i32*]* @a, i64 1, i64 0), i32** @c) to i32)), i32* %arrayidx7, align 4
-  br label %for.inc
-
-for.inc:                                          ; preds = %for.body, %if.then
-  %indvars.iv.next = add nuw nsw i64 %indvars.iv, 1
-  %exitcond = icmp eq i64 %indvars.iv.next, 10000
-  br i1 %exitcond, label %for.end, label %for.body
-
-for.end:                                          ; preds = %for.inc
-  ret void
-}
 
 ; Reverse loop
 ;void foo6(double *in, double *out, unsigned size, int *trigger) {

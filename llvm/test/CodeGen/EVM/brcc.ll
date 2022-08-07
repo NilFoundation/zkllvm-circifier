@@ -1,4 +1,4 @@
-; RUN: llc -march=evm -filetype=asm | FileCheck %s
+; RUN: llc < %s -march=evm -filetype=asm | FileCheck %s
 
 define i256 @brcc1(i256 %a, i256 %b) nounwind {
 ; CHECK-LABEL: brcc1
@@ -16,9 +16,9 @@ exit:
   ret i256 %v
 }
 
-; CHECK-LABEL: brcc2
 ; CHECK: breq %r0, %r1
 define i256 @brcc2(i256 %a, i256 %b) nounwind {
+; CHECK-LABEL: brcc2
 entry:
   %wb = icmp ne i256 %a, %b
   br i1 %wb, label %t1, label %t2

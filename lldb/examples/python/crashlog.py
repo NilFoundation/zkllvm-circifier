@@ -115,8 +115,8 @@ class CrashLog(symbolication.Symbolicator):
                 disassemble = (
                     this_thread_crashed or options.disassemble_all_threads) and frame_idx < options.disassemble_depth
 
-                # Any frame above frame zero and we have to subtract one to
-                # get the previous line entry.
+                # Except for the zeroth frame, we should subtract 1 from every
+                # frame pc to get the previous line entry.
                 pc = frame.pc & crash_log.addr_mask
                 pc = pc if frame_idx == 0 or pc == 0 else pc - 1
                 symbolicated_frame_addresses = crash_log.symbolicate(pc, options.verbose)
@@ -1199,6 +1199,11 @@ be disassembled and lookups can be performed using the addresses found in the cr
 
 def SymbolicateCrashLogs(debugger, command_args):
     option_parser = CrashLogOptionParser()
+
+    if not len(command_args):
+        option_parser.print_help()
+        return
+
     try:
         (options, args) = option_parser.parse_args(command_args)
     except:

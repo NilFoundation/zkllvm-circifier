@@ -115,10 +115,10 @@ cmake_dependent_option(LIBCXXABI_INSTALL_SHARED_LIBRARY
 
 cmake_dependent_option(LIBCXXABI_STATICALLY_LINK_UNWINDER_IN_STATIC_LIBRARY
   "Statically link the LLVM unwinder to static library" ON
-  "LIBCXXABI_ENABLE_STATIC_UNWINDER;LIBCXXABI_ENABLE_STATIC" OFF)
+  "LIBCXXABI_ENABLE_STATIC_UNWINDER" OFF)
 cmake_dependent_option(LIBCXXABI_STATICALLY_LINK_UNWINDER_IN_SHARED_LIBRARY
   "Statically link the LLVM unwinder to shared library" ON
-  "LIBCXXABI_ENABLE_STATIC_UNWINDER;LIBCXXABI_ENABLE_SHARED" OFF)
+  "LIBCXXABI_ENABLE_STATIC_UNWINDER" OFF)
 
 option(LIBCXXABI_BAREMETAL "Build libc++abi for baremetal targets." OFF)
 # The default terminate handler attempts to demangle uncaught exceptions, which
@@ -136,10 +136,31 @@ endif()
 set(LIBCXXABI_LIBCXX_INCLUDES "" CACHE PATH
     "Specify path to libc++ includes.")
 
+set(LIBCXXABI_HERMETIC_STATIC_LIBRARY_DEFAULT OFF)
+if (WIN32)
+  set(LIBCXXABI_HERMETIC_STATIC_LIBRARY_DEFAULT ON)
+endif()
 option(LIBCXXABI_HERMETIC_STATIC_LIBRARY
-  "Do not export any symbols from the static library." OFF)
+  "Do not export any symbols from the static library." ${LIBCXXABI_HERMETIC_STATIC_LIBRARY_DEFAULT})
 
-set(LIBCXXABI_TEST_CONFIG "${CMAKE_CURRENT_SOURCE_DIR}/test/lit.site.cfg.in" CACHE STRING
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+  set(LIBCXXABI_DEFAULT_TEST_CONFIG "llvm-libc++abi-shared-gcc.cfg.in")
+elseif(MINGW)
+  set(LIBCXXABI_DEFAULT_TEST_CONFIG "llvm-libc++abi-mingw.cfg.in")
+elseif(WIN32) # clang-cl
+  if (LIBCXXABI_ENABLE_SHARED)
+    set(LIBCXXABI_DEFAULT_TEST_CONFIG "llvm-libc++abi-shared-clangcl.cfg.in")
+  else()
+    set(LIBCXXABI_DEFAULT_TEST_CONFIG "llvm-libc++abi-static-clangcl.cfg.in")
+  endif()
+else()
+  if (LIBCXXABI_ENABLE_SHARED)
+    set(LIBCXXABI_DEFAULT_TEST_CONFIG "llvm-libc++abi-shared.cfg.in")
+  else()
+    set(LIBCXXABI_DEFAULT_TEST_CONFIG "llvm-libc++abi-static.cfg.in")
+  endif()
+endif()
+set(LIBCXXABI_TEST_CONFIG "${LIBCXXABI_DEFAULT_TEST_CONFIG}" CACHE STRING
   "The path to the Lit testing configuration to use when running the tests.
    If a relative path is provided, it is assumed to be relative to '<monorepo>/libcxxabi/test/configs'.")
 if (NOT IS_ABSOLUTE "${LIBCXXABI_TEST_CONFIG}")
@@ -220,6 +241,11 @@ if(ZOS)
   add_target_flags_if_supported("-fzos-le-char-mode=ebcdic")
 endif()
 
+if (${CMAKE_SYSTEM_NAME} MATCHES "AIX")
+  add_target_flags_if_supported("-mdefault-visibility-export-mapping=explicit")
+  set(CMAKE_AIX_EXPORT_ALL_SYMBOLS OFF)
+endif()
+
 # Configure compiler. Must happen after setting the target flags.
 include(config-ix)
 
@@ -246,25 +272,6 @@ add_definitions(-D_LIBCXXABI_BUILDING_LIBRARY)
 # libcxxabi needs to, for various reasons, include the libcpp headers as if
 # it is being built as part of libcxx.
 add_definitions(-D_LIBCPP_BUILDING_LIBRARY)
-
-# Disable DLL annotations on Windows for static builds.
-if (WIN32 AND LIBCXXABI_ENABLE_STATIC AND NOT LIBCXXABI_ENABLE_SHARED)
-  # If LIBCXX_ENABLE_SHARED isn't set (by the user on the cmake command
-  # line or via a cache file), use its expected default value (enabled).
-  if ((LIBCXX_ENABLE_SHARED OR NOT DEFINED LIBCXX_ENABLE_SHARED) AND LIBCXX_ENABLE_STATIC_ABI_LIBRARY)
-    # Building libcxxabi statically, but intending for it to be statically
-    # linked into a shared libcxx; keep dllexport enabled within libcxxabi,
-    # as the symbols will need to be exported from libcxx.
-  else()
-    # Regular static build; disable dllexports.
-    add_definitions(-D_LIBCXXABI_DISABLE_VISIBILITY_ANNOTATIONS)
-    if (NOT LIBCXXABI_HERMETIC_STATIC_LIBRARY)
-      # TODO: Enable this warning message as soon as we're sure this is the solution.
-      # message(WARNING "Implicitly disabling dllexport on Win32 is not supported anymore. Please build with "
-      #                 "LIBCXXABI_HERMETIC_STATIC_LIBRARY=ON instead. This will become an error in LLVM 16.")
-    endif()
-  endif()
-endif()
 
 add_compile_flags_if_supported(-Werror=return-type)
 
@@ -424,9 +431,6 @@ endif()
 if (LIBCXXABI_BUILD_EXTERNAL_THREAD_LIBRARY)
   add_definitions(-D_LIBCPP_HAS_THREAD_LIBRARY_EXTERNAL)
 endif()
-
-# Prevent libc++abi from having library dependencies on libc++
-add_definitions(-D_LIBCPP_DISABLE_EXTERN_TEMPLATE)
 
 if (MSVC)
   add_definitions(-D_CRT_SECURE_NO_WARNINGS)

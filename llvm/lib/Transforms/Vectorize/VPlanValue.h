@@ -103,6 +103,7 @@ public:
     // Phi-like VPValues. Need to be kept together.
     VPVBlendSC,
     VPVCanonicalIVPHISC,
+    VPVActiveLaneMaskPHISC,
     VPVFirstOrderRecurrencePHISC,
     VPVWidenPHISC,
     VPVWidenIntOrFpInductionSC,
@@ -208,9 +209,7 @@ public:
   /// Subclass identifier (for isa/dyn_cast).
   enum class VPUserID {
     Recipe,
-    // TODO: Currently VPUsers are used in VPBlockBase, but in the future the
-    // only VPUsers should either be recipes or live-outs.
-    Block
+    LiveOut,
   };
 
 private:
@@ -360,6 +359,7 @@ public:
     // Phi-like recipes. Need to be kept together.
     VPBlendSC,
     VPCanonicalIVPHISC,
+    VPActiveLaneMaskPHISC,
     VPFirstOrderRecurrencePHISC,
     VPWidenPHISC,
     VPWidenIntOrFpInductionSC,

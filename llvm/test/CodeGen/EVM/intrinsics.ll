@@ -1,4 +1,4 @@
-; RUN: llc -march=evm -filetype=asm < %s | FileCheck %s
+; RUN: llc < %s -march=evm -filetype=asm | FileCheck %s
 
 define i256 @int_exp(i256 %a, i256 %b) {
 entry:
@@ -8,13 +8,17 @@ entry:
   ret i256 %rv
 }
 
-define i256 @int_sha3(i256 %a, i256 %b, i256 %c) {
+declare i256 @llvm.evm.exp(i256, i256)
+
+define i256 @int_sha3(i256 %a, i256 %b) {
 entry:
-  %rv = call i256 @llvm.evm.sha3(i256 %a, i256 %b, i256 %c)
+  %rv = call i256 @llvm.evm.sha3(i256 %a, i256 %b)
 ; CHECK-LABEL: int_sha3
 ; CHECK: SHA3
   ret i256 %rv
 }
+
+declare i256 @llvm.evm.sha3(i256, i256)
 
 define i256 @int_balance(i256 %addr) {
 ; CHECK-LABEL: int_balance
@@ -24,6 +28,8 @@ entry:
   ret i256 %rv
 }
 
+declare i256 @llvm.evm.balance(i256) #1
+
 define i256 @int_origin() {
 entry:
   %rv = call i256 @llvm.evm.origin()
@@ -31,6 +37,8 @@ entry:
 ; CHECK: ORIGIN
   ret i256 %rv
 }
+
+declare i256 @llvm.evm.origin() #1
 
 define i256 @int_caller() {
 entry:
@@ -40,6 +48,8 @@ entry:
   ret i256 %rv
 }
 
+declare i256 @llvm.evm.caller() #1
+
 define i256 @int_callvalue() {
 entry:
   %rv = call i256 @llvm.evm.callvalue()
@@ -47,6 +57,8 @@ entry:
 ; CHECK: CALLVALUE
   ret i256 %rv
 }
+
+declare i256 @llvm.evm.callvalue() #1
 
 define i256 @int_calldataload(i256 %addr) {
 entry:
@@ -56,6 +68,8 @@ entry:
   ret i256 %rv
 }
 
+declare i256 @llvm.evm.calldataload(i256) #1
+
 define i256 @int_calldatasize() {
 entry:
   %rv = call i256 @llvm.evm.calldatasize()
@@ -63,6 +77,8 @@ entry:
 ; CHECK: CALLDATASIZE
   ret i256 %rv
 }
+
+declare i256 @llvm.evm.calldatasize() #1
 
 define void @int_calldatacopy(i256 %destoffset, i256 %offset, i256 %len) {
 entry:
@@ -72,6 +88,8 @@ entry:
   ret void
 }
 
+declare void @llvm.evm.calldatacopy(i256, i256, i256) #1
+
 define i256 @int_codesize() {
 entry:
   %rv = call i256 @llvm.evm.codesize()
@@ -79,6 +97,8 @@ entry:
 ; CHECK: CODESIZE
   ret i256 %rv
 }
+
+declare i256 @llvm.evm.codesize() #1
 
 define void @int_codecopy(i256 %destoffset, i256 %offset, i256 %len) {
 entry:
@@ -88,6 +108,8 @@ entry:
   ret void
 }
 
+declare void @llvm.evm.codecopy(i256, i256, i256) #1
+
 define i256 @int_gasprice() {
 entry:
   %rv = call i256 @llvm.evm.gasprice()
@@ -95,6 +117,8 @@ entry:
 ; CHECK: GASPRICE
   ret i256 %rv
 }
+
+declare i256 @llvm.evm.gasprice() #1
 
 define i256 @int_extcodesize(i256 %addr) {
 entry:
@@ -104,13 +128,17 @@ entry:
   ret i256 %rv
 }
 
-define void @int_extcodecopy(i256 %destoffset, i256 %offset, i256 %len) {
+declare i256 @llvm.evm.extcodesize(i256) #1
+
+define void @int_extcodecopy(i256 %addr, i256 %destoffset, i256 %offset, i256 %len) {
 entry:
-  call void @llvm.evm.extcodecopy(i256 %destoffset, i256 %offset, i256 %len)
+  call void @llvm.evm.extcodecopy(i256 %addr, i256 %destoffset, i256 %offset, i256 %len)
 ; CHECK-LABEL: int_extcodecopy
 ; CHECK: EXTCODECOPY
   ret void
 }
+
+declare void @llvm.evm.extcodecopy(i256, i256, i256, i256) #1
 
 define i256 @int_returndatasize() {
 entry:
@@ -120,6 +148,8 @@ entry:
   ret i256 %rv
 }
 
+declare i256 @llvm.evm.returndatasize() #1
+
 define void @int_returndatacopy(i256 %destoffset, i256 %offset, i256 %len) {
 entry:
   call void @llvm.evm.returndatacopy(i256 %destoffset, i256 %offset, i256 %len)
@@ -127,6 +157,8 @@ entry:
 ; CHECK: RETURNDATACOPY
   ret void
 }
+
+declare void @llvm.evm.returndatacopy(i256, i256, i256) #1
 
 define i256 @int_blockhash(i256 %addr) {
 entry:
@@ -136,6 +168,8 @@ entry:
   ret i256 %rv
 }
 
+declare i256 @llvm.evm.blockhash(i256) #1
+
 define i256 @int_coinbase() {
 entry:
   %rv = call i256 @llvm.evm.coinbase()
@@ -143,6 +177,8 @@ entry:
 ; CHECK: COINBASE
   ret i256 %rv
 }
+
+declare i256 @llvm.evm.coinbase() #1
 
 define i256 @int_timestamp() {
 entry:
@@ -152,6 +188,8 @@ entry:
   ret i256 %rv
 }
 
+declare i256 @llvm.evm.timestamp() #1
+
 define i256 @int_number() {
 entry:
   %rv = call i256 @llvm.evm.number()
@@ -159,6 +197,8 @@ entry:
 ; CHECK: NUMBER
   ret i256 %rv
 }
+
+declare i256 @llvm.evm.number() #1
 
 define i256 @int_difficulty() {
 entry:
@@ -168,6 +208,8 @@ entry:
   ret i256 %rv
 }
 
+declare i256 @llvm.evm.difficulty() #1
+
 define i256 @int_gaslimit() {
 entry:
   %rv = call i256 @llvm.evm.gaslimit()
@@ -175,6 +217,8 @@ entry:
 ; CHECK: GASLIMIT
   ret i256 %rv
 }
+
+declare i256 @llvm.evm.gaslimit() #1
 
 define i256 @int_sload(i256 %addr) {
 entry:
@@ -184,13 +228,17 @@ entry:
   ret i256 %rv
 }
 
+declare i256 @llvm.evm.sload(i256) #1
+
 define void @int_sstore(i256 %addr, i256 %val) {
 entry:
-  %rv = call i256 @llvm.evm.sstore(i256 %addr, i256 %val)
+  call void @llvm.evm.sstore(i256 %addr, i256 %val)
 ; CHECK-LABEL: int_sstore
 ; CHECK: SSTORE
   ret void
 }
+
+declare void @llvm.evm.sstore(i256, i256) #1
 
 define i256 @int_getpc() {
 entry:
@@ -200,6 +248,8 @@ entry:
   ret i256 %rv
 }
 
+declare i256 @llvm.evm.getpc() #1
+
 define i256 @int_msize() {
 entry:
   %rv = call i256 @llvm.evm.msize()
@@ -207,6 +257,8 @@ entry:
 ; CHECK: MSIZE
   ret i256 %rv
 }
+
+declare i256 @llvm.evm.msize() #1
 
 define i256 @int_gas() {
 entry:
@@ -216,11 +268,14 @@ entry:
   ret i256 %rv
 }
 
+declare i256 @llvm.evm.gas() #1
+
 define void @int_log0(i256 %a, i256 %b) {
-; CHECK-LABEL: int_log0
 entry:
   call void @llvm.evm.log0(i256 %a, i256 %b)
+; CHECK-LABEL: int_log0
 ; CHECK: log0
   ret void
 }
 
+declare void @llvm.evm.log0(i256, i256) #1

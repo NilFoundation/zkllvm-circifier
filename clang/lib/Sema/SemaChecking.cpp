@@ -1959,6 +1959,8 @@ bool Sema::CheckTSBuiltinFunctionCall(const TargetInfo &TI, unsigned BuiltinID,
   case llvm::Triple::bpfeb:
   case llvm::Triple::bpfel:
     return CheckBPFBuiltinFunctionCall(BuiltinID, TheCall);
+  case llvm::Triple::evm:
+    return CheckEVMBuiltinFunctionCall(BuiltinID, TheCall);
   case llvm::Triple::hexagon:
     return CheckHexagonBuiltinFunctionCall(BuiltinID, TheCall);
   case llvm::Triple::mips:
@@ -3388,6 +3390,50 @@ bool Sema::CheckBPFBuiltinFunctionCall(unsigned BuiltinID,
     TheCall->setType(Context.UnsignedLongTy);
   return false;
 }
+
+// EVM local
+bool Sema::CheckEVMBuiltinFunctionCall(unsigned BuiltinID,
+                                       CallExpr *TheCall) {
+  assert(BuiltinID == EVM::BI__builtin_evm_sha3 && "unexpected EVM "
+                                                       "builtin");
+
+  if (checkArgCount(*this, TheCall, 2))
+    return true;
+
+  bool InvalidArg = false;
+
+  // The first argument needs to be a constant int
+  Expr *Arg = TheCall->getArg(0);
+  Optional<llvm::APSInt> Value = Arg->getIntegerConstantExpr(Context);
+  diag::kind kind = 0;
+  if (!Value) {
+    if (BuiltinID == EVM::BI__builtin_evm_sha3) {
+      kind = diag::err_preserve_field_info_not_const;
+    }
+    Diag(Arg->getBeginLoc(), kind) << 2 << Arg->getSourceRange();
+    return true;
+  }
+
+  // The second argument needs to be a constant int
+  Arg = TheCall->getArg(1);
+  Value = Arg->getIntegerConstantExpr(Context);
+  if (!Value) {
+    if (BuiltinID == EVM::BI__builtin_evm_sha3) {
+      kind = diag::err_preserve_field_info_not_const;
+    }
+    Diag(Arg->getBeginLoc(), kind) << 2 << Arg->getSourceRange();
+    return true;
+  }
+
+  if (InvalidArg) {
+    Diag(Arg->getBeginLoc(), kind) << 1 << Arg->getSourceRange();
+    return true;
+  }
+
+  TheCall->setType(Context.UnsignedInt256Ty);
+  return false;
+}
+// EVM local
 
 bool Sema::CheckHexagonBuiltinArgument(unsigned BuiltinID, CallExpr *TheCall) {
   struct ArgInfo {

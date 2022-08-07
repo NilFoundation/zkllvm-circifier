@@ -3143,6 +3143,10 @@ StringRef BuiltinType::getName(const PrintingPolicy &Policy) const {
   case Id:                                                                     \
     return Name;
 #include "clang/Basic/RISCVVTypes.def"
+#define EVM_TYPE(Name, Id, SingletonId)                                        \
+  case Id:                                                                     \
+    return Name;
+#include "clang/Basic/EVMTypes.def"
   }
 
   llvm_unreachable("Invalid builtin type.");
@@ -4190,6 +4194,10 @@ bool Type::canHaveNullability(bool ResultIfUnknown) const {
 #include "clang/Basic/PPCTypes.def"
 #define RVV_TYPE(Name, Id, SingletonId) case BuiltinType::Id:
 #include "clang/Basic/RISCVVTypes.def"
+      //EVM local
+#define EVM_TYPE(Name, Id, SingletonId) case BuiltinType::Id:
+#include "clang/Basic/EVMTypes.def"
+      // EVM local
     case BuiltinType::BuiltinFn:
     case BuiltinType::NullPtr:
     case BuiltinType::IncompleteMatrixIdx:

@@ -1,0 +1,485 @@
+//===--- BuiltinsEVM.def - EVM Builtin function database --------*- C++ -*-===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines the EVM-specific builtin function database.  Users of
+// this file must define the BUILTIN macro to make use of this information.
+//
+//===----------------------------------------------------------------------===//
+
+// The format of this database matches clang/Basic/Builtins.def.
+
+#if defined(BUILTIN) && !defined(TARGET_BUILTIN)
+#define TARGET_BUILTIN(ID, TYPE, ATTRS, FEATURE) BUILTIN(ID, TYPE, ATTRS)
+#endif
+
+// @brief SHA3 (Keccak)
+//
+//- **Name:** `llvm.evm_builtin_sha3`
+//- **Arguments:**
+//    - `data: u256be`: byte pointer to buffer to hash
+//    - `len: u256be`: length of buffer
+//- **Return:**
+//    - `hash: bytes32`: resulting hash
+//- **Codegen details:**
+//    - SHA3 opcode: `0x20`
+BUILTIN(__builtin_evm_sha3, "WiTs", "nc")
+
+// @brief Address
+//
+//- **Name:** `llvm.evm_builtin_address`
+//- **Arguments:** *None*
+//- **Return:**
+//    - `address: bytes20`: Currently executing account
+//- **Codegen details:**
+//    - ADDRESS opcode: `0x30`
+//
+BUILTIN(__builtin_evm_address, "WiTs", "nc")
+
+// @brief Balance
+//
+//- **Name:** `llvm.evm_builtin_balance`
+//- **Arguments:**
+//    - `address: bytes20`: Account to check balance of
+//- **Return:**
+//    - `balance: u256be`: Balance of given account
+//- **Codegen details:**
+//    - BALANCE opcode: `0x31`
+BUILTIN(__builtin_evm_balance, "WiTs", "nc")
+
+// @brief Origin
+//
+//- **Name:** `llvm.evm_builtin_origin`
+//- **Arguments:** *None*
+//- **Return:**
+//    - `address: bytes20`: Address of TX origin
+//- **Codegen details**:
+//    - ORIGIN opcode: `0x32`
+BUILTIN(__builtin_evm_origin, "WiTs", "nc")
+
+// @brief Caller
+//
+//- **Name:** `llvm.evm_builtin_caller`
+//- **Arguments:** *None*
+//- **Return:**
+//    - `address: bytes20`: Address of caller
+//- **Codegen details:**
+//    - CALLER opcode: `0x33`
+BUILTIN(__builtin_evm_caller, "WiTs", "nc")
+
+// @brief CallValue
+//
+//- **Name:** `llvm.evm_builtin_callvalue`
+//- **Arguments:** *None*
+//- **Return:**
+//    - `value: u256be`: TX value sent
+//- **Codegen details:**
+//    - CALLVALUE opcode: `0x34`
+BUILTIN(__builtin_evm_callvalue, "WiTs", "nc")
+
+// @brief CallDataLoad
+//
+//- **Name:** `llvm.evm_builtin_calldataload`
+//- **Arguments:**
+//    - `offset: u256be`: Offset within call data buffer to load
+//- **Return:**
+//    - `data: bytes32`: 32 bytes of calldata beginning at `offset`
+//- **Codegen details:**
+//    - CALLDATALOAD opcode: `0x35`
+BUILTIN(__builtin_evm_calldataload, "WiTs", "nc")
+
+// @brief CallDataSize
+//
+//- **Name:** `llvm.evm_builtin_calldatasize`
+//- **Arguments:** *None*
+//- **Return:**
+//    - `size: u256be`: Length of call data buffer
+//- **Codegen details:**
+//    - CALLDATASIZE opcode: `0x36`
+BUILTIN(__builtin_evm_calldatasize, "WiTs", "nc")
+
+// @brief CallDataCopy
+//
+//- **Name:** `llvm.evm_builtin_calldatacopy`
+//- **Arguments:**
+//    - `dst: u256be`: Pointer to destination buffer
+//    - `offset: u256be`: Offset within call data to copy
+//    - `len: u256be`: Number of bytes to copy beginning at `offset`
+//- **Return:** *None*
+//- **Codegen details:**
+//    - CALLDATACOPY opcode: `0x37`
+BUILTIN(__builtin_evm_calldatacopy, "WiTs", "nc")
+
+// @brief CodeSize
+//
+//- **Name:** `llvm.evm_builtin_codesize`
+//- **Arguments:** *None*
+//- **Return:**
+//    - `size: u256be`: Size of code at currently executing account
+//- **Codegen details:**
+//    - CODESIZE opcode: `0x38`
+BUILTIN(__builtin_evm_codesize, "WiTs", "nc")
+
+// @brief CodeCopy
+//
+//- **Name:** `llvm.evm_builtin_codecopy`
+//- **Arguments:**
+//    - `dst: u256be`: Pointer to destination buffer
+//    - `offset: u256be`: Offset within code to copy
+//    - `len: u256be`: Number of bytes to copy beginning at `offset`
+//- **Return:** *None*
+//- **Codegen details:**
+//    - CODECOPY opcode: `0x39`
+BUILTIN(__builtin_evm_codecopy, "WiTs", "nc")
+
+// @brief GasPrice
+//
+//- **Name:** `llvm.evm_builtin_gasprice`
+//- **Arguments:** *None*
+//- **Return:**
+//    - `price: u256`: Cost of gas in current environment
+//- **Codegen details:**
+//    - GASPRICE opcode: `0x3a`
+BUILTIN(__builtin_evm_gasprice, "WiTs", "nc")
+
+// @brief ExtCodeSize
+//
+//- **Name:** `llvm.evm_builtin_extcodesize`
+//- **Arguments:**
+//    - `address: bytes20`: Address whose code size to check
+//- **Return:**
+//    - `size: u256be`: Size of code at given account
+//- **Codegen details:**
+//    - EXTCODESIZE opcode: `0x3b`
+BUILTIN(__builtin_evm_extcodesize, "WiTs", "nc")
+
+// @brief ExtCodeCopy
+//
+//- **Name:** `llvm.evm_builtin_extcodecopy`
+//- **Arguments:**
+//    - `address: bytes20` Address whose code to copy
+//    - `dst: u256be`: Pointer to destination buffer
+//    - `offset: u256be`: Offset within code to copy
+//    - `len: u256be`: Number of bytes to copy beginning at `offset`
+//- **Return:** *None*
+//- **Codegen details:**
+//    - EXTCODECOPY opcode: `0x3C`
+BUILTIN(__builtin_evm_extcodecopy, "WiTs", "nc")
+
+// @brief ReturnDataSize
+//
+//- **Name:** `llvm.evm_builtin_returndatasize`
+//- **Arguments:** *None*
+//- **Return:**
+//    - `size: u256be`: Size of return data buffer from last call
+//- **Codegen details:**
+//    - RETURNDATASIZE opcode: `0x3d`
+BUILTIN(__builtin_evm_returndatasize, "WiTs", "nc")
+
+// @brief ReturnDataCopy
+//
+//- **Name:** `llvm.evm_builtin_returndatacopy`
+//- **Arguments:**
+//    - `dst: u256be`: Pointer to destination buffer
+//    - `offset: u256be`: Offset within return buffer to copy
+//    - `len: u256be`: Number of bytes to copy beginning at `offset`
+//- **Return:** *None*
+//- **Codegen details:**
+//    - RETURNDATACOPY opcode: `0x3e`
+BUILTIN(__builtin_evm_returndatacopy, "WiTs", "nc")
+
+// @brief BlockHash
+//
+//- **Name:** `llvm.evm_builtin_blockhash`
+//- **Arguments:**
+//    - `age: u256be`: The age of the block, between 0 and 256 blocks old
+//- **Return:**
+//    - `hash: bytes32`: The hash of the requested block
+//- **Codegen details:**
+//    - BLOCKHASH opcode: `0x40`
+BUILTIN(__builtin_evm_blockhash, "WiTs", "nc")
+
+// @brief Coinbase
+//
+//- **Name:** `llvm.evm_builtin_coinbase`
+//- **Arguments:** *None*
+//- **Return:**
+//    - `beneficiary: bytes20`: Current mining beneficiary
+//- **Codegen details:**
+//    - COINBASE opcode: `0x41`
+BUILTIN(__builtin_evm_coinbase, "WiTs", "nc")
+
+// @brief Timestamp
+//
+//- **Name:** `llvm.evm_builtin_timestamp`
+//- **Arguments:** *None*
+//- **Return:**
+//    - `stamp: u256be`: Timestamp of last block
+//- **Codegen details:**
+//    - TIMESTAMP opcode: `0x42`
+BUILTIN(__builtin_evm_timestamp, "WiTs", "nc")
+
+// @brief Number
+//
+//- **Name:** `llvm.evm_builtin_blocknumber`
+//- **Arguments:** *None*
+//- **Return:**
+//    - `blknum: u256be`: Current block number
+//- **Codegen details:**
+//    - NUMBER opcode: `0x43`
+BUILTIN(__builtin_evm_blocknumber, "WiTs", "nc")
+
+// @brief Difficulty
+//
+//- **Name:** `llvm.evm_builtin_difficulty`
+//- **Arguments:** *None*
+//- **Return:**
+//    - `difficulty: u256be`: Current block difficulty
+//- **Codegen details:**
+//    - DIFFICULTY opcode: `0x44`
+BUILTIN(__builtin_evm_difficulty, "WiTs", "nc")
+
+// @brief GasLimit
+//
+//- **Name:** `llvm.evm_builtin_gaslimit`
+//- **Arguments:** *None*
+//- **Return:**
+//    - `limit: u256be`: Block gas limit //NOTE: check type again
+//- **Codegen details:**
+//    - GASLIMIT opcode: `0x45`
+BUILTIN(__builtin_evm_gaslimit, "WiTs", "nc")
+
+// @brief StorageLoad
+//
+//- **Name:** `llvm.evm_builtin_sload`
+//- **Arguments:**
+//    - `key: u256be`: Storage key to access
+//- **Return:**
+//    - `value: u256be`: Storage value at key
+//- **Codegen details:**
+//    - SLOAD opcode: `0x54`
+BUILTIN(__builtin_evm_sload, "WiTs", "nc")
+
+// @brief StorageStore
+//
+//- **Name:** `llvm.evm_builtin_sstore`
+//- **Arguments:**
+//    - `key: u256be`: Storage key to write `value`
+//    - `value: u256be`: Value to write
+//- **Return:** *None*
+//- **Codegen details:**
+//    - SSTORE opcode: `0x55`
+BUILTIN(__builtin_evm_sstore, "WiTs", "nc")
+
+// @brief MemSize
+//
+//- **Name:** `llvm.evm_builtin_msize`
+//- **Arguments:** *None*
+//- **Return:**
+//    - `size: u256be`: Size of active memory in bytes
+//- **Codegen details:**
+//    - MSIZE opcode: `0x59`
+BUILTIN(__builtin_evm_msize, "WiTs", "nc")
+
+// @brief Gas
+//
+//- **Name:** `llvm.evm_builtin_gas`
+//- **Arguments:** *None*
+//- **Return:**
+//    - `gasleft: u256be`: Amount of gas left in current execution
+BUILTIN(__builtin_evm_gas, "WiTs", "nc")
+
+// @brief Log0
+//
+//- **Name:** `llvm.evm_builtin_log0`
+//- **Arguments:**
+//    - `data: u256be`: Pointer to log data buffer
+//    - `len: u256be`: Size of log data buffer in bytes
+//- **Return:** *None*
+//- **Codegen details:**
+//    - LOG0 opcode: `0xa0`
+BUILTIN(__builtin_evm_log0, "WiTs", "nc")
+
+// @brief Log1
+//
+//- **Name:** `llvm.evm_builtin_log1`
+//- **Arguments:**
+//    - `data: u256be`: Pointer to log data buffer
+//    - `len: u256be`: Size of log data buffer in bytes
+//    - `topic1: u256be`: Log topic 1
+//- **Return:** *None*
+//- **Codegen details:**
+//    - LOG1 opcode: `0xa1`
+BUILTIN(__builtin_evm_log1, "WiTs", "nc")
+
+// @brief Log2
+//
+//- **Name:** `llvm.evm_builtin_log2`
+//- **Arguments:**
+//    - `data: u256be`: Pointer to log data buffer
+//    - `len: u256be`: Size of log data buffer in bytes
+//    - `topic1: u256be`: Log topic 1
+//    - `topic2: u256be`: Log topic 2
+//- **Return:** *None*
+//- **Codegen details:**
+//    - LOG2 opcode: `0xa2`
+BUILTIN(__builtin_evm_log2, "WiTs", "nc")
+
+//### Log3
+//
+//- **Name:** `llvm.evm_builtin_log3`
+//- **Arguments:**
+//   - `data: u256be`: Pointer to log data buffer
+//   - `len: u256be`: Size of log data buffer in bytes
+//   - `topic1: u256be`: Log topic 1
+//   - `topic2: u256be`: Log topic 2
+//   - `topic3: u256be`: Log topic 3
+//- **Return:** *None*
+//- **Codegen details:**
+//   - LOG3 opcode: `0xa3`
+BUILTIN(__builtin_evm_log3, "WiTs", "nc")
+
+//### Log4
+//
+//- **Name:** `llvm.evm_builtin_log4`
+//- **Arguments:**
+//   - `data: u256be`: Pointer to log data buffer
+//   - `len: u256be`: Size of log data buffer in bytes
+//   - `topic1: u256be`: Log topic 1
+//   - `topic2: u256be`: Log topic 2
+//   - `topic3: u256be`: Log topic 3
+//   - `topic4: u256be`: Log topic 4
+//- **Return:** *None*
+//- **Codegen details:**
+//   - LOG4 opcode: `0xa4`
+BUILTIN(__builtin_evm_log4, "WiTs", "nc")
+
+//### Create
+//
+//- **Name:** `llvm.evm_builtin_create`
+//- **Arguments:**
+//   - `value: u256be`: Value in wei sent to new contract
+//   - `code: u256be`: Pointer to code buffer for new contract
+//   - `len: u256be`: Code buffer length
+//- **Return:**
+//   - `addr: bytes20`: Address of newly created contract
+//- **Codegen details:**
+//   - CREATE opcode: `0xf0`
+BUILTIN(__builtin_evm_create, "WiTs", "nc")
+
+//### Create2
+//
+//- **Name:** `llvm.evm_builtin_create2`
+//- **Arguments:**
+//   - `value: u256be`: Value in wei sent to new contract
+//   - `code: u256be`: Pointer to code buffer for new contract
+//   - `len: u256be`: Code buffer length
+//   - `salt: bytes32`: Salt for address creation
+//- **Return:**
+//   - `addr: bytes20`: Address of newly created contract
+//- **Codegen details:**
+//   - CREATE2 opcode: `0xf5`
+BUILTIN(__builtin_evm_create2, "WiTs", "nc")
+
+//### Call
+//
+//- **Name:** `llvm.evm_builtin_call`
+//- **Arguments:**
+//   - `gas: u256be`: Gas allowance for call
+//   - `address: bytes20`: Call destination address
+//   - `value: u256be`: Wei value sent with call
+//   - `input: u256be`: Input data pointer
+//   - `inputlen: u256be`: Input data buffer size
+//   - `output: u256be`: Output buffer pointer
+//   - `outputlen: u256be`: Output data buffer size
+//- **Return:**
+//   - `return: u256be`: Exit code
+//- **Codegen details:**
+//   - CALL opcode: `0xf1`
+BUILTIN(__builtin_evm_call, "WiTs", "nc")
+
+// @brief CallCode
+//
+//- **Name:** `llvm.evm_builtin_callcode`
+//- **Arguments:**
+//   - `gas: u256be`: Gas allowance for call
+//   - `address: bytes20`: Address of code to use
+//   - `value: u256be`: Wei value sent with call
+//   - `input: u256be`: Input data pointer
+//   - `inputlen: u256be`: Input data buffer size
+//   - `output: u256be`: Output buffer pointer
+//   - `outputlen: u256be`: Output data buffer size
+//- **Return:**
+//   - `return: u256be`: Exit code
+//- **Codegen details:**
+//   - CALL opcode: `0xf2`
+BUILTIN(__builtin_evm_callcode, "WiTs", "nc")
+
+// @brief DelegateCall
+//
+//- **Name:** `llvm.evm_builtin_calldelegate`
+//- **Arguments:**
+//   - `gas: u256be`: Gas allowance for call
+//   - `address: bytes20`: Address of code to use
+//   - `input: u256be`: Input data pointer
+//   - `inputlen: u256be`: Input data buffer size
+//   - `output: u256be`: Output buffer pointer
+//   - `outputlen: u256be`: Output data buffer size
+//- **Return:**
+//   - `return: u256be`: Exit code
+//- **Codegen details:**
+//   - CALLDELEGATE opcode: `0xf4`
+BUILTIN(__builtin_evm_calldelegate, "WiTs", "nc")
+
+// @brief StaticCall
+//
+//- **Name:** `llvm.evm_builtin_staticcall`
+//- **Arguments:**
+//   - `gas: u256be`: Gas allowance for call
+//   - `address: bytes20`: Call destination address
+//   - `input: u256be`: Input data pointer
+//   - `inputlen: u256be`: Input data buffer size
+//   - `output: u256be`: Output buffer pointer
+//   - `outputlen: u256be`: Output data buffer size
+//- **Codegen details:**
+//   - STATICCALL opcode: `0xfa`
+BUILTIN(__builtin_evm_staticcall, "WiTs", "nc")
+
+// @brief Return
+//
+//- **Name:** `llvm.evm_builtin_return`
+//- **Arguments:**
+//   - `data: u256be`: Return data pointer
+//   - `len: u256be`: Return buffer size
+//- **Return:** *Ends execution*
+//- **Codegen details:**
+//   - RETURN opcode: `0xf3`
+BUILTIN(__builtin_evm_return, "WiTs", "nc")
+
+// @brief Revert
+//
+//- **Name:** `llvm.evm_builtin_revert`
+//- **Arguments:**
+//   - `data: u256be`: Return data pointer
+//   - `len: u256be`: Return buffer size
+//- **Return:** *Ends execution*
+//- **Codegen details**
+//   - REVERT opcode: `0xfd`
+BUILTIN(__builtin_evm_revert, "WiTs", "nc")
+
+// @brief SelfDestruct
+//
+//- **Name:** `llvm.evm_builtin_selfdestruct`
+//- **Arguments:**
+//   - `beneficiary: bytes20`: Address to send funds to
+//- **Return:** *Ends execution*
+//- **Codegen details:**
+//   - SELFDESTRUCT opcode: `0xff`
+BUILTIN(__builtin_evm_selfdestruct, "WiTs", "nc")
+
+#undef BUILTIN
+#undef TARGET_BUILTIN

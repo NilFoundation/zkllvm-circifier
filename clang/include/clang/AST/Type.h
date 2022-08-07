@@ -2578,6 +2578,11 @@ public:
 // RVV Types
 #define RVV_TYPE(Name, Id, SingletonId) Id,
 #include "clang/Basic/RISCVVTypes.def"
+// EVM local
+// EVM Types
+#define EVM_TYPE(Name, Id, SingletonId) Id,
+#include "clang/Basic/EVMTypes.def"
+// EVM local
 // All other builtin types
 #define BUILTIN_TYPE(Id, SingletonId) Id,
 #define LAST_BUILTIN_TYPE(Id) LastKind = Id

@@ -108,6 +108,9 @@ public:
     case WebAssembly:
       return T.isWasm();
 
+    case EVM:
+      return T.isEVM();
+
     case XL:
       return T.isOSAIX();
 
@@ -161,6 +164,9 @@ public:
     switch (getKind()) {
     case WebAssembly:
       // WebAssembly doesn't require any special alignment for member functions.
+      return false;
+    case EVM:
+      // TODO: copied from WebAssembly
       return false;
     case AppleARM64:
     case Fuchsia:
@@ -243,6 +249,7 @@ public:
     case Fuchsia:
     case GenericARM:
     case WebAssembly:
+    case EVM:
     case WatchOS:
       return false;
 
@@ -297,6 +304,7 @@ public:
     case AppleARM64:
     case Fuchsia:
     case WebAssembly:
+    case EVM:
     case WatchOS:
       return UseTailPaddingUnlessPOD11;
 

@@ -1,4 +1,4 @@
-; RUN: llvm-as < %s | llc -mtriple=evm -filetype=asm | FileCheck %s
+; RUN: llc -march=evm -filetype=asm < %s | FileCheck %s
 
 define i256 @addop(i256 %a, i256 %b) nounwind {
 ; CHECK-LABEL: addop:

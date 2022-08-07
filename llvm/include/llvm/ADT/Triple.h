@@ -906,6 +906,11 @@ public:
     return getArch() == Triple::wasm32 || getArch() == Triple::wasm64;
   }
 
+  /// Tests whether the target is evm.
+  bool isEVM() const {
+    return getArch() == Triple::evm;
+  }
+
   // Tests whether the target is CSKY
   bool isCSKY() const {
     return getArch() == Triple::csky;

@@ -545,6 +545,11 @@ llvm::Type *CodeGenTypes::ConvertType(QualType T) {
       ResultType = llvm::Type::getInt8PtrTy(getLLVMContext());
       break;
 
+#define EVM_TYPE(Name, Id, SingletonId) case BuiltinType::Id:
+#include "clang/Basic/EVMTypes.def"
+      ResultType = llvm::IntegerType::get(getLLVMContext(), 256);
+      break;
+
     case BuiltinType::UInt128:
     case BuiltinType::Int128:
       ResultType = llvm::IntegerType::get(getLLVMContext(), 128);

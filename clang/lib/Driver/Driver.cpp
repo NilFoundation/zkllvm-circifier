@@ -50,6 +50,7 @@
 #include "ToolChains/TCE.h"
 #include "ToolChains/VEToolchain.h"
 #include "ToolChains/WebAssembly.h"
+#include "ToolChains/EVM.h"
 #include "ToolChains/XCore.h"
 #include "ToolChains/ZOS.h"
 #include "clang/Basic/TargetID.h"
@@ -6089,6 +6090,9 @@ const ToolChain &Driver::getToolChain(const ArgList &Args,
       case llvm::Triple::wasm32:
       case llvm::Triple::wasm64:
         TC = std::make_unique<toolchains::WebAssembly>(*this, Target, Args);
+        break;
+      case llvm::Triple::evm:
+        TC = std::make_unique<toolchains::EVM>(*this, Target, Args);
         break;
       case llvm::Triple::avr:
         TC = std::make_unique<toolchains::AVRToolChain>(*this, Target, Args);

@@ -296,6 +296,11 @@ static void getWebAssemblyTargetFeatures(const ArgList &Args,
   handleTargetFeaturesGroup(Args, Features, options::OPT_m_wasm_Features_Group);
 }
 
+static void getEVMTargetFeatures(const ArgList &Args,
+                                         std::vector<StringRef> &Features) {
+  // handleTargetFeaturesGroup(Args, Features, options::OPT_m_evm_Features_Group);
+}
+
 static void getTargetFeatures(const Driver &D, const llvm::Triple &Triple,
                               const ArgList &Args, ArgStringList &CmdArgs,
                               bool ForAS, bool IsAux = false) {
@@ -345,6 +350,9 @@ static void getTargetFeatures(const Driver &D, const llvm::Triple &Triple,
   case llvm::Triple::wasm32:
   case llvm::Triple::wasm64:
     getWebAssemblyTargetFeatures(Args, Features);
+    break;
+  case llvm::Triple::evm:
+    getEVMTargetFeatures(Args, Features);
     break;
   case llvm::Triple::sparc:
   case llvm::Triple::sparcel:
@@ -523,6 +531,7 @@ static bool useFramePointerForTargetByDefault(const ArgList &Args,
   case llvm::Triple::xcore:
   case llvm::Triple::wasm32:
   case llvm::Triple::wasm64:
+  case llvm::Triple::evm:
   case llvm::Triple::msp430:
     // XCore never wants frame pointers, regardless of OS.
     // WebAssembly never wants frame pointers.
@@ -1841,6 +1850,10 @@ void Clang::RenderTargetOptions(const llvm::Triple &EffectiveTriple,
     AddWebAssemblyTargetArgs(Args, CmdArgs);
     break;
 
+  case llvm::Triple::evm:
+    AddEVMTargetArgs(Args, CmdArgs);
+    break;
+
   case llvm::Triple::ve:
     AddVETargetArgs(Args, CmdArgs);
     break;
@@ -2388,6 +2401,16 @@ void Clang::AddLanaiTargetArgs(const ArgList &Args,
 }
 
 void Clang::AddWebAssemblyTargetArgs(const ArgList &Args,
+                                     ArgStringList &CmdArgs) const {
+  // Default to "hidden" visibility.
+  if (!Args.hasArg(options::OPT_fvisibility_EQ,
+                   options::OPT_fvisibility_ms_compat)) {
+    CmdArgs.push_back("-fvisibility");
+    CmdArgs.push_back("hidden");
+  }
+}
+
+void Clang::AddEVMTargetArgs(const ArgList &Args,
                                      ArgStringList &CmdArgs) const {
   // Default to "hidden" visibility.
   if (!Args.hasArg(options::OPT_fvisibility_EQ,

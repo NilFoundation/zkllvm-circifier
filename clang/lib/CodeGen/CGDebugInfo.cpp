@@ -814,6 +814,7 @@ llvm::DIType *CGDebugInfo::CreateType(const BuiltinType *BT) {
   case BuiltinType::UShort:
   case BuiltinType::UInt:
   case BuiltinType::UInt128:
+  case BuiltinType::UInt256:
   case BuiltinType::ULong:
   case BuiltinType::WChar_U:
   case BuiltinType::ULongLong:
@@ -822,6 +823,7 @@ llvm::DIType *CGDebugInfo::CreateType(const BuiltinType *BT) {
   case BuiltinType::Short:
   case BuiltinType::Int:
   case BuiltinType::Int128:
+  case BuiltinType::Int256:
   case BuiltinType::Long:
   case BuiltinType::WChar_S:
   case BuiltinType::LongLong:

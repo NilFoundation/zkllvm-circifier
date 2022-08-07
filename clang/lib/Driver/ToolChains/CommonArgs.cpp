@@ -348,6 +348,18 @@ static StringRef getWebAssemblyTargetCPU(const ArgList &Args) {
   return "generic";
 }
 
+/// Get the (LLVM) name of the EVM cpu we are targeting.
+static StringRef getEVMTargetCPU(const ArgList &Args) {
+  // If we have -mcpu=, use that.
+  if (Arg *A = Args.getLastArg(options::OPT_mcpu_EQ)) {
+    StringRef CPU = A->getValue();
+
+    return CPU;
+  }
+
+  return "generic";
+}
+
 std::string tools::getCPUName(const Driver &D, const ArgList &Args,
                               const llvm::Triple &T, bool FromAs) {
   Arg *A;
@@ -461,6 +473,8 @@ std::string tools::getCPUName(const Driver &D, const ArgList &Args,
   case llvm::Triple::wasm32:
   case llvm::Triple::wasm64:
     return std::string(getWebAssemblyTargetCPU(Args));
+  case llvm::Triple::evm:
+    return std::string(getEVMTargetCPU(Args));
   }
 }
 

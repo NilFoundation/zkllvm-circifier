@@ -1,4 +1,4 @@
-; RUN: llc < %s -march=evm -filetype=asm | FileCheck %s
+; RUN: llc -march=evm -filetype=asm < %s | FileCheck %s
 
 define i256 @lshr(i256 %a, i256 %cnt) {
 entry:

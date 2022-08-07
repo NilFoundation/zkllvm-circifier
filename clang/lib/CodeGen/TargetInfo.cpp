@@ -11576,6 +11576,13 @@ const TargetCodeGenInfo &CodeGenModule::getTargetCodeGenInfo() {
     return SetCGInfo(new WebAssemblyTargetCodeGenInfo(Types, Kind));
   }
 
+  case llvm::Triple::evm: {
+    EVMABIInfo::ABIKind Kind = EVMABIInfo::MVP;
+    if (getTarget().getABI() == "experimental-mv")
+      Kind = EVMABIInfo::ExperimentalMV;
+    return SetCGInfo(new EVMTargetCodeGenInfo(Types, Kind));
+  }
+
   case llvm::Triple::arm:
   case llvm::Triple::armeb:
   case llvm::Triple::thumb:

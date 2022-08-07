@@ -38,6 +38,7 @@
 #include "Targets/TCE.h"
 #include "Targets/VE.h"
 #include "Targets/WebAssembly.h"
+#include "Targets/EVM.h"
 #include "Targets/X86.h"
 #include "Targets/XCore.h"
 #include "clang/Basic/Diagnostic.h"
@@ -649,6 +650,17 @@ TargetInfo *AllocateTarget(const llvm::Triple &Triple,
         return new EmscriptenTargetInfo<WebAssembly64TargetInfo>(Triple, Opts);
       case llvm::Triple::UnknownOS:
         return new WebAssemblyOSTargetInfo<WebAssembly64TargetInfo>(Triple, Opts);
+      default:
+        return nullptr;
+    }
+  case llvm::Triple::evm:
+    if (Triple.getSubArch() != llvm::Triple::NoSubArch ||
+        Triple.getVendor() != llvm::Triple::UnknownVendor ||
+        !Triple.isOSBinFormatEVM())
+      return nullptr;
+    switch (os) {
+      case llvm::Triple::UnknownOS:
+        return new EVMOSTargetInfo<EVMTargetInfo>(Triple, Opts);
       default:
         return nullptr;
     }

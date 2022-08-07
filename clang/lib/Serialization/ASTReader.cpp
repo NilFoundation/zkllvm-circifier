@@ -7105,6 +7105,13 @@ QualType ASTReader::GetType(TypeID ID) {
       T = Context.SingletonId; \
       break;
 #include "clang/Basic/RISCVVTypes.def"
+      // EVM local
+#define EVM_TYPE(Name, Id, SingletonId) \
+    case PREDEF_TYPE_##Id##_ID: \
+      T = Context.SingletonId; \
+      break;
+#include "clang/Basic/EVMTypes.def"
+      // EVM local
     }
 
     assert(!T.isNull() && "Unknown predefined type");

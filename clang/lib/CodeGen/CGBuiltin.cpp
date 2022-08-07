@@ -5428,6 +5428,8 @@ static Value *EmitTargetArchBuiltinExpr(CodeGenFunction *CGF,
   case llvm::Triple::wasm32:
   case llvm::Triple::wasm64:
     return CGF->EmitWebAssemblyBuiltinExpr(BuiltinID, E);
+  case llvm::Triple::evm:
+    return CGF->EmitEVMBuiltinExpr(BuiltinID, E);
   case llvm::Triple::hexagon:
     return CGF->EmitHexagonBuiltinExpr(BuiltinID, E);
   case llvm::Triple::riscv32:
@@ -18830,6 +18832,15 @@ Value *CodeGenFunction::EmitWebAssemblyBuiltinExpr(unsigned BuiltinID,
         CGM.getIntrinsic(Intrinsic::wasm_dot_i8x16_i7x16_add_signed);
     return Builder.CreateCall(Callee, {LHS, RHS, Acc});
   }
+  default:
+    return nullptr;
+  }
+}
+
+Value *CodeGenFunction::EmitEVMBuiltinExpr(unsigned BuiltinID,
+                                                   const CallExpr *E) {
+  llvm_unreachable("unexpected builtin ID");
+  switch (BuiltinID) {
   default:
     return nullptr;
   }

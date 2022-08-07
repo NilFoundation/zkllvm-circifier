@@ -1,0 +1,31 @@
+//===-- EVMTypes.def - Metadata about EVM types ------*- C++ -*-===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+//  This file defines various EVM builtin types.  The macros are:
+//
+//    EVM_TYPE(Id, SingletonId) - A builtin type that has not been
+//    covered by any other #define.  Defining this macro covers all
+//    the builtins.
+//
+// where:
+//
+//  - Name is the name of the builtin type.
+//
+//  - BuiltinType::Id is the enumerator defining the type.
+//
+//  - Context.SingletonId is the global singleton of this type.
+//
+//===----------------------------------------------------------------------===//
+
+//===- Vector point types -----------------------------------------------===//
+
+
+EVM_TYPE("__evm_int256_t", Int256, Int256Ty)
+EVM_TYPE("__evm_uint256_t", UInt256, Int256Ty)
+
+#undef EVM_TYPE

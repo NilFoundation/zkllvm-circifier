@@ -1,4 +1,4 @@
-; RUN: llc < %s -march=evm -filetype=asm | FileCheck %s
+; RUN: llc -march=evm -filetype=asm < %s | FileCheck %s
 
 define i256 @am1(i256* %a) nounwind {
 ; CHECK-LABEL: am1:

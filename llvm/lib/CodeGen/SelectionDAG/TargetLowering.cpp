@@ -397,7 +397,7 @@ void TargetLowering::softenSetCCOperands(SelectionDAG &DAG, EVT VT,
     }
   }
 
-  // Use the target specific return value for comparions lib calls.
+  // Use the target specific return value for comparison lib calls.
   EVT RetVT = getCmpLibcallReturnType();
   SDValue Ops[2] = {NewLHS, NewRHS};
   TargetLowering::MakeLibCallOptions CallOptions;
@@ -3220,7 +3220,7 @@ bool TargetLowering::SimplifyDemandedVectorElts(
     // Simplify mask using undef elements from LHS/RHS.
     bool Updated = false;
     bool IdentityLHS = true, IdentityRHS = true;
-    SmallVector<int, 32> NewMask(ShuffleMask.begin(), ShuffleMask.end());
+    SmallVector<int, 32> NewMask(ShuffleMask);
     for (unsigned i = 0; i != NumElts; ++i) {
       int &M = NewMask[i];
       if (M < 0)
@@ -3578,6 +3578,19 @@ bool TargetLowering::isGuaranteedNotToBeUndefOrPoisonForTargetNode(
       "Should use isGuaranteedNotToBeUndefOrPoison if you don't know whether Op"
       " is a target node!");
   return false;
+}
+
+bool TargetLowering::canCreateUndefOrPoisonForTargetNode(
+    SDValue Op, const APInt &DemandedElts, const SelectionDAG &DAG,
+    bool PoisonOnly, bool ConsiderFlags, unsigned Depth) const {
+  assert((Op.getOpcode() >= ISD::BUILTIN_OP_END ||
+          Op.getOpcode() == ISD::INTRINSIC_WO_CHAIN ||
+          Op.getOpcode() == ISD::INTRINSIC_W_CHAIN ||
+          Op.getOpcode() == ISD::INTRINSIC_VOID) &&
+         "Should use canCreateUndefOrPoison if you don't know whether Op"
+         " is a target node!");
+  // Be conservative and return true.
+  return true;
 }
 
 bool TargetLowering::isKnownNeverNaNForTargetNode(SDValue Op,
@@ -7983,6 +7996,50 @@ SDValue TargetLowering::expandCTLZ(SDNode *Node, SelectionDAG &DAG) const {
   return DAG.getNode(ISD::CTPOP, dl, VT, Op);
 }
 
+SDValue TargetLowering::CTTZTableLookup(SDNode *Node, SelectionDAG &DAG,
+                                        const SDLoc &DL, EVT VT, SDValue Op,
+                                        unsigned BitWidth) const {
+  if (BitWidth != 32 && BitWidth != 64)
+    return SDValue();
+  APInt DeBruijn = BitWidth == 32 ? APInt(32, 0x077CB531U)
+                                  : APInt(64, 0x0218A392CD3D5DBFULL);
+  const DataLayout &TD = DAG.getDataLayout();
+  MachinePointerInfo PtrInfo =
+      MachinePointerInfo::getConstantPool(DAG.getMachineFunction());
+  unsigned ShiftAmt = BitWidth - Log2_32(BitWidth);
+  SDValue Neg = DAG.getNode(ISD::SUB, DL, VT, DAG.getConstant(0, DL, VT), Op);
+  SDValue Lookup = DAG.getNode(
+      ISD::SRL, DL, VT,
+      DAG.getNode(ISD::MUL, DL, VT, DAG.getNode(ISD::AND, DL, VT, Op, Neg),
+                  DAG.getConstant(DeBruijn, DL, VT)),
+      DAG.getConstant(ShiftAmt, DL, VT));
+  Lookup = DAG.getSExtOrTrunc(Lookup, DL, getPointerTy(TD));
+
+  SmallVector<uint8_t> Table(BitWidth, 0);
+  for (unsigned i = 0; i < BitWidth; i++) {
+    APInt Shl = DeBruijn.shl(i);
+    APInt Lshr = Shl.lshr(ShiftAmt);
+    Table[Lshr.getZExtValue()] = i;
+  }
+
+  // Create a ConstantArray in Constant Pool
+  auto *CA = ConstantDataArray::get(*DAG.getContext(), Table);
+  SDValue CPIdx = DAG.getConstantPool(CA, getPointerTy(TD),
+                                      TD.getPrefTypeAlign(CA->getType()));
+  SDValue ExtLoad = DAG.getExtLoad(ISD::ZEXTLOAD, DL, VT, DAG.getEntryNode(),
+                                   DAG.getMemBasePlusOffset(CPIdx, Lookup, DL),
+                                   PtrInfo, MVT::i8);
+  if (Node->getOpcode() != ISD::CTLZ_ZERO_UNDEF) {
+    EVT SetCCVT =
+        getSetCCResultType(DAG.getDataLayout(), *DAG.getContext(), VT);
+    SDValue Zero = DAG.getConstant(0, DL, VT);
+    SDValue SrcIsZero = DAG.getSetCC(DL, SetCCVT, Op, Zero, ISD::SETEQ);
+    ExtLoad = DAG.getSelect(DL, VT, SrcIsZero,
+                            DAG.getConstant(BitWidth, DL, VT), ExtLoad);
+  }
+  return ExtLoad;
+}
+
 SDValue TargetLowering::expandCTTZ(SDNode *Node, SelectionDAG &DAG) const {
   SDLoc dl(Node);
   EVT VT = Node->getValueType(0);
@@ -8015,6 +8072,12 @@ SDValue TargetLowering::expandCTTZ(SDNode *Node, SelectionDAG &DAG) const {
                         !isOperationLegalOrCustomOrPromote(ISD::AND, VT) ||
                         !isOperationLegalOrCustomOrPromote(ISD::XOR, VT)))
     return SDValue();
+
+  // Emit Table Lookup if ISD::CTLZ and ISD::CTPOP are not legal.
+  if (!VT.isVector() && isOperationExpand(ISD::CTPOP, VT) &&
+      !isOperationLegal(ISD::CTLZ, VT))
+    if (SDValue V = CTTZTableLookup(Node, DAG, dl, VT, Op, NumBitsPerElt))
+      return V;
 
   // for now, we use: { return popcount(~x & (x - 1)); }
   // unless the target has ctlz but not ctpop, in which case we use:

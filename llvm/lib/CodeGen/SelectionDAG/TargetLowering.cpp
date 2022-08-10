@@ -351,7 +351,7 @@ void TargetLowering::softenSetCCOperands(SelectionDAG &DAG, EVT VT,
     break;
   case ISD::SETO:
     ShouldInvertCC = true;
-    LLVM_FALLTHROUGH;
+    [[fallthrough]];
   case ISD::SETUO:
     LC1 = (VT == MVT::f32) ? RTLIB::UO_F32 :
           (VT == MVT::f64) ? RTLIB::UO_F64 :
@@ -360,7 +360,7 @@ void TargetLowering::softenSetCCOperands(SelectionDAG &DAG, EVT VT,
   case ISD::SETONE:
     // SETONE = O && UNE
     ShouldInvertCC = true;
-    LLVM_FALLTHROUGH;
+    [[fallthrough]];
   case ISD::SETUEQ:
     LC1 = (VT == MVT::f32) ? RTLIB::UO_F32 :
           (VT == MVT::f64) ? RTLIB::UO_F64 :
@@ -1107,7 +1107,7 @@ bool TargetLowering::SimplifyDemandedBits(
 
   // Other users may use these bits.
   bool HasMultiUse = false;
-  if (!Op.getNode()->hasOneUse() && !AssumeSingleUse) {
+  if (!AssumeSingleUse && !Op.getNode()->hasOneUse()) {
     if (Depth >= SelectionDAG::MaxRecursionDepth) {
       // Limit search depth.
       return false;
@@ -2583,7 +2583,7 @@ bool TargetLowering::SimplifyDemandedBits(
       SDValue And1 = TLO.DAG.getNode(ISD::AND, dl, VT, Op.getOperand(0), One);
       return TLO.CombineTo(Op, And1);
     }
-    LLVM_FALLTHROUGH;
+    [[fallthrough]];
   case ISD::ADD:
   case ISD::SUB: {
     // Add, Sub, and Mul don't demand any bits in positions beyond that
@@ -2686,7 +2686,7 @@ bool TargetLowering::SimplifyDemandedBits(
       }
     }
 
-    LLVM_FALLTHROUGH;
+    [[fallthrough]];
   }
   default:
     if (Op.getOpcode() >= ISD::BUILTIN_OP_END) {
@@ -2827,7 +2827,7 @@ bool TargetLowering::SimplifyDemandedVectorElts(
   }
 
   // If Op has other users, assume that all elements are needed.
-  if (!Op.getNode()->hasOneUse() && !AssumeSingleUse)
+  if (!AssumeSingleUse && !Op.getNode()->hasOneUse())
     DemandedElts.setAllBits();
 
   // Not demanding any elements from Op.
@@ -3321,7 +3321,7 @@ bool TargetLowering::SimplifyDemandedVectorElts(
                                      Depth + 1, /*AssumeSingleUse*/ true))
         return true;
     }
-    LLVM_FALLTHROUGH;
+    [[fallthrough]];
   }
   case ISD::OR:
   case ISD::XOR:
@@ -3389,9 +3389,15 @@ bool TargetLowering::SimplifyDemandedVectorElts(
     if (SimplifyDemandedVectorElts(Op1, DemandedElts, SrcUndef, SrcZero, TLO,
                                    Depth + 1))
       return true;
-    if (SimplifyDemandedVectorElts(Op0, DemandedElts, KnownUndef, KnownZero,
+    // If we know that a demanded element was zero in Op1 we don't need to
+    // demand it in Op0 - its guaranteed to be zero.
+    APInt DemandedElts0 = DemandedElts & ~SrcZero;
+    if (SimplifyDemandedVectorElts(Op0, DemandedElts0, KnownUndef, KnownZero,
                                    TLO, Depth + 1))
       return true;
+
+    KnownUndef &= DemandedElts0;
+    KnownZero &= DemandedElts0;
 
     // If every element pair has a zero/undef then just fold to zero.
     // fold (and x, undef) -> 0  /  (and x, 0) -> 0
@@ -9834,7 +9840,7 @@ bool TargetLowering::LegalizeSetCCCondCode(SelectionDAG &DAG, EVT VT,
       assert(TLI.isCondCodeLegal(ISD::SETOEQ, OpVT) &&
              "If SETUE is expanded, SETOEQ or SETUNE must be legal!");
       NeedInvert = true;
-      LLVM_FALLTHROUGH;
+      [[fallthrough]];
     case ISD::SETO:
       assert(TLI.isCondCodeLegal(ISD::SETOEQ, OpVT) &&
              "If SETO is expanded, SETOEQ must be legal!");
@@ -9858,7 +9864,7 @@ bool TargetLowering::LegalizeSetCCCondCode(SelectionDAG &DAG, EVT VT,
         NeedInvert = ((unsigned)CCCode & 0x8U);
         break;
       }
-      LLVM_FALLTHROUGH;
+      [[fallthrough]];
     case ISD::SETOEQ:
     case ISD::SETOGT:
     case ISD::SETOGE:
@@ -9879,7 +9885,7 @@ bool TargetLowering::LegalizeSetCCCondCode(SelectionDAG &DAG, EVT VT,
         break;
       }
       // Fallthrough if we are unsigned integer.
-      LLVM_FALLTHROUGH;
+      [[fallthrough]];
     case ISD::SETLE:
     case ISD::SETGT:
     case ISD::SETGE:

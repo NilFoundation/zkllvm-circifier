@@ -52,6 +52,7 @@ LoongArchTargetLowering::LoongArchTargetLowering(const TargetMachine &TM,
   setOperationAction(ISD::SRA_PARTS, GRLenVT, Custom);
   setOperationAction(ISD::SRL_PARTS, GRLenVT, Custom);
   setOperationAction(ISD::FP_TO_SINT, GRLenVT, Custom);
+  setOperationAction(ISD::ROTL, GRLenVT, Expand);
 
   setOperationAction({ISD::GlobalAddress, ISD::ConstantPool}, GRLenVT, Custom);
 
@@ -65,8 +66,18 @@ LoongArchTargetLowering::LoongArchTargetLowering(const TargetMachine &TM,
     setOperationAction(ISD::SRL, MVT::i32, Custom);
     setOperationAction(ISD::FP_TO_SINT, MVT::i32, Custom);
     setOperationAction(ISD::BITCAST, MVT::i32, Custom);
+    setOperationAction(ISD::ROTR, MVT::i32, Custom);
+    setOperationAction(ISD::ROTL, MVT::i32, Custom);
     if (Subtarget.hasBasicF() && !Subtarget.hasBasicD())
       setOperationAction(ISD::FP_TO_UINT, MVT::i32, Custom);
+  }
+
+  // LA32 does not have REVB.2W and REVB.D due to the 64-bit operands, and
+  // the narrower REVB.W does not exist. But LA32 does have REVB.2H, so i16
+  // and i32 could still be byte-swapped relatively cheaply.
+  setOperationAction(ISD::BSWAP, MVT::i16, Custom);
+  if (Subtarget.is64Bit()) {
+    setOperationAction(ISD::BSWAP, MVT::i32, Custom);
   }
 
   static const ISD::CondCode FPCCToExpand[] = {ISD::SETOGT, ISD::SETOGE,
@@ -130,6 +141,8 @@ SDValue LoongArchTargetLowering::LowerOperation(SDValue Op,
     // This can be called for an i32 shift amount that needs to be promoted.
     assert(Op.getOperand(1).getValueType() == MVT::i32 && Subtarget.is64Bit() &&
            "Unexpected custom legalisation");
+    return SDValue();
+  case ISD::BSWAP:
     return SDValue();
   case ISD::ConstantPool:
     return lowerConstantPool(Op, DAG);
@@ -353,6 +366,10 @@ static LoongArchISD::NodeType getLoongArchWOpcode(unsigned Opcode) {
     return LoongArchISD::SRA_W;
   case ISD::SRL:
     return LoongArchISD::SRL_W;
+  case ISD::ROTR:
+    return LoongArchISD::ROTR_W;
+  case ISD::ROTL:
+    return LoongArchISD::ROTL_W;
   }
 }
 
@@ -381,9 +398,17 @@ void LoongArchTargetLowering::ReplaceNodeResults(
   case ISD::SHL:
   case ISD::SRA:
   case ISD::SRL:
+  case ISD::ROTR:
     assert(N->getValueType(0) == MVT::i32 && Subtarget.is64Bit() &&
            "Unexpected custom legalisation");
     if (N->getOperand(1).getOpcode() != ISD::Constant) {
+      Results.push_back(customLegalizeToWOp(N, DAG));
+      break;
+    }
+    break;
+  case ISD::ROTL:
+    ConstantSDNode *CN;
+    if ((CN = dyn_cast<ConstantSDNode>(N->getOperand(1)))) {
       Results.push_back(customLegalizeToWOp(N, DAG));
       break;
     }
@@ -416,6 +441,29 @@ void LoongArchTargetLowering::ReplaceNodeResults(
     SDValue Tmp1, Tmp2;
     TLI.expandFP_TO_UINT(N, Tmp1, Tmp2, DAG);
     Results.push_back(DAG.getNode(ISD::TRUNCATE, DL, MVT::i32, Tmp1));
+    break;
+  }
+  case ISD::BSWAP: {
+    SDValue Src = N->getOperand(0);
+    EVT VT = N->getValueType(0);
+    assert((VT == MVT::i16 || VT == MVT::i32) &&
+           "Unexpected custom legalization");
+    MVT GRLenVT = Subtarget.getGRLenVT();
+    SDValue NewSrc = DAG.getNode(ISD::ANY_EXTEND, DL, GRLenVT, Src);
+    SDValue Tmp;
+    switch (VT.getSizeInBits()) {
+    default:
+      llvm_unreachable("Unexpected operand width");
+    case 16:
+      Tmp = DAG.getNode(LoongArchISD::REVB_2H, DL, GRLenVT, NewSrc);
+      break;
+    case 32:
+      // Only LA64 will get to here due to the size mismatch between VT and
+      // GRLenVT, LA32 lowering is directly defined in LoongArchInstrInfo.
+      Tmp = DAG.getNode(LoongArchISD::REVB_2W, DL, GRLenVT, NewSrc);
+      break;
+    }
+    Results.push_back(DAG.getNode(ISD::TRUNCATE, DL, VT, Tmp));
     break;
   }
   }
@@ -847,6 +895,10 @@ const char *LoongArchTargetLowering::getTargetNodeName(unsigned Opcode) const {
     NODE_NAME_CASE(MOVGR2FR_W_LA64)
     NODE_NAME_CASE(MOVFR2GR_S_LA64)
     NODE_NAME_CASE(FTINT)
+    NODE_NAME_CASE(REVB_2H)
+    NODE_NAME_CASE(REVB_2W)
+    NODE_NAME_CASE(ROTR_W)
+    NODE_NAME_CASE(ROTL_W)
   }
 #undef NODE_NAME_CASE
   return nullptr;

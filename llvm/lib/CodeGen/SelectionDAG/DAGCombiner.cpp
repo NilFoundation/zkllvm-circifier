@@ -135,6 +135,11 @@ static cl::opt<bool> EnableShrinkLoadReplaceStoreWithStore(
     cl::desc("DAG combiner enable load/<replace bytes>/store with "
              "a narrower store"));
 
+static cl::opt<bool> EnableVectorFCopySignExtendRound(
+    "combiner-vector-fcopysign-extend-round", cl::Hidden, cl::init(false),
+    cl::desc(
+        "Enable merging extends and rounds into FCOPYSIGN on vector types"));
+
 namespace {
 
   class DAGCombiner {
@@ -1962,7 +1967,7 @@ SDValue DAGCombiner::visitTokenFactor(SDNode *N) {
           Changed = true;
           break;
         }
-        LLVM_FALLTHROUGH;
+        [[fallthrough]];
 
       default:
         // Only add if it isn't already in the list.
@@ -13863,15 +13868,40 @@ SDValue DAGCombiner::visitFREEZE(SDNode *N) {
   if (DAG.isGuaranteedNotToBeUndefOrPoison(N0, /*PoisonOnly*/ false))
     return N0;
 
-  // Fold freeze(unaryop(x)) -> unaryop(freeze(x)).
-  // TODO: Replace with pushFreezeToPreventPoisonFromPropagating fold and
-  // support getNumOperands() >= 1.
-  if (N0.getNumOperands() == 1 &&
-      !DAG.canCreateUndefOrPoison(N0, /*PoisonOnly*/ false) && N0->hasOneUse())
-    return DAG.getNode(N0.getOpcode(), SDLoc(N0), N->getValueType(0),
-                       DAG.getNode(ISD::FREEZE, SDLoc(N0),
-                                   N0.getOperand(0).getValueType(),
-                                   N0.getOperand(0)));
+  // Fold freeze(op(x,y,z)) -> op(freeze(x),y,z).
+  // Try to push freeze through instructions that propagate but don't produce
+  // poison as far as possible. If an operand of freeze follows three
+  // conditions 1) one-use, 2) does not produce poison, and 3) has all but one
+  // guaranteed-non-poison operands then push the freeze through to the one
+  // operand that is not guaranteed non-poison.
+  if (!DAG.canCreateUndefOrPoison(N0, /*PoisonOnly*/ false) &&
+      N0->getNumValues() == 1 && N0->hasOneUse()) {
+    SDValue MaybePoisonOperand;
+    for (SDValue Op : N0->ops()) {
+      if (DAG.isGuaranteedNotToBeUndefOrPoison(Op, /*PoisonOnly*/ false))
+        continue;
+      if ((!MaybePoisonOperand && N0->isOnlyUserOf(Op.getNode())) ||
+          MaybePoisonOperand == Op) {
+        MaybePoisonOperand = Op;
+        continue;
+      }
+      // Multiple maybe-poison ops - bail out.
+      MaybePoisonOperand = SDValue();
+      break;
+    }
+    if (MaybePoisonOperand) {
+      // Recreate the node with the frozen maybe-poison operand.
+      // TODO: Drop the isOnlyUserOf constraint and replace all users of
+      // MaybePoisonOperand with FrozenMaybePoisonOperand
+      // to match pushFreezeToPreventPoisonFromPropagating behavior.
+      SDValue FrozenMaybePoisonOperand = DAG.getFreeze(MaybePoisonOperand);
+      SmallVector<SDValue> Ops(N0->op_begin(), N0->op_end());
+      for (SDValue &Op : Ops)
+        if (Op == MaybePoisonOperand)
+          Op = FrozenMaybePoisonOperand;
+      return DAG.getNode(N0.getOpcode(), SDLoc(N0), N0->getVTList(), Ops);
+    }
+  }
 
   return SDValue();
 }
@@ -14989,7 +15019,7 @@ SDValue DAGCombiner::visitFMUL(SDNode *N) {
       case ISD::SETLT:
       case ISD::SETLE:
         std::swap(TrueOpnd, FalseOpnd);
-        LLVM_FALLTHROUGH;
+        [[fallthrough]];
       case ISD::SETOGT:
       case ISD::SETUGT:
       case ISD::SETOGE:
@@ -15421,11 +15451,7 @@ static inline bool CanCombineFCOPYSIGN_EXTEND_ROUND(SDNode *N) {
     if (N1Op0VT == MVT::f128)
       return false;
 
-    // Avoid mismatched vector operand types, for better instruction selection.
-    if (N1Op0VT.isVector())
-      return false;
-
-    return true;
+    return !N1Op0VT.isVector() || EnableVectorFCopySignExtendRound;
   }
   return false;
 }

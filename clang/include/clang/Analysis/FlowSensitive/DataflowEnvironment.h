@@ -140,8 +140,6 @@ public:
   ///  The body of the callee must not reference globals.
   ///
   ///  The arguments of `Call` must map 1:1 to the callee's parameters.
-  ///
-  ///  Each argument of `Call` must already have a `StorageLocation`.
   Environment pushCall(const CallExpr *Call) const;
   Environment pushCall(const CXXConstructExpr *Call) const;
 
@@ -392,7 +390,7 @@ private:
   DataflowAnalysisContext *DACtx;
 
   // `DeclContext` of the block being analysed if provided.
-  const DeclContext *DeclCtx;
+  const DeclContext *DeclCtx = nullptr;
 
   // In a properly initialized `Environment`, `ReturnLoc` should only be null if
   // its `DeclContext` could not be cast to a `FunctionDecl`.

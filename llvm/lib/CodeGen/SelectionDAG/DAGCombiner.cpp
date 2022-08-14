@@ -72,6 +72,7 @@
 #include <string>
 #include <tuple>
 #include <utility>
+#include <variant>
 
 using namespace llvm;
 
@@ -13926,7 +13927,8 @@ SDValue DAGCombiner::visitFREEZE(SDNode *N) {
   // conditions 1) one-use, 2) does not produce poison, and 3) has all but one
   // guaranteed-non-poison operands then push the freeze through to the one
   // operand that is not guaranteed non-poison.
-  if (!DAG.canCreateUndefOrPoison(N0, /*PoisonOnly*/ false) &&
+  if (!DAG.canCreateUndefOrPoison(N0, /*PoisonOnly*/ false,
+                                  /*ConsiderFlags*/ true) &&
       N0->getNumValues() == 1 && N0->hasOneUse()) {
     SDValue MaybePoisonOperand;
     for (SDValue Op : N0->ops()) {
@@ -13943,6 +13945,7 @@ SDValue DAGCombiner::visitFREEZE(SDNode *N) {
     }
     if (MaybePoisonOperand) {
       // Recreate the node with the frozen maybe-poison operand.
+      // TODO: Disable ConsiderFlags and just strip poison generating flags?
       // TODO: Drop the isOnlyUserOf constraint and replace all users of
       // MaybePoisonOperand with FrozenMaybePoisonOperand
       // to match pushFreezeToPreventPoisonFromPropagating behavior.
@@ -24943,13 +24946,6 @@ SDValue DAGCombiner::FindBetterChain(SDNode *N, SDValue OldChain) {
   return DAG.getTokenFactor(SDLoc(N), Aliases);
 }
 
-namespace {
-// TODO: Replace with with std::monostate when we move to C++17.
-struct UnitT { } Unit;
-bool operator==(const UnitT &, const UnitT &) { return true; }
-bool operator!=(const UnitT &, const UnitT &) { return false; }
-} // namespace
-
 // This function tries to collect a bunch of potentially interesting
 // nodes to improve the chains of, all at once. This might seem
 // redundant, as this function gets called when visiting every store
@@ -24970,8 +24966,8 @@ bool DAGCombiner::parallelizeChainedStores(StoreSDNode *St) {
   // the common case, every store writes to the immediately previous address
   // space and thus merged with the previous interval at insertion time.
 
-  using IMap =
-      llvm::IntervalMap<int64_t, UnitT, 8, IntervalMapHalfOpenInfo<int64_t>>;
+  using IMap = llvm::IntervalMap<int64_t, std::monostate, 8,
+                                 IntervalMapHalfOpenInfo<int64_t>>;
   IMap::Allocator A;
   IMap Intervals(A);
 
@@ -24998,7 +24994,8 @@ bool DAGCombiner::parallelizeChainedStores(StoreSDNode *St) {
     return false;
 
   // Add ST's interval.
-  Intervals.insert(0, (St->getMemoryVT().getSizeInBits() + 7) / 8, Unit);
+  Intervals.insert(0, (St->getMemoryVT().getSizeInBits() + 7) / 8,
+                   std::monostate{});
 
   while (StoreSDNode *Chain = dyn_cast<StoreSDNode>(STChain->getChain())) {
     if (Chain->getMemoryVT().isScalableVector())
@@ -25027,7 +25024,7 @@ bool DAGCombiner::parallelizeChainedStores(StoreSDNode *St) {
     // If there's a previous interval, we should start after it.
     if (I != Intervals.begin() && (--I).stop() <= Offset)
       break;
-    Intervals.insert(Offset, Offset + Length, Unit);
+    Intervals.insert(Offset, Offset + Length, std::monostate{});
 
     ChainedStores.push_back(Chain);
     STChain = Chain;

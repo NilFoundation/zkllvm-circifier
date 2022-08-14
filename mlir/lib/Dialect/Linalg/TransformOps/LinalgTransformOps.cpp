@@ -467,8 +467,19 @@ transform::MatchOp::apply(transform::TransformResults &results,
         return WalkResult::advance();
     }
 
-    if (getAttribute().has_value() && !op->hasAttr(getAttribute().value()))
-      return WalkResult::advance();
+    // Check if all specified attributes match.
+    if (getOpAttrs().has_value()) {
+      DictionaryAttr opAttrs = getOpAttrs().value();
+      for (NamedAttribute attr : opAttrs) {
+        if (attr.getName() == getInterfaceAttrName() ||
+            attr.getName() == getOpsAttrName())
+          continue;
+        if (!op->hasAttr(attr.getName()))
+          return WalkResult::advance();
+        if (op->getAttr(attr.getName()) != attr.getValue())
+          return WalkResult::advance();
+      }
+    }
 
     // All constraints are satisfied.
     res.push_back(op);
@@ -976,7 +987,8 @@ ParseResult transform::TileOp::parse(OpAsmParser &parser,
   auto pdlOperationType = pdl::OperationType::get(parser.getContext());
   if (parser.parseOperand(target) ||
       parser.resolveOperand(target, pdlOperationType, result.operands) ||
-      parseOperandsOrIntegersSizesList(parser, dynamicSizes, staticSizes) ||
+      parseDynamicIndexList(parser, dynamicSizes, staticSizes,
+                            ShapedType::kDynamicSize) ||
       parser.resolveOperands(dynamicSizes, pdlOperationType, result.operands) ||
       parser.parseOptionalAttrDict(result.attributes))
     return ParseResult::failure();
@@ -990,8 +1002,8 @@ ParseResult transform::TileOp::parse(OpAsmParser &parser,
 
 void TileOp::print(OpAsmPrinter &p) {
   p << ' ' << getTarget();
-  printOperandsOrIntegersSizesList(p, getOperation(), getDynamicSizes(),
-                                   getStaticSizes());
+  printDynamicIndexList(p, getOperation(), getDynamicSizes(), getStaticSizes(),
+                        ShapedType::kDynamicSize);
   p.printOptionalAttrDict((*this)->getAttrs(), {getStaticSizesAttrName()});
 }
 

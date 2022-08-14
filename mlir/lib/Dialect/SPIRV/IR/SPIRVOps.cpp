@@ -1579,10 +1579,10 @@ ParseResult spirv::BranchConditionalOp::parse(OpAsmParser &parser,
     return failure();
   result.addSuccessors(dest);
   result.addOperands(falseOperands);
-  result.addAttribute(
-      spirv::BranchConditionalOp::getOperandSegmentSizeAttr(),
-      builder.getI32VectorAttr({1, static_cast<int32_t>(trueOperands.size()),
-                                static_cast<int32_t>(falseOperands.size())}));
+  result.addAttribute(spirv::BranchConditionalOp::getOperandSegmentSizeAttr(),
+                      builder.getDenseI32ArrayAttr(
+                          {1, static_cast<int32_t>(trueOperands.size()),
+                           static_cast<int32_t>(falseOperands.size())}));
 
   return success();
 }
@@ -2241,7 +2241,7 @@ ParseResult spirv::FuncOp::parse(OpAsmParser &parser, OperationState &result) {
   auto *body = result.addRegion();
   OptionalParseResult parseResult =
       parser.parseOptionalRegion(*body, entryArgs);
-  return failure(parseResult.hasValue() && failed(*parseResult));
+  return failure(parseResult.has_value() && failed(*parseResult));
 }
 
 void spirv::FuncOp::print(OpAsmPrinter &printer) {

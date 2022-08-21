@@ -1,7 +1,7 @@
 # This is a C++ grammar from the C++ standard [1].
 #
 # The grammar is a superset of the true grammar requring semantic constraints to
-# resolve ambiguties. The grammar is context-free and ambiguous (beyond the
+# resolve ambiguities. The grammar is context-free and ambiguous (beyond the
 # limit of LR(k)). We use general parsing algorithm (e.g GLR) to handle the
 # grammar and generate a transition table which is used to drive the parsing.
 #
@@ -68,7 +68,7 @@ unqualified-id := ~ type-name
 unqualified-id := ~ decltype-specifier
 unqualified-id := template-id
 qualified-id := nested-name-specifier TEMPLATE_opt unqualified-id
-nested-name-specifier := ::
+nested-name-specifier := :: [guard]
 nested-name-specifier := type-name ::
 nested-name-specifier := namespace-name ::
 nested-name-specifier := decltype-specifier ::
@@ -290,7 +290,7 @@ expression-statement := expression_opt ;
 compound-statement := { statement-seq_opt [recover=Brackets] }
 statement-seq := statement
 statement-seq := statement-seq statement
-selection-statement := IF CONSTEXPR_opt ( init-statement_opt condition ) statement
+selection-statement := IF CONSTEXPR_opt ( init-statement_opt condition ) statement [guard]
 selection-statement := IF CONSTEXPR_opt ( init-statement_opt condition ) statement ELSE statement
 selection-statement := SWITCH ( init-statement_opt condition ) statement
 iteration-statement := WHILE ( condition ) statement
@@ -350,7 +350,7 @@ decl-specifier := CONSTEVAL
 decl-specifier := CONSTINIT
 decl-specifier := INLINE
 decl-specifier-seq := decl-specifier
-decl-specifier-seq := decl-specifier decl-specifier-seq
+decl-specifier-seq := decl-specifier decl-specifier-seq [guard]
 storage-class-specifier := STATIC
 storage-class-specifier := THREAD_LOCAL
 storage-class-specifier := EXTERN
@@ -364,31 +364,32 @@ type-specifier := elaborated-type-specifier
 type-specifier := typename-specifier
 type-specifier := cv-qualifier
 type-specifier-seq := type-specifier
-type-specifier-seq := type-specifier type-specifier-seq
+type-specifier-seq := type-specifier type-specifier-seq [guard]
 defining-type-specifier := type-specifier
 defining-type-specifier := class-specifier
 defining-type-specifier := enum-specifier
 defining-type-specifier-seq := defining-type-specifier
-defining-type-specifier-seq := defining-type-specifier defining-type-specifier-seq
+defining-type-specifier-seq := defining-type-specifier defining-type-specifier-seq [guard]
 simple-type-specifier := nested-name-specifier_opt type-name
 simple-type-specifier := nested-name-specifier TEMPLATE simple-template-id
 simple-type-specifier := decltype-specifier
 simple-type-specifier := placeholder-type-specifier
 simple-type-specifier := nested-name-specifier_opt template-name
-simple-type-specifier := CHAR
-simple-type-specifier := CHAR8_T
-simple-type-specifier := CHAR16_T
-simple-type-specifier := CHAR32_T
-simple-type-specifier := WCHAR_T
-simple-type-specifier := BOOL
+simple-type-specifier := builtin-type
+builtin-type := CHAR
+builtin-type := CHAR8_T
+builtin-type := CHAR16_T
+builtin-type := CHAR32_T
+builtin-type := WCHAR_T
+builtin-type := BOOL
 simple-type-specifier := SHORT
-simple-type-specifier := INT
+builtin-type := INT
 simple-type-specifier := LONG
 simple-type-specifier := SIGNED
 simple-type-specifier := UNSIGNED
-simple-type-specifier := FLOAT
-simple-type-specifier := DOUBLE
-simple-type-specifier := VOID
+builtin-type := FLOAT
+builtin-type := DOUBLE
+builtin-type := VOID
 type-name := class-name
 type-name := enum-name
 type-name := typedef-name
@@ -536,12 +537,12 @@ module-partition := : module-name-qualifier_opt IDENTIFIER
 module-name-qualifier := IDENTIFIER .
 module-name-qualifier := module-name-qualifier IDENTIFIER .
 export-declaration := EXPORT declaration
-export-declaration := EXPORT ( declaration-seq_opt )
+export-declaration := EXPORT { declaration-seq_opt }
 export-declaration := export-keyword module-import-declaration
-module-import-declaration := import-keyword module-name
-module-import-declaration := import-keyword module-partition
+module-import-declaration := import-keyword module-name ;
+module-import-declaration := import-keyword module-partition ;
 # FIXME: we don't have header-name in the grammar. Handle these in PP?
-# module-import-declaration := import-keyword header-name
+# module-import-declaration := import-keyword header-name ;
 global-module-fragment := module-keyword ; declaration-seq_opt
 private-module-fragment := module-keyword : PRIVATE ; declaration-seq_opt
 
@@ -556,7 +557,8 @@ class-key := STRUCT
 class-key := UNION
 member-specification := member-declaration member-specification_opt
 member-specification := access-specifier : member-specification_opt
-member-declaration := decl-specifier-seq_opt member-declarator-list_opt ;
+member-declaration := decl-specifier-seq member-declarator-list_opt ;
+member-declaration := member-declarator-list ;
 member-declaration := function-definition
 member-declaration := using-declaration
 member-declaration := using-enum-declaration
@@ -569,9 +571,9 @@ member-declaration := opaque-enum-declaration
 member-declaration := empty-declaration
 member-declarator-list := member-declarator
 member-declarator-list := member-declarator-list , member-declarator
-member-declarator := declarator virt-specifier-seq_opt pure-specifier_opt
-member-declarator := declarator requires-clause
-member-declarator := declarator brace-or-equal-initializer
+member-declarator := function-declarator virt-specifier-seq_opt pure-specifier_opt
+member-declarator := function-declarator requires-clause
+member-declarator := non-function-declarator brace-or-equal-initializer_opt
 member-declarator := IDENTIFIER_opt : constant-expression brace-or-equal-initializer_opt
 virt-specifier-seq := virt-specifier
 virt-specifier-seq := virt-specifier-seq virt-specifier

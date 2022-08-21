@@ -197,9 +197,19 @@ func.func @omp_simdloop(%lb : index, %ub : index, %step : i32) -> () {
   "omp.simdloop" (%lb, %ub, %step) ({
     ^bb0(%iv: index):
       omp.yield
-  }) {operand_segment_sizes = dense<[1,1,1,0]> : vector<4xi32>} :
-    (index, index, i32) -> () 
+  }) {operand_segment_sizes = array<i32: 1,1,1,0>} :
+    (index, index, i32) -> ()
 
+  return
+}
+
+// -----
+
+func.func @omp_simdloop_pretty_simdlen(%lb : index, %ub : index, %step : index) -> () {
+  // expected-error @below {{op attribute 'simdlen' failed to satisfy constraint: 64-bit signless integer attribute whose value is positive}}
+  omp.simdloop simdlen(0) for (%iv): index = (%lb) to (%ub) step (%step) {
+    omp.yield
+  }
   return
 }
 
@@ -705,17 +715,6 @@ func.func @omp_atomic_update8(%x: memref<i32>, %expr: i32) {
 
 // -----
 
-func.func @omp_atomic_update9(%x: memref<i32>, %expr: i32) {
-  // expected-error @below {{the update region must have at least two operations (binop and terminator)}}
-  omp.atomic.update %x : memref<i32> {
-  ^bb0(%xval: i32):
-    omp.yield (%xval : i32)
-  }
-  return
-}
-
-// -----
-
 func.func @omp_atomic_update(%x: memref<i32>, %expr: i32) {
   // expected-error @below {{the hints omp_sync_hint_uncontended and omp_sync_hint_contended cannot be combined}}
   omp.atomic.update hint(uncontended, contended) %x : memref<i32> {
@@ -986,7 +985,7 @@ func.func @omp_sections(%data_var : memref<i32>) -> () {
   // expected-error @below {{expected equal sizes for allocate and allocator variables}}
   "omp.sections" (%data_var) ({
     omp.terminator
-  }) {operand_segment_sizes = dense<[0,1,0]> : vector<3xi32>} : (memref<i32>) -> ()
+  }) {operand_segment_sizes = array<i32: 0,1,0>} : (memref<i32>) -> ()
   return
 }
 
@@ -996,7 +995,7 @@ func.func @omp_sections(%data_var : memref<i32>) -> () {
   // expected-error @below {{expected as many reduction symbol references as reduction variables}}
   "omp.sections" (%data_var) ({
     omp.terminator
-  }) {operand_segment_sizes = dense<[1,0,0]> : vector<3xi32>} : (memref<i32>) -> ()
+  }) {operand_segment_sizes = array<i32: 1,0,0>} : (memref<i32>) -> ()
   return
 }
 
@@ -1111,7 +1110,7 @@ func.func @omp_single(%data_var : memref<i32>) -> () {
   // expected-error @below {{expected equal sizes for allocate and allocator variables}}
   "omp.single" (%data_var) ({
     omp.barrier
-  }) {operand_segment_sizes = dense<[1,0]> : vector<2xi32>} : (memref<i32>) -> ()
+  }) {operand_segment_sizes = array<i32: 1,0>} : (memref<i32>) -> ()
   return
 }
 
@@ -1303,7 +1302,7 @@ func.func @taskloop(%lb: i32, %ub: i32, %step: i32) {
   "omp.taskloop"(%lb, %ub, %ub, %lb, %step, %step, %testmemref) ({
   ^bb0(%arg3: i32, %arg4: i32):
     "omp.terminator"() : () -> ()
-  }) {operand_segment_sizes = dense<[2, 2, 2, 0, 0, 0, 0, 0, 1, 0, 0, 0]> : vector<12xi32>} : (i32, i32, i32, i32, i32, i32, memref<i32>) -> ()
+  }) {operand_segment_sizes = array<i32: 2, 2, 2, 0, 0, 0, 0, 0, 1, 0, 0, 0>} : (i32, i32, i32, i32, i32, i32, memref<i32>) -> ()
   return
 }
 
@@ -1316,7 +1315,7 @@ func.func @taskloop(%lb: i32, %ub: i32, %step: i32) {
   "omp.taskloop"(%lb, %ub, %ub, %lb, %step, %step, %testf32, %testf32_2) ({
   ^bb0(%arg3: i32, %arg4: i32):
     "omp.terminator"() : () -> ()
-  }) {operand_segment_sizes = dense<[2, 2, 2, 0, 0, 0, 2, 0, 0, 0, 0, 0]> : vector<12xi32>, reductions = [@add_f32]} : (i32, i32, i32, i32, i32, i32, !llvm.ptr<f32>, !llvm.ptr<f32>) -> ()
+  }) {operand_segment_sizes = array<i32: 2, 2, 2, 0, 0, 0, 2, 0, 0, 0, 0, 0>, reductions = [@add_f32]} : (i32, i32, i32, i32, i32, i32, !llvm.ptr<f32>, !llvm.ptr<f32>) -> ()
   return
 }
 
@@ -1329,7 +1328,7 @@ func.func @taskloop(%lb: i32, %ub: i32, %step: i32) {
   "omp.taskloop"(%lb, %ub, %ub, %lb, %step, %step, %testf32) ({
   ^bb0(%arg3: i32, %arg4: i32):
     "omp.terminator"() : () -> ()
-  }) {operand_segment_sizes = dense<[2, 2, 2, 0, 0, 0, 1, 0, 0, 0, 0, 0]> : vector<12xi32>, reductions = [@add_f32, @add_f32]} : (i32, i32, i32, i32, i32, i32, !llvm.ptr<f32>) -> ()
+  }) {operand_segment_sizes = array<i32: 2, 2, 2, 0, 0, 0, 1, 0, 0, 0, 0, 0>, reductions = [@add_f32, @add_f32]} : (i32, i32, i32, i32, i32, i32, !llvm.ptr<f32>) -> ()
   return
 }
 
@@ -1342,7 +1341,7 @@ func.func @taskloop(%lb: i32, %ub: i32, %step: i32) {
   "omp.taskloop"(%lb, %ub, %ub, %lb, %step, %step, %testf32, %testf32_2) ({
   ^bb0(%arg3: i32, %arg4: i32):
     "omp.terminator"() : () -> ()
-  }) {in_reductions = [@add_f32], operand_segment_sizes = dense<[2, 2, 2, 0, 0, 2, 0, 0, 0, 0, 0, 0]> : vector<12xi32>} : (i32, i32, i32, i32, i32, i32, !llvm.ptr<f32>, !llvm.ptr<f32>) -> ()
+  }) {in_reductions = [@add_f32], operand_segment_sizes = array<i32: 2, 2, 2, 0, 0, 2, 0, 0, 0, 0, 0, 0>} : (i32, i32, i32, i32, i32, i32, !llvm.ptr<f32>, !llvm.ptr<f32>) -> ()
   return
 }
 
@@ -1355,7 +1354,7 @@ func.func @taskloop(%lb: i32, %ub: i32, %step: i32) {
   "omp.taskloop"(%lb, %ub, %ub, %lb, %step, %step, %testf32_2) ({
   ^bb0(%arg3: i32, %arg4: i32):
     "omp.terminator"() : () -> ()
-  }) {in_reductions = [@add_f32, @add_f32], operand_segment_sizes = dense<[2, 2, 2, 0, 0, 1, 0, 0, 0, 0, 0, 0]> : vector<12xi32>} : (i32, i32, i32, i32, i32, i32, !llvm.ptr<f32>) -> ()
+  }) {in_reductions = [@add_f32, @add_f32], operand_segment_sizes = array<i32: 2, 2, 2, 0, 0, 1, 0, 0, 0, 0, 0, 0>} : (i32, i32, i32, i32, i32, i32, !llvm.ptr<f32>) -> ()
   return
 }
 
@@ -1419,3 +1418,14 @@ func.func @taskloop(%lb: i32, %ub: i32, %step: i32) {
   }
   return
 }
+
+// -----
+
+func.func @omp_threadprivate() {
+  %1 = llvm.mlir.addressof @_QFsubEx : !llvm.ptr<i32>
+  // expected-error @below {{op failed to verify that all of {sym_addr, tls_addr} have same type}}
+  %2 = omp.threadprivate %1 : !llvm.ptr<i32> -> memref<i32>
+  return
+}
+
+llvm.mlir.global internal @_QFsubEx() : i32

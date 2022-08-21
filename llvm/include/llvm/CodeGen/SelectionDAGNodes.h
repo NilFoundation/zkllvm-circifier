@@ -53,6 +53,7 @@
 #include <iterator>
 #include <string>
 #include <tuple>
+#include <utility>
 
 namespace llvm {
 
@@ -120,6 +121,9 @@ bool isBuildVectorOfConstantFPSDNodes(const SDNode *N);
 /// Return true if the node has at least one operand and all operands of the
 /// specified node are ISD::UNDEF.
 bool allOperandsUndef(const SDNode *N);
+
+/// Return true if the specified node is FREEZE(UNDEF).
+bool isFreezeUndef(const SDNode *N);
 
 } // end namespace ISD
 
@@ -2078,6 +2082,11 @@ public:
                           BitVector &UndefElements) const;
 
   bool isConstant() const;
+
+  /// If this BuildVector is constant and represents the numerical series
+  /// "<a, a+n, a+2n, a+3n, ...>" where a is integer and n is a non-zero integer,
+  /// the value "<a,n>" is returned.
+  Optional<std::pair<APInt, APInt>> isConstantSequence() const;
 
   /// Recast bit data \p SrcBitElements to \p DstEltSizeInBits wide elements.
   /// Undef elements are treated as zero, and entirely undefined elements are

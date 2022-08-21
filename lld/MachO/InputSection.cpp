@@ -67,7 +67,7 @@ std::string InputSection::getLocation(uint64_t off) const {
   // First, try to find a symbol that's near the offset. Use it as a reference
   // point.
   if (auto *sym = getContainingSymbol(off))
-    return (toString(getFile()) + ":(symbol " + sym->getName() + "+0x" +
+    return (toString(getFile()) + ":(symbol " + toString(*sym) + "+0x" +
             Twine::utohexstr(off - sym->value) + ")")
         .str();
 
@@ -251,7 +251,7 @@ void CStringInputSection::splitIntoPieces() {
     if (end == StringRef::npos)
       fatal(getLocation(off) + ": string is not null terminated");
     size_t size = end + 1;
-    uint32_t hash = config->dedupLiterals ? xxHash64(s.substr(0, size)) : 0;
+    uint32_t hash = deduplicateLiterals ? xxHash64(s.substr(0, size)) : 0;
     pieces.emplace_back(off, hash);
     s = s.substr(size);
     off += size;

@@ -179,7 +179,14 @@ TEST(Decl, InConsistLinkageForTemplates) {
     void f() {}
 
     template <>
-    void f<int>() {})");
+    void f<int>() {}
+
+    export template <class T>
+    class C {};
+
+    template<>
+    class C<int> {};
+    )");
 
   auto AST =
       tooling::buildASTFromCodeWithArgs(Code.code(), /*Args=*/{"-std=c++20"});
@@ -193,6 +200,18 @@ TEST(Decl, InConsistLinkageForTemplates) {
   const FunctionDecl *SpecializedF = Funcs[1].getNodeAs<FunctionDecl>("f");
   EXPECT_EQ(TemplateF->getLinkageInternal(),
             SpecializedF->getLinkageInternal());
+
+  llvm::SmallVector<ast_matchers::BoundNodes, 1> ClassTemplates =
+      match(classTemplateDecl().bind("C"), Ctx);
+  llvm::SmallVector<ast_matchers::BoundNodes, 1> ClassSpecializations =
+      match(classTemplateSpecializationDecl().bind("C"), Ctx);
+
+  EXPECT_EQ(ClassTemplates.size(), 1U);
+  EXPECT_EQ(ClassSpecializations.size(), 1U);
+  const NamedDecl *TemplatedC = ClassTemplates[0].getNodeAs<NamedDecl>("C");
+  const NamedDecl *SpecializedC = ClassSpecializations[0].getNodeAs<NamedDecl>("C");
+  EXPECT_EQ(TemplatedC->getLinkageInternal(),
+            SpecializedC->getLinkageInternal());
 }
 
 TEST(Decl, ModuleAndInternalLinkage) {
@@ -240,4 +259,23 @@ TEST(Decl, ModuleAndInternalLinkage) {
 
   EXPECT_EQ(b->getLinkageInternal(), ModuleLinkage);
   EXPECT_EQ(g->getLinkageInternal(), ModuleLinkage);
+}
+
+TEST(Decl, GetNonTransparentDeclContext) {
+  llvm::Annotations Code(R"(
+    export module m3;
+    export template <class> struct X {
+      template <class Self> friend void f(Self &&self) {
+        (Self&)self;
+      }
+    };)");
+
+  auto AST =
+      tooling::buildASTFromCodeWithArgs(Code.code(), /*Args=*/{"-std=c++20"});
+  ASTContext &Ctx = AST->getASTContext();
+
+  auto *f = selectFirst<FunctionDecl>(
+      "f", match(functionDecl(hasName("f")).bind("f"), Ctx));
+
+  EXPECT_TRUE(f->getNonTransparentDeclContext()->isFileContext());
 }

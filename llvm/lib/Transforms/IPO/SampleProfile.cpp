@@ -25,6 +25,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/PriorityQueue.h"
 #include "llvm/ADT/SCCIterator.h"
 #include "llvm/ADT/SmallVector.h"
@@ -475,7 +476,7 @@ protected:
       const SmallVectorImpl<CallBase *> &Candidates, const Function &F,
       bool Hot);
   void promoteMergeNotInlinedContextSamples(
-      DenseMap<CallBase *, const FunctionSamples *> NonInlinedCallSites,
+      MapVector<CallBase *, const FunctionSamples *> NonInlinedCallSites,
       const Function &F);
   std::vector<Function *> buildFunctionOrder(Module &M, CallGraph *CG);
   std::unique_ptr<ProfiledCallGraph> buildProfiledCallGraph(CallGraph &CG);
@@ -687,8 +688,8 @@ SampleProfileLoader::findIndirectCallFunctionSamples(
 
   auto FSCompare = [](const FunctionSamples *L, const FunctionSamples *R) {
     assert(L && R && "Expect non-null FunctionSamples");
-    if (L->getEntrySamples() != R->getEntrySamples())
-      return L->getEntrySamples() > R->getEntrySamples();
+    if (L->getHeadSamplesEstimate() != R->getHeadSamplesEstimate())
+      return L->getHeadSamplesEstimate() > R->getHeadSamplesEstimate();
     return FunctionSamples::getGUID(L->getName()) <
            FunctionSamples::getGUID(R->getName());
   };
@@ -703,7 +704,7 @@ SampleProfileLoader::findIndirectCallFunctionSamples(
     // as that already includes both inlined callee and non-inlined ones..
     Sum = 0;
     for (const auto *const FS : CalleeSamples) {
-      Sum += FS->getEntrySamples();
+      Sum += FS->getHeadSamplesEstimate();
       R.push_back(FS);
     }
     llvm::sort(R, FSCompare);
@@ -724,7 +725,7 @@ SampleProfileLoader::findIndirectCallFunctionSamples(
     if (M->empty())
       return R;
     for (const auto &NameFS : *M) {
-      Sum += NameFS.second.getEntrySamples();
+      Sum += NameFS.second.getHeadSamplesEstimate();
       R.push_back(&NameFS.second);
     }
     llvm::sort(R, FSCompare);
@@ -1043,7 +1044,7 @@ void SampleProfileLoader::findExternalInlineCandidate(
     bool PreInline =
         UsePreInlinerDecision &&
         CalleeSample->getContext().hasAttribute(ContextShouldBeInlined);
-    if (!PreInline && CalleeSample->getEntrySamples() < Threshold)
+    if (!PreInline && CalleeSample->getHeadSamplesEstimate() < Threshold)
       continue;
 
     StringRef Name = CalleeSample->getFuncName();
@@ -1106,7 +1107,7 @@ bool SampleProfileLoader::inlineHotFunctions(
          "ProfAccForSymsInList should be false when profile-sample-accurate "
          "is enabled");
 
-  DenseMap<CallBase *, const FunctionSamples *> LocalNotInlinedCallSites;
+  MapVector<CallBase *, const FunctionSamples *> LocalNotInlinedCallSites;
   bool Changed = false;
   bool LocalChanged = true;
   while (LocalChanged) {
@@ -1124,8 +1125,9 @@ bool SampleProfileLoader::inlineHotFunctions(
               assert((!FunctionSamples::UseMD5 || FS->GUIDToFuncNameMap) &&
                      "GUIDToFuncNameMap has to be populated");
               AllCandidates.push_back(CB);
-              if (FS->getEntrySamples() > 0 || FunctionSamples::ProfileIsCS)
-                LocalNotInlinedCallSites.try_emplace(CB, FS);
+              if (FS->getHeadSamplesEstimate() > 0 ||
+                  FunctionSamples::ProfileIsCS)
+                LocalNotInlinedCallSites.insert({CB, FS});
               if (callsiteIsHot(FS, PSI, ProfAccForSymsInList))
                 Hot = true;
               else if (shouldInlineColdCallee(*CB))
@@ -1164,7 +1166,7 @@ bool SampleProfileLoader::inlineHotFunctions(
           if (!callsiteIsHot(FS, PSI, ProfAccForSymsInList))
             continue;
 
-          Candidate = {I, FS, FS->getEntrySamples(), 1.0};
+          Candidate = {I, FS, FS->getHeadSamplesEstimate(), 1.0};
           if (tryPromoteAndInlineCandidate(F, Candidate, SumOrigin, Sum)) {
             LocalNotInlinedCallSites.erase(I);
             LocalChanged = true;
@@ -1278,7 +1280,7 @@ bool SampleProfileLoader::getInlineCandidate(InlineCandidate *NewCandidate,
     Factor = Probe->Factor;
 
   uint64_t CallsiteCount =
-      CalleeSamples ? CalleeSamples->getEntrySamples() * Factor : 0;
+      CalleeSamples ? CalleeSamples->getHeadSamplesEstimate() * Factor : 0;
   *NewCandidate = {CB, CalleeSamples, CallsiteCount, Factor};
   return true;
 }
@@ -1408,7 +1410,7 @@ bool SampleProfileLoader::inlineHotFunctionsWithPriority(
   if (ExternalInlineAdvisor)
     SizeLimit = std::numeric_limits<unsigned>::max();
 
-  DenseMap<CallBase *, const FunctionSamples *> LocalNotInlinedCallSites;
+  MapVector<CallBase *, const FunctionSamples *> LocalNotInlinedCallSites;
 
   // Perform iterative BFS call site prioritized inlining
   bool Changed = false;
@@ -1434,7 +1436,7 @@ bool SampleProfileLoader::inlineHotFunctionsWithPriority(
           continue;
         }
         uint64_t EntryCountDistributed =
-            FS->getEntrySamples() * Candidate.CallsiteDistribution;
+            FS->getHeadSamplesEstimate() * Candidate.CallsiteDistribution;
         // In addition to regular inline cost check, we also need to make sure
         // ICP isn't introducing excessive speculative checks even if individual
         // target looks beneficial to promote and inline. That means we should
@@ -1465,7 +1467,7 @@ bool SampleProfileLoader::inlineHotFunctionsWithPriority(
           ICPCount++;
           Changed = true;
         } else if (!ContextTracker) {
-          LocalNotInlinedCallSites.try_emplace(I, FS);
+          LocalNotInlinedCallSites.insert({I, FS});
         }
       }
     } else if (CalledFunction && CalledFunction->getSubprogram() &&
@@ -1478,7 +1480,7 @@ bool SampleProfileLoader::inlineHotFunctionsWithPriority(
         }
         Changed = true;
       } else if (!ContextTracker) {
-        LocalNotInlinedCallSites.try_emplace(I, Candidate.CalleeSamples);
+        LocalNotInlinedCallSites.insert({I, Candidate.CalleeSamples});
       }
     } else if (LTOPhase == ThinOrFullLTOPhase::ThinLTOPreLink) {
       findExternalInlineCandidate(I, findCalleeFunctionSamples(*I),
@@ -1504,11 +1506,11 @@ bool SampleProfileLoader::inlineHotFunctionsWithPriority(
 }
 
 void SampleProfileLoader::promoteMergeNotInlinedContextSamples(
-    DenseMap<CallBase *, const FunctionSamples *> NonInlinedCallSites,
+    MapVector<CallBase *, const FunctionSamples *> NonInlinedCallSites,
     const Function &F) {
   // Accumulate not inlined callsite information into notInlinedSamples
   for (const auto &Pair : NonInlinedCallSites) {
-    CallBase *I = Pair.getFirst();
+    CallBase *I = Pair.first;
     Function *Callee = I->getCalledFunction();
     if (!Callee || Callee->isDeclaration())
       continue;
@@ -1520,8 +1522,8 @@ void SampleProfileLoader::promoteMergeNotInlinedContextSamples(
         << "' into '" << ore::NV("Caller", &F) << "'");
 
     ++NumCSNotInlined;
-    const FunctionSamples *FS = Pair.getSecond();
-    if (FS->getTotalSamples() == 0 && FS->getEntrySamples() == 0) {
+    const FunctionSamples *FS = Pair.second;
+    if (FS->getTotalSamples() == 0 && FS->getHeadSamplesEstimate() == 0) {
       continue;
     }
 
@@ -1539,7 +1541,7 @@ void SampleProfileLoader::promoteMergeNotInlinedContextSamples(
         // Use entry samples as head samples during the merge, as inlinees
         // don't have head samples.
         const_cast<FunctionSamples *>(FS)->addHeadSamples(
-            FS->getEntrySamples());
+            FS->getHeadSamplesEstimate());
 
         // Note that we have to do the merge right after processing function.
         // This allows OutlineFS's profile to be used for annotation during
@@ -1552,7 +1554,7 @@ void SampleProfileLoader::promoteMergeNotInlinedContextSamples(
     } else {
       auto pair =
           notInlinedCallInfo.try_emplace(Callee, NotInlinedProfileInfo{0});
-      pair.first->second.entryCount += FS->getEntrySamples();
+      pair.first->second.entryCount += FS->getHeadSamplesEstimate();
     }
   }
 }
@@ -1616,7 +1618,7 @@ void SampleProfileLoader::generateMDProfMetadata(Function &F) {
             if (const FunctionSamplesMap *M =
                     FS->findFunctionSamplesMapAt(CallSite)) {
               for (const auto &NameFS : *M)
-                Sum += NameFS.second.getEntrySamples();
+                Sum += NameFS.second.getHeadSamplesEstimate();
             }
           }
           if (Sum)

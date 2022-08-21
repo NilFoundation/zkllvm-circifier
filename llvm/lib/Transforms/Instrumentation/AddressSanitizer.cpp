@@ -1232,14 +1232,16 @@ bool AddressSanitizer::isInterestingAlloca(const AllocaInst &AI) {
        // dynamic alloca instrumentation for them as well.
        !AI.isUsedWithInAlloca() &&
        // swifterror allocas are register promoted by ISel
-       !AI.isSwiftError());
+       !AI.isSwiftError() &&
+       // safe allocas are not interesting
+       !(SSGI && SSGI->isSafe(AI)));
 
   ProcessedAllocas[&AI] = IsInteresting;
   return IsInteresting;
 }
 
 bool AddressSanitizer::ignoreAccess(Instruction *Inst, Value *Ptr) {
-  // Instrument acesses from different address spaces only for AMDGPU.
+  // Instrument accesses from different address spaces only for AMDGPU.
   Type *PtrTy = cast<PointerType>(Ptr->getType()->getScalarType());
   if (PtrTy->getPointerAddressSpace() != 0 &&
       !(TargetTriple.isAMDGPU() && !isUnsupportedAMDGPUAddrspace(Ptr)))

@@ -543,9 +543,8 @@ Value Importer::processConstant(llvm::Constant *c) {
       if (!elementValue)
         return nullptr;
       if (useInsertValue) {
-        ArrayAttr indexAttr = bEntry.getI32ArrayAttr({static_cast<int32_t>(i)});
-        root = bEntry.create<InsertValueOp>(UnknownLoc::get(context), rootType,
-                                            root, elementValue, indexAttr);
+        root = bEntry.create<InsertValueOp>(UnknownLoc::get(context), root,
+                                            elementValue, i);
       } else {
         Attribute indexAttr = bEntry.getI32IntegerAttr(static_cast<int32_t>(i));
         Value indexValue = bEntry.create<ConstantOp>(
@@ -907,7 +906,7 @@ LogicalResult Importer::processInstruction(llvm::Instruction *inst) {
 
     if (brInst->isConditional()) {
       state.addAttribute(LLVM::CondBrOp::getOperandSegmentSizeAttr(),
-                         b.getI32VectorAttr(operandSegmentSizes));
+                         b.getDenseI32ArrayAttr(operandSegmentSizes));
     }
 
     b.create(state);
@@ -1072,24 +1071,23 @@ LogicalResult Importer::processInstruction(llvm::Instruction *inst) {
     Value basePtr = processValue(gep->getOperand(0));
     Type sourceElementType = processType(gep->getSourceElementType());
 
-    SmallVector<Value> indices;
-    for (llvm::Value *operand : llvm::drop_begin(gep->operand_values())) {
-      indices.push_back(processValue(operand));
-      if (!indices.back())
-        return failure();
-    }
     // Treat every indices as dynamic since GEPOp::build will refine those
     // indices into static attributes later. One small downside of this
     // approach is that many unused `llvm.mlir.constant` would be emitted
     // at first place.
-    SmallVector<int32_t> structIndices(indices.size(),
-                                       LLVM::GEPOp::kDynamicIndex);
+    SmallVector<GEPArg> indices;
+    for (llvm::Value *operand : llvm::drop_begin(gep->operand_values())) {
+      Value val = processValue(operand);
+      if (!val)
+        return failure();
+      indices.push_back(val);
+    }
 
     Type type = processType(inst->getType());
     if (!type)
       return failure();
-    instMap[inst] = b.create<GEPOp>(loc, type, sourceElementType, basePtr,
-                                    indices, structIndices);
+    instMap[inst] =
+        b.create<GEPOp>(loc, type, sourceElementType, basePtr, indices);
     return success();
   }
   case llvm::Instruction::InsertValue: {
@@ -1101,11 +1099,8 @@ LogicalResult Importer::processInstruction(llvm::Instruction *inst) {
     if (!aggOperand)
       return failure();
 
-    SmallVector<int32_t> idxValues;
-    for (unsigned idx : ivInst->getIndices())
-      idxValues.push_back(static_cast<int32_t>(idx));
-    ArrayAttr indices = b.getI32ArrayAttr(idxValues);
-
+    SmallVector<int64_t> indices;
+    llvm::append_range(indices, ivInst->getIndices());
     instMap[inst] = b.create<InsertValueOp>(loc, aggOperand, inserted, indices);
     return success();
   }
@@ -1119,12 +1114,9 @@ LogicalResult Importer::processInstruction(llvm::Instruction *inst) {
     if (!type)
       return failure();
 
-    SmallVector<int32_t> idxValues;
-    for (unsigned idx : evInst->getIndices())
-      idxValues.push_back(static_cast<int32_t>(idx));
-    ArrayAttr indices = b.getI32ArrayAttr(idxValues);
-
-    instMap[inst] = b.create<ExtractValueOp>(loc, type, aggOperand, indices);
+    SmallVector<int64_t> indices;
+    llvm::append_range(indices, evInst->getIndices());
+    instMap[inst] = b.create<ExtractValueOp>(loc, aggOperand, indices);
     return success();
   }
   case llvm::Instruction::ShuffleVector: {

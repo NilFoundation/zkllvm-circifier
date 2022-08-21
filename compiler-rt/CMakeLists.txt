@@ -296,7 +296,7 @@ if(COMPILER_RT_ENABLE_WERROR)
   append_string_if(COMPILER_RT_HAS_WX_FLAG /WX CMAKE_C_FLAGS CMAKE_CXX_FLAGS)
 endif()
 
-append_string_if(COMPILER_RT_HAS_STD_CXX14_FLAG -std=c++14 CMAKE_CXX_FLAGS)
+append_string_if(COMPILER_RT_HAS_STD_CXX17_FLAG -std=c++17 CMAKE_CXX_FLAGS)
 
 # Emulate C99 and C++11's __func__ for MSVC prior to 2013 CTP.
 if(NOT COMPILER_RT_HAS_FUNC_SYMBOL)
@@ -478,6 +478,12 @@ append_list_if(MINGW -fms-extensions SANITIZER_COMMON_CFLAGS)
 # -nostdlib++ and --unwindlib=none if supported, or -nodefaultlibs otherwise.
 append_list_if(C_SUPPORTS_NODEFAULTLIBS_FLAG -nodefaultlibs SANITIZER_COMMON_LINK_FLAGS)
 append_list_if(COMPILER_RT_HAS_Z_TEXT -Wl,-z,text SANITIZER_COMMON_LINK_FLAGS)
+
+# Only necessary for 32-bit SPARC.  Solaris 11.2+ ld uses -z ignore/-z record
+# natively, but supports --as-needed/--no-as-needed for GNU ld compatibility.
+if("${COMPILER_RT_DEFAULT_TARGET_ARCH}" MATCHES "sparc")
+  list(APPEND SANITIZER_COMMON_LINK_LIBS -Wl,--as-needed atomic -Wl,--no-as-needed)
+endif()
 
 if (COMPILER_RT_USE_BUILTINS_LIBRARY)
   string(REPLACE "-Wl,-z,defs" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")

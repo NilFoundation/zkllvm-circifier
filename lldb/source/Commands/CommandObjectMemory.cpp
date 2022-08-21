@@ -427,7 +427,7 @@ protected:
           switch (type_str[type_str.size() - 1]) {
           case '*':
             ++pointer_count;
-            LLVM_FALLTHROUGH;
+            [[fallthrough]];
           case ' ':
           case '\t':
             type_str.erase(type_str.size() - 1);
@@ -1659,7 +1659,7 @@ class CommandObjectMemoryRegion : public CommandObjectParsed {
 public:
   class OptionGroupMemoryRegion : public OptionGroup {
   public:
-    OptionGroupMemoryRegion() : OptionGroup(), m_all(false, false) {}
+    OptionGroupMemoryRegion() : m_all(false, false) {}
 
     ~OptionGroupMemoryRegion() override = default;
 

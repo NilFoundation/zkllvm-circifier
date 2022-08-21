@@ -40,6 +40,7 @@ TensorExp::TensorExp(Kind k, unsigned x, unsigned y, Value v, Operation *o)
   // Unary operations.
   case kAbsF:
   case kAbsC:
+  case kAbsI:
   case kCeilF:
   case kFloorF:
   case kSqrtF:
@@ -310,6 +311,7 @@ bool Merger::isSingleCondition(unsigned t, unsigned e) const {
   // Unary operations.
   case kAbsF:
   case kAbsC:
+  case kAbsI:
   case kCeilF:
   case kFloorF:
   case kSqrtF:
@@ -398,6 +400,7 @@ static const char *kindToOpSymbol(Kind kind) {
   // Unary operations.
   case kAbsF:
   case kAbsC:
+  case kAbsI:
     return "abs";
   case kCeilF:
     return "ceil";
@@ -497,6 +500,7 @@ void Merger::dumpExp(unsigned e) const {
   // Unary operations.
   case kAbsF:
   case kAbsC:
+  case kAbsI:
   case kCeilF:
   case kFloorF:
   case kSqrtF:
@@ -591,9 +595,6 @@ void Merger::dumpBits(const BitVector &bits) const {
       case kDense:
         llvm::dbgs() << "D";
         break;
-      case kSingle:
-        llvm::dbgs() << "T";
-        break;
       case kUndef:
         llvm::dbgs() << "U";
         break;
@@ -633,6 +634,7 @@ unsigned Merger::buildLattices(unsigned e, unsigned i) {
   // Unary operations.
   case kAbsF:
   case kAbsC:
+  case kAbsI:
   case kCeilF:
   case kFloorF:
   case kSqrtF:
@@ -799,7 +801,7 @@ unsigned Merger::buildLattices(unsigned e, unsigned i) {
 
 Optional<unsigned> Merger::buildTensorExpFromLinalg(linalg::GenericOp op) {
   // Build the linalg semantics backward from yield.
-  Operation *yield = op.region().front().getTerminator();
+  Operation *yield = op.getRegion().front().getTerminator();
   assert(isa<linalg::YieldOp>(yield));
   return buildTensorExp(op, yield->getOperand(0));
 }
@@ -810,7 +812,7 @@ bool Merger::maybeZero(unsigned e) const {
     if (auto c = tensorExps[e].val.getDefiningOp<complex::ConstantOp>()) {
       ArrayAttr arrayAttr = c.getValue();
       return arrayAttr[0].cast<FloatAttr>().getValue().isZero() &&
-             arrayAttr[0].cast<FloatAttr>().getValue().isZero();
+             arrayAttr[1].cast<FloatAttr>().getValue().isZero();
     }
     if (auto c = tensorExps[e].val.getDefiningOp<arith::ConstantIntOp>())
       return c.value() == 0;
@@ -883,22 +885,24 @@ Optional<unsigned> Merger::buildTensorExp(linalg::GenericOp op, Value v) {
   }
   // Something defined outside is invariant.
   Operation *def = v.getDefiningOp();
-  if (def->getBlock() != &op.region().front())
+  if (def->getBlock() != &op.getRegion().front())
     return addExp(kInvariant, v);
   // Construct index operations.
   if (def->getNumOperands() == 0) {
     if (auto indexOp = dyn_cast<linalg::IndexOp>(def))
-      return addExp(kIndex, indexOp.dim());
+      return addExp(kIndex, indexOp.getDim());
   }
   // Construct unary operations if subexpression can be built.
   if (def->getNumOperands() == 1) {
     auto x = buildTensorExp(op, def->getOperand(0));
     if (x.has_value()) {
       unsigned e = x.value();
-      if (isa<math::AbsOp>(def))
+      if (isa<math::AbsFOp>(def))
         return addExp(kAbsF, e);
       if (isa<complex::AbsOp>(def))
         return addExp(kAbsC, e);
+      if (isa<math::AbsIOp>(def))
+        return addExp(kAbsI, e);
       if (isa<math::CeilOp>(def))
         return addExp(kCeilF, e);
       if (isa<math::FloorOp>(def))
@@ -1076,12 +1080,14 @@ Value Merger::buildExp(RewriterBase &rewriter, Location loc, unsigned e,
     llvm_unreachable("unexpected non-op");
   // Unary operations.
   case kAbsF:
-    return rewriter.create<math::AbsOp>(loc, v0);
+    return rewriter.create<math::AbsFOp>(loc, v0);
   case kAbsC: {
     auto type = v0.getType().cast<ComplexType>();
     auto eltType = type.getElementType().cast<FloatType>();
     return rewriter.create<complex::AbsOp>(loc, eltType, v0);
   }
+  case kAbsI:
+    return rewriter.create<math::AbsIOp>(loc, v0);
   case kCeilF:
     return rewriter.create<math::CeilOp>(loc, v0);
   case kFloorF:

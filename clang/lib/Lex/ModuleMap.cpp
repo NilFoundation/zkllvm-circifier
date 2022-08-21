@@ -456,10 +456,8 @@ static bool violatesPrivateInclude(Module *RequestingModule,
         &Header.getModule()->Headers[Module::HK_Private],
         &Header.getModule()->Headers[Module::HK_PrivateTextual]};
     for (auto *Hs : HeaderList)
-      IsPrivate |=
-          std::find_if(Hs->begin(), Hs->end(), [&](const Module::Header &H) {
-            return H.Entry == IncFileEnt;
-          }) != Hs->end();
+      IsPrivate |= llvm::any_of(
+          *Hs, [&](const Module::Header &H) { return H.Entry == IncFileEnt; });
     assert(IsPrivate && "inconsistent headers and roles");
   }
 #endif
@@ -1670,7 +1668,7 @@ retry:
         break;
       }
     }
-    LLVM_FALLTHROUGH;
+    [[fallthrough]];
 
   default:
     Diags.Report(Tok.getLocation(), diag::err_mmap_unknown_token);

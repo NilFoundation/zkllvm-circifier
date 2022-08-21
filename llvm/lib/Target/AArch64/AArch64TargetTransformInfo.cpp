@@ -1683,6 +1683,9 @@ InstructionCost AArch64TTIImpl::getCastInstrCost(unsigned Opcode, Type *Dst,
     { ISD::UINT_TO_FP, MVT::v2f64, MVT::v2i16, 4 },
     { ISD::UINT_TO_FP, MVT::v2f64, MVT::v2i32, 2 },
 
+    // Complex: to v4f64
+    { ISD::SINT_TO_FP, MVT::v4f64, MVT::v4i32,  4 },
+    { ISD::UINT_TO_FP, MVT::v4f64, MVT::v4i32,  4 },
 
     // LowerVectorFP_TO_INT
     { ISD::FP_TO_SINT, MVT::v2i32, MVT::v2f32, 1 },
@@ -2014,7 +2017,7 @@ InstructionCost AArch64TTIImpl::getArithmeticInstrCost(
                                      TargetTransformInfo::OP_None);
       return Cost;
     }
-    LLVM_FALLTHROUGH;
+    [[fallthrough]];
   case ISD::UDIV: {
     if (Opd2Info == TargetTransformInfo::OK_UniformConstantValue) {
       auto VT = TLI->getValueType(DL, Ty);
@@ -2706,6 +2709,7 @@ AArch64TTIImpl::getArithmeticReductionCost(unsigned Opcode, VectorType *ValTy,
       {ISD::ADD, MVT::v4i16,  2},
       {ISD::ADD, MVT::v8i16,  2},
       {ISD::ADD, MVT::v4i32,  2},
+      {ISD::ADD, MVT::v2i64,  2},
       {ISD::OR,  MVT::v8i8,  15},
       {ISD::OR,  MVT::v16i8, 17},
       {ISD::OR,  MVT::v4i16,  7},
@@ -3027,8 +3031,15 @@ InstructionCost AArch64TTIImpl::getShuffleCost(TTI::ShuffleKind Kind,
 
 bool AArch64TTIImpl::preferPredicateOverEpilogue(
     Loop *L, LoopInfo *LI, ScalarEvolution &SE, AssumptionCache &AC,
-    TargetLibraryInfo *TLI, DominatorTree *DT, LoopVectorizationLegality *LVL) {
+    TargetLibraryInfo *TLI, DominatorTree *DT, LoopVectorizationLegality *LVL,
+    InterleavedAccessInfo *IAI) {
   if (!ST->hasSVE() || TailFoldingKindLoc == TailFoldingKind::TFDisabled)
+    return false;
+
+  // We don't currently support vectorisation with interleaving for SVE - with
+  // such loops we're better off not using tail-folding. This gives us a chance
+  // to fall back on fixed-width vectorisation using NEON's ld2/st2/etc.
+  if (IAI->hasGroups())
     return false;
 
   TailFoldingKind Required; // Defaults to 0.

@@ -1758,21 +1758,24 @@ def Vector_MaskedStoreOp :
 
 def Vector_GatherOp :
   Vector_Op<"gather">,
-    Arguments<(ins Arg<AnyMemRef, "", [MemRead]>:$base,
+    Arguments<(ins Arg<AnyShaped, "", [MemRead]>:$base,
                Variadic<Index>:$indices,
                VectorOfRankAndType<[1], [AnyInteger, Index]>:$index_vec,
                VectorOfRankAndType<[1], [I1]>:$mask,
                VectorOfRank<[1]>:$pass_thru)>,
     Results<(outs VectorOfRank<[1]>:$result)> {
 
-  let summary = "gathers elements from memory into a vector as defined by an index vector and mask";
+  let summary = [{
+    gathers elements from memory or ranked tensor into a vector as defined by an
+    index vector and mask
+  }];
 
   let description = [{
-    The gather operation gathers elements from memory into a 1-D vector as
-    defined by a base with indices and an additional 1-D index vector, but
-    only if the corresponding bit is set in a 1-D mask vector. Otherwise, the
-    element is taken from a 1-D pass-through vector. Informally the semantics
-    are:
+    The gather operation gathers elements from memory or ranked tensor into a
+    1-D vector as defined by a base with indices and an additional 1-D index
+    vector, but only if the corresponding bit is set in a 1-D mask vector.
+    Otherwise, the element is taken from a 1-D pass-through vector. Informally
+    the semantics are:
     ```
     result[0] := mask[0] ? base[index[0]] : pass_thru[0]
     result[1] := mask[1] ? base[index[1]] : pass_thru[1]
@@ -1797,8 +1800,8 @@ def Vector_GatherOp :
     ```
   }];
   let extraClassDeclaration = [{
-    MemRefType getMemRefType() {
-      return getBase().getType().cast<MemRefType>();
+    ShapedType getBaseType() {
+      return getBase().getType().cast<ShapedType>();
     }
     VectorType getIndexVectorType() {
       return getIndexVec().getType().cast<VectorType>();
@@ -2570,16 +2573,16 @@ def Vector_WarpExecuteOnLane0Op : Vector_Op<"warp_execute_on_lane_0",
       [DeclareOpInterfaceMethods<RegionBranchOpInterface, ["areTypesCompatible"]>,
        SingleBlockImplicitTerminator<"vector::YieldOp">,
        RecursiveSideEffects]> {
-  let summary = "Executes operations in the associated region on lane #0 of a"
-                "GPU SIMT warp";
+  let summary = "Executes operations in the associated region on thread #0 of a"
+                "SPMD program";
   let description = [{
     `warp_execute_on_lane_0` is an operation used to bridge the gap between
-    vector programming and GPU SIMT programming model. It allows to trivially
-    convert a region of vector code meant to run on a GPU warp into a valid SIMT
-    region and then allows incremental transformation to distribute vector
-    operations on the SIMT lane.
+    vector programming and SPMD programming model like GPU SIMT. It allows to
+    trivially convert a region of vector code meant to run on a multiple threads
+    into a valid SPMD region and then allows incremental transformation to
+    distribute vector operations on the threads.
 
-    Any code present in the region would only be executed on first lane
+    Any code present in the region would only be executed on first thread/lane
     based on the `laneid` operand. The `laneid` operand is an integer ID between
     [0, `warp_size`). The `warp_size` attribute indicates the number of lanes in
     a warp.
@@ -2588,7 +2591,8 @@ def Vector_WarpExecuteOnLane0Op : Vector_Op<"warp_execute_on_lane_0",
     the single lane execution. The matching region argument is a vector of all
     the values of those lanes available to the single active lane. The
     distributed dimension is implicit based on the shape of the operand and
-    argument. In the future this may be described by an affine map.
+    argument. the properties of the distribution may be described by extra
+    attributes (e.g. affine map).
 
     Return values are distributed on all lanes using laneId as index. The
     vector is distributed based on the shape ratio between the vector type of
@@ -2600,6 +2604,8 @@ def Vector_WarpExecuteOnLane0Op : Vector_Op<"warp_execute_on_lane_0",
     Therefore the `warp_execute_on_lane_0` operations allow to implicitly copy
     between lane0 and the lanes of the warp. When distributing a vector
     from lane0 to all the lanes, the data are distributed in a block cyclic way.
+    For exemple `vector<64xf32>` gets distributed on 32 threads and map to
+    `vector<2xf32>` where thread 0 contains vector[0] and vector[1].
 
     During lowering values passed as operands and return value need to be
     visible to different lanes within the warp. This would usually be done by
@@ -2611,43 +2617,62 @@ def Vector_WarpExecuteOnLane0Op : Vector_Op<"warp_execute_on_lane_0",
 
     Example:
     ```
+    // Execute in parallel on all threads/lanes.
     vector.warp_execute_on_lane_0 (%laneid)[32] {
+      // Serial code running only on thread/lane 0.
       ...
     }
+    // Execute in parallel on all threads/lanes.
     ```
 
     This may be lowered to an scf.if region as below:
     ```
+      // Execute in parallel on all threads/lanes.
       %cnd = arith.cmpi eq, %laneid, %c0 : index
       scf.if %cnd {
-         ...
+        // Serial code running only on thread/lane 0.
+        ...
       }
+      // Execute in parallel on all threads/lanes.
     ```
 
     When the region has operands and/or return values:
     ```
+    // Execute in parallel on all threads/lanes.
     %0 = vector.warp_execute_on_lane_0(%laneid)[32]
     args(%v0 : vector<4xi32>) -> (vector<1xf32>) {
     ^bb0(%arg0 : vector<128xi32>) :
+      // Serial code running only on thread/lane 0.
       ...
       vector.yield %1 : vector<32xf32>
     }
+    // Execute in parallel on all threads/lanes.
     ```
 
     values at the region boundary would go through memory:
     ```
-    %tmp0 = memreg.alloc() : memref<32xf32, 3>
-    %tmp1 = memreg.alloc() : memref<32xf32, 3>
+    // Execute in parallel on all threads/lanes.
+    ...
+    // Store the data from each thread into memory and Synchronization.
+    %tmp0 = memreg.alloc() : memref<128xf32>
+    %tmp1 = memreg.alloc() : memref<32xf32>
     %cnd = arith.cmpi eq, %laneid, %c0 : index
-    vector.store %v0, %tmp0[%laneid] : memref<32xf32>, vector<1xf32>
-    warp_sync
+    vector.store %v0, %tmp0[%laneid] : memref<128xf32>, vector<4xf32>
+    some_synchronization_primitive
     scf.if %cnd {
-      %arg0 = vector.load %tmp0[%c0] : memref<32xf32>, vector<32xf32>
+      // Serialized code running only on thread 0.
+      // Load the data from all the threads into a register from thread 0. This
+      // allow threads 0 to access data from all the threads.
+      %arg0 = vector.load %tmp0[%c0] : memref<128xf32>, vector<128xf32>
       ...
+      // Store the data from thread 0 into memory.
       vector.store %1, %tmp1[%c0] : memref<32xf32>, vector<32xf32>
     }
-    warp_sync
+    // Synchronization and load the data in a block cyclic way so that the
+    // vector is distributed on all threads.
+    some_synchronization_primitive
     %0 = vector.load %tmp1[%laneid] : memref<32xf32>, vector<32xf32>
+    // Execute in parallel on all threads/lanes.
     ```
 
   }];

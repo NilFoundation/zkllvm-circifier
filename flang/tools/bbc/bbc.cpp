@@ -167,7 +167,8 @@ static mlir::LogicalResult convertFortranSourceToMLIR(
   parsing.messages().Emit(llvm::errs(), parsing.allCooked());
   if (!parsing.consumedWholeFile()) {
     parsing.EmitMessage(llvm::errs(), parsing.finalRestingPlace(),
-                        "parser FAIL (final position)");
+                        "parser FAIL (final position)",
+                        "error: ", llvm::raw_ostream::RED);
     return mlir::failure();
   }
   if ((!parsing.messages().empty() && (parsing.messages().AnyFatalError())) ||
@@ -216,10 +217,12 @@ static mlir::LogicalResult convertFortranSourceToMLIR(
   auto &defKinds = semanticsContext.defaultKinds();
   fir::KindMapping kindMap(
       &ctx, llvm::ArrayRef<fir::KindTy>{fir::fromDefaultKinds(defKinds)});
+  // Use default lowering options for bbc.
+  Fortran::lower::LoweringOptions loweringOptions{};
   auto burnside = Fortran::lower::LoweringBridge::create(
-      ctx, defKinds, semanticsContext.intrinsics(),
+      ctx, semanticsContext, defKinds, semanticsContext.intrinsics(),
       semanticsContext.targetCharacteristics(), parsing.allCooked(), "",
-      kindMap);
+      kindMap, loweringOptions);
   burnside.lower(parseTree, semanticsContext);
   mlir::ModuleOp mlirModule = burnside.getModule();
   std::error_code ec;
@@ -275,6 +278,7 @@ int main(int argc, char **argv) {
   registerAllPasses();
 
   mlir::registerMLIRContextCLOptions();
+  mlir::registerAsmPrinterCLOptions();
   mlir::registerPassManagerCLOptions();
   mlir::PassPipelineCLParser passPipe("", "Compiler passes to run");
   llvm::cl::ParseCommandLineOptions(argc, argv, "Burnside Bridge Compiler\n");

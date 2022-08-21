@@ -11,6 +11,18 @@ def RestrictedStructSigactionPtr : RestrictedPtrType<StructSigaction>;
 def ConstRestrictedStructSigactionPtr : ConstType<RestrictedStructSigactionPtr>;
 
 def PThreadStartT : NamedType<"__pthread_start_t">;
+def PThreadTSSDtorT : NamedType<"__pthread_tss_dtor_t">;
+def PThreadKeyT : NamedType<"pthread_key_t">;
+def PThreadKeyTPtr : PtrType<PThreadKeyT>;
+
+def InoT : NamedType<"ino_t">;
+def DIR : NamedType<"DIR">;
+def DIRPtr : PtrType<DIR>;
+def DIRRestrictedPtr : RestrictedPtrType<DIR>;
+def StructDirent : NamedType<"struct dirent">;
+def StructDirentPtr : PtrType<StructDirent>;
+def StructDirentPtrPtr : PtrType<StructDirentPtr>;
+def ConstStructDirentPtrPtr : ConstType<StructDirentPtrPtr>;
 
 def POSIX : StandardSpec<"POSIX"> {
   PtrType CharPtr = PtrType<CharType>;
@@ -41,7 +53,6 @@ def POSIX : StandardSpec<"POSIX"> {
   ConstType ConstPThreadMutexTPtr = ConstType<PThreadMutexTPtr>;
   ConstType ConstRestrictedPThreadMutexTPtr = ConstType<RestrictedPThreadMutexTPtr>;
 
-  NamedType PThreadTType = NamedType<"pthread_t">;
   PtrType PThreadTPtr = PtrType<PThreadTType>;
   RestrictedPtrType RestrictedPThreadTPtr = RestrictedPtrType<PThreadTType>;
 
@@ -398,7 +409,15 @@ def POSIX : StandardSpec<"POSIX"> {
   HeaderSpec PThread = HeaderSpec<
     "pthread.h",
     [], // Macros
-    [PThreadAttrTType, PThreadMutexAttrTType, PThreadMutexTType, PThreadStartT, PThreadTType], // Types
+    [
+        PThreadAttrTType,
+        PThreadKeyT,
+        PThreadMutexAttrTType,
+        PThreadMutexTType,
+        PThreadStartT,
+        PThreadTSSDtorT,
+        PThreadTType,
+    ], // Types
     [], // Enumerations
     [
       FunctionSpec<
@@ -465,6 +484,11 @@ def POSIX : StandardSpec<"POSIX"> {
           "pthread_detach",
           RetValSpec<IntType>,
           [ArgSpec<PThreadTType>]
+      >,
+      FunctionSpec<
+          "pthread_exit",
+          RetValSpec<VoidType>,
+          [ArgSpec<VoidPtr>]
       >,
       FunctionSpec<
           "pthread_self",
@@ -556,6 +580,26 @@ def POSIX : StandardSpec<"POSIX"> {
           RetValSpec<IntType>,
           [ArgSpec<PThreadMutexTPtr>]
       >,
+      FunctionSpec<
+          "pthread_key_create",
+          RetValSpec<IntType>,
+          [ArgSpec<PThreadKeyTPtr>, ArgSpec<PThreadTSSDtorT>]
+      >,
+      FunctionSpec<
+          "pthread_key_delete",
+          RetValSpec<IntType>,
+          [ArgSpec<PThreadKeyT>]
+      >,
+      FunctionSpec<
+          "pthread_getspecific",
+          RetValSpec<VoidPtr>,
+          [ArgSpec<PThreadKeyT>]
+      >,
+      FunctionSpec<
+          "pthread_setspecific",
+          RetValSpec<VoidPtr>,
+          [ArgSpec<PThreadKeyT>, ArgSpec<ConstVoidPtr>]
+      >,
     ]
   >;
 
@@ -578,8 +622,48 @@ def POSIX : StandardSpec<"POSIX"> {
       ]
   >;
 
+  HeaderSpec Dirent = HeaderSpec<
+      "dirent.h",
+      [], // Macros
+      [InoT, StructDirent, DIR], // Types
+      [], // Enumerations
+      [
+          FunctionSpec<
+              "alphasort",
+              RetValSpec<IntType>,
+              [ArgSpec<ConstStructDirentPtrPtr>, ArgSpec<ConstStructDirentPtrPtr>]
+          >,
+          FunctionSpec<
+              "closedir",
+              RetValSpec<IntType>,
+              [ArgSpec<DIRPtr>]
+          >,
+          FunctionSpec<
+              "dirfd",
+              RetValSpec<IntType>,
+              [ArgSpec<DIRPtr>]
+          >,
+          FunctionSpec<
+              "fdopendir",
+              RetValSpec<DIRPtr>,
+              [ArgSpec<IntType>]
+          >,
+          FunctionSpec<
+              "opendir",
+              RetValSpec<DIRPtr>,
+              [ArgSpec<ConstCharPtr>]
+          >,
+          FunctionSpec<
+              "readdir",
+              RetValSpec<StructDirentPtr>,
+              [ArgSpec<DIRPtr>]
+          >,
+      ]
+  >;
+
   let Headers = [
     CType,
+    Dirent,
     Errno,
     FCntl,
     PThread,

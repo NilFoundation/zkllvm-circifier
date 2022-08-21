@@ -1856,14 +1856,6 @@ public:
   SDValue FoldSetCC(EVT VT, SDValue N1, SDValue N2, ISD::CondCode Cond,
                     const SDLoc &dl);
 
-  /// See if the specified operand can be simplified with the knowledge that
-  /// only the bits specified by DemandedBits are used.  If so, return the
-  /// simpler operand, otherwise return a null SDValue.
-  ///
-  /// (This exists alongside SimplifyDemandedBits because GetDemandedBits can
-  /// simplify nodes with multiple uses more aggressively.)
-  SDValue GetDemandedBits(SDValue V, const APInt &DemandedBits);
-
   /// Return true if the sign bit of Op is known to be zero.
   /// We use this predicate to simplify operations downstream.
   bool SignBitIsZero(SDValue Op, unsigned Depth = 0) const;
@@ -1980,6 +1972,32 @@ public:
     return isGuaranteedNotToBeUndefOrPoison(Op, DemandedElts,
                                             /*PoisonOnly*/ true, Depth);
   }
+
+  /// Return true if Op can create undef or poison from non-undef & non-poison
+  /// operands. The DemandedElts argument limits the check to the requested
+  /// vector elements.
+  ///
+  /// \p ConsiderFlags controls whether poison producing flags on the
+  /// instruction are considered.  This can be used to see if the instruction
+  /// could still introduce undef or poison even without poison generating flags
+  /// which might be on the instruction.  (i.e. could the result of
+  /// Op->dropPoisonGeneratingFlags() still create poison or undef)
+  bool canCreateUndefOrPoison(SDValue Op, const APInt &DemandedElts,
+                              bool PoisonOnly = false,
+                              bool ConsiderFlags = true,
+                              unsigned Depth = 0) const;
+
+  /// Return true if Op can create undef or poison from non-undef & non-poison
+  /// operands.
+  ///
+  /// \p ConsiderFlags controls whether poison producing flags on the
+  /// instruction are considered.  This can be used to see if the instruction
+  /// could still introduce undef or poison even without poison generating flags
+  /// which might be on the instruction.  (i.e. could the result of
+  /// Op->dropPoisonGeneratingFlags() still create poison or undef)
+  bool canCreateUndefOrPoison(SDValue Op, bool PoisonOnly = false,
+                              bool ConsiderFlags = true,
+                              unsigned Depth = 0) const;
 
   /// Return true if the specified operand is an ISD::ADD with a ConstantSDNode
   /// on the right-hand side, or if it is an ISD::OR with a ConstantSDNode that

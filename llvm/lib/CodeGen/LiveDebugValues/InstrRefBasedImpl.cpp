@@ -297,6 +297,8 @@ public:
     for (auto Location : MTracker->locations()) {
       LocIdx Idx = Location.Idx;
       ValueIDNum &VNum = MLocs[Idx.asU64()];
+      if (VNum == ValueIDNum::EmptyValue)
+        continue;
       VarLocs.push_back(VNum);
 
       // Is there a variable that wants a location for this value? If not, skip.
@@ -1330,7 +1332,7 @@ bool InstrRefBasedLDV::transferDebugPHI(MachineInstr &MI) {
   const MachineOperand &MO = MI.getOperand(0);
   unsigned InstrNum = MI.getOperand(1).getImm();
 
-  auto EmitBadPHI = [this, &MI, InstrNum](void) -> bool {
+  auto EmitBadPHI = [this, &MI, InstrNum]() -> bool {
     // Helper lambda to do any accounting when we fail to find a location for
     // a DBG_PHI. This can happen if DBG_PHIs are malformed, or refer to a
     // dead stack slot, for example.
@@ -1931,7 +1933,7 @@ void InstrRefBasedLDV::produceMLocTransferFunction(
         Result.first->second = P;
     }
 
-    // Accumulate any bitmask operands into the clobberred reg mask for this
+    // Accumulate any bitmask operands into the clobbered reg mask for this
     // block.
     for (auto &P : MTracker->Masks) {
       BlockMasks[CurBB].clearBitsNotInMask(P.first->getRegMask(), BVWords);
@@ -2933,12 +2935,17 @@ void InstrRefBasedLDV::initialSetup(MachineFunction &MF) {
   // Compute mappings of block <=> RPO order.
   ReversePostOrderTraversal<MachineFunction *> RPOT(&MF);
   unsigned int RPONumber = 0;
-  for (MachineBasicBlock *MBB : RPOT) {
+  auto processMBB = [&](MachineBasicBlock *MBB) {
     OrderToBB[RPONumber] = MBB;
     BBToOrder[MBB] = RPONumber;
     BBNumToRPO[MBB->getNumber()] = RPONumber;
     ++RPONumber;
-  }
+  };
+  for (MachineBasicBlock *MBB : RPOT)
+    processMBB(MBB);
+  for (MachineBasicBlock &MBB : MF)
+    if (BBToOrder.find(&MBB) == BBToOrder.end())
+      processMBB(&MBB);
 
   // Order value substitutions by their "source" operand pair, for quick lookup.
   llvm::sort(MF.DebugValueSubstitutions);
@@ -3136,8 +3143,7 @@ bool InstrRefBasedLDV::emitTransfers(
                         MI->getDebugLoc()->getInlinedAt());
       Insts.emplace_back(AllVarsNumbering.find(Var)->second, MI);
     }
-    llvm::sort(Insts,
-               [](const auto &A, const auto &B) { return A.first < B.first; });
+    llvm::sort(Insts, llvm::less_first());
 
     // Insert either before or after the designated point...
     if (P.MBB) {
@@ -3709,10 +3715,9 @@ Optional<ValueIDNum> InstrRefBasedLDV::resolveDbgPHIsImpl(
   for (auto &PHI : CreatedPHIs)
     SortedPHIs.push_back(PHI);
 
-  std::sort(
-      SortedPHIs.begin(), SortedPHIs.end(), [&](LDVSSAPhi *A, LDVSSAPhi *B) {
-        return BBToOrder[&A->getParent()->BB] < BBToOrder[&B->getParent()->BB];
-      });
+  llvm::sort(SortedPHIs, [&](LDVSSAPhi *A, LDVSSAPhi *B) {
+    return BBToOrder[&A->getParent()->BB] < BBToOrder[&B->getParent()->BB];
+  });
 
   for (auto &PHI : SortedPHIs) {
     ValueIDNum ThisBlockValueNum =

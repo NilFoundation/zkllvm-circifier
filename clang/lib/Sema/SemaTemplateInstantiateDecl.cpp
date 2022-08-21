@@ -633,7 +633,7 @@ static bool isRelevantAttr(Sema &S, const Decl *D, const Attr *A) {
           FD->getReturnType()->isLValueReferenceType()) {
         return false;
       }
-      LLVM_FALLTHROUGH;
+      [[fallthrough]];
     case Builtin::BImove:
     case Builtin::BImove_if_noexcept:
       // HACK: Super-old versions of libc++ (3.1 and earlier) provide
@@ -2182,6 +2182,11 @@ Decl *TemplateDeclInstantiator::VisitFunctionDecl(
     // definition. We don't want non-template functions to be marked as being
     // template instantiations.
     Function->setInstantiationOfMemberFunction(D, TSK_ImplicitInstantiation);
+  } else if (!isFriend) {
+    // If this is not a function template, and this is not a friend (that is,
+    // this is a locally declared function), save the instantiation relationship
+    // for the purposes of constraint instantiation.
+    Function->setInstantiatedFromDecl(D);
   }
 
   if (isFriend) {
@@ -6142,6 +6147,8 @@ NamedDecl *Sema::FindInstantiatedDecl(SourceLocation Loc, NamedDecl *D,
 
       // Move to the outer template scope.
       if (FunctionDecl *FD = dyn_cast<FunctionDecl>(DC)) {
+        // FIXME: We should use `getNonTransparentDeclContext()` here instead
+        // of `getDeclContext()` once we find the invalid test case.
         if (FD->getFriendObjectKind() && FD->getDeclContext()->isFileContext()){
           DC = FD->getLexicalDeclContext();
           continue;

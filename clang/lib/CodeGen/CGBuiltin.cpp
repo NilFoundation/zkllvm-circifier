@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "ABIInfo.h"
 #include "CGCUDARuntime.h"
 #include "CGCXXABI.h"
 #include "CGObjCRuntime.h"
@@ -2204,7 +2205,15 @@ RValue CodeGenFunction::EmitBuiltinExpr(const GlobalDecl GD, unsigned BuiltinID,
   // might. Also, math builtins have the same semantics as their math library
   // twins. Thus, we can transform math library and builtin calls to their
   // LLVM counterparts if the call is marked 'const' (known to never set errno).
-  if (FD->hasAttr<ConstAttr>()) {
+  // In case FP exceptions are enabled, the experimental versions of the
+  // intrinsics model those.
+  bool ConstWithoutErrnoAndExceptions =
+      getContext().BuiltinInfo.isConstWithoutErrnoAndExceptions(BuiltinID);
+  bool ConstWithoutExceptions =
+      getContext().BuiltinInfo.isConstWithoutExceptions(BuiltinID);
+  if (FD->hasAttr<ConstAttr>() ||
+      ((ConstWithoutErrnoAndExceptions || ConstWithoutExceptions) &&
+       (!ConstWithoutErrnoAndExceptions || (!getLangOpts().MathErrno)))) {
     switch (BuiltinIDIfNoAsmLabel) {
     case Builtin::BIceil:
     case Builtin::BIceilf:
@@ -5034,7 +5043,7 @@ RValue CodeGenFunction::EmitBuiltinExpr(const GlobalDecl GD, unsigned BuiltinID,
         EmitLifetimeEnd(TmpSize, TmpPtr);
       return Call;
     }
-    LLVM_FALLTHROUGH;
+    [[fallthrough]];
   }
   // OpenCL v2.0 s6.13.17.6 - Kernel query functions need bitcast of block
   // parameter.
@@ -6636,7 +6645,7 @@ Value *CodeGenFunction::EmitCommonNeonBuiltinExpr(
   case NEON::BI__builtin_neon_vcalt_v:
   case NEON::BI__builtin_neon_vcaltq_v:
     std::swap(Ops[0], Ops[1]);
-    LLVM_FALLTHROUGH;
+    [[fallthrough]];
   case NEON::BI__builtin_neon_vcage_v:
   case NEON::BI__builtin_neon_vcageq_v:
   case NEON::BI__builtin_neon_vcagt_v:
@@ -8039,7 +8048,7 @@ Value *CodeGenFunction::EmitARMBuiltinExpr(unsigned BuiltinID,
       int Indices[] = {1 - Lane, Lane};
       return Builder.CreateShuffleVector(Ops[1], Ld, Indices, "vld1q_lane");
     }
-    LLVM_FALLTHROUGH;
+    [[fallthrough]];
   case NEON::BI__builtin_neon_vld1_lane_v: {
     Ops[1] = Builder.CreateBitCast(Ops[1], Ty);
     PtrOp0 = Builder.CreateElementBitCast(PtrOp0, VTy->getElementType());
@@ -8079,7 +8088,7 @@ Value *CodeGenFunction::EmitARMBuiltinExpr(unsigned BuiltinID,
   case NEON::BI__builtin_neon_vsri_n_v:
   case NEON::BI__builtin_neon_vsriq_n_v:
     rightShift = true;
-    LLVM_FALLTHROUGH;
+    [[fallthrough]];
   case NEON::BI__builtin_neon_vsli_n_v:
   case NEON::BI__builtin_neon_vsliq_n_v:
     Ops[2] = EmitNeonShiftVector(Ops[2], Ty, rightShift);
@@ -8102,7 +8111,7 @@ Value *CodeGenFunction::EmitARMBuiltinExpr(unsigned BuiltinID,
       return Builder.CreateCall(CGM.getIntrinsic(Intrinsic::arm_neon_vst1,
                                                  Tys), Ops);
     }
-    LLVM_FALLTHROUGH;
+    [[fallthrough]];
   case NEON::BI__builtin_neon_vst1_lane_v: {
     Ops[1] = Builder.CreateBitCast(Ops[1], Ty);
     Ops[1] = Builder.CreateExtractElement(Ops[1], Ops[2]);
@@ -10121,7 +10130,7 @@ Value *CodeGenFunction::EmitAArch64BuiltinExpr(unsigned BuiltinID,
   case NEON::BI__builtin_neon_vcvts_f32_u32:
   case NEON::BI__builtin_neon_vcvtd_f64_u64:
     usgn = true;
-    LLVM_FALLTHROUGH;
+    [[fallthrough]];
   case NEON::BI__builtin_neon_vcvts_f32_s32:
   case NEON::BI__builtin_neon_vcvtd_f64_s64: {
     Ops.push_back(EmitScalarExpr(E->getArg(0)));
@@ -10137,7 +10146,7 @@ Value *CodeGenFunction::EmitAArch64BuiltinExpr(unsigned BuiltinID,
   case NEON::BI__builtin_neon_vcvth_f16_u32:
   case NEON::BI__builtin_neon_vcvth_f16_u64:
     usgn = true;
-    LLVM_FALLTHROUGH;
+    [[fallthrough]];
   case NEON::BI__builtin_neon_vcvth_f16_s16:
   case NEON::BI__builtin_neon_vcvth_f16_s32:
   case NEON::BI__builtin_neon_vcvth_f16_s64: {
@@ -11270,7 +11279,7 @@ Value *CodeGenFunction::EmitAArch64BuiltinExpr(unsigned BuiltinID,
   case NEON::BI__builtin_neon_vaddv_u8:
     // FIXME: These are handled by the AArch64 scalar code.
     usgn = true;
-    LLVM_FALLTHROUGH;
+    [[fallthrough]];
   case NEON::BI__builtin_neon_vaddv_s8: {
     Int = usgn ? Intrinsic::aarch64_neon_uaddv : Intrinsic::aarch64_neon_saddv;
     Ty = Int32Ty;
@@ -11282,7 +11291,7 @@ Value *CodeGenFunction::EmitAArch64BuiltinExpr(unsigned BuiltinID,
   }
   case NEON::BI__builtin_neon_vaddv_u16:
     usgn = true;
-    LLVM_FALLTHROUGH;
+    [[fallthrough]];
   case NEON::BI__builtin_neon_vaddv_s16: {
     Int = usgn ? Intrinsic::aarch64_neon_uaddv : Intrinsic::aarch64_neon_saddv;
     Ty = Int32Ty;
@@ -11294,7 +11303,7 @@ Value *CodeGenFunction::EmitAArch64BuiltinExpr(unsigned BuiltinID,
   }
   case NEON::BI__builtin_neon_vaddvq_u8:
     usgn = true;
-    LLVM_FALLTHROUGH;
+    [[fallthrough]];
   case NEON::BI__builtin_neon_vaddvq_s8: {
     Int = usgn ? Intrinsic::aarch64_neon_uaddv : Intrinsic::aarch64_neon_saddv;
     Ty = Int32Ty;
@@ -11306,7 +11315,7 @@ Value *CodeGenFunction::EmitAArch64BuiltinExpr(unsigned BuiltinID,
   }
   case NEON::BI__builtin_neon_vaddvq_u16:
     usgn = true;
-    LLVM_FALLTHROUGH;
+    [[fallthrough]];
   case NEON::BI__builtin_neon_vaddvq_s16: {
     Int = usgn ? Intrinsic::aarch64_neon_uaddv : Intrinsic::aarch64_neon_saddv;
     Ty = Int32Ty;
@@ -11936,7 +11945,7 @@ Value *CodeGenFunction::EmitBPFBuiltinExpr(unsigned BuiltinID,
          "unexpected BPF builtin");
 
   // A sequence number, injected into IR builtin functions, to
-  // prevent CSE given the only difference of the funciton
+  // prevent CSE given the only difference of the function
   // may just be the debuginfo metadata.
   static uint32_t BuiltinSeqNum;
 
@@ -12349,7 +12358,7 @@ static Value *EmitX86FMAExpr(CodeGenFunction &CGF, const CallExpr *E,
   default: break;
   case clang::X86::BI__builtin_ia32_vfmsubph512_mask3:
     Subtract = true;
-    LLVM_FALLTHROUGH;
+    [[fallthrough]];
   case clang::X86::BI__builtin_ia32_vfmaddph512_mask:
   case clang::X86::BI__builtin_ia32_vfmaddph512_maskz:
   case clang::X86::BI__builtin_ia32_vfmaddph512_mask3:
@@ -12357,7 +12366,7 @@ static Value *EmitX86FMAExpr(CodeGenFunction &CGF, const CallExpr *E,
     break;
   case clang::X86::BI__builtin_ia32_vfmsubaddph512_mask3:
     Subtract = true;
-    LLVM_FALLTHROUGH;
+    [[fallthrough]];
   case clang::X86::BI__builtin_ia32_vfmaddsubph512_mask:
   case clang::X86::BI__builtin_ia32_vfmaddsubph512_maskz:
   case clang::X86::BI__builtin_ia32_vfmaddsubph512_mask3:
@@ -12365,21 +12374,21 @@ static Value *EmitX86FMAExpr(CodeGenFunction &CGF, const CallExpr *E,
     break;
   case clang::X86::BI__builtin_ia32_vfmsubps512_mask3:
     Subtract = true;
-    LLVM_FALLTHROUGH;
+    [[fallthrough]];
   case clang::X86::BI__builtin_ia32_vfmaddps512_mask:
   case clang::X86::BI__builtin_ia32_vfmaddps512_maskz:
   case clang::X86::BI__builtin_ia32_vfmaddps512_mask3:
     IID = llvm::Intrinsic::x86_avx512_vfmadd_ps_512; break;
   case clang::X86::BI__builtin_ia32_vfmsubpd512_mask3:
     Subtract = true;
-    LLVM_FALLTHROUGH;
+    [[fallthrough]];
   case clang::X86::BI__builtin_ia32_vfmaddpd512_mask:
   case clang::X86::BI__builtin_ia32_vfmaddpd512_maskz:
   case clang::X86::BI__builtin_ia32_vfmaddpd512_mask3:
     IID = llvm::Intrinsic::x86_avx512_vfmadd_pd_512; break;
   case clang::X86::BI__builtin_ia32_vfmsubaddps512_mask3:
     Subtract = true;
-    LLVM_FALLTHROUGH;
+    [[fallthrough]];
   case clang::X86::BI__builtin_ia32_vfmaddsubps512_mask:
   case clang::X86::BI__builtin_ia32_vfmaddsubps512_maskz:
   case clang::X86::BI__builtin_ia32_vfmaddsubps512_mask3:
@@ -12387,7 +12396,7 @@ static Value *EmitX86FMAExpr(CodeGenFunction &CGF, const CallExpr *E,
     break;
   case clang::X86::BI__builtin_ia32_vfmsubaddpd512_mask3:
     Subtract = true;
-    LLVM_FALLTHROUGH;
+    [[fallthrough]];
   case clang::X86::BI__builtin_ia32_vfmaddsubpd512_mask:
   case clang::X86::BI__builtin_ia32_vfmaddsubpd512_maskz:
   case clang::X86::BI__builtin_ia32_vfmaddsubpd512_mask3:
@@ -14727,7 +14736,7 @@ Value *CodeGenFunction::EmitX86BuiltinExpr(unsigned BuiltinID,
   case X86::BI__builtin_ia32_cmppd256_mask:
   case X86::BI__builtin_ia32_cmppd512_mask:
     IsMaskFCmp = true;
-    LLVM_FALLTHROUGH;
+    [[fallthrough]];
   case X86::BI__builtin_ia32_cmpps:
   case X86::BI__builtin_ia32_cmpps256:
   case X86::BI__builtin_ia32_cmppd:
@@ -15216,7 +15225,7 @@ Value *CodeGenFunction::EmitX86BuiltinExpr(unsigned BuiltinID,
   }
   case X86::BI__builtin_ia32_vfcmaddcph512_mask:
     IsConjFMA = true;
-    LLVM_FALLTHROUGH;
+    [[fallthrough]];
   case X86::BI__builtin_ia32_vfmaddcph512_mask: {
     Intrinsic::ID IID = IsConjFMA
                             ? Intrinsic::x86_avx512fp16_mask_vfcmadd_cph_512
@@ -15226,7 +15235,7 @@ Value *CodeGenFunction::EmitX86BuiltinExpr(unsigned BuiltinID,
   }
   case X86::BI__builtin_ia32_vfcmaddcsh_round_mask:
     IsConjFMA = true;
-    LLVM_FALLTHROUGH;
+    [[fallthrough]];
   case X86::BI__builtin_ia32_vfmaddcsh_round_mask: {
     Intrinsic::ID IID = IsConjFMA ? Intrinsic::x86_avx512fp16_mask_vfcmadd_csh
                                   : Intrinsic::x86_avx512fp16_mask_vfmadd_csh;
@@ -15236,7 +15245,7 @@ Value *CodeGenFunction::EmitX86BuiltinExpr(unsigned BuiltinID,
   }
   case X86::BI__builtin_ia32_vfcmaddcsh_round_mask3:
     IsConjFMA = true;
-    LLVM_FALLTHROUGH;
+    [[fallthrough]];
   case X86::BI__builtin_ia32_vfmaddcsh_round_mask3: {
     Intrinsic::ID IID = IsConjFMA ? Intrinsic::x86_avx512fp16_mask_vfcmadd_csh
                                   : Intrinsic::x86_avx512fp16_mask_vfmadd_csh;
@@ -16237,7 +16246,7 @@ Value *CodeGenFunction::EmitPPCBuiltinExpr(unsigned BuiltinID,
     auto Pair = EmitAtomicCompareExchange(
         LV, RValue::get(OldVal), RValue::get(Op2), E->getExprLoc(),
         llvm::AtomicOrdering::Monotonic, llvm::AtomicOrdering::Monotonic, true);
-    // Unlike c11's atomic_compare_exchange, accroding to
+    // Unlike c11's atomic_compare_exchange, according to
     // https://www.ibm.com/docs/en/xl-c-and-cpp-aix/16.1?topic=functions-compare-swap-compare-swaplp
     // > In either case, the contents of the memory location specified by addr
     // > are copied into the memory location specified by old_val_addr.
@@ -16506,39 +16515,35 @@ Value *EmitAMDGPUGridSize(CodeGenFunction &CGF, unsigned Index) {
 // it into LLVM's memory ordering specifier using atomic C ABI, and writes
 // to \p AO. \p Scope takes a const char * and converts it into AMDGCN
 // specific SyncScopeID and writes it to \p SSID.
-bool CodeGenFunction::ProcessOrderScopeAMDGCN(Value *Order, Value *Scope,
+void CodeGenFunction::ProcessOrderScopeAMDGCN(Value *Order, Value *Scope,
                                               llvm::AtomicOrdering &AO,
                                               llvm::SyncScope::ID &SSID) {
-  if (isa<llvm::ConstantInt>(Order)) {
-    int ord = cast<llvm::ConstantInt>(Order)->getZExtValue();
+  int ord = cast<llvm::ConstantInt>(Order)->getZExtValue();
 
-    // Map C11/C++11 memory ordering to LLVM memory ordering
-    assert(llvm::isValidAtomicOrderingCABI(ord));
-    switch (static_cast<llvm::AtomicOrderingCABI>(ord)) {
-    case llvm::AtomicOrderingCABI::acquire:
-    case llvm::AtomicOrderingCABI::consume:
-      AO = llvm::AtomicOrdering::Acquire;
-      break;
-    case llvm::AtomicOrderingCABI::release:
-      AO = llvm::AtomicOrdering::Release;
-      break;
-    case llvm::AtomicOrderingCABI::acq_rel:
-      AO = llvm::AtomicOrdering::AcquireRelease;
-      break;
-    case llvm::AtomicOrderingCABI::seq_cst:
-      AO = llvm::AtomicOrdering::SequentiallyConsistent;
-      break;
-    case llvm::AtomicOrderingCABI::relaxed:
-      AO = llvm::AtomicOrdering::Monotonic;
-      break;
-    }
-
-    StringRef scp;
-    llvm::getConstantStringInfo(Scope, scp);
-    SSID = getLLVMContext().getOrInsertSyncScopeID(scp);
-    return true;
+  // Map C11/C++11 memory ordering to LLVM memory ordering
+  assert(llvm::isValidAtomicOrderingCABI(ord));
+  switch (static_cast<llvm::AtomicOrderingCABI>(ord)) {
+  case llvm::AtomicOrderingCABI::acquire:
+  case llvm::AtomicOrderingCABI::consume:
+    AO = llvm::AtomicOrdering::Acquire;
+    break;
+  case llvm::AtomicOrderingCABI::release:
+    AO = llvm::AtomicOrdering::Release;
+    break;
+  case llvm::AtomicOrderingCABI::acq_rel:
+    AO = llvm::AtomicOrdering::AcquireRelease;
+    break;
+  case llvm::AtomicOrderingCABI::seq_cst:
+    AO = llvm::AtomicOrdering::SequentiallyConsistent;
+    break;
+  case llvm::AtomicOrderingCABI::relaxed:
+    AO = llvm::AtomicOrdering::Monotonic;
+    break;
   }
-  return false;
+
+  StringRef scp;
+  llvm::getConstantStringInfo(Scope, scp);
+  SSID = getLLVMContext().getOrInsertSyncScopeID(scp);
 }
 
 Value *CodeGenFunction::EmitAMDGPUBuiltinExpr(unsigned BuiltinID,
@@ -16968,12 +16973,10 @@ Value *CodeGenFunction::EmitAMDGPUBuiltinExpr(unsigned BuiltinID,
     Function *F = CGM.getIntrinsic(Intrinsic::fshr, Src0->getType());
     return Builder.CreateCall(F, { Src0, Src1, Src2 });
   }
-
   case AMDGPU::BI__builtin_amdgcn_fence: {
-    if (ProcessOrderScopeAMDGCN(EmitScalarExpr(E->getArg(0)),
-                                EmitScalarExpr(E->getArg(1)), AO, SSID))
-      return Builder.CreateFence(AO, SSID);
-    LLVM_FALLTHROUGH;
+    ProcessOrderScopeAMDGCN(EmitScalarExpr(E->getArg(0)),
+                            EmitScalarExpr(E->getArg(1)), AO, SSID);
+    return Builder.CreateFence(AO, SSID);
   }
   case AMDGPU::BI__builtin_amdgcn_atomic_inc32:
   case AMDGPU::BI__builtin_amdgcn_atomic_inc64:
@@ -16999,22 +17002,20 @@ Value *CodeGenFunction::EmitAMDGPUBuiltinExpr(unsigned BuiltinID,
     llvm::Function *F =
         CGM.getIntrinsic(BuiltinAtomicOp, {ResultType, Ptr->getType()});
 
-    if (ProcessOrderScopeAMDGCN(EmitScalarExpr(E->getArg(2)),
-                                EmitScalarExpr(E->getArg(3)), AO, SSID)) {
+    ProcessOrderScopeAMDGCN(EmitScalarExpr(E->getArg(2)),
+                            EmitScalarExpr(E->getArg(3)), AO, SSID);
 
-      // llvm.amdgcn.atomic.inc and llvm.amdgcn.atomic.dec expects ordering and
-      // scope as unsigned values
-      Value *MemOrder = Builder.getInt32(static_cast<int>(AO));
-      Value *MemScope = Builder.getInt32(static_cast<int>(SSID));
+    // llvm.amdgcn.atomic.inc and llvm.amdgcn.atomic.dec expects ordering and
+    // scope as unsigned values
+    Value *MemOrder = Builder.getInt32(static_cast<int>(AO));
+    Value *MemScope = Builder.getInt32(static_cast<int>(SSID));
 
-      QualType PtrTy = E->getArg(0)->IgnoreImpCasts()->getType();
-      bool Volatile =
-          PtrTy->castAs<PointerType>()->getPointeeType().isVolatileQualified();
-      Value *IsVolatile = Builder.getInt1(static_cast<bool>(Volatile));
+    QualType PtrTy = E->getArg(0)->IgnoreImpCasts()->getType();
+    bool Volatile =
+      PtrTy->castAs<PointerType>()->getPointeeType().isVolatileQualified();
+    Value *IsVolatile = Builder.getInt1(static_cast<bool>(Volatile));
 
-      return Builder.CreateCall(F, {Ptr, Val, MemOrder, MemScope, IsVolatile});
-    }
-    LLVM_FALLTHROUGH;
+    return Builder.CreateCall(F, {Ptr, Val, MemOrder, MemScope, IsVolatile});
   }
   default:
     return nullptr;
@@ -19116,6 +19117,9 @@ Value *CodeGenFunction::EmitRISCVBuiltinExpr(unsigned BuiltinID,
   Intrinsic::ID ID = Intrinsic::not_intrinsic;
   unsigned NF = 1;
   constexpr unsigned TAIL_UNDISTURBED = 0;
+  constexpr unsigned TAIL_AGNOSTIC = 1;
+  constexpr unsigned TAIL_AGNOSTIC_MASK_AGNOSTIC = 3;
+  int DefaultPolicy = TAIL_UNDISTURBED;
 
   // Required for overloaded intrinsics.
   llvm::SmallVector<llvm::Type *, 2> IntrinsicTypes;

@@ -1737,7 +1737,7 @@ OpFoldResult BroadcastOp::fold(ArrayRef<Attribute> operands) {
   if (!operands[0])
     return {};
   auto vectorType = getVectorType();
-  if (operands[0].getType().isIntOrIndexOrFloat())
+  if (operands[0].isa<IntegerAttr, FloatAttr>())
     return DenseElementsAttr::get(vectorType, operands[0]);
   if (auto attr = operands[0].dyn_cast<SplatElementsAttr>())
     return DenseElementsAttr::get(vectorType, attr.getSplatValue<Attribute>());
@@ -1855,7 +1855,7 @@ OpFoldResult vector::ShuffleOp::fold(ArrayRef<Attribute> operands) {
   if (!lhs || !rhs)
     return {};
 
-  auto lhsType = lhs.getType().cast<VectorType>();
+  auto lhsType = lhs.cast<DenseElementsAttr>().getType().cast<VectorType>();
   // Only support 1-D for now to avoid complicated n-D DenseElementsAttr
   // manipulation.
   if (lhsType.getRank() != 1)
@@ -2100,7 +2100,7 @@ void InsertStridedSliceOp::build(OpBuilder &builder, OperationState &result,
   result.addAttribute(getStridesAttrStrName(), stridesAttr);
 }
 
-// TODO: Should be moved to Tablegen Confined attributes.
+// TODO: Should be moved to Tablegen ConfinedAttr attributes.
 template <typename OpType>
 static LogicalResult isIntegerArrayAttrSmallerThanShape(OpType op,
                                                         ArrayAttr arrayAttr,
@@ -3015,10 +3015,10 @@ ParseResult TransferReadOp::parse(OpAsmParser &parser, OperationState &result) {
     if (parser.resolveOperand(maskInfo, maskType, result.operands))
       return failure();
   }
-  result.addAttribute(
-      TransferReadOp::getOperandSegmentSizeAttr(),
-      builder.getI32VectorAttr({1, static_cast<int32_t>(indexInfo.size()), 1,
-                                static_cast<int32_t>(hasMask.succeeded())}));
+  result.addAttribute(TransferReadOp::getOperandSegmentSizeAttr(),
+                      builder.getDenseI32ArrayAttr(
+                          {1, static_cast<int32_t>(indexInfo.size()), 1,
+                           static_cast<int32_t>(hasMask.succeeded())}));
   return parser.addTypeToList(vectorType, result.types);
 }
 
@@ -3284,11 +3284,91 @@ public:
     return success();
   }
 };
+
+/// Store to load forwarding for transfer operations with permuation maps.
+/// Even if the permutation maps are different we can still propagate the store
+/// into the load if the size of the dimensions read and written match. Then we
+/// can replace the transfer_read + transfer_write by vector.broadcast and
+/// vector.transpose.
+/// Example:
+/// ```
+/// %w0 = vector.transfer_write %v0, %arg0[%c0, %c0, %c0]
+///  {in_bounds = [true, true],
+///   permutation_map = affine_map<(d0, d1, d2) -> (d2, d1)>} :
+///   vector<4x1xf32>, tensor<4x4x4xf32>
+///  %r = vector.transfer_read %w0[%c0, %c0, %c0], %cf0
+///   {in_bounds = [true, true, true, true],
+///   permutation_map = affine_map<(d0, d1, d2) -> (d1, 0, d2, 0)>} :
+///   tensor<4x4x4xf32>, vector<1x100x4x5xf32>
+/// ```
+/// To:
+/// ```
+/// %0 = vector.broadcast %arg1 : vector<4x1xf32> to vector<100x5x4x1xf32>
+/// %r = vector.transpose %0, [3, 0, 2, 1] :
+///   vector<100x5x4x1xf32> to vector<1x100x4x5xf32>
+/// ```
+struct TransferReadAfterWriteToBroadcast
+    : public OpRewritePattern<TransferReadOp> {
+  using OpRewritePattern<TransferReadOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(TransferReadOp readOp,
+                                PatternRewriter &rewriter) const override {
+    if (readOp.hasOutOfBoundsDim() ||
+        !readOp.getShapedType().isa<RankedTensorType>())
+      return failure();
+    auto defWrite = readOp.getSource().getDefiningOp<vector::TransferWriteOp>();
+    if (!defWrite)
+      return failure();
+
+    SmallVector<int64_t> readDims = readOp.getTransferChunkAccessed();
+    Value vec;
+    if (readOp.getIndices() == defWrite.getIndices() &&
+        readOp.getMask() == defWrite.getMask()) {
+      SmallVector<int64_t> writeDims = defWrite.getTransferChunkAccessed();
+      // TODO: If the writeDim is a superset of the read dims we could do an
+      // extract_strided_slice.
+      if (writeDims == readDims)
+        vec = defWrite.getVector();
+    }
+    // TODO: loop through the chain of transfer_write if we can prove that they
+    // don't overlap with the transfer_read. This requires improving
+    // `isDisjointTransferIndices` helper.
+    if (!vec)
+      return failure();
+    SmallVector<unsigned> permutation;
+    AffineMap readMap = compressUnusedDims(readOp.getPermutationMap());
+    AffineMap writeMap = compressUnusedDims(defWrite.getPermutationMap());
+    AffineMap map = readMap.compose(writeMap);
+    if (map.getNumResults() == 0)
+      return failure();
+    // Calculate the permuation to apply to go from the vector stored to the
+    // vector read.
+    if (!map.isPermutationOfMinorIdentityWithBroadcasting(permutation))
+      return failure();
+
+    Location loc = readOp.getLoc();
+    // Calculate the broadcast shape by applying the reverse permuation to the
+    // final shape we want.
+    ArrayRef<int64_t> destShape = readOp.getVectorType().getShape();
+    SmallVector<int64_t> broadcastShape(destShape.size());
+    for (const auto &pos : llvm::enumerate(permutation))
+      broadcastShape[pos.value()] = destShape[pos.index()];
+    VectorType broadcastedType = VectorType::get(
+        broadcastShape, defWrite.getVectorType().getElementType());
+    vec = rewriter.create<vector::BroadcastOp>(loc, broadcastedType, vec);
+    SmallVector<int64_t> transposePerm(permutation.begin(), permutation.end());
+    rewriter.replaceOpWithNewOp<vector::TransposeOp>(readOp, vec,
+                                                     transposePerm);
+    return success();
+  }
+};
 } // namespace
 
 void TransferReadOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                  MLIRContext *context) {
-  results.add<FoldExtractSliceIntoTransferRead>(context);
+  results
+      .add<FoldExtractSliceIntoTransferRead, TransferReadAfterWriteToBroadcast>(
+          context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -3385,10 +3465,10 @@ ParseResult TransferWriteOp::parse(OpAsmParser &parser,
     if (parser.resolveOperand(maskInfo, maskType, result.operands))
       return failure();
   }
-  result.addAttribute(
-      TransferWriteOp::getOperandSegmentSizeAttr(),
-      builder.getI32VectorAttr({1, 1, static_cast<int32_t>(indexInfo.size()),
-                                static_cast<int32_t>(hasMask.succeeded())}));
+  result.addAttribute(TransferWriteOp::getOperandSegmentSizeAttr(),
+                      builder.getDenseI32ArrayAttr(
+                          {1, 1, static_cast<int32_t>(indexInfo.size()),
+                           static_cast<int32_t>(hasMask.succeeded())}));
   return failure(shapedType.isa<RankedTensorType>() &&
                  parser.addTypeToList(shapedType, result.types));
 }
@@ -3985,12 +4065,15 @@ LogicalResult GatherOp::verify() {
   VectorType indVType = getIndexVectorType();
   VectorType maskVType = getMaskVectorType();
   VectorType resVType = getVectorType();
-  MemRefType memType = getMemRefType();
+  ShapedType baseType = getBaseType();
 
-  if (resVType.getElementType() != memType.getElementType())
+  if (!baseType.isa<MemRefType, RankedTensorType>())
+    return emitOpError("requires base to be a memref or ranked tensor type");
+
+  if (resVType.getElementType() != baseType.getElementType())
     return emitOpError("base and result element type should match");
-  if (llvm::size(getIndices()) != memType.getRank())
-    return emitOpError("requires ") << memType.getRank() << " indices";
+  if (llvm::size(getIndices()) != baseType.getRank())
+    return emitOpError("requires ") << baseType.getRank() << " indices";
   if (resVType.getDimSize(0) != indVType.getDimSize(0))
     return emitOpError("expected result dim to match indices dim");
   if (resVType.getDimSize(0) != maskVType.getDimSize(0))

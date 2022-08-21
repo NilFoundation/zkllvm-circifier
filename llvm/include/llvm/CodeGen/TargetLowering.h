@@ -834,8 +834,8 @@ public:
   virtual EVT getSetCCResultType(const DataLayout &DL, LLVMContext &Context,
                                  EVT VT) const;
 
-  /// Return the ValueType for comparison libcalls. Comparions libcalls include
-  /// floating point comparion calls, and Ordered/Unordered check calls on
+  /// Return the ValueType for comparison libcalls. Comparison libcalls include
+  /// floating point comparison calls, and Ordered/Unordered check calls on
   /// floating point numbers.
   virtual
   MVT::SimpleValueType getCmpLibcallReturnType() const;
@@ -1960,7 +1960,8 @@ public:
 
   /// Perform a masked atomicrmw using a target-specific intrinsic. This
   /// represents the core LL/SC loop which will be lowered at a late stage by
-  /// the backend.
+  /// the backend. The target-specific intrinsic returns the loaded value and
+  /// is not responsible for masking and shifting the result.
   virtual Value *emitMaskedAtomicRMWIntrinsic(IRBuilderBase &Builder,
                                               AtomicRMWInst *AI,
                                               Value *AlignedAddr, Value *Incr,
@@ -1979,7 +1980,8 @@ public:
 
   /// Perform a masked cmpxchg using a target-specific intrinsic. This
   /// represents the core LL/SC loop which will be lowered at a late stage by
-  /// the backend.
+  /// the backend. The target-specific intrinsic returns the loaded value and
+  /// is not responsible for masking and shifting the result.
   virtual Value *emitMaskedAtomicCmpXchgIntrinsic(
       IRBuilderBase &Builder, AtomicCmpXchgInst *CI, Value *AlignedAddr,
       Value *CmpVal, Value *NewVal, Value *Mask, AtomicOrdering Ord) const {
@@ -3774,6 +3776,14 @@ public:
       SDValue Op, const APInt &DemandedElts, const SelectionDAG &DAG,
       bool PoisonOnly, unsigned Depth) const;
 
+  /// Return true if Op can create undef or poison from non-undef & non-poison
+  /// operands. The DemandedElts argument limits the check to the requested
+  /// vector elements.
+  virtual bool
+  canCreateUndefOrPoisonForTargetNode(SDValue Op, const APInt &DemandedElts,
+                                      const SelectionDAG &DAG, bool PoisonOnly,
+                                      bool ConsiderFlags, unsigned Depth) const;
+
   /// Tries to build a legal vector shuffle using the provided parameters
   /// or equivalent variations. The Mask argument maybe be modified as the
   /// function tries different variations.
@@ -4754,6 +4764,12 @@ public:
   /// \param N Node to expand
   /// \returns The expansion result or SDValue() if it fails.
   SDValue expandCTLZ(SDNode *N, SelectionDAG &DAG) const;
+
+  /// Expand CTTZ via Table Lookup.
+  /// \param N Node to expand
+  /// \returns The expansion result or SDValue() if it fails.
+  SDValue CTTZTableLookup(SDNode *N, SelectionDAG &DAG, const SDLoc &DL, EVT VT,
+                          SDValue Op, unsigned NumBitsPerElt) const;
 
   /// Expand CTTZ/CTTZ_ZERO_UNDEF nodes. Expands vector/scalar CTTZ nodes,
   /// vector nodes can only succeed if all operations are legal/custom.

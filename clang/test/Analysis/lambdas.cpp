@@ -203,6 +203,22 @@ void testVariableLengthArrayCaptured() {
   clang_analyzer_eval(i == 7); // expected-warning{{TRUE}}
 }
 
+#if __cplusplus >= 201402L
+// Capture copy elided object.
+
+struct Elided{
+  int x = 0;
+  Elided(int) {}
+};
+
+void testCopyElidedObjectCaptured(int x) {
+  [e = Elided(x)] {
+    clang_analyzer_eval(e.x == 0); // expected-warning{{TRUE}}
+  }();
+}
+
+#endif
+
 // Test inline defensive checks
 int getNum();
 
@@ -399,8 +415,8 @@ int f() {
 // CHECK:   Succs (1): B1
 // CHECK: [B1]
 // CHECK:   1: x
-// CHECK:   2: [B1.1] (ImplicitCastExpr, NoOp, const struct X)
-// CHECK:   3: [B1.2] (CXXConstructExpr, struct X)
+// CHECK:   2: [B1.1] (ImplicitCastExpr, NoOp, const X)
+// CHECK:   3: [B1.2] (CXXConstructExpr[B1.4]+0, X)
 // CHECK:   4: [x]     {
 // CHECK:    }
 // CHECK:   5: (void)[B1.4] (CStyleCastExpr, ToVoid, void)
@@ -408,4 +424,3 @@ int f() {
 // CHECK:   Succs (1): B0
 // CHECK: [B0 (EXIT)]
 // CHECK:   Preds (1): B1
-

@@ -298,6 +298,9 @@ RawComment *ASTContext::getRawCommentForDeclNoCache(const Decl *D) const {
     return nullptr;
 
   const FileID File = SourceMgr.getDecomposedLoc(DeclLoc).first;
+  if (!File.isValid()) {
+    return nullptr;
+  }
   const auto CommentsInThisFile = Comments.getCommentsInFile(File);
   if (!CommentsInThisFile || CommentsInThisFile->empty())
     return nullptr;
@@ -2088,7 +2091,7 @@ TypeInfo ASTContext::getTypeInfoImpl(const Type *T) const {
     case BuiltinType::Int128:
     case BuiltinType::UInt128:
       Width = 128;
-      Align = 128; // int128_t is 128-bit aligned on all targets.
+      Align = Target->getInt128Align();
       break;
     case BuiltinType::ShortAccum:
     case BuiltinType::UShortAccum:
@@ -2491,7 +2494,7 @@ CharUnits ASTContext::getTypeAlignInChars(const Type *T) const {
 }
 
 /// getTypeUnadjustedAlignInChars - Return the ABI-specified alignment of a
-/// type, in characters, before alignment adustments. This method does
+/// type, in characters, before alignment adjustments. This method does
 /// not work on incomplete types.
 CharUnits ASTContext::getTypeUnadjustedAlignInChars(QualType T) const {
   return toCharUnitsFromBits(getTypeUnadjustedAlign(T));
@@ -4426,7 +4429,7 @@ QualType ASTContext::getFunctionTypeInternal(
       case EST_Unparsed: case EST_Unevaluated: case EST_Uninstantiated:
         // We don't know yet. It shouldn't matter what we pick here; no-one
         // should ever look at this.
-        LLVM_FALLTHROUGH;
+        [[fallthrough]];
       case EST_None: case EST_MSAny: case EST_NoexceptFalse:
         CanonicalEPI.ExceptionSpec.Type = EST_None;
         break;
@@ -4750,19 +4753,20 @@ QualType ASTContext::getBTFTagAttributedType(const BTFTypeTagAttr *BTFAttr,
 /// Retrieve a substitution-result type.
 QualType
 ASTContext::getSubstTemplateTypeParmType(const TemplateTypeParmType *Parm,
-                                         QualType Replacement) const {
+                                         QualType Replacement,
+                                         Optional<unsigned> PackIndex) const {
   assert(Replacement.isCanonical()
          && "replacement types must always be canonical");
 
   llvm::FoldingSetNodeID ID;
-  SubstTemplateTypeParmType::Profile(ID, Parm, Replacement);
+  SubstTemplateTypeParmType::Profile(ID, Parm, Replacement, PackIndex);
   void *InsertPos = nullptr;
   SubstTemplateTypeParmType *SubstParm
     = SubstTemplateTypeParmTypes.FindNodeOrInsertPos(ID, InsertPos);
 
   if (!SubstParm) {
     SubstParm = new (*this, TypeAlignment)
-      SubstTemplateTypeParmType(Parm, Replacement);
+        SubstTemplateTypeParmType(Parm, Replacement, PackIndex);
     Types.push_back(SubstParm);
     SubstTemplateTypeParmTypes.InsertNode(SubstParm, InsertPos);
   }
@@ -7822,7 +7826,7 @@ ASTContext::getObjCEncodingForPropertyDecl(const ObjCPropertyDecl *PD,
 /// 'l' or 'L' , but not always.  For typedefs, we need to use
 /// 'i' or 'I' instead if encoding a struct field, or a pointer!
 void ASTContext::getLegacyIntegralTypeEncoding (QualType &PointeeTy) const {
-  if (isa<TypedefType>(PointeeTy.getTypePtr())) {
+  if (PointeeTy->getAs<TypedefType>()) {
     if (const auto *BT = PointeeTy->getAs<BuiltinType>()) {
       if (BT->getKind() == BuiltinType::ULong && getIntWidth(PointeeTy) == 32)
         PointeeTy = UnsignedIntTy;
@@ -8112,7 +8116,7 @@ void ASTContext::getObjCEncodingForTypeImpl(QualType T, std::string &S,
     // pointee gets emitted _before_ the '^'.  The read-only qualifier of
     // the pointer itself gets ignored, _unless_ we are looking at a typedef!
     // Also, do not emit the 'r' for anything but the outermost type!
-    if (isa<TypedefType>(T.getTypePtr())) {
+    if (T->getAs<TypedefType>()) {
       if (Options.IsOutermostType() && T.isConstQualified()) {
         isReadOnly = true;
         S += 'r';
@@ -8294,7 +8298,7 @@ void ASTContext::getObjCEncodingForTypeImpl(QualType T, std::string &S,
       return;
     }
     // TODO: Double check to make sure this intentionally falls through.
-    LLVM_FALLTHROUGH;
+    [[fallthrough]];
   }
 
   case Type::ObjCInterface: {
@@ -11681,7 +11685,7 @@ void ASTContext::forEachMultiversionedFunctionVersion(
        FD->getDeclContext()->getRedeclContext()->lookup(FD->getDeclName())) {
     FunctionDecl *CurFD = CurDecl->getAsFunction()->getMostRecentDecl();
     if (CurFD && hasSameType(CurFD->getType(), FD->getType()) &&
-        std::end(SeenDecls) == llvm::find(SeenDecls, CurFD)) {
+        !llvm::is_contained(SeenDecls, CurFD)) {
       SeenDecls.insert(CurFD);
       Pred(CurFD);
     }

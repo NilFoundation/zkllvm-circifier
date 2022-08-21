@@ -27,7 +27,7 @@
 _LIBCPP_BEGIN_NAMESPACE_STD
 
 template <class _AlgPolicy, class _Compare, class _InputIterator1, class _InputIterator2>
-void
+_LIBCPP_HIDE_FROM_ABI void
 __merge_move_construct(_InputIterator1 __first1, _InputIterator1 __last1,
         _InputIterator2 __first2, _InputIterator2 __last2,
         typename iterator_traits<_InputIterator1>::value_type* __result, _Compare __comp)
@@ -69,7 +69,7 @@ __merge_move_construct(_InputIterator1 __first1, _InputIterator1 __last1,
 }
 
 template <class _AlgPolicy, class _Compare, class _InputIterator1, class _InputIterator2, class _OutputIterator>
-void
+_LIBCPP_HIDE_FROM_ABI void
 __merge_move_assign(_InputIterator1 __first1, _InputIterator1 __last1,
         _InputIterator2 __first2, _InputIterator2 __last2,
         _OutputIterator __result, _Compare __comp)
@@ -203,7 +203,7 @@ __stable_sort(_RandomAccessIterator __first, _RandomAccessIterator __last, _Comp
     }
     std::__stable_sort<_AlgPolicy, _Compare>(__first, __m, __comp, __l2, __buff, __buff_size);
     std::__stable_sort<_AlgPolicy, _Compare>(__m, __last, __comp, __len - __l2, __buff, __buff_size);
-    std::__inplace_merge<_AlgPolicy, _Compare>(__first, __m, __last, __comp, __l2, __len - __l2, __buff, __buff_size);
+    std::__inplace_merge<_AlgPolicy>(__first, __m, __last, __comp, __l2, __len - __l2, __buff, __buff_size);
 }
 
 template <class _AlgPolicy, class _RandomAccessIterator, class _Compare>

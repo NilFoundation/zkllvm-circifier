@@ -114,6 +114,7 @@ void ExternalFileUnit::OpenUnit(std::optional<OpenStatus> status,
     // Otherwise, OPEN on open unit with new FILE= implies CLOSE
     DoImpliedEndfile(handler);
     FlushOutput(handler);
+    TruncateFrame(0, handler);
     Close(CloseStatus::Keep, handler);
   }
   if (newPath.get() && newPathLength > 0) {
@@ -697,7 +698,8 @@ bool ExternalFileUnit::SetDirectRec(
 void ExternalFileUnit::EndIoStatement() {
   io_.reset();
   u_.emplace<std::monostate>();
-  lock_.Drop();
+  CriticalSection critical{lock_};
+  isBusy_ = false;
 }
 
 void ExternalFileUnit::BeginSequentialVariableUnformattedInputRecord(

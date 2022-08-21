@@ -120,7 +120,7 @@ loadMatchingPDBFile(std::string exe_path, llvm::BumpPtrAllocator &allocator) {
   if (!FileSystem::Instance().Exists(pdb_file)) {
     const auto exe_dir = FileSpec(exe_path).CopyByRemovingLastPathComponent();
     const auto pdb_name = FileSpec(pdb_file).GetFilename().GetCString();
-    pdb_file = exe_dir.CopyByAppendingPathComponent(pdb_name).GetCString();
+    pdb_file = exe_dir.CopyByAppendingPathComponent(pdb_name).GetPathAsConstString().GetStringRef();
   }
 
   // If the file is not a PDB or if it doesn't have a matching GUID, fail.
@@ -774,7 +774,7 @@ VariableSP SymbolFileNativePDB::CreateGlobalVariable(PdbGlobalSymId var_id) {
   switch (sym.kind()) {
   case S_GDATA32:
     is_external = true;
-    LLVM_FALLTHROUGH;
+    [[fallthrough]];
   case S_LDATA32: {
     DataSym ds(sym.kind());
     llvm::cantFail(SymbolDeserializer::deserializeAs<DataSym>(sym, ds));
@@ -789,7 +789,7 @@ VariableSP SymbolFileNativePDB::CreateGlobalVariable(PdbGlobalSymId var_id) {
   }
   case S_GTHREAD32:
     is_external = true;
-    LLVM_FALLTHROUGH;
+    [[fallthrough]];
   case S_LTHREAD32: {
     ThreadLocalDataSym tlds(sym.kind());
     llvm::cantFail(
@@ -1563,10 +1563,15 @@ void SymbolFileNativePDB::FindGlobalVariables(
 }
 
 void SymbolFileNativePDB::FindFunctions(
-    ConstString name, const CompilerDeclContext &parent_decl_ctx,
-    FunctionNameType name_type_mask, bool include_inlines,
+    const Module::LookupInfo &lookup_info,
+    const CompilerDeclContext &parent_decl_ctx, bool include_inlines,
     SymbolContextList &sc_list) {
   std::lock_guard<std::recursive_mutex> guard(GetModuleMutex());
+  ConstString name = lookup_info.GetLookupName();
+  FunctionNameType name_type_mask = lookup_info.GetNameTypeMask();
+  if (name_type_mask & eFunctionNameTypeFull)
+    name = lookup_info.GetName();
+
   // For now we only support lookup by method name or full name.
   if (!(name_type_mask & eFunctionNameTypeFull ||
         name_type_mask & eFunctionNameTypeMethod))

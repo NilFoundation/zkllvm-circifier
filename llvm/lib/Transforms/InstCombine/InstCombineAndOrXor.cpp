@@ -1430,11 +1430,33 @@ Instruction *InstCombinerImpl::foldCastedBitwiseLogic(BinaryOperator &I) {
   if (!Cast1)
     return nullptr;
 
-  // Both operands of the logic operation are casts. The casts must be of the
-  // same type for reduction.
-  auto CastOpcode = Cast0->getOpcode();
-  if (CastOpcode != Cast1->getOpcode() || SrcTy != Cast1->getSrcTy())
+  // Both operands of the logic operation are casts. The casts must be the
+  // same kind for reduction.
+  Instruction::CastOps CastOpcode = Cast0->getOpcode();
+  if (CastOpcode != Cast1->getOpcode())
     return nullptr;
+
+  // If the source types do not match, but the casts are matching extends, we
+  // can still narrow the logic op.
+  if (SrcTy != Cast1->getSrcTy()) {
+    Value *X, *Y;
+    if (match(Cast0, m_OneUse(m_ZExtOrSExt(m_Value(X)))) &&
+        match(Cast1, m_OneUse(m_ZExtOrSExt(m_Value(Y))))) {
+      // Cast the narrower source to the wider source type.
+      unsigned XNumBits = X->getType()->getScalarSizeInBits();
+      unsigned YNumBits = Y->getType()->getScalarSizeInBits();
+      if (XNumBits < YNumBits)
+        X = Builder.CreateCast(CastOpcode, X, Y->getType());
+      else
+        Y = Builder.CreateCast(CastOpcode, Y, X->getType());
+      // Do the logic op in the intermediate width, then widen more.
+      Value *NarrowLogic = Builder.CreateBinOp(LogicOpc, X, Y);
+      return CastInst::Create(CastOpcode, NarrowLogic, DestTy);
+    }
+
+    // Give up for other cast opcodes.
+    return nullptr;
+  }
 
   Value *Cast0Src = Cast0->getOperand(0);
   Value *Cast1Src = Cast1->getOperand(0);
@@ -2664,8 +2686,8 @@ Value *InstCombinerImpl::foldAndOrOfICmps(ICmpInst *LHS, ICmpInst *RHS,
   // Inverted form (example):
   // (icmp slt (X | Y), 0) & (icmp sgt (X & Y), -1) -> (icmp slt (X ^ Y), 0)
   bool TrueIfSignedL, TrueIfSignedR;
-  if (InstCombiner::isSignBitCheck(PredL, *LHSC, TrueIfSignedL) &&
-      InstCombiner::isSignBitCheck(PredR, *RHSC, TrueIfSignedR) &&
+  if (isSignBitCheck(PredL, *LHSC, TrueIfSignedL) &&
+      isSignBitCheck(PredR, *RHSC, TrueIfSignedR) &&
       (RHS->hasOneUse() || LHS->hasOneUse())) {
     Value *X, *Y;
     if (IsAnd) {
@@ -2777,6 +2799,10 @@ Instruction *InstCombinerImpl::visitOr(BinaryOperator &I) {
     return BinaryOperator::CreateMul(X, IncrementY);
   }
 
+  // X | (X ^ Y) --> X | Y (4 commuted patterns)
+  if (match(&I, m_c_Or(m_Value(X), m_c_Xor(m_Deferred(X), m_Value(Y)))))
+    return BinaryOperator::CreateOr(X, Y);
+
   // (A & C) | (B & D)
   Value *A, *B, *C, *D;
   if (match(Op0, m_And(m_Value(A), m_Value(C))) &&
@@ -2886,30 +2912,36 @@ Instruction *InstCombinerImpl::visitOr(BinaryOperator &I) {
     SwappedForXor = true;
   }
 
-  // A | ( A ^ B) -> A |  B
-  // A | (~A ^ B) -> A | ~B
-  // (A & B) | (A ^ B)
-  // ~A | (A ^ B) -> ~(A & B)
-  // The swap above should always make Op0 the 'not' for the last case.
   if (match(Op1, m_Xor(m_Value(A), m_Value(B)))) {
-    if (Op0 == A || Op0 == B)
-      return BinaryOperator::CreateOr(A, B);
+    // (A | ?) | (A ^ B) --> (A | ?) | B
+    // (B | ?) | (A ^ B) --> (B | ?) | A
+    if (match(Op0, m_c_Or(m_Specific(A), m_Value())))
+      return BinaryOperator::CreateOr(Op0, B);
+    if (match(Op0, m_c_Or(m_Specific(B), m_Value())))
+      return BinaryOperator::CreateOr(Op0, A);
 
+    // (A & B) | (A ^ B) --> A | B
+    // (B & A) | (A ^ B) --> A | B
     if (match(Op0, m_And(m_Specific(A), m_Specific(B))) ||
         match(Op0, m_And(m_Specific(B), m_Specific(A))))
       return BinaryOperator::CreateOr(A, B);
 
+    // ~A | (A ^ B) --> ~(A & B)
+    // ~B | (A ^ B) --> ~(A & B)
+    // The swap above should always make Op0 the 'not'.
     if ((Op0->hasOneUse() || Op1->hasOneUse()) &&
         (match(Op0, m_Not(m_Specific(A))) || match(Op0, m_Not(m_Specific(B)))))
       return BinaryOperator::CreateNot(Builder.CreateAnd(A, B));
 
+    // A | (~A ^ B) --> ~B | A
+    // B | (A ^ ~B) --> ~A | B
     if (Op1->hasOneUse() && match(A, m_Not(m_Specific(Op0)))) {
-      Value *Not = Builder.CreateNot(B, B->getName() + ".not");
-      return BinaryOperator::CreateOr(Not, Op0);
+      Value *NotB = Builder.CreateNot(B, B->getName() + ".not");
+      return BinaryOperator::CreateOr(NotB, Op0);
     }
     if (Op1->hasOneUse() && match(B, m_Not(m_Specific(Op0)))) {
-      Value *Not = Builder.CreateNot(A, A->getName() + ".not");
-      return BinaryOperator::CreateOr(Not, Op0);
+      Value *NotA = Builder.CreateNot(A, A->getName() + ".not");
+      return BinaryOperator::CreateOr(NotA, Op0);
     }
   }
 

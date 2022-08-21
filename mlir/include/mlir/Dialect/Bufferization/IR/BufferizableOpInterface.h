@@ -52,10 +52,8 @@ public:
   template <typename... DialectTs>
   void allowDialect() {
     // The following expands a call to allowDialectImpl for each dialect
-    // in 'DialectTs'. This magic is necessary due to a limitation in the places
-    // that a parameter pack can be expanded in c++11.
-    // FIXME: In c++17 this can be simplified by using 'fold expressions'.
-    (void)std::initializer_list<int>{0, (allowDialectImpl<DialectTs>(), 0)...};
+    // in 'DialectTs'.
+    (allowDialectImpl<DialectTs>(), ...);
   }
 
   /// Deny the given dialects.
@@ -63,8 +61,7 @@ public:
   /// This function adds one or multiple DENY entries.
   template <typename... DialectTs>
   void denyDialect() {
-    // FIXME: In c++17 this can be simplified by using 'fold expressions'.
-    (void)std::initializer_list<int>{0, (denyDialectImpl<DialectTs>(), 0)...};
+    (denyDialectImpl<DialectTs>(), ...);
   }
 
   /// Allow the given dialect.
@@ -82,8 +79,7 @@ public:
   /// This function adds one or multiple ALLOW entries.
   template <typename... OpTys>
   void allowOperation() {
-    // FIXME: In c++17 this can be simplified by using 'fold expressions'.
-    (void)std::initializer_list<int>{0, (allowOperationImpl<OpTys>(), 0)...};
+    (allowOperationImpl<OpTys>(), ...);
   }
 
   /// Deny the given ops.
@@ -91,8 +87,7 @@ public:
   /// This function adds one or multiple DENY entries.
   template <typename... OpTys>
   void denyOperation() {
-    // FIXME: In c++17 this can be simplified by using 'fold expressions'.
-    (void)std::initializer_list<int>{0, (denyOperationImpl<OpTys>(), 0)...};
+    (denyOperationImpl<OpTys>(), ...);
   }
 
   /// Allow the given op.
@@ -510,6 +505,12 @@ OpTy replaceOpWithNewBufferizedOp(RewriterBase &rewriter, Operation *op,
   replaceOpWithBufferizedValues(rewriter, op, newOp->getResults());
   return newOp;
 }
+
+/// Return `true` if the buffer of given OpResult should be deallocated. This
+/// function should be called during `BufferizableOpInterface::bufferize`
+/// implementations that allocate a new buffer for the given OpResult.
+bool shouldDeallocateOpResult(OpResult opResult,
+                              const BufferizationOptions &options);
 
 /// Return a MemRefType to which the type of the given value can be bufferized.
 ///

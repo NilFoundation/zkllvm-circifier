@@ -851,9 +851,18 @@ void CodeGenFunction::StartFunction(GlobalDecl GD, QualType RetTy,
     }
   }
 
-  if (CGM.getCodeGenOpts().getProfileInstr() != CodeGenOptions::ProfileNone)
-    if (CGM.isFunctionBlockedFromProfileInstr(Fn, Loc))
+  if (CGM.getCodeGenOpts().getProfileInstr() != CodeGenOptions::ProfileNone) {
+    switch (CGM.isFunctionBlockedFromProfileInstr(Fn, Loc)) {
+    case ProfileList::Skip:
+      Fn->addFnAttr(llvm::Attribute::SkipProfile);
+      break;
+    case ProfileList::Forbid:
       Fn->addFnAttr(llvm::Attribute::NoProfile);
+      break;
+    case ProfileList::Allow:
+      break;
+    }
+  }
 
   unsigned Count, Offset;
   if (const auto *Attr =
@@ -2214,7 +2223,6 @@ void CodeGenFunction::EmitVariablyModifiedType(QualType type) {
     case Type::ConstantMatrix:
     case Type::Record:
     case Type::Enum:
-    case Type::Elaborated:
     case Type::Using:
     case Type::TemplateSpecialization:
     case Type::ObjCTypeParam:
@@ -2223,6 +2231,10 @@ void CodeGenFunction::EmitVariablyModifiedType(QualType type) {
     case Type::ObjCObjectPointer:
     case Type::BitInt:
       llvm_unreachable("type class is never variably-modified!");
+
+    case Type::Elaborated:
+      type = cast<ElaboratedType>(ty)->getNamedType();
+      break;
 
     case Type::Adjusted:
       type = cast<AdjustedType>(ty)->getAdjustedType();

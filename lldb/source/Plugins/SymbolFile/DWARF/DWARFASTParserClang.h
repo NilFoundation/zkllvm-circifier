@@ -45,6 +45,9 @@ public:
                                   const DWARFDIE &die,
                                   bool *type_is_new_ptr) override;
 
+  lldb_private::ConstString
+  ConstructDemangledNameFromDWARF(const DWARFDIE &die) override;
+
   lldb_private::Function *
   ParseFunctionFromDWARF(lldb_private::CompileUnit &comp_unit,
                          const DWARFDIE &die,
@@ -239,9 +242,8 @@ private:
                          const DWARFDIE &die, ParsedDWARFTypeAttributes &attrs);
   lldb::TypeSP ParseSubroutine(const DWARFDIE &die,
                                ParsedDWARFTypeAttributes &attrs);
-  // FIXME: attrs should be passed as a const reference.
   lldb::TypeSP ParseArrayType(const DWARFDIE &die,
-                              ParsedDWARFTypeAttributes &attrs);
+                              const ParsedDWARFTypeAttributes &attrs);
   lldb::TypeSP ParsePointerToMemberType(const DWARFDIE &die,
                                         const ParsedDWARFTypeAttributes &attrs);
 

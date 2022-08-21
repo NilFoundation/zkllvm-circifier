@@ -67,7 +67,6 @@ namespace clang {
 class CodeCompletionHandler;
 class CommentHandler;
 class DirectoryEntry;
-class DirectoryLookup;
 class EmptylineHandler;
 class ExternalPreprocessorSource;
 class FileEntry;
@@ -2229,7 +2228,8 @@ public:
              ConstSearchDirIterator *CurDir, SmallVectorImpl<char> *SearchPath,
              SmallVectorImpl<char> *RelativePath,
              ModuleMap::KnownHeader *SuggestedModule, bool *IsMapped,
-             bool *IsFrameworkFound, bool SkipCache = false);
+             bool *IsFrameworkFound, bool SkipCache = false,
+             bool OpenFile = true, bool CacheFailures = true);
 
   /// Return true if we're in the top-level file, not in a \#include.
   bool isInPrimaryFile() const;

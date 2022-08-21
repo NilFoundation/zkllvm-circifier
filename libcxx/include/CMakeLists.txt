@@ -72,6 +72,7 @@ set(files
   __algorithm/ranges_all_of.h
   __algorithm/ranges_any_of.h
   __algorithm/ranges_binary_search.h
+  __algorithm/ranges_clamp.h
   __algorithm/ranges_copy.h
   __algorithm/ranges_copy_backward.h
   __algorithm/ranges_copy_if.h
@@ -96,6 +97,7 @@ set(files
   __algorithm/ranges_is_heap.h
   __algorithm/ranges_is_heap_until.h
   __algorithm/ranges_is_partitioned.h
+  __algorithm/ranges_is_permutation.h
   __algorithm/ranges_is_sorted.h
   __algorithm/ranges_is_sorted_until.h
   __algorithm/ranges_iterator_concept.h
@@ -112,6 +114,7 @@ set(files
   __algorithm/ranges_mismatch.h
   __algorithm/ranges_move.h
   __algorithm/ranges_move_backward.h
+  __algorithm/ranges_next_permutation.h
   __algorithm/ranges_none_of.h
   __algorithm/ranges_nth_element.h
   __algorithm/ranges_partial_sort.h
@@ -120,6 +123,7 @@ set(files
   __algorithm/ranges_partition_copy.h
   __algorithm/ranges_partition_point.h
   __algorithm/ranges_pop_heap.h
+  __algorithm/ranges_prev_permutation.h
   __algorithm/ranges_push_heap.h
   __algorithm/ranges_remove.h
   __algorithm/ranges_remove_copy.h
@@ -131,7 +135,9 @@ set(files
   __algorithm/ranges_replace_if.h
   __algorithm/ranges_reverse.h
   __algorithm/ranges_reverse_copy.h
+  __algorithm/ranges_rotate.h
   __algorithm/ranges_rotate_copy.h
+  __algorithm/ranges_sample.h
   __algorithm/ranges_search.h
   __algorithm/ranges_search_n.h
   __algorithm/ranges_set_difference.h
@@ -177,9 +183,11 @@ set(files
   __algorithm/stable_sort.h
   __algorithm/swap_ranges.h
   __algorithm/transform.h
+  __algorithm/uniform_random_bit_generator_adaptor.h
   __algorithm/unique.h
   __algorithm/unique_copy.h
   __algorithm/unwrap_iter.h
+  __algorithm/unwrap_range.h
   __algorithm/upper_bound.h
   __assert
   __availability
@@ -324,6 +332,8 @@ set(files
   __functional/unary_negate.h
   __functional/unwrap_ref.h
   __functional/weak_result_type.h
+  __fwd/hash.h
+  __fwd/pair.h
   __fwd/span.h
   __fwd/string_view.h
   __hash_table
@@ -384,6 +394,7 @@ set(files
   __memory/ranges_uninitialized_algorithms.h
   __memory/raw_storage_iterator.h
   __memory/shared_ptr.h
+  __memory/swap_allocator.h
   __memory/temporary_buffer.h
   __memory/uninitialized_algorithms.h
   __memory/unique_ptr.h
@@ -505,11 +516,19 @@ set(files
   __type_traits/add_pointer.h
   __type_traits/add_rvalue_reference.h
   __type_traits/add_volatile.h
+  __type_traits/aligned_storage.h
+  __type_traits/aligned_union.h
   __type_traits/alignment_of.h
   __type_traits/apply_cv.h
+  __type_traits/can_extract_key.h
+  __type_traits/common_reference.h
+  __type_traits/common_type.h
   __type_traits/conditional.h
   __type_traits/conjunction.h
+  __type_traits/copy_cv.h
+  __type_traits/copy_cvref.h
   __type_traits/decay.h
+  __type_traits/dependent_type.h
   __type_traits/disjunction.h
   __type_traits/enable_if.h
   __type_traits/extent.h
@@ -524,6 +543,7 @@ set(files
   __type_traits/is_base_of.h
   __type_traits/is_bounded_array.h
   __type_traits/is_callable.h
+  __type_traits/is_char_like_type.h
   __type_traits/is_class.h
   __type_traits/is_compound.h
   __type_traits/is_const.h
@@ -541,6 +561,7 @@ set(files
   __type_traits/is_floating_point.h
   __type_traits/is_function.h
   __type_traits/is_fundamental.h
+  __type_traits/is_implicitly_default_constructible.h
   __type_traits/is_integral.h
   __type_traits/is_literal_type.h
   __type_traits/is_member_function_pointer.h
@@ -550,6 +571,7 @@ set(files
   __type_traits/is_move_constructible.h
   __type_traits/is_nothrow_assignable.h
   __type_traits/is_nothrow_constructible.h
+  __type_traits/is_nothrow_convertible.h
   __type_traits/is_nothrow_copy_assignable.h
   __type_traits/is_nothrow_copy_constructible.h
   __type_traits/is_nothrow_default_constructible.h
@@ -561,6 +583,7 @@ set(files
   __type_traits/is_pod.h
   __type_traits/is_pointer.h
   __type_traits/is_polymorphic.h
+  __type_traits/is_primary_template.h
   __type_traits/is_reference.h
   __type_traits/is_reference_wrapper.h
   __type_traits/is_referenceable.h
@@ -568,7 +591,9 @@ set(files
   __type_traits/is_scalar.h
   __type_traits/is_scoped_enum.h
   __type_traits/is_signed.h
+  __type_traits/is_signed_integer.h
   __type_traits/is_standard_layout.h
+  __type_traits/is_swappable.h
   __type_traits/is_trivial.h
   __type_traits/is_trivially_assignable.h
   __type_traits/is_trivially_constructible.h
@@ -582,24 +607,39 @@ set(files
   __type_traits/is_unbounded_array.h
   __type_traits/is_union.h
   __type_traits/is_unsigned.h
+  __type_traits/is_unsigned_integer.h
+  __type_traits/is_valid_expansion.h
   __type_traits/is_void.h
   __type_traits/is_volatile.h
+  __type_traits/lazy.h
+  __type_traits/make_32_64_or_128_bit.h
+  __type_traits/make_const_lvalue_ref.h
+  __type_traits/make_signed.h
+  __type_traits/make_unsigned.h
+  __type_traits/maybe_const.h
+  __type_traits/nat.h
   __type_traits/negation.h
+  __type_traits/promote.h
   __type_traits/rank.h
   __type_traits/remove_all_extents.h
   __type_traits/remove_const.h
+  __type_traits/remove_const_ref.h
   __type_traits/remove_cv.h
+  __type_traits/remove_cvref.h
   __type_traits/remove_extent.h
   __type_traits/remove_pointer.h
   __type_traits/remove_reference.h
   __type_traits/remove_volatile.h
+  __type_traits/result_of.h
   __type_traits/type_identity.h
+  __type_traits/type_list.h
   __type_traits/underlying_type.h
   __type_traits/void_t.h
   __undef_macros
   __utility/as_const.h
   __utility/auto_cast.h
   __utility/cmp.h
+  __utility/convert_to_integral.h
   __utility/declval.h
   __utility/exchange.h
   __utility/forward.h
@@ -615,6 +655,7 @@ set(files
   __utility/transaction.h
   __utility/unreachable.h
   __variant/monostate.h
+  __verbose_abort
   algorithm
   any
   array

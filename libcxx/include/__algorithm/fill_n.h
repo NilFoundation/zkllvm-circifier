@@ -11,6 +11,7 @@
 
 #include <__config>
 #include <__iterator/iterator_traits.h>
+#include <__utility/convert_to_integral.h>
 #include <type_traits>
 
 #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
@@ -18,6 +19,8 @@
 #endif
 
 _LIBCPP_BEGIN_NAMESPACE_STD
+
+// fill_n isn't specialized for std::memset, because the compiler already optimizes the loop to a call to std::memset.
 
 template <class _OutputIterator, class _Size, class _Tp>
 inline _LIBCPP_INLINE_VISIBILITY _LIBCPP_CONSTEXPR_AFTER_CXX17

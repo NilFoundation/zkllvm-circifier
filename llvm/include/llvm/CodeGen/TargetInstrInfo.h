@@ -39,7 +39,6 @@
 
 namespace llvm {
 
-class AAResults;
 class DFAPacketizer;
 class InstrItineraryData;
 class LiveIntervals;

@@ -275,6 +275,45 @@ static ParsedType recoverFromTypeInKnownDependentBase(Sema &S,
   return S.CreateParsedType(T, Builder.getTypeSourceInfo(Context, T));
 }
 
+/// Build a ParsedType for a simple-type-specifier with a nested-name-specifier.
+static ParsedType buildNamedType(Sema &S, const CXXScopeSpec *SS, QualType T,
+                                 SourceLocation NameLoc,
+                                 bool WantNontrivialTypeSourceInfo = true) {
+  switch (T->getTypeClass()) {
+  case Type::DeducedTemplateSpecialization:
+  case Type::Enum:
+  case Type::InjectedClassName:
+  case Type::Record:
+  case Type::Typedef:
+  case Type::UnresolvedUsing:
+  case Type::Using:
+    break;
+  // These can never be qualified so an ElaboratedType node
+  // would carry no additional meaning.
+  case Type::ObjCInterface:
+  case Type::ObjCTypeParam:
+  case Type::TemplateTypeParm:
+    return ParsedType::make(T);
+  default:
+    llvm_unreachable("Unexpected Type Class");
+  }
+
+  if (!SS || SS->isEmpty())
+    return ParsedType::make(
+        S.Context.getElaboratedType(ETK_None, nullptr, T, nullptr));
+
+  QualType ElTy = S.getElaboratedType(ETK_None, *SS, T);
+  if (!WantNontrivialTypeSourceInfo)
+    return ParsedType::make(ElTy);
+
+  TypeLocBuilder Builder;
+  Builder.pushTypeSpec(T).setNameLoc(NameLoc);
+  ElaboratedTypeLoc ElabTL = Builder.push<ElaboratedTypeLoc>(ElTy);
+  ElabTL.setElaboratedKeywordLoc(SourceLocation());
+  ElabTL.setQualifierLoc(SS->getWithLocInContext(S.Context));
+  return S.CreateParsedType(ElTy, Builder.getTypeSourceInfo(S.Context, ElTy));
+}
+
 /// If the identifier refers to a type name within this scope,
 /// return the declaration of that type.
 ///
@@ -417,7 +456,7 @@ ParsedType Sema::getTypeName(const IdentifierInfo &II, SourceLocation NameLoc,
       }
     }
     // If typo correction failed or was not performed, fall through
-    LLVM_FALLTHROUGH;
+    [[fallthrough]];
   case LookupResult::FoundOverloaded:
   case LookupResult::FoundUnresolvedValue:
     Result.suppressDiagnostics();
@@ -500,8 +539,7 @@ ParsedType Sema::getTypeName(const IdentifierInfo &II, SourceLocation NameLoc,
   } else if (auto *UD = dyn_cast<UnresolvedUsingIfExistsDecl>(IIDecl)) {
     (void)DiagnoseUseOfDecl(UD, NameLoc);
     // Recover with 'int'
-    T = Context.IntTy;
-    FoundUsingShadow = nullptr;
+    return ParsedType::make(Context.IntTy);
   } else if (AllowDeducedTemplate) {
     if (auto *TD = getAsTypeTemplateDecl(IIDecl)) {
       assert(!FoundUsingShadow || FoundUsingShadow->getTargetDecl() == TD);
@@ -523,27 +561,7 @@ ParsedType Sema::getTypeName(const IdentifierInfo &II, SourceLocation NameLoc,
   if (FoundUsingShadow)
     T = Context.getUsingType(FoundUsingShadow, T);
 
-  // NOTE: avoid constructing an ElaboratedType(Loc) if this is a
-  // constructor or destructor name (in such a case, the scope specifier
-  // will be attached to the enclosing Expr or Decl node).
-  if (SS && SS->isNotEmpty() && !IsCtorOrDtorName &&
-      !isa<ObjCInterfaceDecl, UnresolvedUsingIfExistsDecl>(IIDecl)) {
-    if (WantNontrivialTypeSourceInfo) {
-      // Construct a type with type-source information.
-      TypeLocBuilder Builder;
-      Builder.pushTypeSpec(T).setNameLoc(NameLoc);
-
-      T = getElaboratedType(ETK_None, *SS, T);
-      ElaboratedTypeLoc ElabTL = Builder.push<ElaboratedTypeLoc>(T);
-      ElabTL.setElaboratedKeywordLoc(SourceLocation());
-      ElabTL.setQualifierLoc(SS->getWithLocInContext(Context));
-      return CreateParsedType(T, Builder.getTypeSourceInfo(Context, T));
-    } else {
-      T = getElaboratedType(ETK_None, *SS, T);
-    }
-  }
-
-  return ParsedType::make(T);
+  return buildNamedType(*this, SS, T, NameLoc, WantNontrivialTypeSourceInfo);
 }
 
 // Builds a fake NNS for the given decl context.
@@ -1147,17 +1165,7 @@ Corrected:
     QualType T = Context.getTypeDeclType(Type);
     if (const auto *USD = dyn_cast<UsingShadowDecl>(Found))
       T = Context.getUsingType(USD, T);
-
-    if (SS.isEmpty()) // No elaborated type, trivial location info
-      return ParsedType::make(T);
-
-    TypeLocBuilder Builder;
-    Builder.pushTypeSpec(T).setNameLoc(NameLoc);
-    T = getElaboratedType(ETK_None, SS, T);
-    ElaboratedTypeLoc ElabTL = Builder.push<ElaboratedTypeLoc>(T);
-    ElabTL.setElaboratedKeywordLoc(SourceLocation());
-    ElabTL.setQualifierLoc(SS.getWithLocInContext(Context));
-    return CreateParsedType(T, Builder.getTypeSourceInfo(Context, T));
+    return buildNamedType(*this, &SS, T, NameLoc);
   };
 
   NamedDecl *FirstDecl = (*Result.begin())->getUnderlyingDecl();
@@ -1711,6 +1719,80 @@ bool Sema::CheckRedeclarationInModule(NamedDecl *New, NamedDecl *Old) {
   return false;
 }
 
+// Check the redefinition in C++20 Modules.
+//
+// [basic.def.odr]p14:
+// For any definable item D with definitions in multiple translation units,
+// - if D is a non-inline non-templated function or variable, or
+// - if the definitions in different translation units do not satisfy the
+// following requirements,
+//   the program is ill-formed; a diagnostic is required only if the definable
+//   item is attached to a named module and a prior definition is reachable at
+//   the point where a later definition occurs.
+// - Each such definition shall not be attached to a named module
+// ([module.unit]).
+// - Each such definition shall consist of the same sequence of tokens, ...
+// ...
+//
+// Return true if the redefinition is not allowed. Return false otherwise.
+bool Sema::IsRedefinitionInModule(const NamedDecl *New,
+                                     const NamedDecl *Old) const {
+  assert(getASTContext().isSameEntity(New, Old) &&
+         "New and Old are not the same definition, we should diagnostic it "
+         "immediately instead of checking it.");
+  assert(const_cast<Sema *>(this)->isReachable(New) &&
+         const_cast<Sema *>(this)->isReachable(Old) &&
+         "We shouldn't see unreachable definitions here.");
+
+  Module *NewM = New->getOwningModule();
+  Module *OldM = Old->getOwningModule();
+
+  // We only checks for named modules here. The header like modules is skipped.
+  // FIXME: This is not right if we import the header like modules in the module
+  // purview.
+  //
+  // For example, assuming "header.h" provides definition for `D`.
+  // ```C++
+  // //--- M.cppm
+  // export module M;
+  // import "header.h"; // or #include "header.h" but import it by clang modules
+  // actually.
+  //
+  // //--- Use.cpp
+  // import M;
+  // import "header.h"; // or uses clang modules.
+  // ```
+  //
+  // In this case, `D` has multiple definitions in multiple TU (M.cppm and
+  // Use.cpp) and `D` is attached to a named module `M`. The compiler should
+  // reject it. But the current implementation couldn't detect the case since we
+  // don't record the information about the importee modules.
+  //
+  // But this might not be painful in practice. Since the design of C++20 Named
+  // Modules suggests us to use headers in global module fragment instead of
+  // module purview.
+  if (NewM && NewM->isHeaderLikeModule())
+    NewM = nullptr;
+  if (OldM && OldM->isHeaderLikeModule())
+    OldM = nullptr;
+
+  if (!NewM && !OldM)
+    return true;
+
+  // [basic.def.odr]p14.3
+  // Each such definition shall not be attached to a named module
+  // ([module.unit]).
+  if ((NewM && NewM->isModulePurview()) || (OldM && OldM->isModulePurview()))
+    return true;
+
+  // Then New and Old lives in the same TU if their share one same module unit.
+  if (NewM)
+    NewM = NewM->getTopLevelModule();
+  if (OldM)
+    OldM = OldM->getTopLevelModule();
+  return OldM == NewM;
+}
+
 static bool isUsingDecl(NamedDecl *D) {
   return isa<UsingShadowDecl>(D) ||
          isa<UnresolvedUsingTypenameDecl>(D) ||
@@ -2092,7 +2174,7 @@ static void CheckPoppedLabel(LabelDecl *L, Sema &S) {
 }
 
 void Sema::ActOnPopScope(SourceLocation Loc, Scope *S) {
-  S->mergeNRVOIntoParent();
+  S->applyNRVO();
 
   if (S->decl_empty()) return;
   assert((S->getFlags() & (Scope::DeclScope | Scope::TemplateParamScope)) &&
@@ -2949,7 +3031,7 @@ static void checkNewAttributesAfterDef(Sema &S, Decl *New, const Decl *Old) {
       continue;
     } else if (isa<OMPDeclareVariantAttr>(NewAttribute)) {
       // We allow to add OMP[Begin]DeclareVariantAttr to be added to
-      // declarations after defintions.
+      // declarations after definitions.
       ++I;
       continue;
     }
@@ -3960,7 +4042,7 @@ bool Sema::MergeFunctionDecl(FunctionDecl *New, NamedDecl *&OldD, Scope *S,
     // default argument promotion rules were already checked by
     // ASTContext::typesAreCompatible().
     if (Old->hasPrototype() && !New->hasWrittenPrototype() && NewDeclIsDefn &&
-        Old->getNumParams() != New->getNumParams()) {
+        Old->getNumParams() != New->getNumParams() && !Old->isImplicit()) {
       if (Old->hasInheritedPrototype())
         Old = Old->getCanonicalDecl();
       Diag(New->getLocation(), diag::err_conflicting_types) << New;
@@ -4657,6 +4739,7 @@ bool Sema::checkVarDeclRedefinition(VarDecl *Old, VarDecl *New) {
   if (!hasVisibleDefinition(Old) &&
       (New->getFormalLinkage() == InternalLinkage ||
        New->isInline() ||
+       isa<VarTemplateSpecializationDecl>(New) ||
        New->getDescribedVarTemplate() ||
        New->getNumTemplateParameterLists() ||
        New->getDeclContext()->isDependentContext())) {
@@ -7555,7 +7638,7 @@ NamedDecl *Sema::ActOnVariableDeclarator(
     Diag(D.getDeclSpec().getConstexprSpecLoc(),
          diag::err_constexpr_wrong_decl_kind)
         << static_cast<int>(D.getDeclSpec().getConstexprSpecifier());
-    LLVM_FALLTHROUGH;
+    [[fallthrough]];
 
   case ConstexprSpecKind::Constexpr:
     NewVD->setConstexpr(true);
@@ -9923,6 +10006,27 @@ Sema::ActOnFunctionDeclarator(Scope *S, Declarator &D, DeclContext *DC,
     }
   }
 
+  if (getLangOpts().HLSL) {
+    auto &TargetInfo = getASTContext().getTargetInfo();
+    // Skip operator overload which not identifier.
+    // Also make sure NewFD is in translation-unit scope.
+    if (!NewFD->isInvalidDecl() && Name.isIdentifier() &&
+        NewFD->getName() == TargetInfo.getTargetOpts().HLSLEntry &&
+        S->getDepth() == 0) {
+      CheckHLSLEntryPoint(NewFD);
+      if (!NewFD->isInvalidDecl()) {
+        auto TripleShaderType = TargetInfo.getTriple().getEnvironment();
+        AttributeCommonInfo AL(NewFD->getBeginLoc());
+        HLSLShaderAttr::ShaderType ShaderType = (HLSLShaderAttr::ShaderType)(
+            TripleShaderType - (uint32_t)llvm::Triple::Pixel);
+        // To share code with HLSLShaderAttr, add HLSLShaderAttr to entry
+        // function.
+        if (HLSLShaderAttr *Attr = mergeHLSLShaderAttr(NewFD, AL, ShaderType))
+          NewFD->addAttr(Attr);
+      }
+    }
+  }
+
   if (!getLangOpts().CPlusPlus) {
     // Perform semantic checking on the function declaration.
     if (!NewFD->isInvalidDecl() && NewFD->isMain())
@@ -10482,7 +10586,7 @@ static Attr *getImplicitCodeSegAttrFromClass(Sema &S, const FunctionDecl *FD) {
 /// (from the current #pragma code-seg value).
 ///
 /// \param FD Function being declared.
-/// \param IsDefinition Whether it is a definition or just a declarartion.
+/// \param IsDefinition Whether it is a definition or just a declaration.
 /// \returns A CodeSegAttr or SectionAttr to apply to the function or
 ///          nullptr if no attribute should be added.
 Attr *Sema::getImplicitCodeSegOrSectionAttrForFunction(const FunctionDecl *FD,
@@ -11414,17 +11518,12 @@ bool Sema::CheckFunctionDeclaration(Scope *S, FunctionDecl *NewFD,
       CXXRecordDecl *Record = Destructor->getParent();
       QualType ClassType = Context.getTypeDeclType(Record);
 
-      // FIXME: Shouldn't we be able to perform this check even when the class
-      // type is dependent? Both gcc and edg can handle that.
-      if (!ClassType->isDependentType()) {
-        DeclarationName Name
-          = Context.DeclarationNames.getCXXDestructorName(
-                                        Context.getCanonicalType(ClassType));
-        if (NewFD->getDeclName() != Name) {
-          Diag(NewFD->getLocation(), diag::err_destructor_name);
-          NewFD->setInvalidDecl();
-          return Redeclaration;
-        }
+      DeclarationName Name = Context.DeclarationNames.getCXXDestructorName(
+          Context.getCanonicalType(ClassType));
+      if (NewFD->getDeclName() != Name) {
+        Diag(NewFD->getLocation(), diag::err_destructor_name);
+        NewFD->setInvalidDecl();
+        return Redeclaration;
       }
     } else if (auto *Guide = dyn_cast<CXXDeductionGuideDecl>(NewFD)) {
       if (auto *TD = Guide->getDescribedFunctionTemplate())
@@ -11753,6 +11852,23 @@ void Sema::CheckMSVCRTEntryPoint(FunctionDecl *FD) {
   if (!FD->isInvalidDecl() && FD->getDescribedFunctionTemplate()) {
     Diag(FD->getLocation(), diag::err_mainlike_template_decl) << FD;
     FD->setInvalidDecl();
+  }
+}
+
+void Sema::CheckHLSLEntryPoint(FunctionDecl *FD) {
+  auto &TargetInfo = getASTContext().getTargetInfo();
+  auto const Triple = TargetInfo.getTriple();
+  switch (Triple.getEnvironment()) {
+  default:
+    // FIXME: check all shader profiles.
+    break;
+  case llvm::Triple::EnvironmentType::Compute:
+    if (!FD->hasAttr<HLSLNumThreadsAttr>()) {
+      Diag(FD->getLocation(), diag::err_hlsl_missing_numthreads)
+          << Triple.getEnvironmentName();
+      FD->setInvalidDecl();
+    }
+    break;
   }
 }
 
@@ -13177,7 +13293,7 @@ void Sema::ActOnUninitializedDecl(Decl *RealDecl) {
       // that has an in-class initializer, so we type-check this like
       // a declaration.
       //
-      LLVM_FALLTHROUGH;
+      [[fallthrough]];
 
     case VarDecl::DeclarationOnly:
       // It's only a declaration.
@@ -14604,7 +14720,7 @@ static void RebuildLambdaScopeInfo(CXXMethodDecl *CallOperator,
   auto I = LambdaClass->field_begin();
   for (const auto &C : LambdaClass->captures()) {
     if (C.capturesVariable()) {
-      VarDecl *VD = C.getCapturedVar();
+      ValueDecl *VD = C.getCapturedVar();
       if (VD->isInitCapture())
         S.CurrentInstantiationScope->InstantiatedLocal(VD, VD);
       const bool ByRef = C.getCaptureKind() == LCK_ByRef;
@@ -15405,8 +15521,8 @@ NamedDecl *Sema::ImplicitlyDefineFunction(SourceLocation Loc,
   // Because typo correction is expensive, only do it if the implicit
   // function declaration is going to be treated as an error.
   //
-  // Perform the corection before issuing the main diagnostic, as some consumers
-  // use typo-correction callbacks to enhance the main diagnostic.
+  // Perform the correction before issuing the main diagnostic, as some
+  // consumers use typo-correction callbacks to enhance the main diagnostic.
   if (S && !ExternCPrev &&
       (Diags.getDiagnosticLevel(diag_id, Loc) >= DiagnosticsEngine::Error)) {
     DeclFilterCCC<FunctionDecl> CCC{};
@@ -15594,11 +15710,20 @@ void Sema::AddKnownFunctionAttributes(FunctionDecl *FD) {
       FD->addAttr(CallbackAttr::CreateImplicit(
           Context, Encoding.data(), Encoding.size(), FD->getLocation()));
 
-    // Mark const if we don't care about errno and that is the only thing
-    // preventing the function from being const. This allows IRgen to use LLVM
-    // intrinsics for such functions.
-    if (!getLangOpts().MathErrno && !FD->hasAttr<ConstAttr>() &&
-        Context.BuiltinInfo.isConstWithoutErrno(BuiltinID))
+    // Mark const if we don't care about errno and/or floating point exceptions
+    // that are the only thing preventing the function from being const. This
+    // allows IRgen to use LLVM intrinsics for such functions.
+    bool NoExceptions =
+        getLangOpts().getDefaultExceptionMode() == LangOptions::FPE_Ignore;
+    bool ConstWithoutErrnoAndExceptions =
+        Context.BuiltinInfo.isConstWithoutErrnoAndExceptions(BuiltinID);
+    bool ConstWithoutExceptions =
+        Context.BuiltinInfo.isConstWithoutExceptions(BuiltinID);
+    if (!FD->hasAttr<ConstAttr>() &&
+        (ConstWithoutErrnoAndExceptions || ConstWithoutExceptions) &&
+        (!ConstWithoutErrnoAndExceptions ||
+         (!getLangOpts().MathErrno && NoExceptions)) &&
+        (!ConstWithoutExceptions || NoExceptions))
       FD->addAttr(ConstAttr::CreateImplicit(Context, FD->getLocation()));
 
     // We make "fma" on GNU or Windows const because we know it does not set
@@ -18899,13 +19024,23 @@ void Sema::ActOnEnumBody(SourceLocation EnumLoc, SourceRange BraceRange,
     const llvm::APSInt &InitVal = ECD->getInitVal();
 
     // Keep track of the size of positive and negative values.
-    if (InitVal.isUnsigned() || InitVal.isNonNegative())
-      NumPositiveBits = std::max(NumPositiveBits,
-                                 (unsigned)InitVal.getActiveBits());
-    else
+    if (InitVal.isUnsigned() || InitVal.isNonNegative()) {
+      // If the enumerator is zero that should still be counted as a positive
+      // bit since we need a bit to store the value zero.
+      unsigned ActiveBits = InitVal.getActiveBits();
+      NumPositiveBits = std::max({NumPositiveBits, ActiveBits, 1u});
+    } else {
       NumNegativeBits = std::max(NumNegativeBits,
                                  (unsigned)InitVal.getMinSignedBits());
+    }
   }
+
+  // If we have have an empty set of enumerators we still need one bit.
+  // From [dcl.enum]p8
+  // If the enumerator-list is empty, the values of the enumeration are as if
+  // the enumeration had a single enumerator with value 0
+  if (!NumPositiveBits && !NumNegativeBits)
+    NumPositiveBits = 1;
 
   // Figure out the type that should be used for this enum.
   QualType BestType;
@@ -19119,7 +19254,7 @@ void Sema::ActOnPragmaRedefineExtname(IdentifierInfo* Name,
     else
       Diag(PrevDecl->getLocation(), diag::warn_redefine_extname_not_applied)
           << /*Variable*/(isa<FunctionDecl>(PrevDecl) ? 0 : 1) << PrevDecl;
-  // Otherwise, add a label atttibute to ExtnameUndeclaredIdentifiers.
+    // Otherwise, add a label attribute to ExtnameUndeclaredIdentifiers.
   } else
     (void)ExtnameUndeclaredIdentifiers.insert(std::make_pair(Name, Attr));
 }

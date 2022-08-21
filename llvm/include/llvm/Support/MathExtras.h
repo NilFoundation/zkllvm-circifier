@@ -22,10 +22,6 @@
 #include <limits>
 #include <type_traits>
 
-#ifdef __ANDROID_NDK__
-#include <android/api-level.h>
-#endif
-
 #ifdef _MSC_VER
 // Declare these intrinsics manually rather including intrin.h. It's very
 // expensive, and MathExtras.h is popular.
@@ -608,15 +604,6 @@ template <size_t kValue> constexpr inline size_t CTLog2() {
 
 template <> constexpr inline size_t CTLog2<1>() { return 0; }
 
-/// Return the log base 2 of the specified value.
-inline double Log2(double Value) {
-#if defined(__ANDROID_API__) && __ANDROID_API__ < 18
-  return __builtin_log(Value) / __builtin_log(2.0);
-#else
-  return log2(Value);
-#endif
-}
-
 /// Return the floor log base 2 of the specified value, -1 if the value is zero.
 /// (32 bit edition.)
 /// Ex. Log2_32(32) == 5, Log2_32(1) == 0, Log2_32(0) == -1, Log2_32(6) == 2
@@ -745,6 +732,12 @@ inline uint64_t PowerOf2Ceil(uint64_t A) {
 inline uint64_t alignTo(uint64_t Value, uint64_t Align) {
   assert(Align != 0u && "Align can't be 0.");
   return (Value + Align - 1) / Align * Align;
+}
+
+inline uint64_t alignToPowerOf2(uint64_t Value, uint64_t Align) {
+  assert(Align != 0 && (Align & (Align - 1)) == 0 &&
+         "Align must be a power of 2");
+  return (Value + Align - 1) & -Align;
 }
 
 /// If non-zero \p Skew is specified, the return value will be a minimal integer

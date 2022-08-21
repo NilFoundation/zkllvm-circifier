@@ -80,7 +80,7 @@ void llvm::detachDeadBlocks(
       // contained within it must dominate their uses, that all uses will
       // eventually be removed (they are themselves dead).
       if (!I.use_empty())
-        I.replaceAllUsesWith(UndefValue::get(I.getType()));
+        I.replaceAllUsesWith(PoisonValue::get(I.getType()));
       BB->getInstList().pop_back();
     }
     new UnreachableInst(BB->getContext(), BB);
@@ -1142,7 +1142,7 @@ SplitBlockPredecessorsImpl(BasicBlock *BB, ArrayRef<BasicBlock *> Preds,
   if (Preds.empty()) {
     // Insert dummy values as the incoming value.
     for (BasicBlock::iterator I = BB->begin(); isa<PHINode>(I); ++I)
-      cast<PHINode>(I)->addIncoming(UndefValue::get(I->getType()), NewBB);
+      cast<PHINode>(I)->addIncoming(PoisonValue::get(I->getType()), NewBB);
   }
 
   // Update DominatorTree, LoopInfo, and LCCSA analysis information.
@@ -1592,7 +1592,7 @@ static void reconnectPhis(BasicBlock *Out, BasicBlock *GuardBlock,
     auto NewPhi =
         PHINode::Create(Phi->getType(), Incoming.size(),
                         Phi->getName() + ".moved", &FirstGuardBlock->back());
-    for (auto In : Incoming) {
+    for (auto *In : Incoming) {
       Value *V = UndefValue::get(Phi->getType());
       if (In == Out) {
         V = NewPhi;
@@ -1686,7 +1686,7 @@ static void convertToGuardPredicates(
     GuardPredicates[Out] = Phi;
   }
 
-  for (auto In : Incoming) {
+  for (auto *In : Incoming) {
     Value *Condition;
     BasicBlock *Succ0;
     BasicBlock *Succ1;
@@ -1771,9 +1771,9 @@ BasicBlock *llvm::CreateControlFlowHub(
 
   SmallVector<DominatorTree::UpdateType, 16> Updates;
   if (DTU) {
-    for (auto In : Incoming) {
+    for (auto *In : Incoming) {
       Updates.push_back({DominatorTree::Insert, In, FirstGuardBlock});
-      for (auto Succ : successors(In)) {
+      for (auto *Succ : successors(In)) {
         if (Outgoing.count(Succ))
           Updates.push_back({DominatorTree::Delete, In, Succ});
       }

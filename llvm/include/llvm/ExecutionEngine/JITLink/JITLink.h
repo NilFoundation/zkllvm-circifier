@@ -303,7 +303,8 @@ public:
   /// Add an edge to this block.
   void addEdge(Edge::Kind K, Edge::OffsetT Offset, Symbol &Target,
                Edge::AddendT Addend) {
-    assert(!isZeroFill() && "Adding edge to zero-fill block?");
+    assert((K == Edge::KeepAlive || !isZeroFill()) &&
+           "Adding edge to zero-fill block?");
     Edges.push_back(Edge(K, Offset, Target, Addend));
   }
 
@@ -1101,11 +1102,11 @@ public:
   Symbol &addAbsoluteSymbol(StringRef Name, orc::ExecutorAddr Address,
                             orc::ExecutorAddrDiff Size, Linkage L, Scope S,
                             bool IsLive) {
-    assert(llvm::count_if(AbsoluteSymbols,
-                          [&](const Symbol *Sym) {
-                            return Sym->getName() == Name;
-                          }) == 0 &&
-           "Duplicate absolute symbol");
+    assert((S == Scope::Local || llvm::count_if(AbsoluteSymbols,
+                                               [&](const Symbol *Sym) {
+                                                 return Sym->getName() == Name;
+                                               }) == 0) &&
+                                    "Duplicate absolute symbol");
     auto &Sym = Symbol::constructAbsolute(Allocator.Allocate<Symbol>(),
                                           createAddressable(Address), Name,
                                           Size, L, S, IsLive);

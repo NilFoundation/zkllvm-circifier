@@ -25,11 +25,12 @@
 
 #include <type_traits>
 #include <cassert>
+#include <concepts>
 #include "test_macros.h"
 
 //  Test all six comparison operations for sanity
 template <class T, class U = T>
-TEST_CONSTEXPR_CXX14 bool testComparisons(const T& t1, const U& t2, bool isEqual, bool isLess)
+TEST_NODISCARD TEST_CONSTEXPR_CXX14 bool testComparisons(const T& t1, const U& t2, bool isEqual, bool isLess)
 {
     assert(!(isEqual && isLess) && "isEqual and isLess cannot be both true");
     if (isEqual)
@@ -83,7 +84,7 @@ TEST_CONSTEXPR_CXX14 bool testComparisons(const T& t1, const U& t2, bool isEqual
 
 //  Easy call when you can init from something already comparable.
 template <class T, class Param>
-TEST_CONSTEXPR_CXX14 bool testComparisonsValues(Param val1, Param val2)
+TEST_NODISCARD TEST_CONSTEXPR_CXX14 bool testComparisonsValues(Param val1, Param val2)
 {
     const bool isEqual = val1 == val2;
     const bool isLess  = val1  < val2;
@@ -92,8 +93,7 @@ TEST_CONSTEXPR_CXX14 bool testComparisonsValues(Param val1, Param val2)
 }
 
 template <class T, class U = T>
-void AssertComparisonsAreNoexcept()
-{
+TEST_CONSTEXPR_CXX14 void AssertComparisonsAreNoexcept() {
     ASSERT_NOEXCEPT(std::declval<const T&>() == std::declval<const U&>());
     ASSERT_NOEXCEPT(std::declval<const T&>() != std::declval<const U&>());
     ASSERT_NOEXCEPT(std::declval<const T&>() <  std::declval<const U&>());
@@ -103,8 +103,7 @@ void AssertComparisonsAreNoexcept()
 }
 
 template <class T, class U = T>
-void AssertComparisonsReturnBool()
-{
+TEST_CONSTEXPR_CXX14 void AssertComparisonsReturnBool() {
     ASSERT_SAME_TYPE(decltype(std::declval<const T&>() == std::declval<const U&>()), bool);
     ASSERT_SAME_TYPE(decltype(std::declval<const T&>() != std::declval<const U&>()), bool);
     ASSERT_SAME_TYPE(decltype(std::declval<const T&>() <  std::declval<const U&>()), bool);
@@ -112,7 +111,6 @@ void AssertComparisonsReturnBool()
     ASSERT_SAME_TYPE(decltype(std::declval<const T&>() >  std::declval<const U&>()), bool);
     ASSERT_SAME_TYPE(decltype(std::declval<const T&>() >= std::declval<const U&>()), bool);
 }
-
 
 template <class T, class U = T>
 void AssertComparisonsConvertibleToBool()
@@ -127,25 +125,27 @@ void AssertComparisonsConvertibleToBool()
 
 #if TEST_STD_VER > 17
 template <class T, class U = T>
-void AssertOrderAreNoexcept() {
-  AssertComparisonsAreNoexcept<T, U>();
-  ASSERT_NOEXCEPT(std::declval<const T&>() <=> std::declval<const U&>());
+constexpr void AssertOrderAreNoexcept() {
+    AssertComparisonsAreNoexcept<T, U>();
+    ASSERT_NOEXCEPT(std::declval<const T&>() <=> std::declval<const U&>());
 }
 
 template <class Order, class T, class U = T>
-void AssertOrderReturn() {
-  AssertComparisonsReturnBool<T, U>();
-  ASSERT_SAME_TYPE(decltype(std::declval<const T&>() <=> std::declval<const U&>()), Order);
+constexpr void AssertOrderReturn() {
+    AssertComparisonsReturnBool<T, U>();
+    ASSERT_SAME_TYPE(decltype(std::declval<const T&>() <=> std::declval<const U&>()), Order);
 }
 
 template <class Order, class T, class U = T>
-constexpr bool testOrder(const T& t1, const U& t2, Order order) {
-  return (t1 <=> t2 == order) &&
-         testComparisons(t1, t2, order == Order::equal || order == Order::equivalent, order == Order::less);
+TEST_NODISCARD constexpr bool testOrder(const T& t1, const U& t2, Order order) {
+    bool equal = order == Order::equivalent;
+    bool less = order == Order::less;
+
+    return (t1 <=> t2 == order) && testComparisons(t1, t2, equal, less);
 }
 
 template <class T, class Param>
-constexpr bool testOrderValues(Param val1, Param val2) {
+TEST_NODISCARD constexpr bool testOrderValues(Param val1, Param val2) {
   return testOrder(T(val1), T(val2), val1 <=> val2);
 }
 
@@ -153,7 +153,7 @@ constexpr bool testOrderValues(Param val1, Param val2) {
 
 //  Test all two comparison operations for sanity
 template <class T, class U = T>
-TEST_CONSTEXPR_CXX14 bool testEquality(const T& t1, const U& t2, bool isEqual)
+TEST_NODISCARD TEST_CONSTEXPR_CXX14 bool testEquality(const T& t1, const U& t2, bool isEqual)
 {
     if (isEqual)
         {
@@ -175,7 +175,7 @@ TEST_CONSTEXPR_CXX14 bool testEquality(const T& t1, const U& t2, bool isEqual)
 
 //  Easy call when you can init from something already comparable.
 template <class T, class Param>
-TEST_CONSTEXPR_CXX14 bool testEqualityValues(Param val1, Param val2)
+TEST_NODISCARD TEST_CONSTEXPR_CXX14 bool testEqualityValues(Param val1, Param val2)
 {
     const bool isEqual = val1 == val2;
 

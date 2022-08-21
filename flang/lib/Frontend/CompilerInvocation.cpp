@@ -769,6 +769,9 @@ void CompilerInvocation::setFortranOpts() {
   if (frontendOptions.instrumentedParse)
     fortranOptions.instrumentedParse = true;
 
+  if (frontendOptions.showColors)
+    fortranOptions.showColors = true;
+
   if (frontendOptions.needProvenanceRangeToCharBlockMappings)
     fortranOptions.needProvenanceRangeToCharBlockMappings = true;
 
@@ -790,4 +793,13 @@ void CompilerInvocation::setSemanticsOpts(
       .set_warnOnNonstandardUsage(getEnableConformanceChecks())
       .set_warningsAreErrors(getWarnAsErr())
       .set_moduleFileSuffix(getModuleFileSuffix());
+}
+
+/// Set \p loweringOptions controlling lowering behavior based
+/// on the \p optimizationLevel.
+void CompilerInvocation::setLoweringOptions() {
+  const auto &codegenOpts = getCodeGenOpts();
+
+  // Lower TRANSPOSE as a runtime call under -O0.
+  loweringOpts.setOptimizeTranspose(codegenOpts.OptimizationLevel > 0);
 }

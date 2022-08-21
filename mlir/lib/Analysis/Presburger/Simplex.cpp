@@ -1237,8 +1237,7 @@ void SimplexBase::undo(UndoLogEntry entry) {
            col++) {
         assert(colUnknown[col] != nullIndex &&
                "Column should not be a fixed column!");
-        if (std::find(basis.begin(), basis.end(), colUnknown[col]) !=
-            basis.end())
+        if (llvm::is_contained(basis, colUnknown[col]))
           continue;
         if (tableau(u.pos, col) == 0)
           continue;
@@ -1991,9 +1990,7 @@ Optional<SmallVector<int64_t, 8>> Simplex::findIntegerSample() {
           llvm::to_vector<8>(basis.getRow(level));
       basisCoeffs.emplace_back(0);
 
-      MaybeOptimum<int64_t> minRoundedUp, maxRoundedDown;
-      std::tie(minRoundedUp, maxRoundedDown) =
-          computeIntegerBounds(basisCoeffs);
+      auto [minRoundedUp, maxRoundedDown] = computeIntegerBounds(basisCoeffs);
 
       // We don't have any integer values in the range.
       // Pop the stack and return up a level.

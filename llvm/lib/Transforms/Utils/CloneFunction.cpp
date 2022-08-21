@@ -734,14 +734,14 @@ void llvm::CloneAndPruneIntoFromInst(Function *NewFunc, const Function *OldFunc,
     }
 
     // If the loops above have made these phi nodes have 0 or 1 operand,
-    // replace them with undef or the input value.  We must do this for
+    // replace them with poison or the input value.  We must do this for
     // correctness, because 0-operand phis are not valid.
     PN = cast<PHINode>(NewBB->begin());
     if (PN->getNumIncomingValues() == 0) {
       BasicBlock::iterator I = NewBB->begin();
       BasicBlock::const_iterator OldI = OldBB->begin();
       while ((PN = dyn_cast<PHINode>(I++))) {
-        Value *NV = UndefValue::get(PN->getType());
+        Value *NV = PoisonValue::get(PN->getType());
         PN->replaceAllUsesWith(NV);
         assert(VMap[&*OldI] == PN && "VMap mismatch");
         VMap[&*OldI] = NV;
@@ -1041,7 +1041,7 @@ void llvm::cloneNoAliasScopes(ArrayRef<MDNode *> NoAliasDeclScopes,
   MDBuilder MDB(Context);
 
   for (auto *ScopeList : NoAliasDeclScopes) {
-    for (auto &MDOperand : ScopeList->operands()) {
+    for (const auto &MDOperand : ScopeList->operands()) {
       if (MDNode *MD = dyn_cast<MDNode>(MDOperand)) {
         AliasScopeNode SNANode(MD);
 
@@ -1066,7 +1066,7 @@ void llvm::adaptNoAliasScopes(Instruction *I,
   auto CloneScopeList = [&](const MDNode *ScopeList) -> MDNode * {
     bool NeedsReplacement = false;
     SmallVector<Metadata *, 8> NewScopeList;
-    for (auto &MDOp : ScopeList->operands()) {
+    for (const auto &MDOp : ScopeList->operands()) {
       if (MDNode *MD = dyn_cast<MDNode>(MDOp)) {
         if (auto *NewMD = ClonedScopes.lookup(MD)) {
           NewScopeList.push_back(NewMD);

@@ -78,7 +78,7 @@ struct FieldParser<Optional<int>> {
     Optional<int> value;
     value.emplace();
     OptionalParseResult result = parser.parseOptionalInteger(*value);
-    if (result.hasValue()) {
+    if (result.has_value()) {
       if (succeeded(*result))
         return value;
       return failure();
@@ -153,6 +153,12 @@ public:
       ::llvm::function_ref<void(::mlir::Attribute)> walkAttrsFn,
       ::llvm::function_ref<void(::mlir::Type)> walkTypesFn) const {
     walkTypesFn(getBody());
+  }
+  Type replaceImmediateSubElements(llvm::ArrayRef<mlir::Attribute> replAttrs,
+                                   llvm::ArrayRef<mlir::Type> replTypes) const {
+    // TODO: It's not clear how we support replacing sub-elements of mutable
+    // types.
+    return nullptr;
   }
 };
 

@@ -221,7 +221,7 @@ struct CompletionCandidate {
 #ifndef NDEBUG
         llvm_unreachable("Don't expect members from index in code completion");
 #else
-        LLVM_FALLTHROUGH;
+        [[fallthrough]];
 #endif
       case index::SymbolKind::Function:
         // We can't group overloads together that need different #includes.
@@ -788,7 +788,7 @@ struct CompletionRecorder : public CodeCompleteConsumer {
 
   void ProcessCodeCompleteResults(class Sema &S, CodeCompletionContext Context,
                                   CodeCompletionResult *InResults,
-                                  unsigned NumResults) override final {
+                                  unsigned NumResults) final {
     // Results from recovery mode are generally useless, and the callback after
     // recovery (if any) is usually more interesting. To make sure we handle the
     // future callback from sema, we just ignore all callbacks in recovery mode,

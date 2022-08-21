@@ -121,8 +121,9 @@ public:
   std::pair<std::string, std::vector<uint8_t>> serialize() {
     std::set<std::string> Names = this->getNameFragments();
     std::vector<std::string> Sorted(Names.begin(), Names.end());
-    std::sort(Sorted.begin(), Sorted.end(),
-              [](const auto &a, const auto &b) { return a.size() > b.size(); });
+    llvm::sort(Sorted, [](const auto &a, const auto &b) {
+      return a.size() > b.size();
+    });
     std::string Dict(Letters.begin(), Letters.end());
     Dict.reserve(50000);
     for (const std::string &Name : Sorted) {
@@ -246,7 +247,7 @@ public:
       } else {
         // When there is no value (that's most intermediate nodes)
         // Dispense of the 3 values bytes, and only store
-        // 1 byte to track whether the node has sibling and chidren
+        // 1 byte to track whether the node has sibling and children
         // + 2 bytes for the index of the first children if necessary.
         // That index also uses bytes 0-6 of the previous byte.
         uint8_t Byte =
@@ -368,9 +369,7 @@ int main(int argc, char **argv) {
     printf("%06x: %s\n", static_cast<unsigned int>(Codepoint), Name.c_str());
     T.insert(Name, Codepoint);
     LongestName =
-        std::max(LongestName, std::size_t(llvm::count_if(Name, [](char c) {
-                   return llvm::isAlnum(c);
-                 })));
+        std::max(LongestName, std::size_t(llvm::count_if(Name, llvm::isAlnum)));
     NameCount++;
   }
   T.compact();

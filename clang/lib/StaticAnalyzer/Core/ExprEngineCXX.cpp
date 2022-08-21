@@ -263,7 +263,7 @@ SVal ExprEngine::computeObjectUnderConstruction(
       // a simple temporary.
       CallOpts = PreElideCallOpts;
       CallOpts.IsElidableCtorThatHasNotBeenElided = true;
-      LLVM_FALLTHROUGH;
+      [[fallthrough]];
     }
     case ConstructionContext::SimpleTemporaryObjectKind: {
       const auto *TCC = cast<TemporaryObjectConstructionContext>(CC);
@@ -289,6 +289,23 @@ SVal ExprEngine::computeObjectUnderConstruction(
       }
 
       return loc::MemRegionVal(MRMgr.getCXXTempObjectRegion(E, LCtx));
+    }
+    case ConstructionContext::LambdaCaptureKind: {
+      CallOpts.IsTemporaryCtorOrDtor = true;
+
+      const auto *LCC = cast<LambdaCaptureConstructionContext>(CC);
+
+      SVal Base = loc::MemRegionVal(
+          MRMgr.getCXXTempObjectRegion(LCC->getInitializer(), LCtx));
+
+      const auto *CE = dyn_cast_or_null<CXXConstructExpr>(E);
+      if (getIndexOfElementToConstruct(State, CE, LCtx)) {
+        CallOpts.IsArrayCtorOrDtor = true;
+        Base = State->getLValue(E->getType(), svalBuilder.makeArrayIndex(Idx),
+                                Base);
+      }
+
+      return Base;
     }
     case ConstructionContext::ArgumentKind: {
       // Arguments are technically temporaries.
@@ -438,7 +455,7 @@ ProgramStateRef ExprEngine::updateObjectsUnderConstruction(
       }
       // If we decided not to elide the constructor, proceed as if
       // it's a simple temporary.
-      LLVM_FALLTHROUGH;
+      [[fallthrough]];
     }
     case ConstructionContext::SimpleTemporaryObjectKind: {
       const auto *TCC = cast<TemporaryObjectConstructionContext>(CC);
@@ -450,6 +467,17 @@ ProgramStateRef ExprEngine::updateObjectsUnderConstruction(
 
       return State;
     }
+    case ConstructionContext::LambdaCaptureKind: {
+      const auto *LCC = cast<LambdaCaptureConstructionContext>(CC);
+
+      // If we capture and array, we want to store the super region, not a
+      // sub-region.
+      if (const auto *EL = dyn_cast_or_null<ElementRegion>(V.getAsRegion()))
+        V = loc::MemRegionVal(EL->getSuperRegion());
+
+      return addObjectUnderConstruction(
+          State, {LCC->getLambdaExpr(), LCC->getIndex()}, LCtx, V);
+    }
     case ConstructionContext::ArgumentKind: {
       const auto *ACC = cast<ArgumentConstructionContext>(CC);
       if (const auto *BTE = ACC->getCXXBindTemporaryExpr())
@@ -460,6 +488,59 @@ ProgramStateRef ExprEngine::updateObjectsUnderConstruction(
     }
   }
   llvm_unreachable("Unhandled construction context!");
+}
+
+static ProgramStateRef
+bindRequiredArrayElementToEnvironment(ProgramStateRef State,
+                                      const ArrayInitLoopExpr *AILE,
+                                      const LocationContext *LCtx, SVal Idx) {
+  // The ctor in this case is guaranteed to be a copy ctor, otherwise we hit a
+  // compile time error.
+  //
+  //  -ArrayInitLoopExpr                <-- we're here
+  //   |-OpaqueValueExpr
+  //   | `-DeclRefExpr                  <-- match this
+  //   `-CXXConstructExpr
+  //     `-ImplicitCastExpr
+  //       `-ArraySubscriptExpr
+  //         |-ImplicitCastExpr
+  //         | `-OpaqueValueExpr
+  //         |   `-DeclRefExpr
+  //         `-ArrayInitIndexExpr
+  //
+  // The resulting expression might look like the one below in an implicit
+  // copy/move ctor.
+  //
+  //   ArrayInitLoopExpr                <-- we're here
+  //   |-OpaqueValueExpr
+  //   | `-MemberExpr                   <-- match this
+  //   |  (`-CXXStaticCastExpr)         <-- move ctor only
+  //   |     `-DeclRefExpr
+  //   `-CXXConstructExpr
+  //     `-ArraySubscriptExpr
+  //       |-ImplicitCastExpr
+  //       | `-OpaqueValueExpr
+  //       |   `-MemberExpr
+  //       |     `-DeclRefExpr
+  //       `-ArrayInitIndexExpr
+  //
+  // HACK: There is no way we can put the index of the array element into the
+  // CFG unless we unroll the loop, so we manually select and bind the required
+  // parameter to the environment.
+  const auto *CE = cast<CXXConstructExpr>(AILE->getSubExpr());
+  const auto *OVESrc = AILE->getCommonExpr()->getSourceExpr();
+
+  SVal Base = UnknownVal();
+  if (const auto *ME = dyn_cast<MemberExpr>(OVESrc))
+    Base = State->getSVal(ME, LCtx);
+  else if (const auto *DRE = cast<DeclRefExpr>(OVESrc))
+    Base = State->getLValue(cast<VarDecl>(DRE->getDecl()), LCtx);
+  else
+    llvm_unreachable("ArrayInitLoopExpr contains unexpected source expression");
+
+  SVal NthElem = State->getLValue(CE->getType(), Idx, Base);
+
+  return State->BindExpr(CE->getArg(0), LCtx, NthElem);
 }
 
 void ExprEngine::handleConstructor(const Expr *E,
@@ -502,10 +583,24 @@ void ExprEngine::handleConstructor(const Expr *E,
     // Inherited constructors are always base class constructors.
     assert(CE && !CIE && "A complete constructor is inherited?!");
 
+    // If the ctor is part of an ArrayInitLoopExpr, we want to handle it
+    // differently.
+    auto *AILE = CC ? CC->getArrayInitLoop() : nullptr;
+
     unsigned Idx = 0;
-    if (CE->getType()->isArrayType()) {
+    if (CE->getType()->isArrayType() || AILE) {
       Idx = getIndexOfElementToConstruct(State, CE, LCtx).value_or(0u);
       State = setIndexOfElementToConstruct(State, CE, LCtx, Idx + 1);
+    }
+
+    if (AILE) {
+      // Only set this once even though we loop through it multiple times.
+      if (!getPendingInitLoop(State, CE, LCtx))
+        State = setPendingInitLoop(State, CE, LCtx,
+                                   AILE->getArraySize().getLimitedValue());
+
+      State = bindRequiredArrayElementToEnvironment(
+          State, AILE, LCtx, svalBuilder.makeArrayIndex(Idx));
     }
 
     // The target region is found from construction context.
@@ -525,7 +620,7 @@ void ExprEngine::handleConstructor(const Expr *E,
         ("This virtual base should have already been initialized by "
          "the most derived class!"));
     (void)OuterCtor;
-    LLVM_FALLTHROUGH;
+    [[fallthrough]];
   }
   case CXXConstructExpr::CK_NonVirtualBase:
     // In C++17, classes with non-virtual bases may be aggregates, so they would
@@ -545,7 +640,7 @@ void ExprEngine::handleConstructor(const Expr *E,
       CallOpts.IsCtorOrDtorWithImproperlyModeledTargetRegion = true;
       break;
     }
-    LLVM_FALLTHROUGH;
+    [[fallthrough]];
   case CXXConstructExpr::CK_Delegating: {
     const CXXMethodDecl *CurCtor = cast<CXXMethodDecl>(LCtx->getDecl());
     Loc ThisPtr = getSValBuilder().getCXXThis(CurCtor,
@@ -908,7 +1003,7 @@ void ExprEngine::VisitCXXNewExpr(const CXXNewExpr *CNE, ExplodedNode *Pred,
       // values are properly placed inside the required region, however if an
       // initializer list is used, this doesn't happen automatically.
       auto *Init = CNE->getInitializer();
-      bool isInitList = dyn_cast_or_null<InitListExpr>(Init);
+      bool isInitList = isa_and_nonnull<InitListExpr>(Init);
 
       QualType ObjTy =
           isInitList ? Init->getType() : CNE->getType()->getPointeeType();
@@ -1038,19 +1133,47 @@ void ExprEngine::VisitLambdaExpr(const LambdaExpr *LE, ExplodedNode *Pred,
 
   // If we created a new MemRegion for the lambda, we should explicitly bind
   // the captures.
+  unsigned Idx = 0;
   CXXRecordDecl::field_iterator CurField = LE->getLambdaClass()->field_begin();
   for (LambdaExpr::const_capture_init_iterator i = LE->capture_init_begin(),
                                                e = LE->capture_init_end();
-       i != e; ++i, ++CurField) {
+       i != e; ++i, ++CurField, ++Idx) {
     FieldDecl *FieldForCapture = *CurField;
     SVal FieldLoc = State->getLValue(FieldForCapture, V);
 
     SVal InitVal;
     if (!FieldForCapture->hasCapturedVLAType()) {
-      Expr *InitExpr = *i;
+      const Expr *InitExpr = *i;
+
       assert(InitExpr && "Capture missing initialization expression");
-      InitVal = State->getSVal(InitExpr, LocCtxt);
+
+      if (const auto AILE = dyn_cast<ArrayInitLoopExpr>(InitExpr)) {
+        // If the AILE initializes a POD array, we need to keep it as the
+        // InitExpr.
+        if (dyn_cast<CXXConstructExpr>(AILE->getSubExpr()))
+          InitExpr = AILE->getSubExpr();
+      }
+
+      // With C++17 copy elision this can happen.
+      if (const auto *FC = dyn_cast<CXXFunctionalCastExpr>(InitExpr))
+        InitExpr = FC->getSubExpr();
+
+      assert(InitExpr &&
+             "Extracted capture initialization expression is missing");
+
+      if (dyn_cast<CXXConstructExpr>(InitExpr)) {
+        InitVal = *getObjectUnderConstruction(State, {LE, Idx}, LocCtxt);
+        InitVal = State->getSVal(InitVal.getAsRegion());
+
+        State = finishObjectConstruction(State, {LE, Idx}, LocCtxt);
+      } else
+        InitVal = State->getSVal(InitExpr, LocCtxt);
+
     } else {
+
+      assert(!getObjectUnderConstruction(State, {LE, Idx}, LocCtxt) &&
+             "VLA capture by value is a compile time error!");
+
       // The field stores the length of a captured variable-length array.
       // These captures don't have initialization expressions; instead we
       // get the length from the VLAType size expression.

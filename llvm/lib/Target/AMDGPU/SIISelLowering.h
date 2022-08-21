@@ -87,6 +87,8 @@ private:
   SDValue LowerINTRINSIC_W_CHAIN(SDValue Op, SelectionDAG &DAG) const;
   SDValue LowerINTRINSIC_VOID(SDValue Op, SelectionDAG &DAG) const;
 
+  SDValue makeV_ILLEGAL(SDValue Op, SelectionDAG &DAG) const;
+
   // The raw.tbuffer and struct.tbuffer intrinsics have two offset args: offset
   // (the offset that is included in bounds checking and swizzling, to be split
   // between the instruction's voffset and immoffset fields) and soffset (the
@@ -487,10 +489,10 @@ public:
   AtomicExpansionKind
   shouldExpandAtomicCmpXchgInIR(AtomicCmpXchgInst *AI) const override;
 
-  virtual const TargetRegisterClass *
-  getRegClassFor(MVT VT, bool isDivergent) const override;
-  virtual bool requiresUniformRegister(MachineFunction &MF,
-                                       const Value *V) const override;
+  const TargetRegisterClass *getRegClassFor(MVT VT,
+                                            bool isDivergent) const override;
+  bool requiresUniformRegister(MachineFunction &MF,
+                               const Value *V) const override;
   Align getPrefLoopAlignment(MachineLoop *ML) const override;
 
   void allocateHSAUserSGPRs(CCState &CCInfo,

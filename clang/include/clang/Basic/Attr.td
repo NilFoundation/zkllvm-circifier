@@ -1074,7 +1074,7 @@ def CmseNSCall : TypeAttr, TargetSpecificAttr<TargetARM> {
 def Cold : InheritableAttr {
   let Spellings = [GCC<"cold">];
   let Subjects = SubjectList<[Function]>;
-  let Documentation = [Undocumented];
+  let Documentation = [ColdFunctionEntryDocs];
   let SimpleHandler = 1;
 }
 
@@ -1520,7 +1520,7 @@ def GNUInline : InheritableAttr {
 def Hot : InheritableAttr {
   let Spellings = [GCC<"hot">];
   let Subjects = SubjectList<[Function]>;
-  let Documentation = [Undocumented];
+  let Documentation = [HotFunctionEntryDocs];
   let SimpleHandler = 1;
 }
 def : MutualExclusions<[Hot, Cold]>;
@@ -2022,6 +2022,13 @@ def NoEscape : Attr {
   let Spellings = [Clang<"noescape">];
   let Subjects = SubjectList<[ParmVar]>;
   let Documentation = [NoEscapeDocs];
+}
+
+def MaybeUndef : InheritableAttr {
+  let Spellings = [Clang<"maybe_undef">];
+  let Subjects = SubjectList<[ParmVar]>;
+  let Documentation = [MaybeUndefDocs];
+  let SimpleHandler = 1;
 }
 
 def AssumeAligned : InheritableAttr {
@@ -2704,7 +2711,7 @@ def Target : InheritableAttr {
     template<class Compare>
     ParsedTargetAttr parse(Compare cmp) const {
       ParsedTargetAttr Attrs = parse();
-      llvm::sort(std::begin(Attrs.Features), std::end(Attrs.Features), cmp);
+      llvm::sort(Attrs.Features, cmp);
       return Attrs;
     }
 
@@ -4010,17 +4017,37 @@ def HLSLShader : InheritableAttr {
   let Spellings = [Microsoft<"shader">];
   let Subjects = SubjectList<[HLSLEntry]>;
   let LangOpts = [HLSL];
-  let Args = [EnumArgument<"Type", "ShaderType",
-                           ["pixel", "vertex", "geometry", "hull", "domain",
-                            "compute", "raygeneration", "intersection",
-                            "anyhit", "closesthit", "miss", "callable", "mesh",
-                            "amplification"],
-                           ["Pixel", "Vertex", "Geometry", "Hull", "Domain",
-                            "Compute", "RayGeneration", "Intersection",
-                            "AnyHit", "ClosestHit", "Miss", "Callable", "Mesh",
-                            "Amplification"]
-                           >];
+  // NOTE:
+  // order for the enum should match order in llvm::Triple::EnvironmentType.
+  // ShaderType will be converted to llvm::Triple::EnvironmentType like
+  //   (llvm::Triple::EnvironmentType)((uint32_t)ShaderType +
+  //      (uint32_t)llvm::Triple::EnvironmentType::Pixel).
+  // This will avoid update code for convert when new shader type is added.
+  let Args = [
+    EnumArgument<"Type", "ShaderType",
+                 [
+                   "pixel", "vertex", "geometry", "hull", "domain", "compute",
+                   "library", "raygeneration", "intersection", "anyHit",
+                   "closestHit", "miss", "callable", "mesh", "amplification"
+                 ],
+                 [
+                   "Pixel", "Vertex", "Geometry", "Hull", "Domain", "Compute",
+                   "Library", "RayGeneration", "Intersection", "AnyHit",
+                   "ClosestHit", "Miss", "Callable", "Mesh", "Amplification"
+                 ]>
+  ];
   let Documentation = [HLSLSV_ShaderTypeAttrDocs];
+}
+
+def HLSLResource : InheritableAttr {
+  let Spellings = [];
+  let Subjects = SubjectList<[Struct]>;
+  let LangOpts = [HLSL];
+  let Args = [EnumArgument<"ResourceType", "ResourceClass",
+                           ["SRV", "UAV", "CBuffer", "Sampler"],
+                           ["SRV", "UAV", "CBuffer", "Sampler"]
+                           >];
+  let Documentation = [InternalOnly];
 }
 
 def RandomizeLayout : InheritableAttr {

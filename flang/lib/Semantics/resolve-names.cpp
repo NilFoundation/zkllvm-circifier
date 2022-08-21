@@ -1301,7 +1301,7 @@ void AccVisitor::AddAccSourceRange(const parser::CharBlock &source) {
 
 bool AccVisitor::Pre(const parser::OpenACCBlockConstruct &x) {
   if (NeedsScope(x)) {
-    PushScope(Scope::Kind::Block, nullptr);
+    PushScope(Scope::Kind::OtherConstruct, nullptr);
   }
   return true;
 }
@@ -1337,7 +1337,7 @@ public:
   }
 
   bool Pre(const parser::OpenMPLoopConstruct &) {
-    PushScope(Scope::Kind::Block, nullptr);
+    PushScope(Scope::Kind::OtherConstruct, nullptr);
     return true;
   }
   void Post(const parser::OpenMPLoopConstruct &) { PopScope(); }
@@ -1357,7 +1357,7 @@ public:
   }
 
   bool Pre(const parser::OpenMPSectionsConstruct &) {
-    PushScope(Scope::Kind::Block, nullptr);
+    PushScope(Scope::Kind::OtherConstruct, nullptr);
     return true;
   }
   void Post(const parser::OpenMPSectionsConstruct &) { PopScope(); }
@@ -1398,7 +1398,7 @@ void OmpVisitor::AddOmpSourceRange(const parser::CharBlock &source) {
 
 bool OmpVisitor::Pre(const parser::OpenMPBlockConstruct &x) {
   if (NeedsScope(x)) {
-    PushScope(Scope::Kind::Block, nullptr);
+    PushScope(Scope::Kind::OtherConstruct, nullptr);
   }
   return true;
 }
@@ -1456,6 +1456,7 @@ public:
   void Post(const parser::AllocateObject &);
   bool Pre(const parser::PointerAssignmentStmt &);
   void Post(const parser::Designator &);
+  void Post(const parser::SubstringInquiry &);
   template <typename A, typename B>
   void Post(const parser::LoopBounds<A, B> &x) {
     ResolveName(*parser::Unwrap<parser::Name>(x.name));
@@ -2201,7 +2202,8 @@ void ScopeHandler::PushScope(Scope::Kind kind, Symbol *symbol) {
 void ScopeHandler::PushScope(Scope &scope) {
   currScope_ = &scope;
   auto kind{currScope_->kind()};
-  if (kind != Scope::Kind::Block) {
+  if (kind != Scope::Kind::BlockConstruct &&
+      kind != Scope::Kind::OtherConstruct) {
     BeginScope(scope);
   }
   // The name of a module or submodule cannot be "used" in its scope,
@@ -2519,7 +2521,7 @@ void ScopeHandler::NotePossibleBadForwardRef(const parser::Name &name) {
   if (inSpecificationPart_ && name.symbol) {
     auto kind{currScope().kind()};
     if ((kind == Scope::Kind::Subprogram && !currScope().IsStmtFunction()) ||
-        kind == Scope::Kind::Block) {
+        kind == Scope::Kind::BlockConstruct) {
       bool isHostAssociated{&name.symbol->owner() == &currScope()
               ? name.symbol->has<HostAssocDetails>()
               : name.symbol->owner().Contains(currScope())};
@@ -2857,6 +2859,9 @@ void ModuleVisitor::DoAddUse(SourceName location, SourceName localName,
       // it can be locally extended without corrupting the original.
       GenericDetails generic;
       generic.CopyFrom(*localGeneric);
+      if (localGeneric->specific()) {
+        generic.set_specific(*localGeneric->specific());
+      }
       EraseSymbol(localSymbol);
       Symbol &newSymbol{MakeSymbol(
           localSymbol.name(), localSymbol.attrs(), std::move(generic))};
@@ -2871,6 +2876,19 @@ void ModuleVisitor::DoAddUse(SourceName location, SourceName localName,
       localSymbol.flags() = useSymbol.flags();
       AddGenericUse(*localGeneric, localName, useUltimate);
       localGeneric->CopyFrom(*useGeneric);
+      if (useGeneric->specific()) {
+        if (!localGeneric->specific()) {
+          localGeneric->set_specific(
+              *const_cast<Symbol *>(useGeneric->specific()));
+        } else if (&localGeneric->specific()->GetUltimate() !=
+            &useGeneric->specific()->GetUltimate()) {
+          Say(location,
+              "Cannot use-associate generic interface '%s' with specific procedure of the same name when another such generic is in scope"_err_en_US,
+              localName)
+              .Attach(
+                  localSymbol.name(), "Previous USE of '%s'"_en_US, localName);
+        }
+      }
     } else {
       CHECK(useUltimate.has<DerivedTypeDetails>());
       localGeneric->set_derivedType(
@@ -2883,6 +2901,9 @@ void ModuleVisitor::DoAddUse(SourceName location, SourceName localName,
     // with the local derived type.
     GenericDetails generic;
     generic.CopyFrom(*useGeneric);
+    if (useGeneric->specific()) {
+      generic.set_specific(*const_cast<Symbol *>(useGeneric->specific()));
+    }
     EraseSymbol(localSymbol);
     Symbol &newSymbol{MakeSymbol(localName,
         useUltimate.attrs() & ~Attrs{Attr::PUBLIC, Attr::PRIVATE},
@@ -4149,7 +4170,7 @@ Symbol &DeclarationVisitor::HandleAttributeStmt(
     // these can be set on a symbol that is host-assoc or use-assoc
     if (!symbol &&
         (currScope().kind() == Scope::Kind::Subprogram ||
-            currScope().kind() == Scope::Kind::Block)) {
+            currScope().kind() == Scope::Kind::BlockConstruct)) {
       if (auto *hostSymbol{FindSymbol(name)}) {
         symbol = &MakeHostAssocSymbol(name, *hostSymbol);
       }
@@ -4169,7 +4190,7 @@ Symbol &DeclarationVisitor::HandleAttributeStmt(
 }
 // C1107
 bool DeclarationVisitor::CheckNotInBlock(const char *stmt) {
-  if (currScope().kind() == Scope::Kind::Block) {
+  if (currScope().kind() == Scope::Kind::BlockConstruct) {
     Say(MessageFormattedText{
         "%s statement is not allowed in a BLOCK construct"_err_en_US, stmt});
     return false;
@@ -4848,10 +4869,13 @@ void DeclarationVisitor::Post(
     if (!procedure) {
       procedure = NoteInterfaceName(procedureName);
     }
-    if (auto *s{MakeTypeSymbol(bindingName, ProcBindingDetails{*procedure})}) {
-      SetPassNameOn(*s);
-      if (GetAttrs().test(Attr::DEFERRED)) {
-        context().SetError(*s);
+    if (procedure) {
+      if (auto *s{
+              MakeTypeSymbol(bindingName, ProcBindingDetails{*procedure})}) {
+        SetPassNameOn(*s);
+        if (GetAttrs().test(Attr::DEFERRED)) {
+          context().SetError(*s);
+        }
       }
     }
   }
@@ -5301,7 +5325,7 @@ void DeclarationVisitor::CheckSaveStmts() {
     if (auto *symbol{currScope().FindCommonBlock(name)}) {
       auto &objects{symbol->get<CommonBlockDetails>().objects()};
       if (objects.empty()) {
-        if (currScope().kind() != Scope::Kind::Block) {
+        if (currScope().kind() != Scope::Kind::BlockConstruct) {
           Say(name,
               "'%s' appears as a COMMON block in a SAVE statement but not in"
               " a COMMON statement"_err_en_US);
@@ -5785,25 +5809,34 @@ bool DeclarationVisitor::OkToAddComponent(
     const parser::Name &name, const Symbol *extends) {
   for (const Scope *scope{&currScope()}; scope;) {
     CHECK(scope->IsDerivedType());
-    if (auto *prev{FindInScope(*scope, name)}) {
-      if (!context().HasError(*prev)) {
-        parser::MessageFixedText msg;
-        if (extends) {
-          msg = "Type cannot be extended as it has a component named"
-                " '%s'"_err_en_US;
-        } else if (prev->test(Symbol::Flag::ParentComp)) {
-          msg = "'%s' is a parent type of this type and so cannot be"
-                " a component"_err_en_US;
-        } else if (scope != &currScope()) {
-          msg = "Component '%s' is already declared in a parent of this"
-                " derived type"_err_en_US;
-        } else {
-          msg = "Component '%s' is already declared in this"
-                " derived type"_err_en_US;
-        }
-        Say2(name, std::move(msg), *prev, "Previous declaration of '%s'"_en_US);
+    if (auto *prev{FindInScope(*scope, name.source)}) {
+      std::optional<parser::MessageFixedText> msg;
+      if (context().HasError(*prev)) { // don't pile on
+      } else if (extends) {
+        msg = "Type cannot be extended as it has a component named"
+              " '%s'"_err_en_US;
+      } else if (CheckAccessibleComponent(currScope(), *prev)) {
+        // inaccessible component -- redeclaration is ok
+        msg = "Component '%s' is inaccessibly declared in or as a "
+              "parent of this derived type"_warn_en_US;
+      } else if (prev->test(Symbol::Flag::ParentComp)) {
+        msg = "'%s' is a parent type of this type and so cannot be"
+              " a component"_err_en_US;
+      } else if (scope == &currScope()) {
+        msg = "Component '%s' is already declared in this"
+              " derived type"_err_en_US;
+      } else {
+        msg = "Component '%s' is already declared in a parent of this"
+              " derived type"_err_en_US;
       }
-      return false;
+      if (msg) {
+        Say2(
+            name, std::move(*msg), *prev, "Previous declaration of '%s'"_en_US);
+        if (msg->severity() == parser::Severity::Error) {
+          Resolve(name, *prev);
+          return false;
+        }
+      }
     }
     if (scope == &currScope() && extends) {
       // The parent component has not yet been added to the scope.
@@ -6036,7 +6069,7 @@ bool ConstructVisitor::Pre(const parser::DataStmtValue &x) {
 
 bool ConstructVisitor::Pre(const parser::DoConstruct &x) {
   if (x.IsDoConcurrent()) {
-    PushScope(Scope::Kind::Block, nullptr);
+    PushScope(Scope::Kind::OtherConstruct, nullptr);
   }
   return true;
 }
@@ -6059,7 +6092,7 @@ void ConstructVisitor::Post(const parser::ForallStmt &) { PopScope(); }
 
 bool ConstructVisitor::Pre(const parser::BlockStmt &x) {
   CheckDef(x.v);
-  PushScope(Scope::Kind::Block, nullptr);
+  PushScope(Scope::Kind::BlockConstruct, nullptr);
   return false;
 }
 bool ConstructVisitor::Pre(const parser::EndBlockStmt &x) {
@@ -6074,7 +6107,7 @@ void ConstructVisitor::Post(const parser::Selector &x) {
 
 void ConstructVisitor::Post(const parser::AssociateStmt &x) {
   CheckDef(x.t);
-  PushScope(Scope::Kind::Block, nullptr);
+  PushScope(Scope::Kind::OtherConstruct, nullptr);
   const auto assocCount{std::get<std::list<parser::Association>>(x.t).size()};
   for (auto nthLastAssoc{assocCount}; nthLastAssoc > 0; --nthLastAssoc) {
     SetCurrentAssociation(nthLastAssoc);
@@ -6103,7 +6136,7 @@ bool ConstructVisitor::Pre(const parser::Association &x) {
 
 bool ConstructVisitor::Pre(const parser::ChangeTeamStmt &x) {
   CheckDef(x.t);
-  PushScope(Scope::Kind::Block, nullptr);
+  PushScope(Scope::Kind::OtherConstruct, nullptr);
   PushAssociation();
   return true;
 }
@@ -6191,7 +6224,7 @@ void ConstructVisitor::Post(const parser::SelectRankStmt &x) {
 }
 
 bool ConstructVisitor::Pre(const parser::SelectTypeConstruct::TypeCase &) {
-  PushScope(Scope::Kind::Block, nullptr);
+  PushScope(Scope::Kind::OtherConstruct, nullptr);
   return true;
 }
 void ConstructVisitor::Post(const parser::SelectTypeConstruct::TypeCase &) {
@@ -6199,7 +6232,7 @@ void ConstructVisitor::Post(const parser::SelectTypeConstruct::TypeCase &) {
 }
 
 bool ConstructVisitor::Pre(const parser::SelectRankConstruct::RankCase &) {
-  PushScope(Scope::Kind::Block, nullptr);
+  PushScope(Scope::Kind::OtherConstruct, nullptr);
   return true;
 }
 void ConstructVisitor::Post(const parser::SelectRankConstruct::RankCase &) {
@@ -6458,6 +6491,7 @@ const parser::Name *DeclarationVisitor::ResolveDesignator(
       common::visitors{
           [&](const parser::DataRef &x) { return ResolveDataRef(x); },
           [&](const parser::Substring &x) {
+            Walk(std::get<parser::SubstringRange>(x.t).t);
             return ResolveDataRef(std::get<parser::DataRef>(x.t));
           },
       },
@@ -7122,11 +7156,14 @@ void ResolveNamesVisitor::CreateGeneric(const parser::GenericSpec &x) {
   }
   if (existing) {
     Symbol &ultimate{existing->GetUltimate()};
-    if (const auto *existingGeneric{ultimate.detailsIf<GenericDetails>()}) {
+    if (auto *existingGeneric{ultimate.detailsIf<GenericDetails>()}) {
       if (const auto *existingUse{existing->detailsIf<UseDetails>()}) {
         // Create a local copy of a use associated generic so that
         // it can be locally extended without corrupting the original.
         genericDetails.CopyFrom(*existingGeneric);
+        if (existingGeneric->specific()) {
+          genericDetails.set_specific(*existingGeneric->specific());
+        }
         AddGenericUse(genericDetails, existing->name(), existingUse->symbol());
       } else if (existing == &ultimate) {
         // Extending an extant generic in the same scope
@@ -7311,6 +7348,10 @@ bool ResolveNamesVisitor::Pre(const parser::PointerAssignmentStmt &x) {
 }
 void ResolveNamesVisitor::Post(const parser::Designator &x) {
   ResolveDesignator(x);
+}
+void ResolveNamesVisitor::Post(const parser::SubstringInquiry &x) {
+  Walk(std::get<parser::SubstringRange>(x.v.t).t);
+  ResolveDataRef(std::get<parser::DataRef>(x.v.t));
 }
 
 void ResolveNamesVisitor::Post(const parser::ProcComponentRef &x) {

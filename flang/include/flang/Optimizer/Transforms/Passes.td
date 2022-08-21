@@ -16,14 +16,14 @@
 
 include "mlir/Pass/PassBase.td"
 
-def AbstractResultOpt : Pass<"abstract-result-opt", "mlir::func::FuncOp"> {
+class AbstractResultOptBase<string optExt, string operation> 
+  : Pass<"abstract-result-on-" # optExt # "-opt", operation> {
   let summary = "Convert fir.array, fir.box and fir.rec function result to "
                 "function argument";
   let description = [{
     This pass is required before code gen to the LLVM IR dialect,
     including the pre-cg rewrite pass.
   }];
-  let constructor = "::fir::createAbstractResultOptPass()";
   let dependentDialects = [
     "fir::FIROpsDialect", "mlir::func::FuncDialect"
   ];
@@ -33,6 +33,10 @@ def AbstractResultOpt : Pass<"abstract-result-opt", "mlir::func::FuncOp"> {
            "Pass fir.array<T> result as fir.box<fir.array<T>> argument instead"
            " of fir.ref<fir.array<T>>.">
   ];
+}
+
+def AbstractResultOnFuncOpt : AbstractResultOptBase<"func", "mlir::func::FuncOp"> {
+  let constructor = "::fir::createAbstractResultOnFuncOptPass()";
 }
 
 def AffineDialectPromotion : Pass<"promote-to-affine", "::mlir::func::FuncOp"> {
@@ -168,6 +172,20 @@ def MemRefDataFlowOpt : Pass<"fir-memref-dataflow-opt", "::mlir::func::FuncOp"> 
   let dependentDialects = [
     "fir::FIROpsDialect", "mlir::func::FuncDialect"
   ];
+}
+
+// This needs to be a "mlir::ModuleOp" pass, because it inserts simplified
+// functions into the module, which is invalid if a finer grain mlir::Operation
+// is used as the pass specification says to not touch things outside hte scope
+// of the operation being processed.
+def SimplifyIntrinsics : Pass<"simplify-intrinsics", "mlir::ModuleOp"> {
+  let summary = "Intrinsics simplification";
+  let description = [{
+    Qualifying intrinsics calls are replaced with calls to a specialized and
+    simplified function. The simplified function is added to the current module.
+    This function can be inlined by a general purpose inlining pass.
+  }];
+  let constructor = "::fir::createSimplifyIntrinsicsPass()";
 }
 
 def MemoryAllocationOpt : Pass<"memory-allocation-opt", "mlir::func::FuncOp"> {

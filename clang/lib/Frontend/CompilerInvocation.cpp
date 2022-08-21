@@ -510,6 +510,10 @@ static bool FixupInvocation(CompilerInvocation &Invocation,
     Diags.Report(diag::err_drv_argument_not_allowed_with)
         << "-fgnu89-inline" << GetInputKindName(IK);
 
+  if (Args.hasArg(OPT_hlsl_entrypoint) && !LangOpts.HLSL)
+    Diags.Report(diag::err_drv_argument_not_allowed_with)
+        << "-hlsl-entry" << GetInputKindName(IK);
+
   if (Args.hasArg(OPT_fgpu_allow_device_init) && !LangOpts.HIP)
     Diags.Report(diag::warn_ignored_hip_only_option)
         << Args.getLastArg(OPT_fgpu_allow_device_init)->getAsString(Args);
@@ -1924,6 +1928,12 @@ bool CompilerInvocation::ParseCodeGenArgs(CodeGenOptions &Opts, ArgList &Args,
 
     const Option &O = A->getOption();
     Opts.EnableAIXExtendedAltivecABI = O.matches(OPT_mabi_EQ_vec_extabi);
+  }
+
+  if (Arg *A = Args.getLastArg(OPT_mabi_EQ_quadword_atomics)) {
+    if (!T.isOSAIX() || T.isPPC32())
+      Diags.Report(diag::err_drv_unsupported_opt_for_target)
+        << A->getSpelling() << T.str();
   }
 
   bool NeedLocTracking = false;
@@ -4538,7 +4548,10 @@ bool CompilerInvocation::CreateFromArgs(CompilerInvocation &Invocation,
         return CreateFromArgsImpl(Invocation, CommandLineArgs, Diags, Argv0);
       },
       [](CompilerInvocation &Invocation, SmallVectorImpl<const char *> &Args,
-         StringAllocator SA) { Invocation.generateCC1CommandLine(Args, SA); },
+         StringAllocator SA) {
+        Args.push_back("-cc1");
+        Invocation.generateCC1CommandLine(Args, SA);
+      },
       Invocation, DummyInvocation, CommandLineArgs, Diags, Argv0);
 }
 

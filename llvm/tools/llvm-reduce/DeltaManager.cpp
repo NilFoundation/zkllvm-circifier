@@ -40,6 +40,7 @@
 #include "deltas/ReduceRegisterUses.h"
 #include "deltas/ReduceSpecialGlobals.h"
 #include "deltas/ReduceVirtualRegisters.h"
+#include "deltas/RunIRPasses.h"
 #include "deltas/SimplifyInstructions.h"
 #include "llvm/Support/CommandLine.h"
 
@@ -54,10 +55,10 @@ static cl::opt<std::string>
 
 #define DELTA_PASSES                                                           \
   do {                                                                         \
+    DELTA_PASS("functions", reduceFunctionsDeltaPass)                          \
+    DELTA_PASS("function-bodies", reduceFunctionBodiesDeltaPass)               \
     DELTA_PASS("special-globals", reduceSpecialGlobalsDeltaPass)               \
     DELTA_PASS("aliases", reduceAliasesDeltaPass)                              \
-    DELTA_PASS("function-bodies", reduceFunctionBodiesDeltaPass)               \
-    DELTA_PASS("functions", reduceFunctionsDeltaPass)                          \
     DELTA_PASS("basic-blocks", reduceBasicBlocksDeltaPass)                     \
     DELTA_PASS("global-values", reduceGlobalValuesDeltaPass)                   \
     DELTA_PASS("global-objects", reduceGlobalObjectsDeltaPass)                 \
@@ -67,6 +68,7 @@ static cl::opt<std::string>
     DELTA_PASS("arguments", reduceArgumentsDeltaPass)                          \
     DELTA_PASS("instructions", reduceInstructionsDeltaPass)                    \
     DELTA_PASS("simplify-instructions", simplifyInstructionsDeltaPass)         \
+    DELTA_PASS("ir-passes", runIRPassesDeltaPass)                              \
     DELTA_PASS("operands-zero", reduceOperandsZeroDeltaPass)                   \
     DELTA_PASS("operands-one", reduceOperandsOneDeltaPass)                     \
     DELTA_PASS("operands-nan", reduceOperandsNaNDeltaPass)                     \

@@ -167,7 +167,7 @@ inline void createDefaultFIROptimizerPassPipeline(
   pm.addPass(fir::createSimplifyRegionLitePass());
   // Algebraic simplifications may increase code size.
   if (optLevel.isOptimizingForSpeed())
-    pm.addPass(fir::createAlgebraicSimplificationPass());
+    pm.addPass(fir::createAlgebraicSimplificationPass(config));
   pm.addPass(mlir::createCSEPass());
   fir::addMemoryAllocationOpt(pm);
 
@@ -176,6 +176,7 @@ inline void createDefaultFIROptimizerPassPipeline(
   llvm::StringMap<mlir::OpPassManager> pipelines;
   pm.addPass(
       mlir::createInlinerPass(pipelines, defaultFlangInlinerOptPipeline));
+  pm.addPass(fir::createSimplifyRegionLitePass());
   pm.addPass(mlir::createCSEPass());
 
   // convert control flow to CFG form
@@ -190,7 +191,8 @@ inline void createDefaultFIROptimizerPassPipeline(
 #if !defined(FLANG_EXCLUDE_CODEGEN)
 inline void createDefaultFIRCodeGenPassPipeline(mlir::PassManager &pm) {
   fir::addBoxedProcedurePass(pm);
-  pm.addNestedPass<mlir::func::FuncOp>(fir::createAbstractResultOptPass());
+  pm.addNestedPass<mlir::func::FuncOp>(
+      fir::createAbstractResultOnFuncOptPass());
   fir::addCodeGenRewritePass(pm);
   fir::addTargetRewritePass(pm);
   fir::addExternalNameConversionPass(pm);

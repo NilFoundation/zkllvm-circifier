@@ -58,14 +58,16 @@ bool HardwareLoopInfo::canAnalyze(LoopInfo &LI) {
 }
 
 IntrinsicCostAttributes::IntrinsicCostAttributes(
-    Intrinsic::ID Id, const CallBase &CI, InstructionCost ScalarizationCost)
+    Intrinsic::ID Id, const CallBase &CI, InstructionCost ScalarizationCost,
+    bool TypeBasedOnly)
     : II(dyn_cast<IntrinsicInst>(&CI)), RetTy(CI.getType()), IID(Id),
       ScalarizationCost(ScalarizationCost) {
 
   if (const auto *FPMO = dyn_cast<FPMathOperator>(&CI))
     FMF = FPMO->getFastMathFlags();
 
-  Arguments.insert(Arguments.begin(), CI.arg_begin(), CI.arg_end());
+  if (!TypeBasedOnly)
+    Arguments.insert(Arguments.begin(), CI.arg_begin(), CI.arg_end());
   FunctionType *FTy = CI.getCalledFunction()->getFunctionType();
   ParamTys.insert(ParamTys.begin(), FTy->param_begin(), FTy->param_end());
 }
@@ -293,9 +295,9 @@ bool TargetTransformInfo::isHardwareLoopProfitable(
 
 bool TargetTransformInfo::preferPredicateOverEpilogue(
     Loop *L, LoopInfo *LI, ScalarEvolution &SE, AssumptionCache &AC,
-    TargetLibraryInfo *TLI, DominatorTree *DT,
-    LoopVectorizationLegality *LVL) const {
-  return TTIImpl->preferPredicateOverEpilogue(L, LI, SE, AC, TLI, DT, LVL);
+    TargetLibraryInfo *TLI, DominatorTree *DT, LoopVectorizationLegality *LVL,
+    InterleavedAccessInfo *IAI) const {
+  return TTIImpl->preferPredicateOverEpilogue(L, LI, SE, AC, TLI, DT, LVL, IAI);
 }
 
 PredicationStyle TargetTransformInfo::emitGetActiveLaneMask() const {
@@ -702,6 +704,10 @@ bool TargetTransformInfo::enableWritePrefetching() const {
   return TTIImpl->enableWritePrefetching();
 }
 
+bool TargetTransformInfo::shouldPrefetchAddressSpace(unsigned AS) const {
+  return TTIImpl->shouldPrefetchAddressSpace(AS);
+}
+
 unsigned TargetTransformInfo::getMaxInterleaveFactor(unsigned VF) const {
   return TTIImpl->getMaxInterleaveFactor(VF);
 }
@@ -863,7 +869,21 @@ InstructionCost TargetTransformInfo::getCmpSelInstrCost(
 InstructionCost TargetTransformInfo::getVectorInstrCost(unsigned Opcode,
                                                         Type *Val,
                                                         unsigned Index) const {
+  // FIXME: Assert that Opcode is either InsertElement or ExtractElement.
+  // This is mentioned in the interface description and respected by all
+  // callers, but never asserted upon.
   InstructionCost Cost = TTIImpl->getVectorInstrCost(Opcode, Val, Index);
+  assert(Cost >= 0 && "TTI should not produce negative costs!");
+  return Cost;
+}
+
+InstructionCost TargetTransformInfo::getVectorInstrCost(const Instruction &I,
+                                                        Type *Val,
+                                                        unsigned Index) const {
+  // FIXME: Assert that Opcode is either InsertElement or ExtractElement.
+  // This is mentioned in the interface description and respected by all
+  // callers, but never asserted upon.
+  InstructionCost Cost = TTIImpl->getVectorInstrCost(I, Val, Index);
   assert(Cost >= 0 && "TTI should not produce negative costs!");
   return Cost;
 }
@@ -970,11 +990,17 @@ InstructionCost TargetTransformInfo::getMinMaxReductionCost(
   return Cost;
 }
 
-InstructionCost TargetTransformInfo::getExtendedAddReductionCost(
-    bool IsMLA, bool IsUnsigned, Type *ResTy, VectorType *Ty,
+InstructionCost TargetTransformInfo::getExtendedReductionCost(
+    unsigned Opcode, bool IsUnsigned, Type *ResTy, VectorType *Ty,
+    Optional<FastMathFlags> FMF, TTI::TargetCostKind CostKind) const {
+  return TTIImpl->getExtendedReductionCost(Opcode, IsUnsigned, ResTy, Ty, FMF,
+                                           CostKind);
+}
+
+InstructionCost TargetTransformInfo::getMulAccReductionCost(
+    bool IsUnsigned, Type *ResTy, VectorType *Ty,
     TTI::TargetCostKind CostKind) const {
-  return TTIImpl->getExtendedAddReductionCost(IsMLA, IsUnsigned, ResTy, Ty,
-                                              CostKind);
+  return TTIImpl->getMulAccReductionCost(IsUnsigned, ResTy, Ty, CostKind);
 }
 
 InstructionCost
@@ -1104,6 +1130,10 @@ bool TargetTransformInfo::shouldExpandReduction(const IntrinsicInst *II) const {
 
 unsigned TargetTransformInfo::getGISelRematGlobalCost() const {
   return TTIImpl->getGISelRematGlobalCost();
+}
+
+unsigned TargetTransformInfo::getMinTripCountTailFoldingThreshold() const {
+  return TTIImpl->getMinTripCountTailFoldingThreshold();
 }
 
 bool TargetTransformInfo::supportsScalableVectors() const {

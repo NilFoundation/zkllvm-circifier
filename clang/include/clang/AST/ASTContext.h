@@ -473,6 +473,9 @@ class ASTContext : public RefCountedBase<ASTContext> {
   };
   llvm::DenseMap<Module*, PerModuleInitializers*> ModuleInitializers;
 
+  /// For module code-gen cases, this is the top-level module we are building.
+  Module *TopLevelModule = nullptr;
+
   static constexpr unsigned ConstantArrayTypesLog2InitSize = 8;
   static constexpr unsigned GeneralTypesLog2InitSize = 9;
   static constexpr unsigned FunctionProtoTypesLog2InitSize = 12;
@@ -1076,6 +1079,12 @@ public:
   /// Get the initializations to perform when importing a module, if any.
   ArrayRef<Decl*> getModuleInitializers(Module *M);
 
+  /// Set the (C++20) module we are building.
+  void setModuleForCodeGen(Module *M) { TopLevelModule = M; }
+
+  /// Get module under construction, nullptr if this is not a C++20 module.
+  Module *getModuleForCodeGen() const { return TopLevelModule; }
+
   TranslationUnitDecl *getTranslationUnitDecl() const {
     return TUDecl->getMostRecentDecl();
   }
@@ -1605,7 +1614,8 @@ public:
                                    QualType Wrapped);
 
   QualType getSubstTemplateTypeParmType(const TemplateTypeParmType *Replaced,
-                                        QualType Replacement) const;
+                                        QualType Replacement,
+                                        Optional<unsigned> PackIndex) const;
   QualType getSubstTemplateTypeParmPackType(
                                           const TemplateTypeParmType *Replaced,
                                             const TemplateArgument &ArgPack);
@@ -2811,14 +2821,20 @@ public:
   bool typesAreBlockPointerCompatible(QualType, QualType);
 
   bool isObjCIdType(QualType T) const {
+    if (const auto *ET = dyn_cast<ElaboratedType>(T))
+      T = ET->getNamedType();
     return T == getObjCIdType();
   }
 
   bool isObjCClassType(QualType T) const {
+    if (const auto *ET = dyn_cast<ElaboratedType>(T))
+      T = ET->getNamedType();
     return T == getObjCClassType();
   }
 
   bool isObjCSelType(QualType T) const {
+    if (const auto *ET = dyn_cast<ElaboratedType>(T))
+      T = ET->getNamedType();
     return T == getObjCSelType();
   }
 
@@ -3187,11 +3203,11 @@ OPT_LIST(V)
 
 #undef OPT_LIST
 
-    LLVM_NODISCARD ObjCEncOptions keepingOnly(ObjCEncOptions Mask) const {
+    [[nodiscard]] ObjCEncOptions keepingOnly(ObjCEncOptions Mask) const {
       return Bits & Mask.Bits;
     }
 
-    LLVM_NODISCARD ObjCEncOptions forComponentType() const {
+    [[nodiscard]] ObjCEncOptions forComponentType() const {
       ObjCEncOptions Mask = ObjCEncOptions()
                                 .setIsOutermostType()
                                 .setIsStructField();

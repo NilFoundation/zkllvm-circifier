@@ -20,7 +20,6 @@
 
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Stmt.h"
-#include "clang/Analysis/CFG.h"
 #include "clang/Analysis/FlowSensitive/ControlFlowContext.h"
 #include "clang/Analysis/FlowSensitive/DataflowEnvironment.h"
 #include "clang/Analysis/FlowSensitive/TypeErasedDataflowAnalysis.h"
@@ -63,8 +62,16 @@ public:
   using Lattice = LatticeT;
 
   explicit DataflowAnalysis(ASTContext &Context) : Context(Context) {}
+
+  /// Deprecated. Use the `DataflowAnalysisOptions` constructor instead.
   explicit DataflowAnalysis(ASTContext &Context, bool ApplyBuiltinTransfer)
-      : TypeErasedDataflowAnalysis(ApplyBuiltinTransfer), Context(Context) {}
+      : DataflowAnalysis(Context, {ApplyBuiltinTransfer
+                                       ? TransferOptions{}
+                                       : llvm::Optional<TransferOptions>()}) {}
+
+  explicit DataflowAnalysis(ASTContext &Context,
+                            DataflowAnalysisOptions Options)
+      : TypeErasedDataflowAnalysis(Options), Context(Context) {}
 
   ASTContext &getASTContext() final { return Context; }
 
@@ -118,14 +125,14 @@ llvm::Expected<std::vector<
 runDataflowAnalysis(
     const ControlFlowContext &CFCtx, AnalysisT &Analysis,
     const Environment &InitEnv,
-    std::function<void(const Stmt *, const DataflowAnalysisState<
-                                         typename AnalysisT::Lattice> &)>
+    std::function<void(const CFGStmt &, const DataflowAnalysisState<
+                                            typename AnalysisT::Lattice> &)>
         PostVisitStmt = nullptr) {
-  std::function<void(const Stmt *, const TypeErasedDataflowAnalysisState &)>
+  std::function<void(const CFGStmt &, const TypeErasedDataflowAnalysisState &)>
       PostVisitStmtClosure = nullptr;
   if (PostVisitStmt != nullptr) {
     PostVisitStmtClosure = [&PostVisitStmt](
-                               const Stmt *Stmt,
+                               const CFGStmt &Stmt,
                                const TypeErasedDataflowAnalysisState &State) {
       auto *Lattice =
           llvm::any_cast<typename AnalysisT::Lattice>(&State.Lattice.Value);
@@ -146,7 +153,7 @@ runDataflowAnalysis(
 
   llvm::transform(std::move(*TypeErasedBlockStates),
                   std::back_inserter(BlockStates), [](auto &OptState) {
-                    return std::move(OptState).map([](auto &&State) {
+                    return std::move(OptState).transform([](auto &&State) {
                       return DataflowAnalysisState<typename AnalysisT::Lattice>{
                           llvm::any_cast<typename AnalysisT::Lattice>(
                               std::move(State.Lattice.Value)),

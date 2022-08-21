@@ -1,5 +1,23 @@
 // RUN: mlir-opt -convert-openmp-to-llvm -split-input-file %s | FileCheck %s
 
+// CHECK-LABEL: llvm.func @foo(i64, i64)
+func.func private @foo(index, index)
+
+// CHECK-LABEL: llvm.func @critical_block_arg
+func.func @critical_block_arg() {
+  // CHECK: omp.critical
+  omp.critical {
+  // CHECK-NEXT: ^[[BB0:.*]](%[[ARG1:.*]]: i64, %[[ARG2:.*]]: i64):
+  ^bb0(%arg1: index, %arg2: index):
+    // CHECK-NEXT: llvm.call @foo(%[[ARG1]], %[[ARG2]]) : (i64, i64) -> ()
+    func.call @foo(%arg1, %arg2) : (index, index) -> ()
+    omp.terminator
+  }
+  return
+}
+
+// -----
+
 // CHECK-LABEL: llvm.func @master_block_arg
 func.func @master_block_arg() {
   // CHECK: omp.master
@@ -55,13 +73,13 @@ func.func @wsloop(%arg0: index, %arg1: index, %arg2: index, %arg3: index, %arg4:
   omp.parallel {
     // CHECK: omp.wsloop for (%[[ARG6:.*]], %[[ARG7:.*]]) : i64 = (%[[ARG0]], %[[ARG1]]) to (%[[ARG2]], %[[ARG3]]) step (%[[ARG4]], %[[ARG5]]) {
     "omp.wsloop"(%arg0, %arg1, %arg2, %arg3, %arg4, %arg5) ({
-    ^bb0(%arg6: index, %arg7: index):  
+    ^bb0(%arg6: index, %arg7: index):
       // CHECK-DAG: %[[CAST_ARG6:.*]] = builtin.unrealized_conversion_cast %[[ARG6]] : i64 to index
       // CHECK-DAG: %[[CAST_ARG7:.*]] = builtin.unrealized_conversion_cast %[[ARG7]] : i64 to index
       // CHECK: "test.payload"(%[[CAST_ARG6]], %[[CAST_ARG7]]) : (index, index) -> ()
       "test.payload"(%arg6, %arg7) : (index, index) -> ()
       omp.yield
-    }) {operand_segment_sizes = dense<[2, 2, 2, 0, 0, 0, 0]> : vector<7xi32>} : (index, index, index, index, index, index) -> ()
+    }) {operand_segment_sizes = array<i32: 2, 2, 2, 0, 0, 0, 0>} : (index, index, index, index, index, index) -> ()
     omp.terminator
   }
   return

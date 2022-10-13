@@ -53,6 +53,7 @@ add_clang_library(clangDriver
   ToolChains/Cuda.cpp
   ToolChains/Darwin.cpp
   ToolChains/DragonFly.cpp
+  ToolChains/EVM.cpp
   ToolChains/Flang.cpp
   ToolChains/FreeBSD.cpp
   ToolChains/Fuchsia.cpp

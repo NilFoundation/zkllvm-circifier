@@ -42,6 +42,8 @@ public:
 
   // Since we disabled register allocation, enable vreg for PEI.
   bool usesPhysRegsForPEI() const { return false; }
+  // EVM doesn't use physical registers
+  bool usesPhysRegsForValues() const override { return false; }
 };
 }
 

@@ -16,7 +16,7 @@ args = parser.parse_args()
 
 def execute_with_input_in_evm(code: str, input: str, expected: str) -> bool:
     def check_result(command: str, result: str, exp: str) -> bool:
-        if result.find("error") is not -1:
+        if result.find("error") != -1:
             print("Failed.")
             print(result)
             print(command)
@@ -96,7 +96,7 @@ def run_testset(testset) -> List[str]:
         file = val["file"]
         inputs = val["input"]
         output = val["output"]
-        filename = evm_testsuite.runtime_file_prefix + file
+        filename = os.path.abspath(evm_testsuite.runtime_file_prefix + file)
         result = run_binary(name=key, inputs=inputs,
                             output=output, filename=filename)
         if not result:

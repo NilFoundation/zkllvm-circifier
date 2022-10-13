@@ -276,29 +276,6 @@ void EVM::addClangTargetOptions(const ArgList &DriverArgs,
     }
   }
 
-  if (DriverArgs.getLastArg(options::OPT_fevm_exceptions)) {
-    // '-fevm-exceptions' is not compatible with '-mno-exception-handling'
-    if (DriverArgs.hasFlag(options::OPT_mno_exception_handing,
-                           options::OPT_mexception_handing, false))
-      getDriver().Diag(diag::err_drv_argument_not_allowed_with)
-          << "-fevm-exceptions"
-          << "-mno-exception-handling";
-    // '-fevm-exceptions' is not compatible with
-    // '-mllvm -enable-emscripten-cxx-exceptions'
-    for (const Arg *A : DriverArgs.filtered(options::OPT_mllvm)) {
-      if (StringRef(A->getValue(0)) == "-enable-emscripten-cxx-exceptions")
-        getDriver().Diag(diag::err_drv_argument_not_allowed_with)
-            << "-fevm-exceptions"
-            << "-mllvm -enable-emscripten-cxx-exceptions";
-    }
-    // '-fevm-exceptions' implies exception-handling feature
-    CC1Args.push_back("-target-feature");
-    CC1Args.push_back("+exception-handling");
-    // Backend needs -evm-enable-eh to enable evm EH
-    CC1Args.push_back("-mllvm");
-    CC1Args.push_back("-evm-enable-eh");
-  }
-
   for (const Arg *A : DriverArgs.filtered(options::OPT_mllvm)) {
     StringRef Opt = A->getValue(0);
     if (Opt.startswith("-emscripten-cxx-exceptions-allowed")) {

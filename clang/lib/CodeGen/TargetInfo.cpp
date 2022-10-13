@@ -11567,10 +11567,8 @@ const TargetCodeGenInfo &CodeGenModule::getTargetCodeGenInfo() {
   }
 
   case llvm::Triple::evm: {
-    EVMABIInfo::ABIKind Kind = EVMABIInfo::MVP;
-    if (getTarget().getABI() == "experimental-mv")
-      Kind = EVMABIInfo::ExperimentalMV;
-    return SetCGInfo(new EVMTargetCodeGenInfo(Types, Kind));
+    // TODO: EVM TargetCodeGenInfo is not implemented yet
+    return SetCGInfo(new DefaultTargetCodeGenInfo(Types));
   }
 
   case llvm::Triple::arm:

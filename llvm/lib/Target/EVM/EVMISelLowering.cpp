@@ -114,7 +114,6 @@ EVMTargetLowering::EVMTargetLowering(const TargetMachine &TM,
   setOperationAction(ISD::BR_JT, MVT::Other, Expand);
 
   // custom lowering the branch 
-  setOperationAction(ISD::BR, MVT::Other, Custom);
   setOperationAction(ISD::BRCOND, MVT::Other, Expand);
 
   setOperationAction(ISD::FrameIndex, MVT::i256, Custom);

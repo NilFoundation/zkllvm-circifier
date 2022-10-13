@@ -45,7 +45,7 @@ def SDT_EVMCondJump :
 SDTypeProfile<0, 2, [SDTCisVT<1, OtherVT>]>;
 
 def SDT_EVMBrcc :
-SDTypeProfile<0, 4, [SDTCisSameAs<0, 1>, SDTCisPtrTy<3>]>;
+SDTypeProfile<0, 4, [SDTCisSameAs<0, 1>, SDTCisVT<3, OtherVT>]>;
 
 def SDT_EVMSignextend :
 SDTypeProfile<1, 2, [SDTCisVT<2, i256>]>;
@@ -660,7 +660,7 @@ def : Pat<(extload i256:$src), (MLOAD_r i256:$src)>;
 // Memory accesses
 def : Pat<(EVMWrapper tglobaladdr:$in), (PUSH32_r tglobaladdr:$in)>;
 def : Pat<(EVMWrapper tblockaddress:$blk), (PUSH32_r tblockaddress:$blk)>;
-def : Pat<(brind bb:$dst), (pJUMPTO_r bb:$dst)>;
+def : Pat<(br bb:$dst), (pJUMPTO_r bb:$dst)>;
 
 // Common Intrinsics
 def : Pat<(i256 (int_evm_sload GPR:$addr)),

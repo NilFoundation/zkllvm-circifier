@@ -362,7 +362,7 @@ defm GAS      : Inst_0_1<"GAS",
 defm JUMPDEST : Inst_0_0<"JUMPDEST", [(int_evm_jumpdest)], 0x5b, 1>;
 
 let BaseName = "PUSH32" in {
-let isCodeGenOnly = 1 in {
+let isCodeGenOnly = 1, hasSideEffects = 1 in {
 def PUSH32_r :
   EVMInst<(outs GPR:$dst), (ins I256Imm:$src), [(set GPR:$dst, imm:$src)],
           "false", "PUSH32_r \t$dst, $src", 0x7f, 3>;

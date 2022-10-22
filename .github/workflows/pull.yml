@@ -2,13 +2,13 @@ name: Pull Request CI
 
 on:
   pull_request:
-    branches: [ EVM ]
+    branches: [ 6-evm-cpp-frontend ]
 
 jobs:
   build:
 
-    runs-on: ubuntu-latest
-
+    runs-on: [self-hosted, tests-runner]
+    
     steps:
     - uses: actions/checkout@v2
     - name: Set up Python 3

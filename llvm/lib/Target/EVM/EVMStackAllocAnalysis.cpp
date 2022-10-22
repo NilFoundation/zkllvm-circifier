@@ -25,7 +25,7 @@ using namespace llvm;
 char EVMStackAlloc::ID = 0;
 
 INITIALIZE_PASS(EVMStackAlloc, "evm-stackalloc",
-                "Stack Allocation Analysis", false, true)
+                "EVM Stack Allocation", false, true)
 
 
 unsigned EVMStackStatus::getStackDepth() const {
@@ -499,7 +499,7 @@ MachineInstr& EVMStackAlloc::tryToAnalyzeStackArgs(MachineBasicBlock *MBB) {
   LLVM_DEBUG({
     for (size_t i = 0; i < stackargMIs.size(); ++i) {
       dbgs() << "  Record stackarg[" << i << "]: ";
-      MI.dump();
+      stackargMIs[i]->dump();
     }
   });
 
@@ -584,6 +584,7 @@ void EVMStackAlloc::analyzeBasicBlock(MachineBasicBlock *MBB) {
   LLVM_DEBUG({ dbgs() << "  Analyzing MBB" << MBB->getNumber() << ":\n"; });
 
   if (MBB->empty()) {
+    endOfBlockUpdates(MBB);
     return;
   }
 
@@ -810,16 +811,29 @@ void EVMStackAlloc::handleDef(MachineInstr &MI) {
   }
 
   // Everything else goes to memory
-  currentStackStatus.M.insert(defReg);
-  unsigned slot = allocateMemorySlot(defReg);
-  regAssignments.insert(
-      std::pair<unsigned, StackAssignment>(defReg, {NONSTACK, slot}));
+  // But at first, try to find already existing assigment for the given register
+  auto exist_slot = regAssignments.find(defReg);
+  unsigned slot;
+  if (exist_slot != regAssignments.end()) {
+    // We found an existing assignment. Assume, it is in the memory. Although
+    // this assumption may turn out to be incorrect in the future.
+    assert(exist_slot->second.region == StackRegion::NONSTACK);
+    slot = exist_slot->getSecond().slot;
+  } else {
+    // Otherwise, allocate new slot in the memory
+    slot = allocateMemorySlot(defReg);
+    regAssignments.insert(
+        std::pair<unsigned, StackAssignment>(defReg, {NONSTACK, slot}));
+    currentStackStatus.M.insert(defReg);
 
+    LLVM_DEBUG({
+      dbgs() << "    Allocating %" << Register::virtReg2Index(defReg)
+             << " to memslot: " << slot << "\n";
+    });
+  }
+  
   insertStoreToMemoryAfter(defReg, MI, slot);
-  LLVM_DEBUG({
-    dbgs() << "    Allocating %" << Register::virtReg2Index(defReg)
-           << " to memslot: " << slot << "\n";
-  });
+
   return;
 }
 

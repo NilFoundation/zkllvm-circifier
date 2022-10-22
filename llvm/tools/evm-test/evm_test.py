@@ -115,16 +115,11 @@ def print_failed(tests: List[str]) -> None:
         print("    " + t)
 
 def execute_tests() -> bool:
-    for key, val in evm_testsuite.string_input_fixtures.items():
-        inputs = val["input"]
-        output = val["output"]
-        function = val["func"]
     failed_tests = binary_tests()
-    print_failed(failed_tests)
     if not failed_tests:
         return True
     else:
-        print("Some tests are failing.")
+        print_failed(failed_tests)
         return False
 
 seed(2019)

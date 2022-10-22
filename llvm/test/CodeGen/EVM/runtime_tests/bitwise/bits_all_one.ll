@@ -13,11 +13,11 @@ entry:
 }
 
 define i256 @bits(i256) #0 {
-  %2 = alloca i256, align 8
-  %3 = alloca i256, align 8
-  %4 = alloca i256, align 8
-  %5 = alloca i256, align 8
-  %6 = alloca i256, align 8
+  %2 = alloca i256, align 8     ; return value
+  %3 = alloca i256, align 8     ; num
+  %4 = alloca i256, align 8     ; count
+  %5 = alloca i256, align 8     ; n
+  %6 = alloca i256, align 8     ; i
   store i256 %0, i256* %3, align 8
   store i256 0, i256* %4, align 8
   store i256 0, i256* %5, align 8

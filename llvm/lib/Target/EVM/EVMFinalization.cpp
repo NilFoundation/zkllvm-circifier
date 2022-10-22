@@ -116,7 +116,7 @@ void EVMFinalization::expandADJFP(MachineInstr* MI) const {
 
 bool EVMFinalization::runOnMachineFunction(MachineFunction &MF) {
   LLVM_DEBUG({
-    dbgs() << "********** Expand pseudo instructions **********\n"
+    dbgs() << "********** EVM Finalization **********\n"
            << "********** Function: " << MF.getName() << '\n';
   });
 

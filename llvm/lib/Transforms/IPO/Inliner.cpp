@@ -1141,6 +1141,9 @@ ModuleInlinerWrapperPass::ModuleInlinerWrapperPass(InlineParams Params,
 
 PreservedAnalyses ModuleInlinerWrapperPass::run(Module &M,
                                                 ModuleAnalysisManager &MAM) {
+
+  // TODO(maksenov): temporarily disabled, fix it
+  return PreservedAnalyses::all();
   auto &IAA = MAM.getResult<InlineAdvisorAnalysis>(M);
   if (!IAA.tryCreate(Params, Mode,
                      {CGSCCInlineReplayFile,

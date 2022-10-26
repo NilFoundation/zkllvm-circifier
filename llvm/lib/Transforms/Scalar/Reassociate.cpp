@@ -2515,6 +2515,8 @@ PreservedAnalyses ReassociatePass::run(Function &F, FunctionAnalysisManager &) {
   // BuildRankMap to pre calculate ranks correctly. It also excludes dead basic
   // blocks (it has been seen that the analysis in this pass could hang when
   // analysing dead basic blocks).
+  // TODO(maksenov): temporarily disabled, fix it
+  return PreservedAnalyses::all();
   ReversePostOrderTraversal<Function *> RPOT(&F);
 
   // Calculate the rank map for F.

@@ -4653,6 +4653,8 @@ InstCombinePass::InstCombinePass(unsigned MaxIterations)
 
 PreservedAnalyses InstCombinePass::run(Function &F,
                                        FunctionAnalysisManager &AM) {
+  // TODO(maksenov): temporarily disabled, fix it
+  return PreservedAnalyses::all();
   auto &AC = AM.getResult<AssumptionAnalysis>(F);
   auto &DT = AM.getResult<DominatorTreeAnalysis>(F);
   auto &TLI = AM.getResult<TargetLibraryAnalysis>(F);
@@ -4696,6 +4698,8 @@ void InstructionCombiningPass::getAnalysisUsage(AnalysisUsage &AU) const {
 }
 
 bool InstructionCombiningPass::runOnFunction(Function &F) {
+  // TODO(maksenov): temporarily disabled, fix it
+  return true;
   if (skipFunction(F))
     return false;
 

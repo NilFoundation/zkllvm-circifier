@@ -2334,6 +2334,14 @@ Error BitcodeReader::parseTypeTableBody() {
       ResultTy = IntegerType::get(Context, NumBits);
       break;
     }
+    case bitc::TYPE_CODE_GALOIS_FIELD: { // GALOIS_FIELD: [kind]
+      if (Record.empty())
+        return error("Invalid galois field record");
+
+      uint64_t FieldKind = Record[0];
+      ResultTy = GaloisFieldType::get(Context, static_cast<GaloisFieldKind>(FieldKind));
+      break;
+    }
     case bitc::TYPE_CODE_POINTER: { // POINTER: [pointee type] or
                                     //          [pointee type, address space]
       if (Record.empty())

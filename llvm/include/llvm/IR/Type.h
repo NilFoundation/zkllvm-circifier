@@ -27,6 +27,7 @@
 namespace llvm {
 
 class IntegerType;
+class GaloisFieldType;
 struct fltSemantics;
 class LLVMContext;
 class PointerType;
@@ -69,6 +70,7 @@ public:
 
     // Derived types... see DerivedTypes.h file.
     IntegerTyID,        ///< Arbitrary bit width integers
+    GaloisFieldTyID,   ///< ---
     FunctionTyID,       ///< Functions
     PointerTyID,        ///< Pointers
     StructTyID,         ///< Structures
@@ -199,7 +201,11 @@ public:
   bool isIntegerTy(unsigned Bitwidth) const;
 
   /// Return true if this is an integer type or a vector of integer types.
-  bool isIntOrIntVectorTy() const { return getScalarType()->isIntegerTy(); }
+  bool isIntOrIntVectorTy() const {
+    return getScalarType()->isIntegerTy() ||
+           getScalarType()->getTypeID() == GaloisFieldTyID;
+  }
+
 
   /// Return true if this is an integer type or a vector of integer types of
   /// the given width.
@@ -253,7 +259,7 @@ public:
   /// includes all first-class types except struct and array types.
   bool isSingleValueType() const {
     return isFloatingPointTy() || isX86_MMXTy() || isIntegerTy() ||
-           isPointerTy() || isVectorTy() || isX86_AMXTy();
+           isPointerTy() || isVectorTy() || isX86_AMXTy() || getTypeID() == GaloisFieldTyID;
   }
 
   /// Return true if the type is an aggregate type. This means it is valid as
@@ -270,7 +276,7 @@ public:
     // If it's a primitive, it is always sized.
     if (getTypeID() == IntegerTyID || isFloatingPointTy() ||
         getTypeID() == PointerTyID || getTypeID() == X86_MMXTyID ||
-        getTypeID() == X86_AMXTyID)
+        getTypeID() == X86_AMXTyID || getTypeID() == GaloisFieldTyID)
       return true;
     // If it is not something that can have a size (e.g. a function or label),
     // it doesn't have a size.
@@ -438,6 +444,7 @@ public:
   static IntegerType *getInt32Ty(LLVMContext &C);
   static IntegerType *getInt64Ty(LLVMContext &C);
   static IntegerType *getInt128Ty(LLVMContext &C);
+  static GaloisFieldType *GetGfBls12251Base(LLVMContext &C);
   template <typename ScalarTy> static Type *getScalarTy(LLVMContext &C) {
     int noOfBits = sizeof(ScalarTy) * CHAR_BIT;
     if (std::is_integral<ScalarTy>::value) {

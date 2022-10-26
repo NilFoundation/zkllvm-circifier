@@ -283,8 +283,10 @@ namespace llvm {
       x86amx         = 186,    // This is an X86 AMX value
       i64x8          = 187,    // 8 Consecutive GPRs (AArch64)
 
+      bls12381b      = 188,    //
+
       FIRST_VALUETYPE =  1,    // This is always the beginning of the list.
-      LAST_VALUETYPE = i64x8,  // This always remains at the end of the list.
+      LAST_VALUETYPE = bls12381b,  // This always remains at the end of the list.
       VALUETYPE_SIZE = LAST_VALUETYPE + 1,
 
       // This is the current maximum for LAST_VALUETYPE.
@@ -1093,6 +1095,7 @@ namespace llvm {
       case v2048f32:  return TypeSize::Fixed(65536);
       case funcref:
       case externref: return TypeSize::Fixed(0); // opaque type
+      case bls12381b: return TypeSize::Fixed(0);
       }
     }
 

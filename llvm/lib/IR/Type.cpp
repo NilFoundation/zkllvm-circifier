@@ -240,6 +240,8 @@ IntegerType *Type::getInt32Ty(LLVMContext &C) { return &C.pImpl->Int32Ty; }
 IntegerType *Type::getInt64Ty(LLVMContext &C) { return &C.pImpl->Int64Ty; }
 IntegerType *Type::getInt128Ty(LLVMContext &C) { return &C.pImpl->Int128Ty; }
 
+GaloisFieldType *Type::GetGfBls12251Base(LLVMContext &C) {return &C.pImpl->GfBls12_381_Base; }
+
 IntegerType *Type::getIntNTy(LLVMContext &C, unsigned N) {
   return IntegerType::get(C, N);
 }
@@ -333,6 +335,20 @@ IntegerType *IntegerType::get(LLVMContext &C, unsigned NumBits) {
 }
 
 APInt IntegerType::getMask() const { return APInt::getAllOnes(getBitWidth()); }
+
+//===----------------------------------------------------------------------===//
+//                       GaloisFieldType Implementation
+//===----------------------------------------------------------------------===//
+
+GaloisFieldType *GaloisFieldType::get(LLVMContext &C, GaloisFieldKind Kind) {
+
+  // Check for the built-in  types
+  switch (Kind) {
+  case   GALOIS_FIELD_BLS12_381_BASE: return Type::GetGfBls12251Base(C);
+  default: return nullptr;
+  }
+}
+
 
 //===----------------------------------------------------------------------===//
 //                       FunctionType Implementation

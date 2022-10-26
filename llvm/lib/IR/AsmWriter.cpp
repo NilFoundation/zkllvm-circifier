@@ -552,6 +552,12 @@ void TypePrinting::print(Type *Ty, raw_ostream &OS) {
   case Type::IntegerTyID:
     OS << 'i' << cast<IntegerType>(Ty)->getBitWidth();
     return;
+  case Type::GaloisFieldTyID:
+    switch (cast<GaloisFieldType>(Ty)->getFieldKind()) {
+      case llvm::GALOIS_FIELD_BLS12_381_BASE:
+        OS << "bls12_381_base";
+        return;
+    }
 
   case Type::FunctionTyID: {
     FunctionType *FTy = cast<FunctionType>(Ty);

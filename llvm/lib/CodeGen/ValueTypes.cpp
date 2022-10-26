@@ -210,6 +210,8 @@ Type *EVT::getTypeForEVT(LLVMContext &Context) const {
   case MVT::funcref:
     // pointer to i8 addrspace(20)
     return PointerType::get(Type::getInt8Ty(Context), 20);
+  case MVT::bls12381b:
+    return GaloisFieldType::get(Context, GALOIS_FIELD_BLS12_381_BASE);
   case MVT::v1i1:
     return FixedVectorType::get(Type::getInt1Ty(Context), 1);
   case MVT::v2i1:
@@ -553,6 +555,7 @@ MVT MVT::getVT(Type *Ty, bool HandleUnknown){
     return MVT::isVoid;
   case Type::IntegerTyID:
     return getIntegerVT(cast<IntegerType>(Ty)->getBitWidth());
+  case Type::GaloisFieldTyID: return MVT(MVT::bls12381b);
   case Type::HalfTyID:      return MVT(MVT::f16);
   case Type::BFloatTyID:    return MVT(MVT::bf16);
   case Type::FloatTyID:     return MVT(MVT::f32);

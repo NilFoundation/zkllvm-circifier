@@ -1466,6 +1466,10 @@ void ASTContext::InitBuiltinTypes(const TargetInfo &Target,
 #include "clang/Basic/RISCVVTypes.def"
   }
 
+#define FIELD_TYPE(Name, Id, SingletonId) \
+  InitBuiltinType(SingletonId, BuiltinType::Id);
+#include "clang/Basic/FieldTypes.def"
+
   // Builtin type for __objc_yes and __objc_no
   ObjCBuiltinBoolTy = (Target.useSignedCharForObjCBool() ?
                        SignedCharTy : BoolTy);
@@ -2288,6 +2292,12 @@ TypeInfo ASTContext::getTypeInfoImpl(const Type *T) const {
     Align = 8;                                                                 \
     break;
 #include "clang/Basic/RISCVVTypes.def"
+#define FIELD_TYPE(Name, Id, SingletonId) \
+  case BuiltinType::Id: \
+    Width = 8; \
+    Align = 8; \
+    break;
+#include "clang/Basic/FieldTypes.def"
     }
     break;
   case Type::ObjCObjectPointer:
@@ -8049,6 +8059,8 @@ static char getObjCEncodingForPrimitiveType(const ASTContext *C,
 #include "clang/Basic/AArch64SVEACLETypes.def"
 #define RVV_TYPE(Name, Id, SingletonId) case BuiltinType::Id:
 #include "clang/Basic/RISCVVTypes.def"
+#define FIELD_TYPE(Name, Id, SingletoneId) case BuiltinType::Id:
+#include "clang/Basic/FieldTypes.def"
       {
         DiagnosticsEngine &Diags = C->getDiagnostics();
         unsigned DiagID = Diags.getCustomDiagID(DiagnosticsEngine::Error,

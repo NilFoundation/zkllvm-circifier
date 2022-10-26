@@ -511,6 +511,8 @@ LLVMTypeKind LLVMGetTypeKind(LLVMTypeRef Ty) {
     return LLVMMetadataTypeKind;
   case Type::IntegerTyID:
     return LLVMIntegerTypeKind;
+  case Type::GaloisFieldTyID:
+    return LLVMGaloisFieldTypeKind;
   case Type::FunctionTyID:
     return LLVMFunctionTypeKind;
   case Type::StructTyID:

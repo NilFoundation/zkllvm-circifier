@@ -952,6 +952,11 @@ void ModuleBitcodeWriter::writeTypeTable() {
       Code = bitc::TYPE_CODE_INTEGER;
       TypeVals.push_back(cast<IntegerType>(T)->getBitWidth());
       break;
+    case Type::GaloisFieldTyID:
+      // GALOIS_FIELD: [kind]
+      Code = bitc::TYPE_CODE_GALOIS_FIELD;
+      TypeVals.push_back(cast<GaloisFieldType>(T)->getFieldKind());
+      break;
     case Type::PointerTyID: {
       PointerType *PTy = cast<PointerType>(T);
       unsigned AddressSpace = PTy->getAddressSpace();

@@ -929,7 +929,9 @@ static std::string getMangledTypeStr(Type *Ty, bool &HasUnnamedType) {
     case Type::IntegerTyID:
       Result += "i" + utostr(cast<IntegerType>(Ty)->getBitWidth());
       break;
+    case Type::GaloisFieldTyID: Result += "field"; break;
     }
+
   }
   return Result;
 }

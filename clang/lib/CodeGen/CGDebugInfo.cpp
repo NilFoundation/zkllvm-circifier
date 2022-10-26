@@ -812,6 +812,12 @@ llvm::DIType *CGDebugInfo::CreateType(const BuiltinType *BT) {
       return DBuilder.createVectorType(/*Size=*/0, Align, ElemTy,
                                        SubscriptArray);
     }
+#define FIELD_TYPE(Name, Id, SingletoneId) case BuiltinType::Id:
+#include "clang/Basic/FieldTypes.def"
+    {
+      // TODO(maksenov): support debug info for field types
+      break;
+    }
   case BuiltinType::UChar:
   case BuiltinType::Char_U:
     Encoding = llvm::dwarf::DW_ATE_unsigned_char;

@@ -442,6 +442,9 @@ void Sema::Initialize() {
   addImplicitTypedef(Name, Context.SingletonId);
 #include "clang/Basic/RISCVVTypes.def"
   }
+#define FIELD_TYPE(Name, Id, SingletonId) \
+  addImplicitTypedef(Name, Context.SingletonId);
+#include "clang/Basic/FieldTypes.def"
 
   if (Context.getTargetInfo().hasBuiltinMSVaList()) {
     DeclarationName MSVaList = &Context.Idents.get("__builtin_ms_va_list");

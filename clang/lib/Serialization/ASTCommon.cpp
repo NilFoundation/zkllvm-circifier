@@ -250,6 +250,11 @@ serialization::TypeIdxFromBuiltin(const BuiltinType *BT) {
     ID = PREDEF_TYPE_##Id##_ID;                                                \
     break;
 #include "clang/Basic/RISCVVTypes.def"
+#define FIELD_TYPE(Name, Id, SingletonId) \
+  case BuiltinType::Id: \
+    ID = PREDEF_TYPE_##Id##_ID; \
+    break;
+#include "clang/Basic/FieldTypes.def"
   case BuiltinType::BuiltinFn:
     ID = PREDEF_TYPE_BUILTIN_FN;
     break;

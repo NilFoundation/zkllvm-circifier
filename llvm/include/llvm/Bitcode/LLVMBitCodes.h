@@ -177,6 +177,8 @@ enum TypeCodes {
   TYPE_CODE_OPAQUE_POINTER = 25, // OPAQUE_POINTER: [addrspace]
 
   TYPE_CODE_TARGET_TYPE = 26, // TARGET_TYPE
+
+  TYPE_CODE_GALOIS_FIELD = 27, // GALOIS_FIELD: [kind]
 };
 
 enum OperandBundleTagCode {

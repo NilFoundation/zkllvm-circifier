@@ -155,6 +155,7 @@ typedef enum {
   LLVMPPC_FP128TypeKind, /**< 128 bit floating point type (two 64-bits) */
   LLVMLabelTypeKind,     /**< Labels */
   LLVMIntegerTypeKind,   /**< Arbitrary bit width integers */
+  LLVMGaloisFieldTypeKind,
   LLVMFunctionTypeKind,  /**< Functions */
   LLVMStructTypeKind,    /**< Structures */
   LLVMArrayTypeKind,     /**< Arrays */

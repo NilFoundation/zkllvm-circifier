@@ -654,16 +654,7 @@ TargetInfo *AllocateTarget(const llvm::Triple &Triple,
         return nullptr;
     }
   case llvm::Triple::evm:
-    if (Triple.getSubArch() != llvm::Triple::NoSubArch ||
-        Triple.getVendor() != llvm::Triple::UnknownVendor ||
-        !Triple.isOSBinFormatEVM())
-      return nullptr;
-    switch (os) {
-      case llvm::Triple::UnknownOS:
-        return new EVMOSTargetInfo<EVMTargetInfo>(Triple, Opts);
-      default:
-        return nullptr;
-    }
+    return new EVMOSTargetInfo<EVMTargetInfo>(Triple, Opts);
 
   case llvm::Triple::dxil:
     return new DirectXTargetInfo(Triple,Opts);

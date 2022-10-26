@@ -167,8 +167,6 @@ EVM::EVM(const Driver &D, const llvm::Triple &Triple,
                          const llvm::opt::ArgList &Args)
     : ToolChain(D, Triple, Args) {
 
-  assert(Triple.isArch32Bit() != Triple.isArch64Bit());
-
   getProgramPaths().push_back(getDriver().getInstalledDir());
 
   auto SysRoot = getDriver().SysRoot;

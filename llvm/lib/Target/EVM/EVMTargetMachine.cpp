@@ -36,7 +36,7 @@ extern "C" void LLVMInitializeEVMTarget() {
 
 static std::string computeDataLayout(const Triple &TT) {
   // TODO: modify this.
-  return "E-m:e-p:256:256-i:256:256-n256-S0";
+  return "e-S256-i:256:256-p:256:256-a:256:256";
 }
 
 static Reloc::Model getEffectiveRelocModel(const Triple &TT,

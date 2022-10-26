@@ -12,6 +12,7 @@ import evm_testsuite
 
 parser = argparse.ArgumentParser( description = 'Option parser')
 parser.add_argument('--llc-path', dest='llc_path', action='store', default='llc')
+parser.add_argument('--verbose', action='store_true')
 args = parser.parse_args()
 
 def execute_with_input_in_evm(code: str, input: str, expected: str) -> bool:
@@ -47,6 +48,9 @@ def execute_with_input_in_evm(code: str, input: str, expected: str) -> bool:
     else:
         command = [evm_path, "--input", input, "--code", code, "run"]
 
+    if args.verbose:
+        print("Run evm: " + ' '.join(command))
+
     result = subprocess.run(command, stdout=subprocess.PIPE)
     success = check_result(' '.join(command), result.stdout.decode("utf-8"), exp = expected)
     return success
@@ -56,6 +60,9 @@ def generate_obj_file(infilename: str, outfilename: str) -> None:
     llc_exec = args.llc_path
     command = [llc_exec, "-mtriple=evm",
                "-filetype=obj", infilename, "-o", outfilename]
+
+    if args.verbose:
+        print("Run llc: " + ' '.join(command))
 
     result = subprocess.run(command, stdout=subprocess.PIPE)
     result.check_returncode()
@@ -79,7 +86,7 @@ def run_binary(name: str, inputs: List[str], output: str, filename: str) -> bool
         output_str = ''.join(output)
         return output_str
 
-    print("Executing test: \"" + name + "\": ", end="")
+    print("Executing test: \"" + name + '"')
     object_filename = Template(
         "/tmp/evm_test_${num}.o").substitute(num=randint(0, 65535))
     generate_obj_file(filename, object_filename)

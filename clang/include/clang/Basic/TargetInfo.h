@@ -67,26 +67,26 @@ enum class FloatModeKind {
 /// be copied for targets like AMDGPU that base their ABIs on an auxiliary
 /// CPU target.
 struct TransferrableTargetInfo {
-  unsigned char PointerWidth, PointerAlign;
-  unsigned char BoolWidth, BoolAlign;
-  unsigned char IntWidth, IntAlign;
-  unsigned char HalfWidth, HalfAlign;
-  unsigned char BFloat16Width, BFloat16Align;
-  unsigned char FloatWidth, FloatAlign;
-  unsigned char DoubleWidth, DoubleAlign;
-  unsigned char LongDoubleWidth, LongDoubleAlign, Float128Align, Ibm128Align;
-  unsigned char LargeArrayMinWidth, LargeArrayAlign;
-  unsigned char LongWidth, LongAlign;
-  unsigned char LongLongWidth, LongLongAlign;
-  unsigned char Int128Align;
+  unsigned short PointerWidth, PointerAlign;
+  unsigned short BoolWidth, BoolAlign;
+  unsigned short IntWidth, IntAlign;
+  unsigned short HalfWidth, HalfAlign;
+  unsigned short BFloat16Width, BFloat16Align;
+  unsigned short FloatWidth, FloatAlign;
+  unsigned short DoubleWidth, DoubleAlign;
+  unsigned short LongDoubleWidth, LongDoubleAlign, Float128Align, Ibm128Align;
+  unsigned short LargeArrayMinWidth, LargeArrayAlign;
+  unsigned short LongWidth, LongAlign;
+  unsigned short LongLongWidth, LongLongAlign;
+  unsigned short Int128Align;
 
   // Fixed point bit widths
-  unsigned char ShortAccumWidth, ShortAccumAlign;
-  unsigned char AccumWidth, AccumAlign;
-  unsigned char LongAccumWidth, LongAccumAlign;
-  unsigned char ShortFractWidth, ShortFractAlign;
-  unsigned char FractWidth, FractAlign;
-  unsigned char LongFractWidth, LongFractAlign;
+  unsigned short ShortAccumWidth, ShortAccumAlign;
+  unsigned short AccumWidth, AccumAlign;
+  unsigned short LongAccumWidth, LongAccumAlign;
+  unsigned short ShortFractWidth, ShortFractAlign;
+  unsigned short FractWidth, FractAlign;
+  unsigned short LongFractWidth, LongFractAlign;
 
   // If true, unsigned fixed point types have the same number of fractional bits
   // as their signed counterparts, forcing the unsigned types to have one extra

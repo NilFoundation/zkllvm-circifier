@@ -56,14 +56,15 @@ public:
     LongWidth = 256;
     LongLongWidth = 256;
 
+    MaxBitIntWidth = 256;
+
     SizeType = UnsignedLong;
     PtrDiffType = SignedLong;
     IntPtrType = SignedLong;
     WCharType = UnsignedLong;
     Char16Type = UnsignedLong;
     Char32Type = UnsignedLong;
-    resetDataLayout("e-S256-i1:256:256-i8:256:256-i16:256:256-i32:256:256-"
-                    "i64:256:256-i256:256:256-p:256:256-a:256:256");
+    resetDataLayout("e-S256-i:256:256-p:256:256-a:256:256");
   }
 
   void getTargetDefines(const LangOptions &Opts,

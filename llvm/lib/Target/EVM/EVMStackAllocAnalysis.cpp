@@ -831,7 +831,7 @@ void EVMStackAlloc::handleDef(MachineInstr &MI) {
              << " to memslot: " << slot << "\n";
     });
   }
-  
+
   insertStoreToMemoryAfter(defReg, MI, slot);
 
   return;

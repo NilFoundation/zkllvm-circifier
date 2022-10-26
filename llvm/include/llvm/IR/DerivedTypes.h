@@ -98,6 +98,32 @@ unsigned Type::getIntegerBitWidth() const {
   return cast<IntegerType>(this)->getBitWidth();
 }
 
+enum GaloisFieldKind : unsigned {
+  GALOIS_FIELD_BLS12_381_BASE = 0,
+};
+
+/// Class to represent Galois field types.
+class GaloisFieldType : public Type {
+  friend class LLVMContextImpl;
+
+protected:
+  explicit GaloisFieldType(LLVMContext &C, GaloisFieldKind Kind) : Type(C, GaloisFieldTyID){
+    setSubclassData(Kind);
+  }
+
+public:
+  /// Get or create an GaloisFieldType instance.
+  static GaloisFieldType *get(LLVMContext &C, GaloisFieldKind Kind);
+
+  /// Get the kind of field type
+  GaloisFieldKind getFieldKind() const { return static_cast<GaloisFieldKind>(getSubclassData()); }
+
+  /// Methods for support type inquiry through isa, cast, and dyn_cast.
+  static bool classof(const Type *T) {
+    return T->getTypeID() == GaloisFieldTyID;
+  }
+};
+
 /// Class to represent function types
 ///
 class FunctionType : public Type {

@@ -826,6 +826,7 @@ lltok::Kind LLLexer::LexIdentifier() {
   TYPEKEYWORD("x86_amx",   Type::getX86_AMXTy(Context));
   TYPEKEYWORD("token",     Type::getTokenTy(Context));
   TYPEKEYWORD("ptr",       PointerType::getUnqual(Context));
+  TYPEKEYWORD("bls12_381_base", Type::GetGfBls12251Base(Context));
 
 #undef TYPEKEYWORD
 

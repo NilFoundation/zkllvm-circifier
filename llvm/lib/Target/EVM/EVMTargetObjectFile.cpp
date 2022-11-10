@@ -13,6 +13,5 @@ using namespace llvm;
 
 void EVMELFTargetObjectFile::Initialize(MCContext &Ctx,
                                           const TargetMachine &TM) {
-  TargetLoweringObjectFileELF::Initialize(Ctx, TM);
-  InitializeELF(TM.Options.UseInitArray);
+  TargetLoweringObjectFile::Initialize(Ctx, TM);
 }

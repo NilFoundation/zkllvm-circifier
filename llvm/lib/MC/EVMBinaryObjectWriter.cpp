@@ -14,6 +14,8 @@
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/BinaryFormat/EVM.h"
 #include "llvm/Config/llvm-config.h"
+#include "llvm/Demangle/Demangle.h"
+#include "llvm/IR/Function.h"
 #include "llvm/MC/MCAsmBackend.h"
 #include "llvm/MC/MCAsmLayout.h"
 #include "llvm/MC/MCAssembler.h"
@@ -23,13 +25,18 @@
 #include "llvm/MC/MCObjectWriter.h"
 #include "llvm/MC/MCValue.h"
 #include "llvm/MC/MCEVMObjectWriter.h"
+#include "llvm/MC/MCSectionEVM.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/EndianStream.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/LEB128.h"
 #include "llvm/Support/StringSaver.h"
+#include "llvm/Support/JSON.h"
 #include <vector>
+
+#include <sstream>
+#include <iomanip>
 
 using namespace llvm;
 
@@ -87,14 +94,95 @@ void EVMBinaryObjectWriter::reset() {
 
 }
 
-// TODO
+std::string getEVMIntegerTypeName(Type* Type) {
+  IntegerType* Ty = cast<IntegerType>(Type);
+  auto Width = Ty->getBitWidth();
+  if (Ty->getSignBit())
+    return "i" + std::to_string(Width);
+  return "u" + std::to_string(Width);
+}
+
+std::string getEVMTypeName(Argument &Arg) {
+  auto Type = Arg.getType();
+  std::string Res;
+  raw_string_ostream StrOS(Res);
+  if (Type->isIntegerTy()) {
+    return getEVMIntegerTypeName(Type);
+  }
+  llvm_unreachable("Unsupported type");
+}
+
 uint64_t EVMBinaryObjectWriter::writeObject(MCAssembler &Asm,
                                        const MCAsmLayout &Layout) {
   uint64_t StartOffset = W.OS.tell();
+  auto Section = Asm.getContext().getEVMSection();
 
-  for (const MCSection &Sec : Asm) {
-    Asm.writeSectionData(W.OS, &Sec, Layout);
+  json::OStream Json(W.OS, 2);
+
+  Json.objectBegin();
+
+  Json.attributeBegin("functions");
+  Json.arrayBegin();
+  for (auto& F : Section->functions()) {
+    Json.objectBegin();
+
+    auto FuncName = demangle(F.F->getName().str());
+    FuncName = FuncName.substr(0, FuncName.find('('));
+    Json.attribute("name", FuncName);
+    Json.attribute("offset", F.Offset);
+    Json.attribute("stateMutability", "");
+    Json.attribute("type", "function");
+
+    Json.attributeBegin("inputs");
+    Json.arrayBegin();
+    for (Argument &Arg : F.F->args()) {
+      auto TypeString = getEVMTypeName(Arg);
+      Json.object([&](){
+        Json.attribute("name", Arg.getName());
+        Json.attribute("type", TypeString);
+      });
+    }
+    Json.arrayEnd();
+    Json.attributeEnd();
+
+    if (!F.F->getReturnType()->isVoidTy() ) {
+      Json.attributeBegin("outputs");
+      Json.arrayBegin();
+      Json.objectBegin();
+      // TODO: support all possible return types
+      assert(F.F->getReturnType()->isIntegerTy());
+      Json.attribute("name", "");
+      Json.attribute("type", "i256");
+      Json.objectEnd();
+      Json.arrayEnd();
+      Json.attributeEnd();
+    }
+
+    Json.objectEnd();
   }
+  Json.arrayEnd();
+  Json.attributeEnd();
+
+  Json.attributeBegin("jump_offsets");
+  Json.arrayBegin();
+  for (auto offset : Section->fixupOffsets()) {
+    Json.value(offset);
+  }
+  Json.arrayEnd();
+  Json.attributeEnd();
+
+  std::stringstream ss;
+  ss << std::hex;
+  for (const MCFragment &F : *Section) {
+    if (F.getKind() == llvm::MCFragment::FT_Data) {
+      for (uint8_t Ch : cast<MCDataFragment>(F).getContents()) {
+        ss << std::setw(2) << std::setfill('0') << (unsigned)Ch;
+      }
+    }
+  }
+  Json.attribute("code", ss.str());
+
+  Json.objectEnd();
 
   return W.OS.tell() - StartOffset;
 }

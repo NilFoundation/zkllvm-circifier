@@ -265,6 +265,7 @@ void EVMStackAlloc::initialize() {
   regAssignments.clear();
   currentStackStatus.reset();
   edgeset2assignment.clear();
+  memoryAssignment.clear();
 }
 
 void EVMStackAlloc::allocateRegistersToStack(MachineFunction &F) {
@@ -529,7 +530,7 @@ MachineInstr& EVMStackAlloc::tryToAnalyzeStackArgs(MachineBasicBlock *MBB) {
     } else if (defIsLocal(*stackargMI)) {
       regAssignments.insert(
           std::pair<unsigned, StackAssignment>(reg, {L_STACK, 0}));
-      LLVM_DEBUG(dbgs() << "    Allocating %"
+      LLVM_DEBUG(dbgs() << "  1 Allocating %"
                         << Register::virtReg2Index(reg)
                         << " to LOCAL STACK.\n");
       // update stack status
@@ -775,7 +776,7 @@ void EVMStackAlloc::handleDef(MachineInstr &MI) {
       // record assignment
       regAssignments.insert(
           std::pair<unsigned, StackAssignment>(defReg, {L_STACK, 0}));
-      LLVM_DEBUG(dbgs() << "    Allocating %"
+      LLVM_DEBUG(dbgs() << "  2 Allocating %"
                         << Register::virtReg2Index(defReg)
                         << " to LOCAL STACK.\n");
       // update stack status
@@ -1004,7 +1005,7 @@ void EVMStackAlloc::insertStoreToMemoryAfter(unsigned reg, MachineInstr &MI,
   LIS->InsertMachineInstrInMaps(*putlocal);
 
   // TODO: insert this new put local to LiveIntervals
-  LLVM_DEBUG(dbgs() << "    >>> PUTLOCAL(" << memSlot << ") <= %"
+  LLVM_DEBUG(dbgs() << "    >>> AFTER PUTLOCAL(" << memSlot << ") <= %"
                     << Register::virtReg2Index(reg) << "\n");
 }
 
@@ -1021,7 +1022,7 @@ void EVMStackAlloc::insertStoreToMemoryBefore(unsigned reg, MachineInstr &MI,
   LIS->InsertMachineInstrInMaps(*putlocal);
 
   // TODO: insert this new put local to LiveIntervals
-  LLVM_DEBUG(dbgs() << "    >>> PUTLOCAL(" << memSlot << ") <= %"
+  LLVM_DEBUG(dbgs() << "    >>> BEFORE PUTLOCAL(" << memSlot << ") <= %"
                     << Register::virtReg2Index(reg) << "\n");
 }
 
@@ -1263,7 +1264,7 @@ void EVMStackAlloc::getXStackRegion(unsigned edgeSetIndex,
 }
 
 bool EVMStackAlloc::runOnMachineFunction(MachineFunction &MF) {
-  TII = MF.getSubtarget<EVMSubtarget>().getInstrInfo(); 
+  TII = MF.getSubtarget<EVMSubtarget>().getInstrInfo();
   LIS = &getAnalysis<LiveIntervals>();
   MRI = &MF.getRegInfo();
   MFI = MF.getInfo<EVMMachineFunctionInfo>();

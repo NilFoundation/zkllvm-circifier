@@ -51,6 +51,7 @@ class MCSection;
 class MCSectionCOFF;
 class MCSectionDXContainer;
 class MCSectionELF;
+class MCSectionEVM;
 class MCSectionGOFF;
 class MCSectionMachO;
 class MCSectionSPIRV;
@@ -361,6 +362,7 @@ private:
   std::map<XCOFFSectionKey, MCSectionXCOFF *> XCOFFUniquingMap;
   StringMap<MCSectionDXContainer *> DXCUniquingMap;
   StringMap<bool> RelSecNames;
+  std::unique_ptr<MCSectionEVM> EVMSection;
 
   SpecificBumpPtrAllocator<MCSubtargetInfo> MCSubtargetAllocator;
 
@@ -687,6 +689,8 @@ public:
       Optional<XCOFF::CsectProperties> CsectProp = None,
       bool MultiSymbolsAllowed = false, const char *BeginSymName = nullptr,
       Optional<XCOFF::DwarfSectionSubtypeFlags> DwarfSubtypeFlags = None);
+
+  MCSectionEVM *getEVMSection();
 
   // Create and save a copy of STI and return a reference to the copy.
   MCSubtargetInfo &getSubtargetCopy(const MCSubtargetInfo &STI);

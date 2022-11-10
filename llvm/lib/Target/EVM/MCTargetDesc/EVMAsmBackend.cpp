@@ -13,6 +13,7 @@
 #include "llvm/MC/MCContext.h"
 #include "llvm/MC/MCFixup.h"
 #include "llvm/MC/MCObjectWriter.h"
+#include "llvm/MC/MCSectionEVM.h"
 #include "llvm/Support/EndianStream.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ToolOutputFile.h"
@@ -56,83 +57,48 @@ public:
       return;
     }
 
-    // Now FDOut is ready, emit the labeles and its location to the file.
-    // Iterate over this structure and emit tables.
-    llvm::raw_fd_ostream &os = FDOut->os();
-    os << "[\n";
-    for (MCAssembler::const_symbol_iterator it = Asm.symbol_begin(),
-                                            ie = Asm.symbol_end();
-         it != ie; ++it) {
-      os << "\t{ \"SymbolName\": \"";
-      os << it->getName();
-      os << "\", \"Offset\": \"" << it->getOffset() << "\" }\n";
-    }
-    // Get content size
-    {
-      os << "\t{ \"Section Info\": \n";
-      os << "\t\t[\n";
-      for (MCSection &sec : Asm) {
-        size_t sec_size = 0;
-        os << "\t\t\t{ \"begin_symbol\": \"" << sec.getBeginSymbol()->getName() << "\",\n";
-        os << "\t\t\t  \"size\": ";
-        for (MCFragment &Frag : sec) {
-          if (auto *DataFrag = dyn_cast<MCDataFragment>(&Frag)) {
-            sec_size += DataFrag->getContents().size();
-          } else if (auto *DataFrag = dyn_cast<MCAlignFragment>(&Frag)) {
-            continue;
-          } else {
-            llvm_unreachable("EVM does not generate other fragments.");
-          }
-        }
-        os << "\t\t\t  " << sec_size << "}\n";
-      }
-      os << "\t\t],\n";
-      os << "\t}\n";
-    }
-    os << "]\n";
-
     FDOut->keep();
   }
 };
 
-  namespace {
+namespace {
 
-  class EVMAsmBackend : public MCAsmBackend {
-  public:
-    EVMAsmBackend(support::endianness Endian) : MCAsmBackend(Endian) {}
-    ~EVMAsmBackend() override = default;
+class EVMAsmBackend : public MCAsmBackend {
+public:
+  EVMAsmBackend(support::endianness Endian) : MCAsmBackend(Endian) {}
+  ~EVMAsmBackend() override = default;
 
-    void applyFixup(const MCAssembler &Asm, const MCFixup &Fixup,
-                    const MCValue &Target, MutableArrayRef<char> Data,
-                    uint64_t Value, bool IsResolved,
-                    const MCSubtargetInfo *STI) const override;
+  void applyFixup(const MCAssembler &Asm, const MCFixup &Fixup,
+                  const MCValue &Target, MutableArrayRef<char> Data,
+                  uint64_t Value, bool IsResolved,
+                  const MCSubtargetInfo *STI) const override;
 
-    std::unique_ptr<MCObjectTargetWriter>
-    createObjectTargetWriter() const override;
+  std::unique_ptr<MCObjectTargetWriter>
+  createObjectTargetWriter() const override;
 
-    // No instruction requires relaxation
-    bool fixupNeedsRelaxation(const MCFixup &Fixup, uint64_t Value,
-                              const MCRelaxableFragment *DF,
-                              const MCAsmLayout &Layout) const override {
-      return false;
-    }
+  // No instruction requires relaxation
+  bool fixupNeedsRelaxation(const MCFixup &Fixup, uint64_t Value,
+                            const MCRelaxableFragment *DF,
+                            const MCAsmLayout &Layout) const override {
+    return false;
+  }
 
-    unsigned getNumFixupKinds() const override { return 1; }
+  unsigned getNumFixupKinds() const override { return 1; }
 
-    bool mayNeedRelaxation(const MCInst &Inst,
-                           const MCSubtargetInfo &STI) const override {
-      return false;
-    }
+  bool mayNeedRelaxation(const MCInst &Inst,
+                         const MCSubtargetInfo &STI) const override {
+    return false;
+  }
 
-    void relaxInstruction(MCInst &Inst, const MCSubtargetInfo &STI) const override {}
+  void relaxInstruction(MCInst &Inst, const MCSubtargetInfo &STI) const override {}
 
-    bool writeNopData(raw_ostream &OS, uint64_t Count, const MCSubtargetInfo *STI) const override;
+  bool writeNopData(raw_ostream &OS, uint64_t Count, const MCSubtargetInfo *STI) const override;
 
-    void finish(MCAssembler const &Asm, MCAsmLayout &Layout) const override;
+  void finish(MCAssembler const &Asm, MCAsmLayout &Layout) const override;
 
-  private:
-    void applyFixupValue(MutableArrayRef<char> &Contents, size_t Offset,
-                         uint16_t Value) const;
+private:
+  void applyFixupValue(MutableArrayRef<char> &Contents, size_t Offset,
+                       uint16_t Value) const;
 };
 
 } // end anonymous namespace
@@ -187,6 +153,9 @@ void EVMAsmBackend::applyFixup(const MCAssembler &Asm, const MCFixup &Fixup,
                                const MCSubtargetInfo *STI) const {
   assert(Fixup.getKind() == FK_SecRel_2);
   assert(Value <= 0xFFFF);
+
+  auto MetaSection = Asm.getContext().getEVMSection();
+  MetaSection->addFixupOffset(Fixup.getOffset());
 
   applyFixupValue(Data, Fixup.getOffset(), Value);
 }

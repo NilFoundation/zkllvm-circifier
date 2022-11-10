@@ -106,20 +106,13 @@ static unsigned getPushSize(unsigned int opcode) {
   }
 }
 
-static ConstantInt* extractPushOperand(ArrayRef<uint8_t> Bytes, uint64_t Address, unsigned opnd_length) {
-
-
-  // Fail if we reach the end of stream.
-  return nullptr;
-}
-
 static DecodeStatus addOperandToPush(MCInst &Instr, ArrayRef<uint8_t> Bytes, uint64_t Address, unsigned opnd_length) {
-  // extract the operand value from 
-  const ConstantInt* CI = extractPushOperand(Bytes, Address, opnd_length);
-  if (!CI) {
-    return MCDisassembler::Fail;
+  int64_t Val = 0;
+  for (unsigned i = 0; i < opnd_length; i++) {
+    Val |= Bytes[i + 1] << ((opnd_length - i - 1) * 8);
   }
-  Instr.addOperand(MCOperand::createCImm(CI));
+  auto Operand = MCOperand::createImm(Val);
+  Instr.addOperand(Operand);
 }
 
 
@@ -128,9 +121,7 @@ DecodeStatus EVMDisassembler::getInstruction(MCInst &Instr, uint64_t &Size,
                                              ArrayRef<uint8_t> Bytes,
                                              uint64_t Address,
                                              raw_ostream &CStream) const {
-                          
-  uint8_t insn = '\0';
-  DecodeStatus Result = decodeInstruction(DecoderTable8, Instr, insn, Address, this, STI);
+  DecodeStatus Result = decodeInstruction(DecoderTable8, Instr, Bytes[0], Address, this, STI);
   Size = 1;
 
   // if it is an PUSH instruction then we need to add operands and consume some bytes

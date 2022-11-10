@@ -1134,6 +1134,8 @@ add_subdirectory(include/llvm)
 
 add_subdirectory(lib)
 
+add_subdirectory(utils/crypto)
+
 if( LLVM_INCLUDE_UTILS )
   add_subdirectory(utils/FileCheck)
   add_subdirectory(utils/PerfectShuffle)

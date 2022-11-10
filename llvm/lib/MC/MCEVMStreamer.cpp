@@ -57,7 +57,7 @@ void MCEVMStreamer::emitAssemblerFlag(MCAssemblerFlag Flag) {
 
 void MCEVMStreamer::changeSection(MCSection *Section,
                                   const MCExpr *Subsection) {
-  llvm_unreachable("unimplemented");
+  changeSectionImpl(Section, Subsection);
 }
 
 void MCEVMStreamer::emitWeakReference(MCSymbol *Alias, const MCSymbol *Symbol) {

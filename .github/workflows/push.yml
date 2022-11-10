@@ -10,7 +10,11 @@ jobs:
     runs-on: [self-hosted, tests-runner]
 
     steps:
-    - uses: actions/checkout@v2
+    - name: Checkout
+      uses: actions/checkout@v2.3.4
+      with:
+        submodules: true
+        token: ${{ secrets.SUBMODULE_CHECKOUT_SECRET || github.token }}
     - name: Set up Python 3
       uses: actions/setup-python@v2
       with:
@@ -25,6 +29,18 @@ jobs:
         add-apt-repository -y ppa:ethereum/ethereum
         apt-get update
         apt-get install ethereum
+    # - name: Git Sumbodule Update
+    #   run: |
+    #     # git submodule init
+    #     # git submodule update --recursive
+    #     pwd
+    #     git submodule update --init --recursive llvm/utils/crypto/hash
+    #     (cd llvm/utils/crypto/hash && git status)
+    #     (cd llvm/utils/crypto/hash && git branch)
+    #     (cd llvm/utils/crypto/hash && git pull)
+    #     (cd llvm/utils/crypto/hash && git restore --staged .)
+    #     ls -la llvm/utils/crypto/hash
+    #     ls -la llvm/utils/crypto/
     - name: Run cmake
       run: |
         cd ${{ github.workspace }}
@@ -34,8 +50,7 @@ jobs:
     - name: Build llc
       run: |
         cd ${{ github.workspace }}/build
-        make -j4 llc
-    - name: Run Integration tests
+        make -j4 clang evm-linker
+    - name: Run EVM tests
       run: |
-        cd ${{ github.workspace }}/llvm/tools/evm-test
-        python evm_test.py --llc-path ${{ github.workspace }}/build/bin/llc
+        make evm-tests

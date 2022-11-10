@@ -1,3 +1,5 @@
+// EVM_RUN: function: test, input: [], result: 1
+
 void insertionSort(long arr[], long n);
 
 long test() {

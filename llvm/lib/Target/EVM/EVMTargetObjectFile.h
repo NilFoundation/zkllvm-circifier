@@ -10,13 +10,24 @@
 #define LLVM_LIB_TARGET_EVM_EVMTARGETOBJECTFILE_H
 
 #include "llvm/CodeGen/TargetLoweringObjectFileImpl.h"
+#include "llvm/Target/TargetLoweringObjectFile.h"
+#include "llvm/MC/SectionKind.h"
 
 namespace llvm {
 class EVMTargetMachine;
 
 /// This implementation is used for EVM ELF targets.
-class EVMELFTargetObjectFile : public TargetLoweringObjectFileELF {
+class EVMELFTargetObjectFile : public TargetLoweringObjectFile {
   void Initialize(MCContext &Ctx, const TargetMachine &TM) override;
+  MCSection *
+  getExplicitSectionGlobal(const GlobalObject *GO, SectionKind Kind,
+                           const TargetMachine &TM) const override { return nullptr; }
+
+  MCSection *SelectSectionForGlobal(const GlobalObject *GO,
+                                    SectionKind Kind,
+                                    const TargetMachine &TM) const override {
+    return getTextSection();
+  }
 };
 
 } // end namespace llvm

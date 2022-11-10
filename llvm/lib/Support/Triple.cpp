@@ -797,6 +797,9 @@ static Triple::ObjectFormatType getDefaultFormat(const Triple &T) {
       return Triple::COFF;
     return Triple::ELF;
 
+  case Triple::evm:
+    return Triple::EVMBinary;
+
   case Triple::aarch64_be:
   case Triple::amdgcn:
   case Triple::amdil64:
@@ -807,7 +810,6 @@ static Triple::ObjectFormatType getDefaultFormat(const Triple &T) {
   case Triple::bpfeb:
   case Triple::bpfel:
   case Triple::csky:
-  case Triple::evm:
   case Triple::hexagon:
   case Triple::hsail64:
   case Triple::hsail:

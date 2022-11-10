@@ -1,3 +1,5 @@
+// EVM_RUN: function: sort, input: [], result: 1
+
 void quicksort(long* number,long first,long last);
 
 long sort() {

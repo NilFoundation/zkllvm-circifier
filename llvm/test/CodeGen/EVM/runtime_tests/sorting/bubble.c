@@ -1,3 +1,5 @@
+// EVM_RUN: function: sort, input: [], result: 1
+
 void swap(long *xp, long *yp);
 void bubbleSort(long arr[], long n);
 

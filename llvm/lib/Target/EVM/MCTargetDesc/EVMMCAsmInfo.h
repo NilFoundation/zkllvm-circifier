@@ -23,6 +23,7 @@ class EVMMCAsmInfo : public MCAsmInfo {
 public:
   explicit EVMMCAsmInfo(const Triple &TT, const MCTargetOptions &Options) {
     StackGrowsUp = true;
+    HasDotTypeDotSizeDirective = false;
   }
 };
 }

@@ -859,6 +859,17 @@ MCSectionDXContainer *MCContext::getDXContainerSection(StringRef Section,
   return MapIt->second;
 }
 
+MCSectionEVM *MCContext::getEVMSection() {
+  if (!EVMSection) {
+    EVMSection = std::make_unique<MCSectionEVM>(
+        SectionKind::getText(), nullptr);
+    auto *F = new MCDataFragment();
+    EVMSection->getFragmentList().insert(EVMSection->begin(), F);
+    F->setParent(EVMSection.get());
+  }
+  return EVMSection.get();
+}
+
 MCSubtargetInfo &MCContext::getSubtargetCopy(const MCSubtargetInfo &STI) {
   return *new (MCSubtargetAllocator.Allocate()) MCSubtargetInfo(STI);
 }

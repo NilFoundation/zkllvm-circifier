@@ -25,9 +25,12 @@
 #include "llvm/MC/MCInst.h"
 #include "llvm/MC/MCStreamer.h"
 #include "llvm/MC/MCSymbol.h"
+#include "llvm/MC/MCSectionEVM.h"
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/CodeGen/TargetLoweringObjectFileImpl.h"
+
+#include "llvm/MC/MCAssembler.h"
 
 #include "llvm/MC/MCInstBuilder.h"
 
@@ -63,7 +66,7 @@ public:
   bool lowerOperand(const MachineOperand &MO, MCOperand &MCOp) const {
     return LowerEVMMachineOperandToMCOperand(MO, MCOp, *this);
     }
-  //bool runOnMachineFunction(MachineFunction &MF) override;
+  bool runOnMachineFunction(MachineFunction &MF) override;
 
 private:
   MCSymbol* createSymbol(std::string name) const;
@@ -71,6 +74,25 @@ private:
   std::unique_ptr<MCSubtargetInfo> STI;
   MCContext* ctx;
 };
+}
+
+bool EVMAsmPrinter::runOnMachineFunction(MachineFunction &MF) {
+  auto Section = OutStreamer->getContext().getEVMSection();
+  auto& Fragment = cast<MCDataFragment>(*Section->getFragmentList().begin());
+  unsigned offset = Fragment.getContents().size();
+
+  auto &F = MF.getFunction();
+  // TODO: currently we allow only integer types in functions' parameters.
+  bool isSuitable = std::all_of(F.arg_begin(), F.arg_end(), [](auto& Arg) {
+    return Arg.getType()->isIntegerTy();
+  });
+  if (isSuitable) {
+    Section->addFunction(&MF.getFunction(), offset);
+  }
+  SetupMachineFunction(MF);
+  emitFunctionBody();
+
+  return false;
 }
 
 MCSymbol* EVMAsmPrinter::createSymbol(std::string name) const {

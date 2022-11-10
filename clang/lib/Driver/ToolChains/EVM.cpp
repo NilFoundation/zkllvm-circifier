@@ -64,61 +64,7 @@ void evm::Linker::ConstructJob(Compilation &C, const JobAction &JA,
   const char *Linker = Args.MakeArgString(getLinkerPath(Args));
   ArgStringList CmdArgs;
 
-  CmdArgs.push_back("-m");
-  CmdArgs.push_back("evm");
-
-  if (Args.hasArg(options::OPT_s))
-    CmdArgs.push_back("--strip-all");
-
-  Args.AddAllArgs(CmdArgs, options::OPT_L);
-  Args.AddAllArgs(CmdArgs, options::OPT_u);
-  ToolChain.AddFilePathLibArgs(Args, CmdArgs);
-
-  const char *Crt1 = "crt1.o";
-  const char *Entry = nullptr;
-
-  // If crt1-command.o exists, it supports new-style commands, so use it.
-  // Otherwise, use the old crt1.o. This is a temporary transition measure.
-  // Once WASI libc no longer needs to support LLVM versions which lack
-  // support for new-style command, it can make crt1.o the same as
-  // crt1-command.o. And once LLVM no longer needs to support WASI libc
-  // versions before that, it can switch to using crt1-command.o.
-  if (ToolChain.GetFilePath("crt1-command.o") != "crt1-command.o")
-    Crt1 = "crt1-command.o";
-
-  if (const Arg *A = Args.getLastArg(options::OPT_mexec_model_EQ)) {
-    StringRef CM = A->getValue();
-    if (CM == "command") {
-      // Use default values.
-    } else if (CM == "reactor") {
-      Crt1 = "crt1-reactor.o";
-      Entry = "_initialize";
-    } else {
-      ToolChain.getDriver().Diag(diag::err_drv_invalid_argument_to_option)
-          << CM << A->getOption().getName();
-    }
-  }
-  if (!Args.hasArg(options::OPT_nostdlib, options::OPT_nostartfiles))
-    CmdArgs.push_back(Args.MakeArgString(ToolChain.GetFilePath(Crt1)));
-  if (Entry) {
-    CmdArgs.push_back(Args.MakeArgString("--entry"));
-    CmdArgs.push_back(Args.MakeArgString(Entry));
-  }
-
   AddLinkerInputs(ToolChain, Inputs, Args, CmdArgs, JA);
-
-  if (!Args.hasArg(options::OPT_nostdlib, options::OPT_nodefaultlibs)) {
-    if (ToolChain.ShouldLinkCXXStdlib(Args))
-      ToolChain.AddCXXStdlibLibArgs(Args, CmdArgs);
-
-    if (Args.hasArg(options::OPT_pthread)) {
-      CmdArgs.push_back("-lpthread");
-      CmdArgs.push_back("--shared-memory");
-    }
-
-    CmdArgs.push_back("-lc");
-    AddRunTimeLibs(ToolChain, ToolChain.getDriver(), CmdArgs, Args);
-  }
 
   CmdArgs.push_back("-o");
   CmdArgs.push_back(Output.getFilename());
@@ -126,33 +72,6 @@ void evm::Linker::ConstructJob(Compilation &C, const JobAction &JA,
   C.addCommand(std::make_unique<Command>(JA, *this,
                                          ResponseFileSupport::AtFileCurCP(),
                                          Linker, CmdArgs, Inputs, Output));
-
-  // When optimizing, if evm-opt is available, run it.
-  if (Arg *A = Args.getLastArg(options::OPT_O_Group)) {
-    auto evmOptPath = ToolChain.GetProgramPath("evm-opt");
-    if (evmOptPath != "evm-opt") {
-      StringRef OOpt = "s";
-      if (A->getOption().matches(options::OPT_O4) ||
-          A->getOption().matches(options::OPT_Ofast))
-        OOpt = "4";
-      else if (A->getOption().matches(options::OPT_O0))
-        OOpt = "0";
-      else if (A->getOption().matches(options::OPT_O))
-        OOpt = A->getValue();
-
-      if (OOpt != "0") {
-        const char *evmOpt = Args.MakeArgString(evmOptPath);
-        ArgStringList CmdArgs;
-        CmdArgs.push_back(Output.getFilename());
-        CmdArgs.push_back(Args.MakeArgString(llvm::Twine("-O") + OOpt));
-        CmdArgs.push_back("-o");
-        CmdArgs.push_back(Output.getFilename());
-        C.addCommand(std::make_unique<Command>(
-            JA, *this, ResponseFileSupport::AtFileCurCP(), evmOpt, CmdArgs,
-            Inputs, Output));
-      }
-    }
-  }
 }
 
 /// Given a base library directory, append path components to form the

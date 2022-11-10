@@ -1,3 +1,5 @@
+// EVM_RUN: function: hcf, input: [0x18, 0x24], result: 0xc
+
 int hcf(int a, int b)
 {
     while (a != b)

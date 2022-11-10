@@ -651,7 +651,7 @@ def : Pat<(i256 (sra i256:$lhs, i256:$rhs)),
 
 // ext/trunc load/stores
 def : Pat<(truncstore i256:$lhs, i256:$rhs),
-          (MSTORE_r i256:$lhs, i256:$rhs)>;
+          (MSTORE_r i256:$rhs, i256:$lhs)>;
 
 // FIXME
 def : Pat<(zextload i256:$src), (MLOAD_r i256:$src)>;

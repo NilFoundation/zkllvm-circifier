@@ -18,6 +18,7 @@
 #include "llvm/MC/MCSectionCOFF.h"
 #include "llvm/MC/MCSectionDXContainer.h"
 #include "llvm/MC/MCSectionELF.h"
+#include "llvm/MC/MCSectionEVM.h"
 #include "llvm/MC/MCSectionGOFF.h"
 #include "llvm/MC/MCSectionMachO.h"
 #include "llvm/MC/MCSectionSPIRV.h"
@@ -331,7 +332,7 @@ void MCObjectFileInfo::initMachOMCObjectFileInfo(const Triple &T) {
 }
 
 void MCObjectFileInfo::initEVMMCObjectFileInfo(const Triple &T) {
-    // TODO: implement the details.
+  TextSection = Ctx->getEVMSection();
 }
 
 void MCObjectFileInfo::initELFMCObjectFileInfo(const Triple &T, bool Large) {

@@ -197,6 +197,8 @@ public:
   /// True if this is an instance of IntegerType.
   bool isIntegerTy() const { return getTypeID() == IntegerTyID; }
 
+  bool isFieldTy() const { return getTypeID() == GaloisFieldTyID; }
+
   /// Return true if this is an IntegerType of the given width.
   bool isIntegerTy(unsigned Bitwidth) const;
 

@@ -2099,6 +2099,7 @@ public:
   /// isComplexIntegerType() can be used to test for complex integers.
   bool isIntegerType() const;     // C99 6.2.5p17 (int, char, bool, enum)
   bool isEnumeralType() const;
+  bool isFieldType() const;
 
   /// Determine whether this type is a scoped enumeration type.
   bool isScopedEnumeralType() const;
@@ -7222,6 +7223,13 @@ inline bool Type::isIntegerType() const {
       !IsEnumDeclScoped(ET->getDecl());
   }
   return isBitIntType();
+}
+
+inline bool Type::isFieldType() const {
+  if (const auto *BT = dyn_cast<BuiltinType>(CanonicalType)) {
+    return BT->getKind() == BuiltinType::FBls;
+  }
+  return false;
 }
 
 inline bool Type::isFixedPointType() const {

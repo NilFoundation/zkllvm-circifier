@@ -4122,8 +4122,16 @@ def FunctionReturnThunks : InheritableAttr,
   let Subjects = SubjectList<[Function]>;
   let Documentation = [FunctionReturnThunksDocs];
 }
+
 def ReadOnlyPlacement : InheritableAttr {
   let Spellings = [Clang<"enforce_read_only_placement">];
   let Subjects = SubjectList<[Record]>;
   let Documentation = [ReadOnlyPlacementDocs];
+}
+
+def Circuit : Attr {
+  let Spellings = [CXX11<"", "circuit", 201907>,
+                   GCC<"circuit">];
+  let Subjects = SubjectList<[Function]>;
+  let Documentation = [Undocumented];
 }

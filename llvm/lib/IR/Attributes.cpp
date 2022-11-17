@@ -562,6 +562,10 @@ std::string Attribute::getAsString(bool InAttrGrp) const {
     return Result;
   }
 
+  if (hasAttribute(Attribute::Circuit)) {
+    return "circuit";
+  }
+
   // Convert target-dependent attributes to strings of the form:
   //
   //   "kind"

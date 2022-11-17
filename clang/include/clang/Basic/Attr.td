@@ -4199,3 +4199,9 @@ def AvailableOnlyInDefaultEvalMethod : InheritableAttr {
   let Documentation = [Undocumented];
 }
 
+def Circuit : Attr {
+  let Spellings = [CXX11<"", "circuit", 201907>,
+                   GCC<"circuit">];
+  let Subjects = SubjectList<[Function]>;
+  let Documentation = [Undocumented];
+}

@@ -630,6 +630,8 @@ static uint64_t getAttrKindEncoding(Attribute::AttrKind Kind) {
     return bitc::ATTR_KIND_CONVERGENT;
   case Attribute::InAlloca:
     return bitc::ATTR_KIND_IN_ALLOCA;
+  case Attribute::Circuit:
+    return bitc::ATTR_KIND_CIRCUIT;
   case Attribute::Cold:
     return bitc::ATTR_KIND_COLD;
   case Attribute::DisableSanitizerInstrumentation:

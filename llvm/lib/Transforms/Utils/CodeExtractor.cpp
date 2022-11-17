@@ -919,6 +919,7 @@ Function *CodeExtractor::constructFunction(const ValueSet &inputs,
       case Attribute::AllocKind:
       case Attribute::PresplitCoroutine:
       case Attribute::Memory:
+      case Attribute::Circuit:
         continue;
       // Those attributes should be safe to propagate to the extracted function.
       case Attribute::AlwaysInline:

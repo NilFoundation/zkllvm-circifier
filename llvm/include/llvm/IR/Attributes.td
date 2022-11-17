@@ -77,6 +77,9 @@ def ByRef : TypeAttr<"byref", [ParamAttr]>;
 /// Parameter or return value may not contain uninitialized or poison bits.
 def NoUndef : EnumAttr<"noundef", [ParamAttr, RetAttr]>;
 
+/// Entry point for circuit generation
+def Circuit : EnumAttr<"circuit", [FnAttr]>;
+
 /// Marks function as being in a cold path.
 def Cold : EnumAttr<"cold", [FnAttr]>;
 

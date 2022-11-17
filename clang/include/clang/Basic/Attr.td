@@ -4096,3 +4096,10 @@ def FunctionReturnThunks : InheritableAttr,
   let Subjects = SubjectList<[Function]>;
   let Documentation = [FunctionReturnThunksDocs];
 }
+
+def Circuit : Attr {
+  let Spellings = [CXX11<"", "circuit", 201907>,
+                   GCC<"circuit">];
+  let Subjects = SubjectList<[Function]>;
+  let Documentation = [Undocumented];
+}

@@ -7227,7 +7227,8 @@ inline bool Type::isIntegerType() const {
 
 inline bool Type::isFieldType() const {
   if (const auto *BT = dyn_cast<BuiltinType>(CanonicalType)) {
-    return BT->getKind() == BuiltinType::FBls;
+    return BT->getKind() >= BuiltinType::FBls &&
+           BT->getKind() <= BuiltinType::FCurve25519b;
   }
   return false;
 }

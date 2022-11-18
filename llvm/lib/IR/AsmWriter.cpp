@@ -557,6 +557,12 @@ void TypePrinting::print(Type *Ty, raw_ostream &OS) {
       case llvm::GALOIS_FIELD_BLS12_381_BASE:
         OS << "bls12_381_base";
         return;
+      case llvm::GALOIS_FIELD_PALLAS_BASE:
+        OS << "pallas_base";
+        return;
+      case llvm::GALOIS_FIELD_CURVE_25519_BASE:
+        OS << "curve25519_base";
+        return;
     }
 
   case Type::FunctionTyID: {

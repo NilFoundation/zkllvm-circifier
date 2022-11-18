@@ -798,6 +798,8 @@ lltok::Kind LLLexer::LexIdentifier() {
   TYPEKEYWORD("x86_amx",   Type::getX86_AMXTy(Context));
   TYPEKEYWORD("token",     Type::getTokenTy(Context));
   TYPEKEYWORD("bls12_381_base", Type::GetGfBls12251Base(Context));
+  TYPEKEYWORD("pallas_base", Type::GetGfPallasBase(Context));
+  TYPEKEYWORD("curve25519_base", Type::GetGfCurve25519Base(Context));
 
   if (Keyword == "ptr") {
     // setOpaquePointers() must be called before creating any pointer types.

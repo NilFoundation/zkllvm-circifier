@@ -283,10 +283,13 @@ namespace llvm {
       x86amx         = 186,    // This is an X86 AMX value
       i64x8          = 187,    // 8 Consecutive GPRs (AArch64)
 
-      bls12381b      = 188,    //
+      // Field types
+      bls12381b      = 188,
+      pallasb        = 189,
+      curve25519b    = 190,
 
       FIRST_VALUETYPE =  1,    // This is always the beginning of the list.
-      LAST_VALUETYPE = bls12381b,  // This always remains at the end of the list.
+      LAST_VALUETYPE = curve25519b,  // This always remains at the end of the list.
       VALUETYPE_SIZE = LAST_VALUETYPE + 1,
 
       // This is the current maximum for LAST_VALUETYPE.

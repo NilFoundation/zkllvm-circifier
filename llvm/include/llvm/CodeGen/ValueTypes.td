@@ -229,7 +229,10 @@ def externref : ValueType<0,    185>;  // WebAssembly's externref type
 def x86amx    : ValueType<8192, 186>;  // X86 AMX value
 def i64x8     : ValueType<512,  187>;  // 8 Consecutive GPRs (AArch64)
 
-def bls12381b : ValueType<0, 187>;  // Field type
+// Field type
+def bls12381b : ValueType<0, 188>;
+def pallasb   : ValueType<0, 189>;
+def curve25519b : ValueType<0, 190>;
 
 def token      : ValueType<0, 248>;  // TokenTy
 def MetadataVT : ValueType<0, 249>;  // Metadata

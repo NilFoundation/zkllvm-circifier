@@ -827,6 +827,8 @@ lltok::Kind LLLexer::LexIdentifier() {
   TYPEKEYWORD("token",     Type::getTokenTy(Context));
   TYPEKEYWORD("ptr",       PointerType::getUnqual(Context));
   TYPEKEYWORD("bls12_381_base", Type::GetGfBls12251Base(Context));
+  TYPEKEYWORD("pallas_base", Type::GetGfPallasBase(Context));
+  TYPEKEYWORD("curve25519_base", Type::GetGfCurve25519Base(Context));
 
 #undef TYPEKEYWORD
 

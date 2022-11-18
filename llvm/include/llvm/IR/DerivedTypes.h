@@ -100,6 +100,8 @@ unsigned Type::getIntegerBitWidth() const {
 
 enum GaloisFieldKind : unsigned {
   GALOIS_FIELD_BLS12_381_BASE = 0,
+  GALOIS_FIELD_PALLAS_BASE = 1,
+  GALOIS_FIELD_CURVE_25519_BASE = 2,
 };
 
 /// Class to represent Galois field types.

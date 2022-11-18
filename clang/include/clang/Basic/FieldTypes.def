@@ -16,4 +16,6 @@
 //===----------------------------------------------------------------------===//
 
 FIELD_TYPE("field_bls12381b", FBls, FBlsTy)
+FIELD_TYPE("field_pallasb", FPallasb, FPallasBTy)
+FIELD_TYPE("field_curve25519b", FCurve25519b, FCurve25519bTy)
 #undef FIELD_TYPE

@@ -47,7 +47,9 @@ LLVMContextImpl::LLVMContextImpl(LLVMContext &C)
       PPC_FP128Ty(C, Type::PPC_FP128TyID), X86_MMXTy(C, Type::X86_MMXTyID),
       X86_AMXTy(C, Type::X86_AMXTyID), Int1Ty(C, 1), Int8Ty(C, 8),
       Int16Ty(C, 16), Int32Ty(C, 32), Int64Ty(C, 64), Int128Ty(C, 128),
-      GfBls12_381_Base(C, GALOIS_FIELD_BLS12_381_BASE) {
+      GfBls12_381_Base(C, GALOIS_FIELD_BLS12_381_BASE),
+      GfPallas_Base(C, GALOIS_FIELD_PALLAS_BASE),
+      GfCurve25519_Base(C, GALOIS_FIELD_CURVE_25519_BASE) {
   if (OpaquePointersCL.getNumOccurrences()) {
     OpaquePointers = OpaquePointersCL;
   }

@@ -331,6 +331,21 @@ static llvm::Type *getTypeForFormat(llvm::LLVMContext &VMContext,
   llvm_unreachable("Unknown float format!");
 }
 
+static llvm::Type *getFieldTypeById(llvm::LLVMContext &Context, BuiltinType::Kind id) {
+  switch (id) {
+  case BuiltinType::FBls:
+    return llvm::GaloisFieldType::get(Context,
+                                      llvm::GALOIS_FIELD_BLS12_381_BASE);
+  case BuiltinType::FPallasb:
+    return llvm::GaloisFieldType::get(Context, llvm::GALOIS_FIELD_PALLAS_BASE);
+  case BuiltinType::FCurve25519b:
+    return llvm::GaloisFieldType::get(Context,
+                                      llvm::GALOIS_FIELD_CURVE_25519_BASE);
+  default:
+    llvm_unreachable("Unknown field type!");
+  }
+}
+
 llvm::Type *CodeGenTypes::ConvertFunctionTypeInternal(QualType QFT) {
   assert(QFT.isCanonical());
   const Type *Ty = QFT.getTypePtr();
@@ -635,7 +650,7 @@ llvm::Type *CodeGenTypes::ConvertType(QualType T) {
     }
 #define FIELD_TYPE(Name, Id, SingletonId) case BuiltinType::Id:
 #include "clang/Basic/FieldTypes.def"
-    return llvm::GaloisFieldType::get(getLLVMContext(),llvm::GALOIS_FIELD_BLS12_381_BASE);
+    return getFieldTypeById(getLLVMContext(), cast<BuiltinType>(Ty)->getKind());
    case BuiltinType::Dependent:
 #define BUILTIN_TYPE(Id, SingletonId)
 #define PLACEHOLDER_TYPE(Id, SingletonId) \

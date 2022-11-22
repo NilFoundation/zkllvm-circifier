@@ -113,6 +113,7 @@ typedef enum {
   LLVMIntToPtr       = 40,
   LLVMBitCast        = 41,
   LLVMAddrSpaceCast  = 60,
+  LLVMIToGF          = 70,
 
   /* Other Operators */
   LLVMICmp           = 42,

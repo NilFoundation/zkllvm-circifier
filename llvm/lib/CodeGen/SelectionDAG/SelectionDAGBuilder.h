@@ -575,6 +575,7 @@ private:
   void visitIntToPtr(const User &I);
   void visitBitCast(const User &I);
   void visitAddrSpaceCast(const User &I);
+  void visitIToGF(const User &I);
 
   void visitExtractElement(const User &I);
   void visitInsertElement(const User &I);

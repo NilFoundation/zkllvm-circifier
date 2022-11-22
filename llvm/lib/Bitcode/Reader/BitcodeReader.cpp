@@ -1183,6 +1183,7 @@ static int getDecodedCastOpcode(unsigned Val) {
   case bitc::CAST_INTTOPTR: return Instruction::IntToPtr;
   case bitc::CAST_BITCAST : return Instruction::BitCast;
   case bitc::CAST_ADDRSPACECAST: return Instruction::AddrSpaceCast;
+  case bitc::CAST_ITOGF   : return Instruction::IToGF;
   }
 }
 

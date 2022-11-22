@@ -3440,6 +3440,7 @@ CastInst *CastInst::Create(Instruction::CastOps op, Value *S, Type *Ty,
   case IntToPtr:      return new IntToPtrInst      (S, Ty, Name, InsertBefore);
   case BitCast:       return new BitCastInst       (S, Ty, Name, InsertBefore);
   case AddrSpaceCast: return new AddrSpaceCastInst (S, Ty, Name, InsertBefore);
+  case IToGF:         return new IToGFInst         (S, Ty, Name, InsertBefore);
   default: llvm_unreachable("Invalid opcode provided");
   }
 }
@@ -3462,6 +3463,7 @@ CastInst *CastInst::Create(Instruction::CastOps op, Value *S, Type *Ty,
   case IntToPtr:      return new IntToPtrInst      (S, Ty, Name, InsertAtEnd);
   case BitCast:       return new BitCastInst       (S, Ty, Name, InsertAtEnd);
   case AddrSpaceCast: return new AddrSpaceCastInst (S, Ty, Name, InsertAtEnd);
+  case IToGF:         return new IToGFInst         (S, Ty, Name, InsertAtEnd);
   default: llvm_unreachable("Invalid opcode provided");
   }
 }
@@ -3903,6 +3905,8 @@ CastInst::castIsValid(Instruction::CastOps op, Type *SrcTy, Type *DstTy) {
 
     return SrcEC == DstEC;
   }
+  case Instruction::IToGF:
+    return SrcTy->isIntegerTy() && DstTy->isFieldTy();
   }
 }
 
@@ -4059,6 +4063,18 @@ AddrSpaceCastInst::AddrSpaceCastInst(
   Value *S, Type *Ty, const Twine &Name, BasicBlock *InsertAtEnd
 ) : CastInst(Ty, AddrSpaceCast, S, Name, InsertAtEnd) {
   assert(castIsValid(getOpcode(), S, Ty) && "Illegal AddrSpaceCast");
+}
+
+IToGFInst::IToGFInst(
+  Value *S, Type *Ty, const Twine &Name, Instruction *InsertBefore
+) : CastInst(Ty, IToGF, S, Name, InsertBefore) {
+  assert(castIsValid(getOpcode(), S, Ty) && "Illegal IToGF");
+}
+
+IToGFInst::IToGFInst(
+  Value *S, Type *Ty, const Twine &Name, BasicBlock *InsertAtEnd
+)  : CastInst(Ty, IToGF, S, Name, InsertAtEnd) {
+  assert(castIsValid(getOpcode(), S, Ty) && "Illegal IToGF");
 }
 
 //===----------------------------------------------------------------------===//
@@ -4983,6 +4999,10 @@ BitCastInst *BitCastInst::cloneImpl() const {
 
 AddrSpaceCastInst *AddrSpaceCastInst::cloneImpl() const {
   return new AddrSpaceCastInst(getOperand(0), getType());
+}
+
+IToGFInst *IToGFInst::cloneImpl() const {
+  return new IToGFInst(getOperand(0), getType());
 }
 
 CallInst *CallInst::cloneImpl() const {

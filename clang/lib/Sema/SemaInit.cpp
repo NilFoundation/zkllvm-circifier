@@ -3651,6 +3651,7 @@ void InitializationSequence::Step::Destroy() {
   case SK_StdInitializerList:
   case SK_StdInitializerListConstructorCall:
   case SK_OCLSamplerInit:
+  case SK_GaloisFieldInit:
   case SK_OCLZeroOpaqueType:
   case SK_ParenthesizedListInit:
     break;
@@ -3938,6 +3939,13 @@ void InitializationSequence::AddStdInitializerListConstructionStep(QualType T) {
 void InitializationSequence::AddOCLSamplerInitStep(QualType T) {
   Step S;
   S.Kind = SK_OCLSamplerInit;
+  S.Type = T;
+  Steps.push_back(S);
+}
+
+void InitializationSequence::AddGaloisFieldInitStep(QualType T) {
+  Step S;
+  S.Kind = SK_GaloisFieldInit;
   S.Type = T;
   Steps.push_back(S);
 }
@@ -6027,6 +6035,17 @@ static bool TryOCLSamplerInitialization(Sema &S,
   return true;
 }
 
+static bool TryGaloisFieldInitialization(Sema &S,
+                                        InitializationSequence &Sequence,
+                                        QualType DestType,
+                                        Expr *Initializer) {
+  if (!DestType->isFieldType() || !Initializer->getType()->isIntegerType())
+    return false;
+
+  Sequence.AddGaloisFieldInitStep(DestType);
+  return true;
+}
+
 static bool IsZeroInitializer(Expr *Initializer, Sema &S) {
   return Initializer->isIntegerConstantExpr(S.getASTContext()) &&
     (Initializer->EvaluateKnownConstInt(S.getASTContext()) == 0);
@@ -6336,6 +6355,9 @@ void InitializationSequence::InitializeFrom(Sema &S,
          Entity.isParameterKind();
 
   if (TryOCLSamplerInitialization(S, *this, DestType, Initializer))
+    return;
+
+  if (TryGaloisFieldInitialization(S, *this, DestType, Initializer))
     return;
 
   // We're at the end of the line for C: it's either a write-back conversion
@@ -8685,6 +8707,7 @@ ExprResult InitializationSequence::Perform(Sema &S,
   case SK_ProduceObjCObject:
   case SK_StdInitializerList:
   case SK_OCLSamplerInit:
+  case SK_GaloisFieldInit:
   case SK_OCLZeroOpaqueType: {
     assert(Args.size() == 1 || IsHLSLVectorInit);
     CurInit = Args[0];
@@ -9374,6 +9397,11 @@ ExprResult InitializationSequence::Perform(Sema &S,
       // Insert cast from integer to sampler.
       CurInit = S.ImpCastExprToType(Init, S.Context.OCLSamplerTy,
                                       CK_IntToOCLSampler);
+      break;
+    }
+    case SK_GaloisFieldInit: {
+      Expr *Init = CurInit.get();
+      CurInit = S.ImpCastExprToType(Init, DestType, CK_IntToGaloisField);
       break;
     }
     case SK_OCLZeroOpaqueType: {
@@ -10351,6 +10379,10 @@ void InitializationSequence::dump(raw_ostream &OS) const {
 
     case SK_OCLSamplerInit:
       OS << "OpenCL sampler_t from integer constant";
+      break;
+
+    case SK_GaloisFieldInit:
+      OS << "Galois field element from integer constant";
       break;
 
     case SK_OCLZeroOpaqueType:

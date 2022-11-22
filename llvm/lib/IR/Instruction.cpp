@@ -467,6 +467,7 @@ const char *Instruction::getOpcodeName(unsigned OpCode) {
   case PtrToInt:      return "ptrtoint";
   case BitCast:       return "bitcast";
   case AddrSpaceCast: return "addrspacecast";
+  case IToGF:         return "itogf";
 
   // Other instructions...
   case ICmp:           return "icmp";

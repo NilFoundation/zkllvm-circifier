@@ -472,6 +472,10 @@ private:
     return translateCast(TargetOpcode::G_ZEXT, U, MIRBuilder);
   }
 
+  bool translateIToGF(const User &U, MachineIRBuilder &MIRBuilder) {
+    llvm_unreachable("Translation of IToGF instruction is not implemented");
+  }
+
   bool translateShl(const User &U, MachineIRBuilder &MIRBuilder) {
     return translateBinaryOp(TargetOpcode::G_SHL, U, MIRBuilder);
   }

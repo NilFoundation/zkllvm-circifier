@@ -1261,6 +1261,9 @@ Value *ScalarExprEmitter::EmitScalarCast(Value *Src, QualType SrcType,
 
     if (isa<llvm::IntegerType>(DstElementTy))
       return Builder.CreateIntCast(Src, DstTy, InputSigned, "conv");
+    if (isa<llvm::GaloisFieldType>(DstTy)) {
+      return Builder.CreateIToGF(Src, DstTy, "conv");
+    }
     if (InputSigned)
       return Builder.CreateSIToFP(Src, DstTy, "conv");
     return Builder.CreateUIToFP(Src, DstTy, "conv");
@@ -2410,6 +2413,7 @@ Value *ScalarExprEmitter::VisitCastExpr(CastExpr *CE) {
   case CK_FloatingToIntegral:
   case CK_FloatingCast:
   case CK_FixedPointToFloating:
+  case CK_IntToGaloisField:
   case CK_FloatingToFixedPoint: {
     CodeGenFunction::CGFPOptionsRAII FPOptsRAII(CGF, CE);
     return EmitScalarConversion(Visit(E), E->getType(), DestTy,

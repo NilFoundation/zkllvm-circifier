@@ -505,6 +505,7 @@ private:
   void visitPtrToIntInst(PtrToIntInst &I);
   void visitBitCastInst(BitCastInst &I);
   void visitAddrSpaceCastInst(AddrSpaceCastInst &I);
+  void visitIToGFInst(IToGFInst &I);
   void visitPHINode(PHINode &PN);
   void visitCallBase(CallBase &Call);
   void visitUnaryOperator(UnaryOperator &U);
@@ -3160,6 +3161,17 @@ void Verifier::visitAddrSpaceCastInst(AddrSpaceCastInst &I) {
     Check(SrcVTy->getElementCount() ==
               cast<VectorType>(DestTy)->getElementCount(),
           "AddrSpaceCast vector pointer number of elements mismatch", &I);
+  visitInstruction(I);
+}
+
+void Verifier::visitIToGFInst(IToGFInst &I) {
+  // Get the source and destination types
+  Type *SrcTy = I.getOperand(0)->getType();
+  Type *DestTy = I.getType();
+
+  Check(SrcTy->isIntegerTy(), "IToGF only operates on integer", &I);
+  Check(DestTy->isFieldTy(), "IToGF only produces a field", &I);
+
   visitInstruction(I);
 }
 

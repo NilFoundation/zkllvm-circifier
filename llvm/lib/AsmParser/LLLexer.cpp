@@ -850,6 +850,7 @@ lltok::Kind LLLexer::LexIdentifier() {
   INSTKEYWORD(ptrtoint,    PtrToInt);
   INSTKEYWORD(bitcast,     BitCast);
   INSTKEYWORD(addrspacecast, AddrSpaceCast);
+  INSTKEYWORD(itogf,       IToGF);
   INSTKEYWORD(select,      Select);
   INSTKEYWORD(va_arg,      VAArg);
   INSTKEYWORD(ret,         Ret);

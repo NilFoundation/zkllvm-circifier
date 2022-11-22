@@ -3655,6 +3655,7 @@ bool LLParser::parseValID(ValID &ID, PerFunctionState *PFS, Type *ExpectedTy) {
   case lltok::kw_fpext:
   case lltok::kw_bitcast:
   case lltok::kw_addrspacecast:
+  case lltok::kw_itogf:
   case lltok::kw_uitofp:
   case lltok::kw_sitofp:
   case lltok::kw_fptoui:
@@ -6296,6 +6297,7 @@ int LLParser::parseInstruction(Instruction *&Inst, BasicBlock *BB,
   case lltok::kw_fptosi:
   case lltok::kw_inttoptr:
   case lltok::kw_ptrtoint:
+  case lltok::kw_itogf:
     return parseCast(Inst, PFS, KeywordVal);
   // Other.
   case lltok::kw_select: {

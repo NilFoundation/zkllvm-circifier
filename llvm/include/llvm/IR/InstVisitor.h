@@ -186,6 +186,7 @@ public:
   RetTy visitIntToPtrInst(IntToPtrInst &I)        { DELEGATE(CastInst);}
   RetTy visitBitCastInst(BitCastInst &I)          { DELEGATE(CastInst);}
   RetTy visitAddrSpaceCastInst(AddrSpaceCastInst &I) { DELEGATE(CastInst);}
+  RetTy visitIToGFInst(IToGFInst &I)              { DELEGATE(CastInst);}
   RetTy visitSelectInst(SelectInst &I)            { DELEGATE(Instruction);}
   RetTy visitVAArgInst(VAArgInst   &I)            { DELEGATE(UnaryInstruction);}
   RetTy visitExtractElementInst(ExtractElementInst &I) { DELEGATE(Instruction);}

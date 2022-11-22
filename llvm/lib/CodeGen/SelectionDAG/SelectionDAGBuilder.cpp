@@ -3579,6 +3579,10 @@ void SelectionDAGBuilder::visitAddrSpaceCast(const User &I) {
   setValue(&I, N);
 }
 
+void SelectionDAGBuilder::visitIToGF(const User &I) {
+  llvm_unreachable("Lowering for IToGF inst is not implemented");
+}
+
 void SelectionDAGBuilder::visitInsertElement(const User &I) {
   const TargetLowering &TLI = DAG.getTargetLoweringInfo();
   SDValue InVec = getValue(I.getOperand(0));

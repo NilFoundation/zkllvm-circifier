@@ -1237,6 +1237,22 @@ static QualType handleFloatConversion(Sema &S, ExprResult &LHS,
                                     /*ConvertInt=*/!IsCompAssign);
 }
 
+static QualType handleFieldConvertion(Sema &S, ExprResult &LHS,
+                                      ExprResult &RHS, QualType LHSType,
+                                      QualType RHSType) {
+  if (LHSType->isFieldType()) {
+    if (!RHSType->isIntegerType())
+      return QualType();
+    RHS = S.ImpCastExprToType(RHS.get(), LHSType, CK_IntToGaloisField);
+    return LHSType;
+  }
+  assert(RHSType->isFieldType());
+  if (!LHSType->isIntegerType())
+    return QualType();
+  LHS = S.ImpCastExprToType(LHS.get(), RHSType, CK_IntToGaloisField);
+  return RHSType;
+}
+
 /// Diagnose attempts to convert between __float128, __ibm128 and
 /// long double if there is no support for such conversion.
 /// Helper function of UsualArithmeticConversions().
@@ -1581,6 +1597,10 @@ QualType Sema::UsualArithmeticConversions(ExprResult &LHS, ExprResult &RHS,
   if (LHSType->isComplexType() || RHSType->isComplexType())
     return handleComplexConversion(*this, LHS, RHS, LHSType, RHSType,
                                    ACK == ACK_CompAssign);
+
+  // Handle field types
+  if (LHSType->isFieldType() || RHSType->isFieldType())
+    return handleFieldConvertion(*this, LHS, RHS, LHSType, RHSType);
 
   // Now handle "real" floating types (i.e. float, double, long double).
   if (LHSType->isRealFloatingType() || RHSType->isRealFloatingType())

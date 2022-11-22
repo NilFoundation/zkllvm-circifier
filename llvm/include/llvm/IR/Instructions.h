@@ -5353,6 +5353,44 @@ public:
 };
 
 //===----------------------------------------------------------------------===//
+//                          IToGFInst Class
+//===----------------------------------------------------------------------===//
+
+class IToGFInst : public CastInst {
+protected:
+  // Note: Instruction needs to be a friend here to call cloneImpl.
+  friend class Instruction;
+
+  /// Clone an identical IToGFInst
+  IToGFInst *cloneImpl() const;
+
+public:
+  /// Constructor with insert-before-instruction semantics
+  IToGFInst(
+    Value *S,                           ///< The value to be casted
+    Type *Ty,                           ///< The type to cast to
+    const Twine &NameStr = "",          ///< A name for the new instruction
+    Instruction *InsertBefore = nullptr ///< Where to insert the new instruction
+  );
+
+  /// Constructor with insert-at-end-of-block semantics
+  IToGFInst(
+    Value *S,                     ///< The value to be casted
+    Type *Ty,                     ///< The type to cast
+    const Twine &NameStr,         ///< A name for the new instruction
+    BasicBlock *InsertAtEnd       ///< The block to insert the instruction into
+  );
+
+  /// Methods for support type inquiry through isa, cast, and dyn_cast:
+  static bool classof(const Instruction *I) {
+    return I->getOpcode() == IToGF;
+  }
+  static bool classof(const Value *V) {
+    return isa<Instruction>(V) && classof(cast<Instruction>(V));
+  }
+};
+
+//===----------------------------------------------------------------------===//
 //                          Helper functions
 //===----------------------------------------------------------------------===//
 

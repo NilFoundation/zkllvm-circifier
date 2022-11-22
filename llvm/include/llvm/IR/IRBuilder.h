@@ -1956,6 +1956,10 @@ public:
     return CreateCast(Instruction::SIToFP, V, DestTy, Name);
   }
 
+  Value *CreateIToGF(Value *V, Type *DestTy, const Twine &Name = "") {
+    return CreateCast(Instruction::IToGF, V, DestTy, Name);
+  }
+
   Value *CreateFPTrunc(Value *V, Type *DestTy,
                        const Twine &Name = "") {
     if (IsFPConstrained)
@@ -2023,8 +2027,9 @@ public:
                     const Twine &Name = "") {
     if (V->getType() == DestTy)
       return V;
-    if (auto *VC = dyn_cast<Constant>(V))
-      return Insert(Folder.CreateCast(Op, VC, DestTy), Name);
+    // Folding of galois field constants is not supported yet
+    if (isa<Constant>(V) && !isa<GaloisFieldType>(DestTy))
+      return Insert(Folder.CreateCast(Op, cast<Constant>(V), DestTy), Name);
     return Insert(CastInst::Create(Op, V, DestTy), Name);
   }
 

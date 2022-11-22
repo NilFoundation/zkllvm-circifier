@@ -833,7 +833,9 @@ void SCCPInstVisitor::visitCastInst(CastInst &I) {
   if (OpSt.isUnknownOrUndef())
     return;
 
-  if (Constant *OpC = getConstant(OpSt)) {
+  Constant *OpC = getConstant(OpSt);
+  // Folding of galois field constants is not supported yet
+  if (OpC && !isa<GaloisFieldType>(I.getType())) {
     // Fold the constant as we build.
     Constant *C = ConstantFoldCastOperand(I.getOpcode(), OpC, I.getType(), DL);
     markConstant(&I, C);

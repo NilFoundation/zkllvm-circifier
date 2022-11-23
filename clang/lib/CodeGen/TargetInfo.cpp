@@ -2923,12 +2923,6 @@ void X86_64ABIInfo::classify(QualType Ty, uint64_t OffsetBase, Class &Lo,
   }
 
   if (const VectorType *VT = Ty->getAs<VectorType>()) {
-    // TODO(maksenov): remove this workaround
-    Lo = SSE;
-    Hi = SSEUp;
-    return;
-
-
     uint64_t Size = getContext().getTypeSize(VT);
     if (Size == 1 || Size == 8 || Size == 16 || Size == 32) {
       // gcc passes the following as integer:

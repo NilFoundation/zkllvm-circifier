@@ -88,10 +88,10 @@ struct TransferrableTargetInfo {
   unsigned char BFloat16Width, BFloat16Align;
   unsigned char FloatWidth, FloatAlign;
   unsigned char DoubleWidth, DoubleAlign;
-  unsigned char LongDoubleWidth, LongDoubleAlign, Float128Align, Ibm128Align;
+  unsigned int  LongDoubleWidth, LongDoubleAlign, Float128Align, Ibm128Align;
   unsigned char LargeArrayMinWidth, LargeArrayAlign;
-  unsigned char LongWidth, LongAlign;
-  unsigned char LongLongWidth, LongLongAlign;
+  unsigned int  LongWidth, LongAlign;
+  unsigned int  LongLongWidth, LongLongAlign;
   unsigned char Int128Align;
 
   // Fixed point bit widths

@@ -23,6 +23,12 @@ using namespace clang::targets;
 void AssignerTargetInfo::getTargetDefines(const LangOptions &Opts,
                                            MacroBuilder &Builder) const {
   Builder.defineMacro("__ASSIGNER__");
+
+  // TODO(maksenov): remove this after supporting custom standard library
+  Builder.defineMacro("__amd64__");
+  Builder.defineMacro("__amd64");
+  Builder.defineMacro("__x86_64");
+  Builder.defineMacro("__x86_64__");
 }
 
 ArrayRef<Builtin::Info> AssignerTargetInfo::getTargetBuiltins() const {

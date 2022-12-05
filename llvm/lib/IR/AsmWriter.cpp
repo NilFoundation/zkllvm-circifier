@@ -554,15 +554,11 @@ void TypePrinting::print(Type *Ty, raw_ostream &OS) {
     return;
   case Type::GaloisFieldTyID:
     switch (cast<GaloisFieldType>(Ty)->getFieldKind()) {
-      case llvm::GALOIS_FIELD_BLS12_381_BASE:
-        OS << "bls12_381_base";
-        return;
-      case llvm::GALOIS_FIELD_PALLAS_BASE:
-        OS << "pallas_base";
-        return;
-      case llvm::GALOIS_FIELD_CURVE_25519_BASE:
-        OS << "curve25519_base";
-        return;
+#define GALOIS_FIELD_TYPE(Name, EnumId, SingletonId, FrontendId)             \
+    case EnumId:                                                             \
+      OS << Name;                                                            \
+      return;
+#include "llvm/IR/GaloisFieldTypes.def"
     }
 
   case Type::FunctionTyID: {

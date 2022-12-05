@@ -2640,8 +2640,12 @@ public:
 #include "clang/Basic/FieldTypes.def"
 // All other builtin types
 #define BUILTIN_TYPE(Id, SingletonId) Id,
-#define LAST_BUILTIN_TYPE(Id) LastKind = Id
+#define LAST_BUILTIN_TYPE(Id) LastKind = Id,
 #include "clang/AST/BuiltinTypes.def"
+
+// Markers:
+#define FIELD_TYPE_MARKER(Marker, Value) Marker = Value,
+#include "clang/Basic/FieldTypes.def"
   };
 
 private:
@@ -7227,8 +7231,8 @@ inline bool Type::isIntegerType() const {
 
 inline bool Type::isFieldType() const {
   if (const auto *BT = dyn_cast<BuiltinType>(CanonicalType)) {
-    return BT->getKind() >= BuiltinType::FBls &&
-           BT->getKind() <= BuiltinType::FCurve25519b;
+    return BT->getKind() >= BuiltinType::FieldFirstType &&
+           BT->getKind() <= BuiltinType::FieldLastType;
   }
   return false;
 }

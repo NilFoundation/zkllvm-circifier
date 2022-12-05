@@ -210,12 +210,6 @@ Type *EVT::getTypeForEVT(LLVMContext &Context) const {
   case MVT::funcref:
     // pointer to i8 addrspace(20)
     return PointerType::get(Type::getInt8Ty(Context), 20);
-  case MVT::bls12381b:
-    return GaloisFieldType::get(Context, GALOIS_FIELD_BLS12_381_BASE);
-  case MVT::pallasb:
-    return GaloisFieldType::get(Context, GALOIS_FIELD_PALLAS_BASE);
-  case MVT::curve25519b:
-    return GaloisFieldType::get(Context, GALOIS_FIELD_CURVE_25519_BASE);
   case MVT::v1i1:
     return FixedVectorType::get(Type::getInt1Ty(Context), 1);
   case MVT::v2i1:

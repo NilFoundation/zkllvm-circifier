@@ -240,10 +240,6 @@ IntegerType *Type::getInt32Ty(LLVMContext &C) { return &C.pImpl->Int32Ty; }
 IntegerType *Type::getInt64Ty(LLVMContext &C) { return &C.pImpl->Int64Ty; }
 IntegerType *Type::getInt128Ty(LLVMContext &C) { return &C.pImpl->Int128Ty; }
 
-GaloisFieldType *Type::GetGfBls12251Base(LLVMContext &C) {return &C.pImpl->GfBls12_381_Base; }
-GaloisFieldType *Type::GetGfPallasBase(LLVMContext &C) { return &C.pImpl->GfPallas_Base; }
-GaloisFieldType *Type::GetGfCurve25519Base(LLVMContext &C) { return &C.pImpl->GfCurve25519_Base; }
-
 IntegerType *Type::getIntNTy(LLVMContext &C, unsigned N) {
   return IntegerType::get(C, N);
 }
@@ -344,15 +340,11 @@ APInt IntegerType::getMask() const { return APInt::getAllOnes(getBitWidth()); }
 
 GaloisFieldType *GaloisFieldType::get(LLVMContext &C, GaloisFieldKind Kind) {
 
-  // Check for the built-in  types
   switch (Kind) {
-  case GALOIS_FIELD_BLS12_381_BASE:
-    return Type::GetGfBls12251Base(C);
-  case GALOIS_FIELD_PALLAS_BASE:
-    return Type::GetGfPallasBase(C);
-  case GALOIS_FIELD_CURVE_25519_BASE:
-    return Type::GetGfCurve25519Base(C);
-  default: return nullptr;
+#define GALOIS_FIELD_TYPE(Name, EnumId, SingletonId, FrontendId)               \
+  case EnumId:                                                                 \
+    return &C.pImpl->SingletonId;
+#include "llvm/IR/GaloisFieldTypes.def"
   }
 }
 

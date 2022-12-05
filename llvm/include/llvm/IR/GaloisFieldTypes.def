@@ -1,0 +1,30 @@
+//= llvm/GaloisFieldTypes.def - File that describes GaloisFieldType -*- C++ -=//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+// This file contains the list of Galois field types.
+// Use this macros to handle the elements:
+//
+// GALOIS_FIELD_TYPE(Name, EnumId, SingletonId, FrontendId)
+//
+//===----------------------------------------------------------------------===//
+
+// NOTE: NO INCLUDE GUARD DESIRED!
+
+// Provide definitions of macros so that users of this file do not have to
+// define everything to use it...
+//
+
+#ifndef GALOIS_FIELD_TYPE
+#define GALOIS_FIELD_TYPE(Name, EnumId, SingletonId, FrontendId)
+#endif
+
+GALOIS_FIELD_TYPE("field_bls12381b",  GALOIS_FIELD_BLS12_381_BASE,   Bls12381bTy,   FBls)
+GALOIS_FIELD_TYPE("field_pallasb",    GALOIS_FIELD_PALLAS_BASE,      PallasbTy,     FPallasb)
+GALOIS_FIELD_TYPE("field_curve25519b",GALOIS_FIELD_CURVE_25519_BASE, Curve25519bTy, FCurve25519b)
+
+#undef GALOIS_FIELD_TYPE

@@ -1466,9 +1466,9 @@ public:
       TokenTy;
   Type X86_FP80Ty, FP128Ty, PPC_FP128Ty, X86_MMXTy, X86_AMXTy;
   IntegerType Int1Ty, Int8Ty, Int16Ty, Int32Ty, Int64Ty, Int128Ty;
-  GaloisFieldType GfBls12_381_Base;
-  GaloisFieldType GfPallas_Base;
-  GaloisFieldType GfCurve25519_Base;
+#define GALOIS_FIELD_TYPE(Name, EnumId, SingletonId, FrontendId)  \
+  GaloisFieldType SingletonId;
+#include "llvm/IR/GaloisFieldTypes.def"
 
   std::unique_ptr<ConstantTokenNone> TheNoneToken;
 

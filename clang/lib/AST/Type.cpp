@@ -2155,8 +2155,7 @@ bool Type::isArithmeticType() const {
     return (BT->getKind() >= BuiltinType::Bool &&
             BT->getKind() <= BuiltinType::Ibm128 &&
             BT->getKind() != BuiltinType::BFloat16) ||
-            (BT->getKind() >= BuiltinType::FBls &&
-            BT->getKind() <= BuiltinType::FCurve25519b);
+            BT->isFieldType();
   if (const auto *ET = dyn_cast<EnumType>(CanonicalType))
     // GCC allows forward declaration of enum types (forbid by C99 6.7.2.3p2).
     // If a body isn't seen by the time we get here, return false.

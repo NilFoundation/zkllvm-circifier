@@ -446,9 +446,6 @@ public:
   static IntegerType *getInt32Ty(LLVMContext &C);
   static IntegerType *getInt64Ty(LLVMContext &C);
   static IntegerType *getInt128Ty(LLVMContext &C);
-  static GaloisFieldType *GetGfBls12251Base(LLVMContext &C);
-  static GaloisFieldType *GetGfPallasBase(LLVMContext &C);
-  static GaloisFieldType *GetGfCurve25519Base(LLVMContext &C);
   template <typename ScalarTy> static Type *getScalarTy(LLVMContext &C) {
     int noOfBits = sizeof(ScalarTy) * CHAR_BIT;
     if (std::is_integral<ScalarTy>::value) {

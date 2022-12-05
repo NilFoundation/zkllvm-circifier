@@ -797,9 +797,10 @@ lltok::Kind LLLexer::LexIdentifier() {
   TYPEKEYWORD("x86_mmx",   Type::getX86_MMXTy(Context));
   TYPEKEYWORD("x86_amx",   Type::getX86_AMXTy(Context));
   TYPEKEYWORD("token",     Type::getTokenTy(Context));
-  TYPEKEYWORD("bls12_381_base", Type::GetGfBls12251Base(Context));
-  TYPEKEYWORD("pallas_base", Type::GetGfPallasBase(Context));
-  TYPEKEYWORD("curve25519_base", Type::GetGfCurve25519Base(Context));
+
+#define GALOIS_FIELD_TYPE(Name, EnumId, SingletonId, FrontendId)  \
+  TYPEKEYWORD(Name, GaloisFieldType::get(Context, EnumId));
+#include "llvm/IR/GaloisFieldTypes.def"
 
   if (Keyword == "ptr") {
     // setOpaquePointers() must be called before creating any pointer types.

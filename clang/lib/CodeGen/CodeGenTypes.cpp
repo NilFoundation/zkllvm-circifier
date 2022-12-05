@@ -333,14 +333,10 @@ static llvm::Type *getTypeForFormat(llvm::LLVMContext &VMContext,
 
 static llvm::Type *getFieldTypeById(llvm::LLVMContext &Context, BuiltinType::Kind id) {
   switch (id) {
-  case BuiltinType::FBls:
-    return llvm::GaloisFieldType::get(Context,
-                                      llvm::GALOIS_FIELD_BLS12_381_BASE);
-  case BuiltinType::FPallasb:
-    return llvm::GaloisFieldType::get(Context, llvm::GALOIS_FIELD_PALLAS_BASE);
-  case BuiltinType::FCurve25519b:
-    return llvm::GaloisFieldType::get(Context,
-                                      llvm::GALOIS_FIELD_CURVE_25519_BASE);
+#define GALOIS_FIELD_TYPE(Name, EnumId, SingletonId, FrontendId)               \
+  case BuiltinType::FrontendId:                                                \
+    return llvm::GaloisFieldType::get(Context, llvm::EnumId);
+#include "llvm/IR/GaloisFieldTypes.def"
   default:
     llvm_unreachable("Unknown field type!");
   }

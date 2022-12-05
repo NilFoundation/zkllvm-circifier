@@ -15,7 +15,21 @@
 //
 //===----------------------------------------------------------------------===//
 
-FIELD_TYPE("field_bls12381b", FBls, FBlsTy)
-FIELD_TYPE("field_pallasb", FPallasb, FPallasBTy)
-FIELD_TYPE("field_curve25519b", FCurve25519b, FCurve25519bTy)
+#ifndef FIELD_TYPE
+#define FIELD_TYPE(Name, Id, SingletonId)
+#endif
+
+#define GALOIS_FIELD_TYPE(Name, EnumId, SingletonId, FrontendId)  \
+FIELD_TYPE(Name, FrontendId, FrontendId##Ty)
+#include "llvm/IR/GaloisFieldTypes.def"
+
 #undef FIELD_TYPE
+
+#ifndef FIELD_TYPE_MARKER
+#define FIELD_TYPE_MARKER(Marker, Value)
+#endif
+
+FIELD_TYPE_MARKER(FieldFirstType, FBls)
+FIELD_TYPE_MARKER(FieldLastType, FCurve25519b)
+
+#undef FIELD_TYPE_MARKER

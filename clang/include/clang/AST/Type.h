@@ -2137,6 +2137,7 @@ public:
   bool isIntegerType() const;     // C99 6.2.5p17 (int, char, bool, enum)
   bool isEnumeralType() const;
   bool isFieldType() const;
+  bool isCurveType() const;
 
   /// Determine whether this type is a scoped enumeration type.
   bool isScopedEnumeralType() const;
@@ -2683,6 +2684,8 @@ public:
 #include "clang/Basic/WebAssemblyReferenceTypes.def"
 #define FIELD_TYPE(Name, Id, SingletonId) Id,
 #include "clang/Basic/FieldTypes.def"
+#define ELLIPTIC_CURVE_TYPE(Name, EnumId, SingletonId, FrontendId) FrontendId,
+#include "llvm/IR/EllipticCurveTypes.def"
 // All other builtin types
 #define BUILTIN_TYPE(Id, SingletonId) Id,
 #define LAST_BUILTIN_TYPE(Id) LastKind = Id,
@@ -2691,6 +2694,9 @@ public:
 // Markers:
 #define FIELD_TYPE_MARKER(Marker, Value) Marker = Value,
 #include "clang/Basic/FieldTypes.def"
+#define CURVE_FRONTEND_FIRST(Id) CurveFirstType = Id,
+#define CURVE_FRONTEND_LAST(Id) CurveLastType = Id,
+#include "llvm/IR/EllipticCurveTypes.def"
   };
 
 private:
@@ -7307,6 +7313,14 @@ inline bool Type::isFieldType() const {
   if (const auto *BT = dyn_cast<BuiltinType>(CanonicalType)) {
     return BT->getKind() >= BuiltinType::FieldFirstType &&
            BT->getKind() <= BuiltinType::FieldLastType;
+  }
+  return false;
+}
+
+inline bool Type::isCurveType() const {
+  if (const auto *BT = dyn_cast<BuiltinType>(CanonicalType)) {
+    return BT->getKind() >= BuiltinType::CurveFirstType &&
+           BT->getKind() <= BuiltinType::CurveLastType;
   }
   return false;
 }

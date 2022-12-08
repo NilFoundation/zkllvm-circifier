@@ -1101,6 +1101,10 @@ enum PredefinedTypeIDs {
 // \brief Galois field types with auto numeration
 #define FIELD_TYPE(Name, Id, SingletonId) PREDEF_TYPE_##Id##_ID,
 #include "clang/Basic/FieldTypes.def"
+// \brief Elliptic curve types with auto enumeration
+#define ELLIPTIC_CURVE_TYPE(Name, EnumId, SingletonId, FrontendId)             \
+  PREDEF_TYPE_##FrontendId##_ID,
+#include "llvm/IR/EllipticCurveTypes.def"
   // Sentinel value. Considered a predefined type but not useable as one.
   PREDEF_TYPE_LAST_ID
 };

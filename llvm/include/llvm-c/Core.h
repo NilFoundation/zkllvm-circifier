@@ -130,6 +130,7 @@ typedef enum {
   LLVMExtractValue   = 53,
   LLVMInsertValue    = 54,
   LLVMFreeze         = 68,
+  LLVMCMul           = 71,
 
   /* Atomic operators */
   LLVMFence          = 55,
@@ -157,6 +158,7 @@ typedef enum {
   LLVMLabelTypeKind,     /**< Labels */
   LLVMIntegerTypeKind,   /**< Arbitrary bit width integers */
   LLVMGaloisFieldTypeKind,
+  LLVMEllipticCurveTypeKind,
   LLVMFunctionTypeKind,  /**< Functions */
   LLVMStructTypeKind,    /**< Structures */
   LLVMArrayTypeKind,     /**< Arrays */

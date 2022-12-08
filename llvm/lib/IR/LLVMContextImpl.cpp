@@ -50,6 +50,9 @@ LLVMContextImpl::LLVMContextImpl(LLVMContext &C)
 #define GALOIS_FIELD_TYPE(Name, EnumId, SingletonId, FrontendId)  \
       ,SingletonId(C, EnumId)
 #include "llvm/IR/GaloisFieldTypes.def"
+#define ELLIPTIC_CURVE_TYPE(Name, EnumId, SingletonId, FrontendId)  \
+      ,SingletonId(C, EnumId)
+#include "llvm/IR/EllipticCurveTypes.def"
   {
   if (OpaquePointersCL.getNumOccurrences()) {
     OpaquePointers = OpaquePointersCL;

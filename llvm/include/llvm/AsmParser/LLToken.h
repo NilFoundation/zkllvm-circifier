@@ -320,6 +320,7 @@ enum Kind {
   kw_no_cfi,
 
   kw_freeze,
+  kw_cmul,
 
   // Metadata types.
   kw_distinct,

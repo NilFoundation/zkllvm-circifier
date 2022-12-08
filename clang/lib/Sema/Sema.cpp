@@ -446,6 +446,9 @@ void Sema::Initialize() {
 #define FIELD_TYPE(Name, Id, SingletonId) \
   addImplicitTypedef(Name, Context.SingletonId);
 #include "clang/Basic/FieldTypes.def"
+#define ELLIPTIC_CURVE_TYPE(Name, EnumId, SingletonId, FrontendId) \
+  addImplicitTypedef(Name, Context.SingletonId);
+#include "llvm/IR/EllipticCurveTypes.def"
 
   if (Context.getTargetInfo().hasBuiltinMSVaList()) {
     DeclarationName MSVaList = &Context.Idents.get("__builtin_ms_va_list");

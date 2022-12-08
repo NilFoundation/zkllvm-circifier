@@ -483,6 +483,9 @@ NSAPI::getNSNumberFactoryMethodKind(QualType T) const {
 #include "clang/Basic/RISCVVTypes.def"
 #define FIELD_TYPE(Name, Id, SingletonId) case BuiltinType::Id:
 #include "clang/Basic/FieldTypes.def"
+#define ELLIPTIC_CURVE_TYPE(Name, EnumId, SingletonId, FrontendId) \
+  case BuiltinType::FrontendId:
+#include "llvm/IR/EllipticCurveTypes.def"
   case BuiltinType::BoundMember:
   case BuiltinType::Dependent:
   case BuiltinType::Overload:

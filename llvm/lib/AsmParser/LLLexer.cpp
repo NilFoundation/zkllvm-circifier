@@ -812,6 +812,10 @@ lltok::Kind LLLexer::LexIdentifier() {
   TYPEKEYWORD(Name, GaloisFieldType::get(Context, EnumId));
 #include "llvm/IR/GaloisFieldTypes.def"
 
+#define ELLIPTIC_CURVE_TYPE(Name, EnumId, SingletonId, FrontendId)  \
+  TYPEKEYWORD(Name, EllipticCurveType::get(Context, EnumId));
+#include "llvm/IR/EllipticCurveTypes.def"
+
   if (Keyword == "ptr") {
     if (Context.supportsTypedPointers()) {
       Warning("ptr type is only supported in -opaque-pointers mode");
@@ -891,6 +895,7 @@ lltok::Kind LLLexer::LexIdentifier() {
   INSTKEYWORD(cleanuppad,   CleanupPad);
 
   INSTKEYWORD(freeze,       Freeze);
+  INSTKEYWORD(cmul,         CMul);
 
 #undef INSTKEYWORD
 

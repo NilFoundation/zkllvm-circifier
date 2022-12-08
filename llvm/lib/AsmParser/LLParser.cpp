@@ -6447,6 +6447,9 @@ int LLParser::parseInstruction(Instruction *&Inst, BasicBlock *BB,
     return parseExtractValue(Inst, PFS);
   case lltok::kw_insertvalue:
     return parseInsertValue(Inst, PFS);
+  // Curve
+  case lltok::kw_cmul:
+    return parseCMul(Inst, PFS);
   }
 }
 
@@ -7360,6 +7363,26 @@ bool LLParser::parseFreeze(Instruction *&Inst, PerFunctionState &PFS) {
     return true;
 
   Inst = new FreezeInst(Op);
+  return false;
+}
+
+/// parseCMul
+///   ::= 'cmul' Type Value Type Value
+bool LLParser::parseCMul(Instruction *&Inst, PerFunctionState &PFS) {
+  LocTy CurveLoc, FieldLoc;
+  Value *Curve, *Field;
+  if (parseTypeAndValue(Curve, CurveLoc, PFS) ||
+      parseToken(lltok::comma, "expected ',' in cmul instruction") ||
+      parseTypeAndValue(Field, FieldLoc, PFS))
+    return true;
+  if (!Curve->getType()->isCurveTy())
+    return error(CurveLoc, "cmul first argument must be elliptic curve");
+  if (!Field->getType()->isFieldTy())
+    return error(CurveLoc, "cmul second argument must be galois field");
+  if (cast<EllipticCurveType>(Curve->getType())->GetBaseFieldKind() !=
+      cast<GaloisFieldType>(Field->getType())->getFieldKind())
+    return error(FieldLoc, "curve can be multiplied only by its base field");
+  Inst = CMulInst::Create(Curve, Field);
   return false;
 }
 

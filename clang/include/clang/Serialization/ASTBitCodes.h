@@ -1098,6 +1098,9 @@ enum PredefinedTypeIDs {
 #include "clang/Basic/RISCVVTypes.def"
 #define FIELD_TYPE(Name, Id, SingletonId) PREDEF_TYPE_##Id##_ID,
 #include "clang/Basic/FieldTypes.def"
+#define ELLIPTIC_CURVE_TYPE(Name, EnumId, SingletonId, FrontendId)             \
+  PREDEF_TYPE_##FrontendId##_ID,
+#include "llvm/IR/EllipticCurveTypes.def"
 };
 
 /// The number of predefined type IDs that are reserved for

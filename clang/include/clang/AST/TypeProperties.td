@@ -817,6 +817,10 @@ let Class = BuiltinType in {
       case BuiltinType::ID: return ctx.SINGLETON_ID;
 #include "clang/Basic/FieldTypes.def"
 
+#define ELLIPTIC_CURVE_TYPE(NAME, ENUM_ID, SINGLETON_ID, FRONTEND_ID) \
+      case BuiltinType::FRONTEND_ID: return ctx.SINGLETON_ID;
+#include "llvm/IR/EllipticCurveTypes.def"
+
 #define BUILTIN_TYPE(ID, SINGLETON_ID) \
       case BuiltinType::ID: return ctx.SINGLETON_ID;
 #include "clang/AST/BuiltinTypes.def"

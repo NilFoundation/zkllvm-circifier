@@ -647,6 +647,10 @@ llvm::Type *CodeGenTypes::ConvertType(QualType T) {
 #define FIELD_TYPE(Name, Id, SingletonId) case BuiltinType::Id:
 #include "clang/Basic/FieldTypes.def"
     return getFieldTypeById(getLLVMContext(), cast<BuiltinType>(Ty)->getKind());
+#define ELLIPTIC_CURVE_TYPE(Name, EnumId, SingletonId, FrontendId)             \
+  case BuiltinType::FrontendId:                                                \
+      return llvm::EllipticCurveType::get(getLLVMContext(), llvm::EnumId);
+#include "llvm/IR/EllipticCurveTypes.def"
    case BuiltinType::Dependent:
 #define BUILTIN_TYPE(Id, SingletonId)
 #define PLACEHOLDER_TYPE(Id, SingletonId) \

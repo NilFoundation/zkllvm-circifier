@@ -514,6 +514,9 @@ private:
   bool translateAtomicRMW(const User &U, MachineIRBuilder &MIRBuilder);
   bool translateFence(const User &U, MachineIRBuilder &MIRBuilder);
   bool translateFreeze(const User &U, MachineIRBuilder &MIRBuilder);
+  bool translateCMul(const User &U, MachineIRBuilder &MIRBuilder) {
+    llvm_unreachable("Translation of CMul instruction is not implemented");
+  }
 
   // Stubs to keep the compiler happy while we implement the rest of the
   // translation.

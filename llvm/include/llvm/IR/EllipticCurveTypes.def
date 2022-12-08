@@ -1,0 +1,50 @@
+//= llvm/EllipticCurveTypes.def - File that describes EllipticCurveType -*- C++ -=//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+// This file contains the list of elliptic curve types.
+// Use this macros to handle the elements:
+//
+// ELLIPTIC_CURVE_TYPE(Name, EnumId, SingletonId, FrontendId)
+//
+//===----------------------------------------------------------------------===//
+
+// NOTE: NO INCLUDE GUARD DESIRED!
+
+// Provide definitions of macros so that users of this file do not have to
+// define everything to use it...
+//
+
+#ifndef ELLIPTIC_CURVE_TYPE
+#define ELLIPTIC_CURVE_TYPE(Name, EnumId, SingletonId, FrontendId)
+#endif
+
+#ifndef CURVE_FIELD_MAPPING
+#define CURVE_FIELD_MAPPING(CurveKind, CurveFrontendId, FieldKind, FieldFrontendId)
+#endif
+
+#ifndef CURVE_FRONTEND_FIRST
+#define CURVE_FRONTEND_FIRST(FrontendId)
+#endif
+
+#ifndef CURVE_FRONTEND_LAST
+#define CURVE_FRONTEND_LAST(FrontendId)
+#endif
+
+ELLIPTIC_CURVE_TYPE("curve_pallas", ELLIPTIC_CURVE_PALLAS, CPallasTy, CPallas)
+
+#undef ELLIPTIC_CURVE_TYPE
+
+CURVE_FRONTEND_FIRST(CPallas)
+CURVE_FRONTEND_LAST(CPallas)
+
+#undef CURVE_FRONTEND_FIRST
+#undef CURVE_FRONTEND_LAST
+
+CURVE_FIELD_MAPPING(ELLIPTIC_CURVE_PALLAS, CPallas, GALOIS_FIELD_PALLAS_BASE, FPallasb)
+
+#undef CURVE_FIELD_MAPPING

@@ -553,6 +553,7 @@ private:
   void visitFuncletPadInst(FuncletPadInst &FPI);
   void visitCatchSwitchInst(CatchSwitchInst &CatchSwitch);
   void visitCleanupReturnInst(CleanupReturnInst &CRI);
+  void visitCMulInst(CMulInst &CMI);
 
   void verifySwiftErrorCall(CallBase &Call, const Value *SwiftErrorVal);
   void verifySwiftErrorValue(const Value *SwiftErrorVal);
@@ -4477,6 +4478,12 @@ void Verifier::visitCleanupReturnInst(CleanupReturnInst &CRI) {
   }
 
   visitTerminator(CRI);
+}
+
+void Verifier::visitCMulInst(CMulInst &CMI) {
+  Check(CMI.getType()->isCurveTy(), "CMul result must be  elliptic curve", &CMI);
+  Check(CMI.isValidOperands(CMI.getOperand(0), CMI.getOperand(1)), "CMul operands are invalid", &CMI);
+  visitInstruction(CMI);
 }
 
 void Verifier::verifyDominatesUse(Instruction &I, unsigned i) {

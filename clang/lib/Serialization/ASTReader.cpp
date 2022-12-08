@@ -7183,6 +7183,11 @@ QualType ASTReader::GetType(TypeID ID) {
       T = Context.SingletonId; \
       break;
 #include "clang/Basic/FieldTypes.def"
+#define ELLIPTIC_CURVE_TYPE(Name, EnumId, SingletonId, FrontendId) \
+  case PREDEF_TYPE_##FrontendId##_ID: \
+      T = Context.SingletonId; \
+      break;
+#include "llvm/IR/EllipticCurveTypes.def"
     }
 
     assert(!T.isNull() && "Unknown predefined type");

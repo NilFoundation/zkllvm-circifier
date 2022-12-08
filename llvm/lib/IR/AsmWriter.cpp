@@ -559,6 +559,14 @@ void TypePrinting::print(Type *Ty, raw_ostream &OS) {
       return;
 #include "llvm/IR/GaloisFieldTypes.def"
     }
+  case Type::EllipticCurveTyID:
+    switch (cast<EllipticCurveType>(Ty)->getCurveKind()) {
+#define ELLIPTIC_CURVE_TYPE(Name, EnumId, SingletonId, FrontendId)             \
+    case EnumId:                                                             \
+      OS << Name;                                                            \
+      return;
+#include "llvm/IR/EllipticCurveTypes.def"
+    }
 
   case Type::FunctionTyID: {
     FunctionType *FTy = cast<FunctionType>(Ty);

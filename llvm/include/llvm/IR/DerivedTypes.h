@@ -114,7 +114,7 @@ protected:
   }
 
 public:
-  /// Get or create an GaloisFieldType instance.
+  /// Get an GaloisFieldType instance.
   static GaloisFieldType *get(LLVMContext &C, GaloisFieldKind Kind);
 
   /// Get the kind of field type
@@ -125,6 +125,47 @@ public:
     return T->getTypeID() == GaloisFieldTyID;
   }
 };
+
+enum EllipticCurveKind : unsigned {
+#define ELLIPTIC_CURVE_TYPE(Name, EnumId, SingletonId, FrontendId)  \
+  EnumId,
+#include "llvm/IR/EllipticCurveTypes.def"
+};
+
+/// Class to represent elliptic curve types.
+class EllipticCurveType : public Type {
+  friend class LLVMContextImpl;
+
+protected:
+  explicit EllipticCurveType(LLVMContext &C, EllipticCurveKind Kind)
+      : Type(C, EllipticCurveTyID) {
+    setSubclassData(Kind);
+  }
+
+public:
+  /// Get an EllipticCurveType instance.
+  static EllipticCurveType *get(LLVMContext &C, EllipticCurveKind Kind);
+
+  /// Get the kind of curve type
+  EllipticCurveKind getCurveKind() const {
+    return static_cast<EllipticCurveKind>(getSubclassData());
+  }
+
+  GaloisFieldKind GetBaseFieldKind() const {
+    switch (getCurveKind()) {
+#define CURVE_FIELD_MAPPING(CurveKind, CurveFrontendId, FieldKind, FieldFrontendId) \
+    case CurveKind: return FieldKind;
+#include "llvm/IR/EllipticCurveTypes.def"
+    }
+    llvm_unreachable("Base field type for curve is not defined");
+  }
+
+  /// Methods for support type inquiry through isa, cast, and dyn_cast.
+  static bool classof(const Type *T) {
+    return T->getTypeID() == EllipticCurveTyID;
+  }
+};
+
 
 /// Class to represent function types
 ///

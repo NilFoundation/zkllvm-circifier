@@ -5498,6 +5498,54 @@ public:
   }
 };
 
+class CMulInst : public Instruction {
+  CMulInst(Value *Curve, Value *Field, const Twine &NameStr = "",
+                     Instruction *InsertBefore = nullptr);
+  CMulInst(Value *Curve, Value *Field, const Twine &NameStr,
+                     BasicBlock *InsertAtEnd);
+
+protected:
+  // Note: Instruction needs to be a friend here to call cloneImpl.
+  friend class Instruction;
+
+  CMulInst *cloneImpl() const;
+
+public:
+  static CMulInst *Create(Value *Curve, Value *Field,
+                                   const Twine &NameStr = "",
+                                   Instruction *InsertBefore = nullptr) {
+    return new(2) CMulInst(Curve, Field, NameStr, InsertBefore);
+  }
+
+  static CMulInst *Create(Value *Curve, Value *Field,
+                                   const Twine &NameStr,
+                                   BasicBlock *InsertAtEnd) {
+    return new(2) CMulInst(Curve, Field, NameStr, InsertAtEnd);
+  }
+
+  /// Return true if an cmul instruction can be
+  /// formed with the specified operands.
+  static bool isValidOperands(const Value *Curve, const Value *Field);
+
+  /// Transparently provide more efficient getOperand methods.
+  DECLARE_TRANSPARENT_OPERAND_ACCESSORS(Value);
+
+  // Methods for support type inquiry through isa, cast, and dyn_cast:
+  static bool classof(const Instruction *I) {
+    return I->getOpcode() == Instruction::CMul;
+  }
+  static bool classof(const Value *V) {
+    return isa<Instruction>(V) && classof(cast<Instruction>(V));
+  }
+};
+
+template <>
+struct OperandTraits<CMulInst> :
+  public FixedNumOperandTraits<CMulInst, 2> {
+};
+
+DEFINE_TRANSPARENT_OPERAND_ACCESSORS(CMulInst, Value)
+
 } // end namespace llvm
 
 #endif // LLVM_IR_INSTRUCTIONS_H

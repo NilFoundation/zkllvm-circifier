@@ -176,6 +176,7 @@ enum TypeCodes {
 
   TYPE_CODE_OPAQUE_POINTER = 25, // OPAQUE_POINTER: [addrspace]
   TYPE_CODE_GALOIS_FIELD = 26, // GALOIS_FIELD: [kind]
+  TYPE_CODE_ELLIPTIC_CURVE = 27, // ELLIPTIC_CURVE: [kind]
 };
 
 enum OperandBundleTagCode {
@@ -599,6 +600,7 @@ enum FunctionCodes {
                                   //             operation, align, vol,
                                   //             ordering, synchscope]
   FUNC_CODE_BLOCKADDR_USERS = 60, // BLOCKADDR_USERS: [value...]
+  FUNC_CODE_INST_CMUL = 61,  // CMUL: [opty, opval, opty, opval]
 };
 
 enum UseListCodes {

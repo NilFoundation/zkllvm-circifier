@@ -1629,6 +1629,9 @@ bool CursorVisitor::VisitBuiltinTypeLoc(BuiltinTypeLoc TL) {
 #include "clang/Basic/RISCVVTypes.def"
 #define FIELD_TYPE(Name, Id, SingletonId) case BuiltinType::Id:
 #include "clang/Basic/FieldTypes.def"
+#define ELLIPTIC_CURVE_TYPE(Name, EnumId, SingletonId, FrontendId) \
+  case BuiltinType::FrontendId:
+#include "llvm/IR/EllipticCurveTypes.def"
 #define BUILTIN_TYPE(Id, SingletonId)
 #define SIGNED_TYPE(Id, SingletonId) case BuiltinType::Id:
 #define UNSIGNED_TYPE(Id, SingletonId) case BuiltinType::Id:

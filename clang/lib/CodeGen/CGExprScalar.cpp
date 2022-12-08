@@ -764,6 +764,9 @@ public:
     }
     if (Ops.isFixedPointOp())
       return EmitFixedPointBinOp(Ops);
+    if (Ops.Ty->isCurveType()) {
+      return Builder.CreateCMul(Ops.LHS, Ops.RHS, "cmul");
+    }
     return Builder.CreateMul(Ops.LHS, Ops.RHS, "mul");
   }
   /// Create a binary op that checks for overflow.

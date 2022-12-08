@@ -255,6 +255,11 @@ serialization::TypeIdxFromBuiltin(const BuiltinType *BT) {
     ID = PREDEF_TYPE_##Id##_ID; \
     break;
 #include "clang/Basic/FieldTypes.def"
+#define ELLIPTIC_CURVE_TYPE(Name, EnumId, SingletonId, FrontendId) \
+  case BuiltinType::FrontendId: \
+  ID = PREDEF_TYPE_##FrontendId##_ID; \
+  break;
+#include "llvm/IR/EllipticCurveTypes.def"
   case BuiltinType::BuiltinFn:
     ID = PREDEF_TYPE_BUILTIN_FN;
     break;

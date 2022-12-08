@@ -1470,6 +1470,10 @@ void ASTContext::InitBuiltinTypes(const TargetInfo &Target,
   InitBuiltinType(SingletonId, BuiltinType::Id);
 #include "clang/Basic/FieldTypes.def"
 
+#define ELLIPTIC_CURVE_TYPE(Name, EnumId, SingletonId, FrontendId)             \
+  InitBuiltinType(SingletonId, BuiltinType::FrontendId);
+#include "llvm/IR/EllipticCurveTypes.def"
+
   // Builtin type for __objc_yes and __objc_no
   ObjCBuiltinBoolTy = (Target.useSignedCharForObjCBool() ?
                        SignedCharTy : BoolTy);
@@ -2293,11 +2297,14 @@ TypeInfo ASTContext::getTypeInfoImpl(const Type *T) const {
     break;
 #include "clang/Basic/RISCVVTypes.def"
 #define FIELD_TYPE(Name, Id, SingletonId) \
-  case BuiltinType::Id: \
-    Width = 8; \
-    Align = 8; \
-    break;
+  case BuiltinType::Id:
 #include "clang/Basic/FieldTypes.def"
+#define ELLIPTIC_CURVE_TYPE(Name, EnumId, SingletonId, FrontendId) \
+  case BuiltinType::FrontendId:
+#include "llvm/IR/EllipticCurveTypes.def"
+    Width = 8;
+    Align = 8;
+    break;
     }
     break;
   case Type::ObjCObjectPointer:
@@ -8061,6 +8068,9 @@ static char getObjCEncodingForPrimitiveType(const ASTContext *C,
 #include "clang/Basic/RISCVVTypes.def"
 #define FIELD_TYPE(Name, Id, SingletoneId) case BuiltinType::Id:
 #include "clang/Basic/FieldTypes.def"
+#define ELLIPTIC_CURVE_TYPE(Name, EnumId, SingletonId, FrontendId) \
+  case BuiltinType::FrontendId:
+#include "llvm/IR/EllipticCurveTypes.def"
       {
         DiagnosticsEngine &Diags = C->getDiagnostics();
         unsigned DiagID = Diags.getCustomDiagID(DiagnosticsEngine::Error,

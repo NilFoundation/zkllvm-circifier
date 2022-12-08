@@ -524,6 +524,8 @@ LLVMTypeKind LLVMGetTypeKind(LLVMTypeRef Ty) {
     return LLVMIntegerTypeKind;
   case Type::GaloisFieldTyID:
     return LLVMGaloisFieldTypeKind;
+  case Type::EllipticCurveTyID:
+    return LLVMEllipticCurveTypeKind;
   case Type::FunctionTyID:
     return LLVMFunctionTypeKind;
   case Type::StructTyID:

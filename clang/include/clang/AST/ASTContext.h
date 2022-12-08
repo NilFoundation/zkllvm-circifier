@@ -1129,6 +1129,9 @@ public:
 #define FIELD_TYPE(Name, Id, SingletonId) \
   CanQualType SingletonId;
 #include "clang/Basic/FieldTypes.def"
+#define ELLIPTIC_CURVE_TYPE(Name, EnumId, SingletonId, FrontendId)             \
+  CanQualType SingletonId;
+#include "llvm/IR/EllipticCurveTypes.def"
 
   // Types for deductions in C++0x [stmt.ranged]'s desugaring. Built on demand.
   mutable QualType AutoDeductTy;     // Deduction against 'auto'.

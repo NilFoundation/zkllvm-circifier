@@ -4800,6 +4800,40 @@ FreezeInst::FreezeInst(Value *S,
 }
 
 //===----------------------------------------------------------------------===//
+//                            CMulInst Implementation
+//===----------------------------------------------------------------------===//
+
+CMulInst::CMulInst(Value *Curve, Value *Field, const Twine &NameStr,
+                   Instruction *InsertBefore)
+    : Instruction(Curve->getType(), CMul,
+                  OperandTraits<CMulInst>::op_begin(this), 2, InsertBefore) {
+  assert(isValidOperands(Curve, Field));
+  Op<0>() = Curve;
+  Op<1>() = Field;
+  setName(NameStr);
+}
+
+CMulInst::CMulInst(Value *Curve, Value *Field, const Twine &NameStr,
+                   BasicBlock *InsertAtEnd)
+    : Instruction(Curve->getType(), CMul,
+                  OperandTraits<CMulInst>::op_begin(this), 2, InsertAtEnd) {
+  assert(isValidOperands(Curve, Field));
+  Op<0>() = Curve;
+  Op<1>() = Field;
+  setName(NameStr);
+}
+
+bool CMulInst::isValidOperands(const Value *Curve, const Value *Field) {
+  if (!Curve->getType()->isCurveTy() || !Field->getType()->isFieldTy())
+    return false;
+
+  // Curve can be multiplied only by corresponding base field type
+  auto *CurveTy = cast<EllipticCurveType>(Curve->getType());
+  auto *FieldTy = cast<GaloisFieldType>(Field->getType());
+  return CurveTy->GetBaseFieldKind() == FieldTy->getFieldKind();
+}
+
+//===----------------------------------------------------------------------===//
 //                           cloneImpl() implementations
 //===----------------------------------------------------------------------===//
 
@@ -5018,4 +5052,8 @@ UnreachableInst *UnreachableInst::cloneImpl() const {
 
 FreezeInst *FreezeInst::cloneImpl() const {
   return new FreezeInst(getOperand(0));
+}
+
+CMulInst *CMulInst::cloneImpl() const {
+  return CMulInst::Create(getOperand(0), getOperand(1));
 }

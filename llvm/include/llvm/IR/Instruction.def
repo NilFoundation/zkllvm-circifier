@@ -219,6 +219,7 @@ HANDLE_OTHER_INST(65, ExtractValue, ExtractValueInst)// extract from aggregate
 HANDLE_OTHER_INST(66, InsertValue, InsertValueInst)  // insert into aggregate
 HANDLE_OTHER_INST(67, LandingPad, LandingPadInst)  // Landing pad instruction.
 HANDLE_OTHER_INST(68, Freeze, FreezeInst) // Freeze instruction.
+HANDLE_OTHER_INST(69, CMul, CMulInst)  // Curve multiplication instruction
   LAST_OTHER_INST(69)
 
 #undef  FIRST_TERM_INST

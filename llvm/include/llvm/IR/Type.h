@@ -28,6 +28,7 @@ namespace llvm {
 
 class IntegerType;
 class GaloisFieldType;
+class EllipticCurveType;
 struct fltSemantics;
 class LLVMContext;
 class PointerType;
@@ -70,7 +71,8 @@ public:
 
     // Derived types... see DerivedTypes.h file.
     IntegerTyID,        ///< Arbitrary bit width integers
-    GaloisFieldTyID,   ///< ---
+    GaloisFieldTyID,    ///< Galois field elements
+    EllipticCurveTyID,  ///< Elliptic curve elements
     FunctionTyID,       ///< Functions
     PointerTyID,        ///< Pointers
     StructTyID,         ///< Structures
@@ -225,13 +227,15 @@ public:
 
   bool isFieldTy() const { return getTypeID() == GaloisFieldTyID; }
 
+  bool isCurveTy() const { return getTypeID() == EllipticCurveTyID; }
+
   /// Return true if this is an IntegerType of the given width.
   bool isIntegerTy(unsigned Bitwidth) const;
 
   /// Return true if this is an integer type or a vector of integer types.
   bool isIntOrIntVectorTy() const {
-    return getScalarType()->isIntegerTy() ||
-           getScalarType()->getTypeID() == GaloisFieldTyID;
+    return getScalarType()->isIntegerTy() || getScalarType()->isFieldTy() ||
+           getScalarType()->isCurveTy();
   }
 
 
@@ -287,7 +291,8 @@ public:
   /// includes all first-class types except struct and array types.
   bool isSingleValueType() const {
     return isFloatingPointTy() || isX86_MMXTy() || isIntegerTy() ||
-           isPointerTy() || isVectorTy() || isX86_AMXTy() || isTargetExtTy() || getTypeID() == GaloisFieldTyID;
+           isPointerTy() || isVectorTy() || isX86_AMXTy() || isTargetExtTy() || isFieldTy() ||
+           isCurveTy();
   }
 
   /// Return true if the type is an aggregate type. This means it is valid as
@@ -304,7 +309,8 @@ public:
     // If it's a primitive, it is always sized.
     if (getTypeID() == IntegerTyID || isFloatingPointTy() ||
         getTypeID() == PointerTyID || getTypeID() == X86_MMXTyID ||
-        getTypeID() == X86_AMXTyID || getTypeID() == GaloisFieldTyID)
+        getTypeID() == X86_AMXTyID || getTypeID() == GaloisFieldTyID ||
+        getTypeID() == EllipticCurveTyID)
       return true;
     // If it is not something that can have a size (e.g. a function or label),
     // it doesn't have a size.

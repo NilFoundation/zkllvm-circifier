@@ -614,6 +614,9 @@ private:
   void visitLoadFromSwiftError(const LoadInst &I);
   void visitStoreToSwiftError(const StoreInst &I);
   void visitFreeze(const FreezeInst &I);
+  void visitCMul(const CMulInst &I) {
+    llvm_unreachable("Lowering for CMul inst is not implemented");
+  }
 
   void visitInlineAsm(const CallBase &Call,
                       const BasicBlock *EHPadBB = nullptr);

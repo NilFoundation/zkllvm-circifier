@@ -341,12 +341,24 @@ APInt IntegerType::getMask() const { return APInt::getAllOnes(getBitWidth()); }
 //===----------------------------------------------------------------------===//
 
 GaloisFieldType *GaloisFieldType::get(LLVMContext &C, GaloisFieldKind Kind) {
-
   switch (Kind) {
 #define GALOIS_FIELD_TYPE(Name, EnumId, SingletonId, FrontendId)               \
   case EnumId:                                                                 \
     return &C.pImpl->SingletonId;
 #include "llvm/IR/GaloisFieldTypes.def"
+  }
+}
+
+//===----------------------------------------------------------------------===//
+//                       EllipticCurveType Implementation
+//===----------------------------------------------------------------------===//
+
+EllipticCurveType *EllipticCurveType::get(LLVMContext &C, EllipticCurveKind Kind) {
+  switch (Kind) {
+#define ELLIPTIC_CURVE_TYPE(Name, EnumId, SingletonId, FrontendId)             \
+  case EnumId:                                                                 \
+    return &C.pImpl->SingletonId;
+#include "llvm/IR/EllipticCurveTypes.def"
   }
 }
 

@@ -475,6 +475,7 @@ const char *Instruction::getOpcodeName(unsigned OpCode) {
   case LandingPad:     return "landingpad";
   case CleanupPad:     return "cleanuppad";
   case Freeze:         return "freeze";
+  case CMul:           return "cmul";
 
   default: return "<Invalid operator> ";
   }

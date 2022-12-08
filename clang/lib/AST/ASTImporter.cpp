@@ -1094,10 +1094,14 @@ ExpectedType ASTNodeImporter::VisitBuiltinType(const BuiltinType *T) {
   case BuiltinType::Id:                                                        \
     return Importer.getToContext().SingletonId;
 #include "clang/Basic/RISCVVTypes.def"
-#define FIELD_TYPE(Name, Id, SingletonId) \
-  case BuiltinType::Id: \
+#define FIELD_TYPE(Name, Id, SingletonId)                                      \
+  case BuiltinType::Id:                                                        \
     return Importer.getToContext().SingletonId;
 #include "clang/Basic/FieldTypes.def"
+#define ELLIPTIC_CURVE_TYPE(Name, EnumId, SingletonId, FrontendId) \
+  case BuiltinType::FrontendId:  \
+    return Importer.getToContext().SingletonId;
+#include "llvm/IR/EllipticCurveTypes.def"
 #define SHARED_SINGLETON_TYPE(Expansion)
 #define BUILTIN_TYPE(Id, SingletonId) \
   case BuiltinType::Id: return Importer.getToContext().SingletonId;

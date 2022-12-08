@@ -987,6 +987,11 @@ void ModuleBitcodeWriter::writeTypeTable() {
       Code = bitc::TYPE_CODE_GALOIS_FIELD;
       TypeVals.push_back(cast<GaloisFieldType>(T)->getFieldKind());
       break;
+    case Type::EllipticCurveTyID:
+      // EllipticCurve: [kind]
+      Code = bitc::TYPE_CODE_ELLIPTIC_CURVE;
+      TypeVals.push_back(cast<EllipticCurveType>(T)->getCurveKind());
+      break;
     case Type::PointerTyID: {
       PointerType *PTy = cast<PointerType>(T);
       unsigned AddressSpace = PTy->getAddressSpace();
@@ -3273,6 +3278,11 @@ void ModuleBitcodeWriter::writeInstruction(const Instruction &I,
   case Instruction::Freeze:
     Code = bitc::FUNC_CODE_INST_FREEZE;
     pushValueAndType(I.getOperand(0), InstID, Vals);
+    break;
+  case Instruction::CMul:
+    Code = bitc::FUNC_CODE_INST_CMUL;
+    pushValueAndType(I.getOperand(0), InstID, Vals);
+    pushValueAndType(I.getOperand(1), InstID, Vals);
     break;
   }
 

@@ -778,6 +778,7 @@ Align DataLayout::getAlignment(Type *Ty, bool abi_or_pref) const {
   case Type::IntegerTyID:
     return getIntegerAlignment(Ty->getIntegerBitWidth(), abi_or_pref);
   case Type::GaloisFieldTyID:
+  case Type::EllipticCurveTyID:
     return Align(8);
   case Type::HalfTyID:
   case Type::BFloatTyID:

@@ -2362,6 +2362,15 @@ Error BitcodeReader::parseTypeTableBody() {
       ResultTy = GaloisFieldType::get(Context, static_cast<GaloisFieldKind>(FieldKind));
       break;
     }
+    case bitc::TYPE_CODE_ELLIPTIC_CURVE: { // ELLIPTIC_CURVE: [kind]
+      if (Record.empty())
+        return error("Invalid elliptic curve record");
+
+      uint64_t CurveKind = Record[0];
+      ResultTy = EllipticCurveType::get(
+          Context, static_cast<EllipticCurveKind>(CurveKind));
+      break;
+    }
     case bitc::TYPE_CODE_POINTER: { // POINTER: [pointee type] or
                                     //          [pointee type, address space]
       if (Record.empty())
@@ -6470,6 +6479,19 @@ Error BitcodeReader::parseFunctionBody(Function *F) {
 
       I = new FreezeInst(Op);
       ResTypeID = OpTypeID;
+      InstructionList.push_back(I);
+      break;
+    }
+    case bitc::FUNC_CODE_INST_CMUL: {
+      unsigned OpNum = 0;
+      Value *Curve = nullptr, *Field = nullptr;
+      unsigned CurveTyID = 0, FieldTyID = 0;
+      if (getValueTypePair(Record, OpNum, NextValueNo, Curve, CurveTyID, CurBB))
+        return error("Invalid record");
+      if (getValueTypePair(Record, OpNum, NextValueNo, Field, FieldTyID, CurBB))
+        return error("Invalid record");
+      I = CMulInst::Create(Curve, Field);
+      ResTypeID = CurveTyID;
       InstructionList.push_back(I);
       break;
     }

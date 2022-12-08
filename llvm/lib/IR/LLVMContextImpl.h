@@ -1518,6 +1518,9 @@ public:
 #define GALOIS_FIELD_TYPE(Name, EnumId, SingletonId, FrontendId)  \
   GaloisFieldType SingletonId;
 #include "llvm/IR/GaloisFieldTypes.def"
+#define ELLIPTIC_CURVE_TYPE(Name, EnumId, SingletonId, FrontendId)             \
+  EllipticCurveType SingletonId;
+#include "llvm/IR/EllipticCurveTypes.def"
 
   std::unique_ptr<ConstantTokenNone> TheNoneToken;
 

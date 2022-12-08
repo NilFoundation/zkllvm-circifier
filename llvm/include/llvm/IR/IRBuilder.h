@@ -1290,6 +1290,16 @@ public:
     return CreateMul(LHS, RHS, Name, true, false);
   }
 
+  Value *CreateCMul(Value *LHS, Value *RHS, const Twine &Name = "") {
+    if (LHS->getType()->isCurveTy()) {
+      assert(RHS->getType()->isFieldTy());
+      return Insert(CMulInst::Create(LHS, RHS, Name));
+    }
+    assert(LHS->getType()->isFieldTy());
+    assert(RHS->getType()->isCurveTy());
+    return Insert(CMulInst::Create(RHS, LHS, Name));
+  }
+
   Value *CreateUDiv(Value *LHS, Value *RHS, const Twine &Name = "",
                     bool isExact = false) {
     if (Value *V = Folder.FoldExactBinOp(Instruction::UDiv, LHS, RHS, isExact))

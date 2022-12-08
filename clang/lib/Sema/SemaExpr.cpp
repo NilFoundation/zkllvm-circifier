@@ -6592,6 +6592,9 @@ static bool isPlaceholderToRemoveAsArg(QualType type) {
 #define PLACEHOLDER_TYPE(ID, SINGLETON_ID)
 #define BUILTIN_TYPE(ID, SINGLETON_ID) case BuiltinType::ID:
 #include "clang/AST/BuiltinTypes.def"
+#define ELLIPTIC_CURVE_TYPE(Name, EnumId, SingletonId, FrontendId) \
+  case BuiltinType::FrontendId:
+#include "llvm/IR/EllipticCurveTypes.def"
     return false;
 
   // We cannot lower out overload sets; they might validly be resolved
@@ -11070,6 +11073,15 @@ static void DiagnoseBadDivideOrRemainderValues(Sema& S, ExprResult &LHS,
                             << IsDiv << RHS.get()->getSourceRange());
 }
 
+static BuiltinType::Kind getBaseFieldKind(BuiltinType::Kind CurveKind) {
+  switch (CurveKind) {
+#define CURVE_FIELD_MAPPING(CurveId, CurveFrontendId, FieldId, FieldFrontendId) \
+  case BuiltinType::CurveFrontendId: return BuiltinType::FieldFrontendId;
+#include "llvm/IR/EllipticCurveTypes.def"
+  default: llvm_unreachable("Curve type is expected");
+  }
+}
+
 QualType Sema::CheckMultiplyDivideOperands(ExprResult &LHS, ExprResult &RHS,
                                            SourceLocation Loc,
                                            bool IsCompAssign, bool IsDiv) {
@@ -11086,6 +11098,25 @@ QualType Sema::CheckMultiplyDivideOperands(ExprResult &LHS, ExprResult &RHS,
   if (LHSTy->isVLSTBuiltinType() || RHSTy->isVLSTBuiltinType())
     return CheckSizelessVectorOperands(LHS, RHS, Loc, IsCompAssign,
                                        ACK_Arithmetic);
+
+  if (LHSTy->isCurveType() || RHSTy->isCurveType()) {
+    if (IsDiv)
+      return InvalidOperands(Loc, LHS, RHS);
+
+    if (((LHSTy->isCurveType() && RHSTy->isFieldType()) ||
+         (RHSTy->isCurveType() && LHSTy->isFieldType()))) {
+      BuiltinType::Kind CurveKind =
+          cast<BuiltinType>(LHSTy.getCanonicalType())->getKind();
+      BuiltinType::Kind FieldKind =
+          cast<BuiltinType>(RHSTy.getCanonicalType())->getKind();
+      if (RHSTy->isCurveType()) {
+        std::swap(CurveKind, FieldKind);
+      }
+      if (FieldKind == getBaseFieldKind(CurveKind))
+        return LHSTy->isCurveType() ? LHSTy : RHSTy;
+    }
+    return InvalidOperands(Loc, LHS, RHS);
+  }
   if (!IsDiv &&
       (LHSTy->isConstantMatrixType() || RHSTy->isConstantMatrixType()))
     return CheckMatrixMultiplyOperands(LHS, RHS, Loc, IsCompAssign);
@@ -21120,6 +21151,9 @@ ExprResult Sema::CheckPlaceholderExpr(Expr *E) {
 #include "clang/Basic/RISCVVTypes.def"
 #define FIELD_TYPE(Name, Id, SingletonId) case BuiltinType::Id:
 #include "clang/Basic/FieldTypes.def"
+#define ELLIPTIC_CURVE_TYPE(Name, EnumId, SingletonId, FrontendId) \
+  case BuiltinType::FrontendId:
+#include "llvm/IR/EllipticCurveTypes.def"
 #define BUILTIN_TYPE(Id, SingletonId) case BuiltinType::Id:
 #define PLACEHOLDER_TYPE(Id, SingletonId)
 #include "clang/AST/BuiltinTypes.def"

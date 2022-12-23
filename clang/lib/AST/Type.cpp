@@ -4586,3 +4586,15 @@ void AutoType::Profile(llvm::FoldingSetNodeID &ID, const ASTContext &Context) {
   Profile(ID, Context, getDeducedType(), getKeyword(), isDependentType(),
           getTypeConstraintConcept(), getTypeConstraintArguments());
 }
+
+llvm::GaloisFieldKind Type::getLLVMFieldKind() const {
+  assert(isFieldType());
+  switch (cast<BuiltinType>(CanonicalType)->getKind()) {
+#define GALOIS_FIELD_TYPE(Name, EnumId, SingletonId, FrontendId)               \
+  case BuiltinType::FrontendId:                                                \
+    return llvm::EnumId;
+#include "llvm/IR/GaloisFieldTypes.def"
+  default:
+    llvm_unreachable("Unknown field type!");
+  }
+}

@@ -1876,6 +1876,7 @@ private:
 
   friend struct DenseMapInfo<APInt, void>;
   friend class APSInt;
+  friend class FieldElem;
 
   /// This constructor is used only internally for speed of construction of
   /// temporaries. It is unsafe since it takes ownership of the pointer, so it

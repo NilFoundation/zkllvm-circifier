@@ -57,6 +57,7 @@
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/TimeProfiler.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/ZK/FieldArithmetics.h"
 #include <cstring>
 #include <functional>
 #include <optional>
@@ -69,6 +70,8 @@ using llvm::APInt;
 using llvm::APSInt;
 using llvm::APFloat;
 using llvm::FixedPointSemantics;
+using llvm::Optional;
+using llvm::FieldElem;
 
 namespace {
   struct LValue;
@@ -2514,6 +2517,7 @@ static bool HandleConversionToBool(const APValue &Val, bool &Result) {
     }
     Result = Val.getMemberPointerDecl();
     return true;
+  case APValue::Field:
   case APValue::Vector:
   case APValue::Array:
   case APValue::Struct:
@@ -2840,6 +2844,29 @@ static bool handleIntIntBinOp(EvalInfo &Info, const Expr *E, const APSInt &LHS,
   case BO_NE: Result = LHS != RHS; return true;
   case BO_Cmp:
     llvm_unreachable("BO_Cmp should be handled elsewhere");
+  }
+}
+
+/// Perform the given binary operation for field elements.
+static bool handleFieldFieldBinOp(EvalInfo &Info, const Expr *E, const FieldElem &LHS,
+                              BinaryOperatorKind Opcode, FieldElem RHS,
+                              FieldElem &Result) {
+  switch (Opcode) {
+  default:
+    Info.FFDiag(E);
+    return false;
+  case BO_Add:
+    Result = llvm::FieldBinOp(llvm::F_Add, LHS, RHS); return true;
+  case BO_Sub:
+    Result = llvm::FieldBinOp(llvm::F_Sub, LHS, RHS); return true;
+  case BO_Mul:
+    Result = llvm::FieldBinOp(llvm::F_Mul, LHS, RHS);; return true;
+  case BO_Div:
+    if (RHS.isZero()) {
+      Info.FFDiag(E, diag::note_expr_divide_by_zero);
+      return false;
+    }
+    Result = llvm::FieldBinOp(llvm::F_Div, LHS, RHS); return true;
   }
 }
 
@@ -4355,6 +4382,8 @@ struct CompoundAssignSubobjectHandler {
     switch (Subobj.getKind()) {
     case APValue::Int:
       return found(Subobj.getInt(), SubobjType);
+    case APValue::Field:
+      return found(Subobj.getField(),SubobjType);
     case APValue::Float:
       return found(Subobj.getFloat(), SubobjType);
     case APValue::ComplexInt:
@@ -4411,6 +4440,22 @@ struct CompoundAssignSubobjectHandler {
              handleFloatFloatBinOp(Info, E, FValue, Opcode, RHS.getFloat()) &&
              HandleFloatToIntCast(Info, E, PromotedLHSType, FValue, SubobjType,
                                   Value);
+    }
+
+    Info.FFDiag(E);
+    return false;
+  }
+  bool found(FieldElem &Value, QualType SubobjType) {
+    if (!checkConst(SubobjType))
+      return false;
+
+    if (!SubobjType->isFieldType()) {
+      Info.FFDiag(E);
+      return false;
+    }
+
+    if (RHS.isField()) {
+      return handleFieldFieldBinOp(Info, E, Value, Opcode, RHS.getField(), Value);
     }
 
     Info.FFDiag(E);
@@ -6917,6 +6962,7 @@ class APValueToBufferConverter {
     case APValue::FixedPoint:
       // FIXME: We should support these.
 
+    case APValue::Field:
     case APValue::Union:
     case APValue::MemberPointer:
     case APValue::AddrLabelDiff: {
@@ -11105,6 +11151,43 @@ public:
   // FIXME: Missing: array subscript of vector, member of vector
 };
 
+class FieldExprEvaluator
+        : public ExprEvaluatorBase<FieldExprEvaluator> {
+  APValue &Result;
+public:
+  FieldExprEvaluator(EvalInfo &info, APValue &result)
+      : ExprEvaluatorBaseTy(info), Result(result) {}
+
+  bool Success(const FieldElem &FE, const Expr *E, APValue &Result) {
+    assert(E->getType()->isFieldType() &&
+           "Invalid evaluation result.");
+    Result = APValue(FE);
+    return true;
+  }
+  bool Success(const FieldElem &FE, const Expr *E) {
+    return Success(FE, E, Result);
+  }
+
+  bool Success(const APValue &V, const Expr *E) {
+    if (V.isLValue() || V.isAddrLabelDiff() || V.isIndeterminate()) {
+      Result = V;
+      return true;
+    }
+    return Success(V.getField(), E);
+  }
+
+  //===--------------------------------------------------------------------===//
+  //                            Visitor Methods
+  //===--------------------------------------------------------------------===//
+
+  bool VisitCallExpr(const CallExpr *E);
+  bool VisitBuiltinCallExpr(const CallExpr *E, unsigned BuiltinOp);
+  bool VisitBinaryOperator(const BinaryOperator *E);
+  bool VisitUnaryOperator(const UnaryOperator *E);
+
+  bool VisitCastExpr(const CastExpr* E);
+};
+
 class FixedPointExprEvaluator
     : public ExprEvaluatorBase<FixedPointExprEvaluator> {
   APValue &Result;
@@ -12523,7 +12606,8 @@ namespace {
 /// We use a data recursive algorithm for binary operators so that we are able
 /// to handle extreme cases of chained binary operators without causing stack
 /// overflow.
-class DataRecursiveIntBinOpEvaluator {
+template <class Evaluator>
+class DataRecursiveBinOpEvaluator {
   struct EvalResult {
     APValue Val;
     bool Failed;
@@ -12555,24 +12639,19 @@ class DataRecursiveIntBinOpEvaluator {
 
   SmallVector<Job, 16> Queue;
 
-  IntExprEvaluator &IntEval;
+  Evaluator &ExprEval;
   EvalInfo &Info;
   APValue &FinalResult;
 
 public:
-  DataRecursiveIntBinOpEvaluator(IntExprEvaluator &IntEval, APValue &Result)
-    : IntEval(IntEval), Info(IntEval.getEvalInfo()), FinalResult(Result) { }
+  DataRecursiveBinOpEvaluator(Evaluator &ExprEval, APValue &Result)
+    : ExprEval(ExprEval), Info(ExprEval.getEvalInfo()), FinalResult(Result) { }
 
   /// True if \param E is a binary operator that we are going to handle
   /// data recursively.
   /// We handle binary operators that are comma, logical, or that have operands
   /// with integral or enumeration type.
-  static bool shouldEnqueue(const BinaryOperator *E) {
-    return E->getOpcode() == BO_Comma || E->isLogicalOp() ||
-           (E->isPRValue() && E->getType()->isIntegralOrEnumerationType() &&
-            E->getLHS()->getType()->isIntegralOrEnumerationType() &&
-            E->getRHS()->getType()->isIntegralOrEnumerationType());
-  }
+  static bool shouldEnqueue(const BinaryOperator *E);
 
   bool Traverse(const BinaryOperator *E) {
     enqueue(E);
@@ -12587,17 +12666,15 @@ public:
   }
 
 private:
-  bool Success(uint64_t Value, const Expr *E, APValue &Result) {
-    return IntEval.Success(Value, E, Result);
-  }
+  bool Success(uint64_t Value, const Expr *E, APValue &Result);
   bool Success(const APSInt &Value, const Expr *E, APValue &Result) {
-    return IntEval.Success(Value, E, Result);
+    return ExprEval.Success(Value, E, Result);
   }
   bool Error(const Expr *E) {
-    return IntEval.Error(E);
+    return ExprEval.Error(E);
   }
   bool Error(const Expr *E, diag::kind D) {
-    return IntEval.Error(E, D);
+    return ExprEval.Error(E, D);
   }
 
   OptionalDiagnostic CCEDiag(const Expr *E, diag::kind D) {
@@ -12629,7 +12706,32 @@ private:
 
 }
 
-bool DataRecursiveIntBinOpEvaluator::
+template<>
+bool DataRecursiveBinOpEvaluator<IntExprEvaluator>::shouldEnqueue(const BinaryOperator *E) {
+  return E->getOpcode() == BO_Comma || E->isLogicalOp() ||
+          (E->isPRValue() && E->getType()->isIntegralOrEnumerationType() &&
+          E->getLHS()->getType()->isIntegralOrEnumerationType() &&
+          E->getRHS()->getType()->isIntegralOrEnumerationType());
+}
+
+
+template<>
+bool DataRecursiveBinOpEvaluator<FieldExprEvaluator>::shouldEnqueue(const BinaryOperator *E) {
+  return E->getOpcode() == BO_Comma ||
+          (E->isPRValue() && E->getType()->isFieldType() &&
+          E->getLHS()->getType()->isFieldType() &&
+          E->getRHS()->getType()->isFieldType());
+}
+
+template <>
+bool DataRecursiveBinOpEvaluator<IntExprEvaluator>::Success(uint64_t Value,
+                                                            const Expr *E,
+                                                            APValue &Result) {
+    return ExprEval.Success(Value, E, Result);
+  }
+
+template <>
+bool DataRecursiveBinOpEvaluator<IntExprEvaluator>::
        VisitBinOpLHSOnly(EvalResult &LHSResult, const BinaryOperator *E,
                          bool &SuppressRHSDiags) {
   if (E->getOpcode() == BO_Comma) {
@@ -12674,6 +12776,22 @@ bool DataRecursiveIntBinOpEvaluator::
   return true;
 }
 
+template <>
+bool DataRecursiveBinOpEvaluator<FieldExprEvaluator>::
+       VisitBinOpLHSOnly(EvalResult &LHSResult, const BinaryOperator *E,
+                         bool &SuppressRHSDiags) {
+  if (E->getOpcode() == BO_Comma) {
+    // Ignore LHS but note if we could not evaluate it.
+    if (LHSResult.Failed)
+      return Info.noteSideEffect();
+    return true;
+  }
+  if (LHSResult.Failed && !Info.noteFailure())
+    return false; // Ignore RHS;
+
+  return true;
+}
+
 static void addOrSubLValueAsInteger(APValue &LVal, const APSInt &Index,
                                     bool IsSub) {
   // Compute the new offset in the appropriate width, wrapping at 64 bits.
@@ -12687,7 +12805,8 @@ static void addOrSubLValueAsInteger(APValue &LVal, const APSInt &Index,
                                          : Offset64 + Index64);
 }
 
-bool DataRecursiveIntBinOpEvaluator::
+template <>
+bool DataRecursiveBinOpEvaluator<IntExprEvaluator>::
        VisitBinOp(const EvalResult &LHSResult, const EvalResult &RHSResult,
                   const BinaryOperator *E, APValue &Result) {
   if (E->getOpcode() == BO_Comma) {
@@ -12781,7 +12900,27 @@ bool DataRecursiveIntBinOpEvaluator::
   return Success(Value, E, Result);
 }
 
-void DataRecursiveIntBinOpEvaluator::process(EvalResult &Result) {
+template <>
+bool DataRecursiveBinOpEvaluator<FieldExprEvaluator>::
+       VisitBinOp(const EvalResult &LHSResult, const EvalResult &RHSResult,
+                  const BinaryOperator *E, APValue &Result) {
+  if (E->getOpcode() == BO_Comma) {
+    if (RHSResult.Failed)
+      return false;
+    Result = RHSResult.Val;
+    return true;
+  }
+  if (LHSResult.Failed || RHSResult.Failed)
+    return false;
+  FieldElem Value;
+  if (!handleFieldFieldBinOp(Info, E, LHSResult.Val.getField(), E->getOpcode(),
+                             RHSResult.Val.getField(), Value))
+    return false;
+  return ExprEval.Success(Value, E, Result);
+}
+
+template <class Evaluator>
+void DataRecursiveBinOpEvaluator<Evaluator>::process(EvalResult &Result) {
   Job &job = Queue.back();
 
   switch (job.Kind) {
@@ -13235,8 +13374,8 @@ bool IntExprEvaluator::VisitBinaryOperator(const BinaryOperator *E) {
       return false;
   }
 
-  if (DataRecursiveIntBinOpEvaluator::shouldEnqueue(E))
-    return DataRecursiveIntBinOpEvaluator(*this, Result).Traverse(E);
+  if (DataRecursiveBinOpEvaluator<IntExprEvaluator>::shouldEnqueue(E))
+    return DataRecursiveBinOpEvaluator<IntExprEvaluator>(*this, Result).Traverse(E);
 
   assert((!E->getLHS()->getType()->isIntegralOrEnumerationType() ||
           !E->getRHS()->getType()->isIntegralOrEnumerationType()) &&
@@ -13792,6 +13931,74 @@ bool IntExprEvaluator::VisitConceptSpecializationExpr(
 bool IntExprEvaluator::VisitRequiresExpr(const RequiresExpr *E) {
   return Success(E->isSatisfied(), E);
 }
+
+bool FieldExprEvaluator::VisitBinaryOperator(const BinaryOperator *E) {
+  // We don't support assignment in C. C++ assignments don't get here because
+  // assignment is an lvalue in C++.
+  if (E->isAssignmentOp()) {
+    Error(E);
+    if (!Info.noteFailure())
+      return false;
+  }
+
+  if (DataRecursiveBinOpEvaluator<FieldExprEvaluator>::shouldEnqueue(E))
+    return DataRecursiveBinOpEvaluator<FieldExprEvaluator>(*this, Result).Traverse(E);
+  return Error(E);
+}
+
+bool FieldExprEvaluator::VisitUnaryOperator(const UnaryOperator *E) {
+  switch (E->getOpcode()) {
+  default:
+    return Error(E);
+  case UO_Plus:
+    // The result is just the value.
+    return Visit(E->getSubExpr());
+  }
+}
+
+/// HandleCast - This is used to evaluate implicit or explicit casts where the
+/// result type is integer.
+bool FieldExprEvaluator::VisitCastExpr(const CastExpr *E) {
+  const Expr *SubExpr = E->getSubExpr();
+  // QualType DestType = E->getType();
+  // QualType SrcType = SubExpr->getType();
+
+  switch (E->getCastKind()) {
+  default:
+    llvm_unreachable("invalid cast kind for field value");
+  case CK_UserDefinedConversion:
+  case CK_LValueToRValue:
+  case CK_AtomicToNonAtomic:
+  case CK_NoOp:
+  case CK_LValueToRValueBitCast:
+    return ExprEvaluatorBaseTy::VisitCastExpr(E);
+
+  case CK_IntToGaloisField: {
+    APValue Value;
+    if (!EvaluateIntegerOrLValue(SubExpr, Value, Info))
+      return false;
+
+    assert(Value.isInt());
+    Result =
+        APValue(FieldElem(E->getType()->getLLVMFieldKind(), Value.getInt()));
+  }
+  }
+
+  return Success(Result, E);
+  }
+
+bool FieldExprEvaluator::VisitCallExpr(const CallExpr *E) {
+  if (!IsConstantEvaluatedBuiltinCall(E))
+    return ExprEvaluatorBaseTy::VisitCallExpr(E);
+  return VisitBuiltinCallExpr(E, E->getBuiltinCallee());
+}
+
+bool FieldExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
+                                            unsigned BuiltinOp) {
+  llvm_unreachable("Field builtins are not implemented yet");
+  return false;
+}
+
 
 bool FixedPointExprEvaluator::VisitUnaryOperator(const UnaryOperator *E) {
   switch (E->getOpcode()) {
@@ -14993,6 +15200,9 @@ static bool Evaluate(APValue &Result, EvalInfo &Info, const Expr *E) {
     if (!EvaluatePointer(E, LV, Info))
       return false;
     LV.moveInto(Result);
+  } else if (T->isFieldType()) {
+    if (!FieldExprEvaluator(Info, Result).Visit(E))
+      return false;
   } else if (T->isRealFloatingType()) {
     llvm::APFloat F(0.0);
     if (!EvaluateFloat(E, F, Info))

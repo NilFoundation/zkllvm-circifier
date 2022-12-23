@@ -3432,6 +3432,10 @@ bool LLParser::parseValID(ValID &ID, PerFunctionState *PFS, Type *ExpectedTy) {
     ID.APFloatVal = Lex.getAPFloatVal();
     ID.Kind = ValID::t_APFloat;
     break;
+  case lltok::FieldVal:
+    ID.FieldVal = Lex.getFieldVal();
+    ID.Kind = ValID::t_FieldVal;
+    break;
   case lltok::kw_true:
     ID.ConstantVal = ConstantInt::getTrue(Context);
     ID.Kind = ValID::t_Constant;
@@ -5690,6 +5694,12 @@ bool LLParser::convertValIDToValue(Type *Ty, ValID &ID, Value *&V,
       return error(ID.Loc, "integer constant must have integer type");
     ID.APSIntVal = ID.APSIntVal.extOrTrunc(Ty->getPrimitiveSizeInBits());
     V = ConstantInt::get(Context, ID.APSIntVal);
+    return false;
+  case ValID::t_FieldVal:
+    if (!Ty->isFieldTy())
+      return error(ID.Loc, "field constant must have field type");
+    V = ConstantField::get(cast<GaloisFieldType>(Ty),
+                           ID.FieldVal);
     return false;
   case ValID::t_APFloat:
     if (!Ty->isFloatingPointTy() ||

@@ -357,6 +357,8 @@ Constant *Constant::getNullValue(Type *Ty) {
   switch (Ty->getTypeID()) {
   case Type::IntegerTyID:
     return ConstantInt::get(Ty, 0);
+  case Type::GaloisFieldTyID:
+    return ConstantField::get(llvm::cast<GaloisFieldType>(Ty), APInt());
   case Type::HalfTyID:
   case Type::BFloatTyID:
   case Type::FloatTyID:
@@ -703,7 +705,7 @@ static bool constantIsDead(const Constant *C, bool RemoveDeadUsers) {
     ReplaceableMetadataImpl::SalvageDebugInfo(*C);
     const_cast<Constant *>(C)->destroyConstant();
   }
-  
+
   return true;
 }
 
@@ -925,6 +927,31 @@ ConstantInt *ConstantInt::get(IntegerType* Ty, StringRef Str, uint8_t radix) {
 /// Remove the constant from the constant table.
 void ConstantInt::destroyConstantImpl() {
   llvm_unreachable("You can't ConstantInt->destroyConstantImpl()!");
+}
+
+ConstantField::ConstantField(GaloisFieldType *Ty, FieldElem V)
+    : ConstantData(Ty, ConstantFieldVal), Val(V) {}
+
+ConstantField *ConstantField::get(GaloisFieldType *Ty, APInt V) {
+  LLVMContextImpl *pImpl = Ty->getContext().pImpl;
+  if (V.isSingleWord()) {
+    // Use certain bit width for field constant
+    V = APInt(Ty->getBitWidth(), V.getZExtValue());
+  }
+  FieldElem Elem(Ty->getFieldKind(), V);
+  std::unique_ptr<ConstantField> &Slot = pImpl->FieldConstants[Elem];
+  if (!Slot) {
+    Slot.reset(new ConstantField(Ty, Elem));
+  }
+  return Slot.get();
+}
+
+ConstantField *ConstantField::get(GaloisFieldType *Ty, int64_t V) {
+  return get(Ty, APInt(Ty->getBitWidth(), V));
+}
+
+FieldElem ConstantField::getValue() const {
+  return Val;
 }
 
 //===----------------------------------------------------------------------===//
@@ -2006,6 +2033,8 @@ Constant *ConstantExpr::getCast(unsigned oc, Constant *C, Type *Ty,
     return getBitCast(C, Ty, OnlyIfReduced);
   case Instruction::AddrSpaceCast:
     return getAddrSpaceCast(C, Ty, OnlyIfReduced);
+  case Instruction::IToGF:
+    return getFoldedCast(opc, C, Ty, OnlyIfReduced);
   }
 }
 
@@ -2741,6 +2770,9 @@ Constant *ConstantExpr::getExactLogBase2(Constant *C) {
 Constant *ConstantExpr::getBinOpIdentity(unsigned Opcode, Type *Ty,
                                          bool AllowRHSConstant, bool NSZ) {
   assert(Instruction::isBinaryOp(Opcode) && "Only binops allowed");
+
+  if (Ty->isFieldTy())
+    return nullptr;
 
   // Commutative opcodes: it does not matter if AllowRHSConstant is set.
   if (Instruction::isCommutative(Opcode)) {

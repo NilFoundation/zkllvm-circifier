@@ -2060,9 +2060,8 @@ public:
                     const Twine &Name = "") {
     if (V->getType() == DestTy)
       return V;
-    // Folding of galois field constants is not supported yet
-    if (isa<Constant>(V) && !isa<GaloisFieldType>(DestTy))
-      return Insert(Folder.CreateCast(Op, cast<Constant>(V), DestTy), Name);
+    if (auto *VC = dyn_cast<Constant>(V))
+      return Insert(Folder.CreateCast(Op, VC, DestTy), Name);
     return Insert(CastInst::Create(Op, V, DestTy), Name);
   }
 

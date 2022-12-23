@@ -2607,6 +2607,17 @@ void ModuleBitcodeWriter::writeConstants(unsigned FirstVal, unsigned LastVal,
       } else {
         assert(0 && "Unknown FP type!");
       }
+    }  else if (const ConstantField *CF = dyn_cast<ConstantField>(C)) {
+      auto val = CF->getValue();
+      if (val.getBitWidth() > 64) {
+        Code = bitc::CST_CODE_FIELD_WIDE;
+        emitWideAPInt(Record, val);
+      } else {
+        Code = bitc::CST_CODE_FIELD;
+        uint64_t V = val.getSExtValue();
+        emitSignedInt64(Record, V);
+      }
+
     } else if (isa<ConstantDataSequential>(C) &&
                cast<ConstantDataSequential>(C)->isString()) {
       const ConstantDataSequential *Str = cast<ConstantDataSequential>(C);

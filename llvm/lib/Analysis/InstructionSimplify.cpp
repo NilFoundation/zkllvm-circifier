@@ -5059,9 +5059,8 @@ static Value *simplifyPHINode(PHINode *PN, ArrayRef<Value *> IncomingValues,
 
 static Value *simplifyCastInst(unsigned CastOpc, Value *Op, Type *Ty,
                                const SimplifyQuery &Q, unsigned MaxRecurse) {
-  // Folding of galois field constants is not supported yet
-  if (isa<Constant>(Op) && !isa<GaloisFieldType>(Ty))
-    return ConstantFoldCastOperand(CastOpc, cast<Constant>(Op), Ty, Q.DL);
+  if (auto *C = dyn_cast<Constant>(Op))
+    return ConstantFoldCastOperand(CastOpc, C, Ty, Q.DL);
 
   if (auto *CI = dyn_cast<CastInst>(Op)) {
     auto *Src = CI->getOperand(0);

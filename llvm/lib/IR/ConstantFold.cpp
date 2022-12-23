@@ -515,6 +515,11 @@ Constant *llvm::ConstantFoldCastInstruction(unsigned opc, Constant *V,
     return FoldBitCast(V, DestTy);
   case Instruction::AddrSpaceCast:
     return nullptr;
+  case Instruction::IToGF:
+    if (ConstantInt *CI = dyn_cast<ConstantInt>(V)) {
+      return ConstantField::get(cast<GaloisFieldType>(DestTy), CI->getValue());
+    }
+    return nullptr;
   }
 }
 

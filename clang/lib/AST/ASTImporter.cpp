@@ -9810,6 +9810,7 @@ ASTNodeImporter::ImportAPValue(const APValue &FromValue) {
   case APValue::None:
   case APValue::Indeterminate:
   case APValue::Int:
+  case APValue::Field:
   case APValue::Float:
   case APValue::FixedPoint:
   case APValue::ComplexInt:

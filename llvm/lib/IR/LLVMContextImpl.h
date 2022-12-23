@@ -74,6 +74,7 @@ class TypedPointerType;
 class ValueHandleBase;
 
 using DenseMapAPIntKeyInfo = DenseMapInfo<APInt>;
+using DenseMapFieldElemKeyInfo = DenseMapInfo<FieldElem>;
 
 struct DenseMapAPFloatKeyInfo {
   static inline APFloat getEmptyKey() { return APFloat(APFloat::Bogus(), 1); }
@@ -1406,6 +1407,10 @@ public:
   using FPMapTy =
       DenseMap<APFloat, std::unique_ptr<ConstantFP>, DenseMapAPFloatKeyInfo>;
   FPMapTy FPConstants;
+
+  using FieldMapTy =
+      DenseMap<FieldElem, std::unique_ptr<ConstantField>, DenseMapFieldElemKeyInfo>;
+  FieldMapTy FieldConstants;
 
   FoldingSet<AttributeImpl> AttrsSet;
   FoldingSet<AttributeListImpl> AttrsLists;

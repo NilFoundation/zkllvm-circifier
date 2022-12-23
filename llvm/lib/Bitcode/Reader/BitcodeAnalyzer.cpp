@@ -220,6 +220,8 @@ static Optional<const char *> GetCodeName(unsigned CodeID, unsigned BlockID,
       STRINGIFY_CODE(CST_CODE, CE_UNOP)
       STRINGIFY_CODE(CST_CODE, DSO_LOCAL_EQUIVALENT)
       STRINGIFY_CODE(CST_CODE, NO_CFI_VALUE)
+      STRINGIFY_CODE(CST_CODE, FIELD)
+      STRINGIFY_CODE(CST_CODE, FIELD_WIDE)
     case bitc::CST_CODE_BLOCKADDRESS:
       return "CST_CODE_BLOCKADDRESS";
       STRINGIFY_CODE(CST_CODE, DATA)
@@ -986,4 +988,3 @@ Error BitcodeAnalyzer::parseBlock(unsigned BlockID, unsigned IndentLevel,
       return Skipped.takeError();
   }
 }
-

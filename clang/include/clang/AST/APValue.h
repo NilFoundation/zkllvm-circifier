@@ -17,6 +17,7 @@
 #include "llvm/ADT/APFixedPoint.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APSInt.h"
+#include "llvm/ADT/FieldElem.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -121,6 +122,7 @@ namespace clang {
 /// [Vector: N * APValue], [Array: N * APValue]
 class APValue {
   typedef llvm::APFixedPoint APFixedPoint;
+  typedef llvm::FieldElem FieldElem;
   typedef llvm::APSInt APSInt;
   typedef llvm::APFloat APFloat;
 public:
@@ -130,6 +132,7 @@ public:
     /// This object has an indeterminate value (C++ [basic.indet]).
     Indeterminate,
     Int,
+    Field,
     Float,
     FixedPoint,
     ComplexInt,
@@ -298,7 +301,7 @@ private:
   struct MemberPointerData;
 
   // We ensure elsewhere that Data is big enough for LV and MemberPointerData.
-  typedef llvm::AlignedCharArrayUnion<void *, APSInt, APFloat, ComplexAPSInt,
+  typedef llvm::AlignedCharArrayUnion<void *, APSInt, FieldElem, APFloat, ComplexAPSInt,
                                       ComplexAPFloat, Vec, Arr, StructData,
                                       UnionData, AddrLabelDiffData> DataType;
   static const size_t DataSize = sizeof(DataType);
@@ -309,6 +312,9 @@ public:
   APValue() : Kind(None) {}
   explicit APValue(APSInt I) : Kind(None) {
     MakeInt(); setInt(std::move(I));
+  }
+  explicit APValue(FieldElem FE) : Kind(None) {
+    MakeField(); setField(std::move(FE));
   }
   explicit APValue(APFloat F) : Kind(None) {
     MakeFloat(); setFloat(std::move(F));
@@ -391,6 +397,7 @@ public:
   bool hasValue() const { return Kind != None && Kind != Indeterminate; }
 
   bool isInt() const { return Kind == Int; }
+  bool isField() const { return Kind == Field; }
   bool isFloat() const { return Kind == Float; }
   bool isFixedPoint() const { return Kind == FixedPoint; }
   bool isComplexInt() const { return Kind == ComplexInt; }
@@ -418,6 +425,15 @@ public:
   }
   const APSInt &getInt() const {
     return const_cast<APValue*>(this)->getInt();
+  }
+
+  FieldElem &getField() {
+    assert(isField() && "Invalid accessor");
+    return *(FieldElem *)(char *)&Data;
+  }
+
+  const FieldElem &getField() const {
+    return const_cast<APValue*>(this)->getField();
   }
 
   /// Try to convert this value to an integral constant. This works if it's an
@@ -581,6 +597,10 @@ public:
     assert(isInt() && "Invalid accessor");
     *(APSInt *)(char *)&Data = std::move(I);
   }
+  void setField(FieldElem FE) {
+    assert(isField() && "Invalid accessor");
+    *(FieldElem *)(char *)&Data = std::move(FE);
+  }
   void setFloat(APFloat F) {
     assert(isFloat() && "Invalid accessor");
     *(APFloat *)(char *)&Data = std::move(F);
@@ -626,6 +646,11 @@ private:
     assert(isAbsent() && "Bad state change");
     new ((void *)&Data) APSInt(1);
     Kind = Int;
+  }
+  void MakeField() {
+    assert(isAbsent() && "Bad state change");
+    new ((void *)&Data) FieldElem();
+    Kind = Field;
   }
   void MakeFloat() {
     assert(isAbsent() && "Bad state change");

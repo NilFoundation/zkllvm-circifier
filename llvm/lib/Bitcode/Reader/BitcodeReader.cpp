@@ -3093,7 +3093,21 @@ Error BitcodeReader::parseConstants() {
         V = UndefValue::get(CurTy);
       break;
     }
-
+    case bitc::CST_CODE_FIELD: {
+      if (!CurTy->isFieldTy() || Record.empty())
+        return error("Invalid field const record");
+      auto FTy = cast<GaloisFieldType>(CurTy);
+      V = ConstantField::get(FTy, Record[0]);
+      break;
+    }
+    case bitc::CST_CODE_FIELD_WIDE: {
+      if (!CurTy->isFieldTy() || Record.empty())
+        return error("Invalid field const record");
+      auto FTy = cast<GaloisFieldType>(CurTy);
+      APInt FieldVal = readWideAPInt(Record, FTy->getBitWidth());
+      V = ConstantField::get(FTy, FieldVal);
+      break;
+    }
     case bitc::CST_CODE_AGGREGATE: {// AGGREGATE: [n x value number]
       if (Record.empty())
         return error("Invalid aggregate record");

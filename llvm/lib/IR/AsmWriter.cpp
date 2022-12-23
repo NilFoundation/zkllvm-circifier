@@ -1373,6 +1373,13 @@ static void WriteConstantInternal(raw_ostream &Out, const Constant *CV,
     return;
   }
 
+  if (const ConstantField *CF = dyn_cast<ConstantField>(CV)) {
+    SmallString<40> Str;
+    CF->getValue().toString(Str, 16, false);
+    Out << "f0x" << Str;
+    return;
+  }
+
   if (const ConstantFP *CFP = dyn_cast<ConstantFP>(CV)) {
     const APFloat &APF = CFP->getValueAPF();
     if (&APF.getSemantics() == &APFloat::IEEEsingle() ||

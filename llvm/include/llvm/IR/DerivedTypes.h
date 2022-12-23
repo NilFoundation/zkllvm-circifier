@@ -21,6 +21,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/IR/Type.h"
+#include "llvm/ZK/FieldKinds.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/TypeSize.h"
@@ -98,12 +99,6 @@ unsigned Type::getIntegerBitWidth() const {
   return cast<IntegerType>(this)->getBitWidth();
 }
 
-enum GaloisFieldKind : unsigned {
-#define GALOIS_FIELD_TYPE(Name, EnumId, SingletonId, FrontendId)  \
-  EnumId,
-#include "llvm/IR/GaloisFieldTypes.def"
-};
-
 /// Class to represent Galois field types.
 class GaloisFieldType : public Type {
   friend class LLVMContextImpl;
@@ -119,6 +114,8 @@ public:
 
   /// Get the kind of field type
   GaloisFieldKind getFieldKind() const { return static_cast<GaloisFieldKind>(getSubclassData()); }
+
+  unsigned getBitWidth() const { return GetNumberBits(getFieldKind()); }
 
   /// Methods for support type inquiry through isa, cast, and dyn_cast.
   static bool classof(const Type *T) {

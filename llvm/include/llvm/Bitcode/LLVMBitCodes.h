@@ -414,6 +414,8 @@ enum ConstantsCodes {
                               //                 sideeffect|alignstack|
                               //                 asmdialect|unwind,
                               //                 asmstr,conststr]
+  CST_CODE_FIELD = 31,
+  CST_CODE_FIELD_WIDE = 32,
 };
 
 /// CastOpcodes - These are values used in the bitcode files to encode which

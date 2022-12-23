@@ -23,6 +23,7 @@
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/FieldElem.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/IR/Constant.h"
@@ -247,6 +248,27 @@ public:
   /// Methods to support type inquiry through isa, cast, and dyn_cast.
   static bool classof(const Value *V) {
     return V->getValueID() == ConstantIntVal;
+  }
+};
+
+class ConstantField final : public ConstantData {
+  friend class Constant;
+
+  FieldElem Val;
+
+  ConstantField(GaloisFieldType *Ty, FieldElem Elem);
+
+  void destroyConstantImpl() {
+    llvm_unreachable("You can't ConstantField->destroyConstantImpl()!");
+  }
+
+public:
+  ConstantField(const ConstantField &) = delete;
+  static ConstantField *get(GaloisFieldType *Ty, APInt V);
+  static ConstantField *get(GaloisFieldType *Ty, int64_t V);
+  FieldElem getValue() const;
+  static bool classof(const Value *V) {
+    return V->getValueID() == ConstantFieldVal;
   }
 };
 

@@ -223,6 +223,10 @@ InstructionCost X86TTIImpl::getArithmeticInstrCost(
     ArrayRef<const Value *> Args,
     const Instruction *CxtI) {
 
+  // TODO(maksenov): remove this workaround
+  if (Ty->isFieldTy())
+    return InstructionCost();
+
   // vXi8 multiplications are always promoted to vXi16.
   // Sub-128-bit types can be extended/packed more efficiently.
   if (Opcode == Instruction::Mul && Ty->isVectorTy() &&

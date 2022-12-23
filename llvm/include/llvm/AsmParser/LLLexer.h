@@ -39,7 +39,8 @@ namespace llvm {
     unsigned UIntVal = 0;
     Type *TyVal = nullptr;
     APFloat APFloatVal{0.0};
-    APSInt APSIntVal{0};
+    APSInt  APSIntVal{0};
+    APInt   FieldVal;
 
     // When false (default), an identifier ending in ':' is a label token.
     // When true, the ':' is treated as a separate token.
@@ -61,6 +62,7 @@ namespace llvm {
     unsigned getUIntVal() const { return UIntVal; }
     const APSInt &getAPSIntVal() const { return APSIntVal; }
     const APFloat &getAPFloatVal() const { return APFloatVal; }
+    const APInt &getFieldVal() const { return FieldVal; }
 
     void setIgnoreColonInIdentifiers(bool val) {
       IgnoreColonInIdentifiers = val;

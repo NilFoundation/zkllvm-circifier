@@ -4,6 +4,7 @@ set(LLVM_LINK_COMPONENTS
   FrontendOpenMP
   Support
   TargetParser
+  ZK
   )
 
 # FIXME: the entry points to the interpreter should be moved out of clangAST

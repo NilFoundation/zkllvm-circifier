@@ -54,6 +54,7 @@ namespace llvm {
       t_LocalID, t_GlobalID,           // ID in UIntVal.
       t_LocalName, t_GlobalName,       // Name in StrVal.
       t_APSInt, t_APFloat,             // Value in APSIntVal/APFloatVal.
+      t_FieldVal,
       t_Null, t_Undef, t_Zero, t_None, t_Poison, // No value.
       t_EmptyArray,                    // No value:  []
       t_Constant,                      // Value in ConstantVal.
@@ -68,6 +69,7 @@ namespace llvm {
     std::string StrVal, StrVal2;
     APSInt APSIntVal;
     APFloat APFloatVal{0.0};
+    APInt FieldVal;
     Constant *ConstantVal;
     std::unique_ptr<Constant *[]> ConstantStructElts;
     bool NoCFI = false;

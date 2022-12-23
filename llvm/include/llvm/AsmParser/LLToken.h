@@ -480,7 +480,8 @@ enum Kind {
   Type,
 
   APFloat, // APFloatVal
-  APSInt   // APSInt
+  APSInt,   // APSInt
+  FieldVal,  // Field
 };
 } // end namespace lltok
 } // end namespace llvm

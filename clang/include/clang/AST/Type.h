@@ -41,6 +41,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/ADT/iterator_range.h"
+#include "llvm/ZK/FieldKinds.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -2101,6 +2102,8 @@ public:
   bool isEnumeralType() const;
   bool isFieldType() const;
   bool isCurveType() const;
+
+  llvm::GaloisFieldKind getLLVMFieldKind() const;
 
   /// Determine whether this type is a scoped enumeration type.
   bool isScopedEnumeralType() const;
@@ -7295,8 +7298,10 @@ inline bool Type::isUnsignedFixedPointType() const {
 
 inline bool Type::isScalarType() const {
   if (const auto *BT = dyn_cast<BuiltinType>(CanonicalType))
-    return BT->getKind() > BuiltinType::Void &&
-           BT->getKind() <= BuiltinType::NullPtr;
+    return (BT->getKind() > BuiltinType::Void &&
+            BT->getKind() <= BuiltinType::NullPtr) ||
+           (BT->getKind() >= BuiltinType::FieldFirstType &&
+            BT->getKind() <= BuiltinType::FieldLastType);
   if (const EnumType *ET = dyn_cast<EnumType>(CanonicalType))
     // Enums are scalar types, but only if they are defined.  Incomplete enums
     // are not treated as scalar types.

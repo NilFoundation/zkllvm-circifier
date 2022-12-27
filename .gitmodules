@@ -1,0 +1,3 @@
+[submodule "rslang"]
+	path = rslang
+	url = git@github.com:nilfoundation/zkllvm-rslang.git

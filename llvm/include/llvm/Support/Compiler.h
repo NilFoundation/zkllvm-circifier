@@ -23,6 +23,14 @@
 #include <sal.h>
 #endif
 
+// TVM local begin
+#ifdef LLVM_BYTE_SIZE_IN_BITS
+static const unsigned ByteSizeInBits = LLVM_BYTE_SIZE_IN_BITS;
+#else
+static const unsigned ByteSizeInBits = 8;
+#endif
+// TVM local end
+
 #ifndef __has_feature
 # define __has_feature(x) 0
 #endif

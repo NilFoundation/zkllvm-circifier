@@ -725,6 +725,18 @@ public:
                         BytesAdded);
   }
 
+  // TVM local begin
+  virtual void ReplaceUsesOfBlockWith(MachineBasicBlock *Pred,
+                                      MachineBasicBlock *Old,
+                                      MachineBasicBlock *New) const {
+    Pred->ReplaceUsesOfBlockWith(Old, New);
+  }
+  virtual bool canFallthrough(MachineBasicBlock &From,
+                              MachineBasicBlock &To) const {
+    return true;
+  }
+  // TVM local end
+
   /// Object returned by analyzeLoopForPipelining. Allows software pipelining
   /// implementations to query attributes of the loop being pipelined and to
   /// apply target-specific updates to the loop once pipelining is complete.

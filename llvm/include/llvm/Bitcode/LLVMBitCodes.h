@@ -177,6 +177,13 @@ enum TypeCodes {
   TYPE_CODE_OPAQUE_POINTER = 25, // OPAQUE_POINTER: [addrspace]
   TYPE_CODE_GALOIS_FIELD = 26, // GALOIS_FIELD: [kind]
   TYPE_CODE_ELLIPTIC_CURVE = 27, // ELLIPTIC_CURVE: [kind]
+
+  // TVM local begin
+  TYPE_CODE_TVMSLICE = 28,   // TVM Slice
+  TYPE_CODE_TVMBUILDER = 29, // TVM Builder
+  TYPE_CODE_TVMCELL = 30,    // TVM Cell
+  TYPE_CODE_TVMTUPLE = 31    // TVM Tuple
+  // TVM local end
 };
 
 enum OperandBundleTagCode {

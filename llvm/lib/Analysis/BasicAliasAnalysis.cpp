@@ -503,6 +503,29 @@ struct BasicAAResult::DecomposedGEP {
   }
 };
 
+/// To ensure a pointer offset fits in an integer of size PointerSize
+/// (in bits) when that size is smaller than the maximum pointer size. This is
+/// an issue, for example, in particular for 32b pointers with negative indices
+/// that rely on two's complement wrap-arounds for precise alias information
+/// where the maximum pointer size is 64b.
+static APInt adjustToPointerSize(const APInt &Offset, unsigned PointerSize) {
+  // TVM local begin
+  if (PointerSize > 64)
+    return Offset;
+  // TVM local end
+  assert(PointerSize <= Offset.getBitWidth() && "Invalid PointerSize!");
+  unsigned ShiftBits = Offset.getBitWidth() - PointerSize;
+  return (Offset << ShiftBits).ashr(ShiftBits);
+}
+
+static unsigned getMaxPointerSize(const DataLayout &DL) {
+  unsigned MaxPointerSize = DL.getMaxPointerSizeInBits();
+  if (MaxPointerSize < 64 && ForceAtLeast64Bits) MaxPointerSize = 64;
+  if (DoubleCalcBits) MaxPointerSize *= 2;
+
+  return MaxPointerSize;
+}
+
 
 /// If V is a symbolic pointer expression, decompose it into a base pointer
 /// with a constant offset and a number of scaled symbolic offsets.
@@ -602,8 +625,10 @@ BasicAAResult::DecomposeGEPExpression(const Value *V, const DataLayout &DL,
 
       // For an array/pointer, add the element offset, explicitly scaled.
       if (const ConstantInt *CIdx = dyn_cast<ConstantInt>(Index)) {
-        if (CIdx->isZero())
+        // TVM local begin: 64-bit check
+        if (CIdx->isZero() || !CIdx->getValue().isSignedIntN(64))
           continue;
+        // TVM local end
 
         // Don't attempt to analyze GEPs if the scalable index is not zero.
         TypeSize AllocTypeSize = DL.getTypeAllocSize(GTI.getIndexedType());

@@ -199,8 +199,9 @@ getAllocationDataForFunction(const Function *Callee, AllocType AllocTy,
   int FstParam = FnData->FstParam;
   int SndParam = FnData->SndParam;
   FunctionType *FTy = Callee->getFunctionType();
-
-  if (FTy->getReturnType() == Type::getInt8PtrTy(FTy->getContext()) &&
+  // TVM local begin
+  if (FTy->getReturnType() == Type::getIntBytePtrTy(FTy->getContext()) &&
+  // TVM local end
       FTy->getNumParams() == FnData->NumParams &&
       (FstParam < 0 ||
        (FTy->getParamType(FstParam)->isIntegerTy(32) ||
@@ -591,6 +592,12 @@ Value *llvm::getFreedOperand(const CallBase *CB, const TargetLibraryInfo *TLI) {
     // All currently supported free functions free the first argument.
     return CB->getArgOperand(0);
   }
+
+  // TVM local begin
+  FunctionType *FTy = Callee->getFunctionType();
+  if (FTy->getParamType(0) != Type::getIntBytePtrTy(Callee->getContext()))
+    return nullptr;
+  // TVM local end
 
   if (checkFnAllocKind(CB, AllocFnKind::Free))
     return CB->getArgOperandWithAttribute(Attribute::AllocatedPointer);

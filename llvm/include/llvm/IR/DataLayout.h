@@ -406,22 +406,24 @@ public:
     return PTy && isNonIntegralPointerType(PTy);
   }
 
+  // TVM local begin
   /// Layout pointer size, in bits
   /// FIXME: The defaults need to be removed once all of
   /// the backends/clients are updated.
   unsigned getPointerSizeInBits(unsigned AS = 0) const {
-    return getPointerAlignElem(AS).TypeBitWidth;
-  }
-
-  /// Returns the maximum index size over all address spaces.
-  unsigned getMaxIndexSizeInBits() const {
-    return getMaxIndexSize() * 8;
+    return getPointerSize(AS) * ByteSizeInBits;
   }
 
   /// Size in bits of index used for address calculation in getelementptr.
   unsigned getIndexSizeInBits(unsigned AS) const {
-    return getPointerAlignElem(AS).IndexBitWidth;
+    return getIndexSize(AS) * ByteSizeInBits;
   }
+
+  /// Returns the maximum pointer size over all address spaces.
+  unsigned getMaxPointerSizeInBits() const {
+    return getMaxPointerSize() * ByteSizeInBits;
+  }
+  // TVM local end
 
   /// Layout pointer size, in bits, based on the type.  If this function is
   /// called with a pointer type, then the type size of the pointer is returned.
@@ -434,9 +436,11 @@ public:
   /// The function should be called with pointer or vector of pointers type.
   unsigned getIndexTypeSizeInBits(Type *Ty) const;
 
+  // TVM local begin
   unsigned getPointerTypeSize(Type *Ty) const {
-    return getPointerTypeSizeInBits(Ty) / 8;
+    return getPointerTypeSizeInBits(Ty) / ByteSizeInBits;
   }
+  // TVM local end
 
   /// Size examples:
   ///
@@ -464,28 +468,23 @@ public:
   /// have a size (Type::isSized() must return true).
   TypeSize getTypeSizeInBits(Type *Ty) const;
 
+  // TVM local begin
   /// Returns the maximum number of bytes that may be overwritten by
   /// storing the specified type.
   ///
-  /// If Ty is a scalable vector type, the scalable property will be set and
-  /// the runtime size will be a positive integer multiple of the base size.
-  ///
   /// For example, returns 5 for i36 and 10 for x86_fp80.
   TypeSize getTypeStoreSize(Type *Ty) const {
-    TypeSize BaseSize = getTypeSizeInBits(Ty);
-    return {divideCeil(BaseSize.getKnownMinSize(), 8), BaseSize.isScalable()};
+    return TypeSize::Fixed((getTypeSizeInBits(Ty) + (ByteSizeInBits - 1)) / ByteSizeInBits);
   }
 
   /// Returns the maximum number of bits that may be overwritten by
   /// storing the specified type; always a multiple of 8.
   ///
-  /// If Ty is a scalable vector type, the scalable property will be set and
-  /// the runtime size will be a positive integer multiple of the base size.
-  ///
   /// For example, returns 40 for i36 and 80 for x86_fp80.
   TypeSize getTypeStoreSizeInBits(Type *Ty) const {
-    return 8 * getTypeStoreSize(Ty);
+    return TypeSize::Fixed(ByteSizeInBits * getTypeStoreSize(Ty));
   }
+  // TVM local end
 
   /// Returns true if no extra padding bits are needed when storing the
   /// specified type.
@@ -517,7 +516,9 @@ public:
   /// This is the amount that alloca reserves for this type. For example,
   /// returns 96 or 128 for x86_fp80, depending on alignment.
   TypeSize getTypeAllocSizeInBits(Type *Ty) const {
-    return 8 * getTypeAllocSize(Ty);
+    // TVM local begin
+    return ByteSizeInBits * getTypeAllocSize(Ty);
+    // TVM local end
   }
 
   /// Returns the minimum ABI-required alignment for the specified type.
@@ -628,7 +629,9 @@ class StructLayout final : public TrailingObjects<StructLayout, uint64_t> {
 public:
   uint64_t getSizeInBytes() const { return StructSize; }
 
-  uint64_t getSizeInBits() const { return 8 * StructSize; }
+  // TVM local begin
+  uint64_t getSizeInBits() const { return ByteSizeInBits * StructSize; }
+  // TVM local end
 
   Align getAlignment() const { return StructAlignment; }
 
@@ -655,7 +658,9 @@ public:
   }
 
   uint64_t getElementOffsetInBits(unsigned Idx) const {
-    return getElementOffset(Idx) * 8;
+    // TVM local begin
+    return getElementOffset(Idx) * ByteSizeInBits;
+    // TVM local end
   }
 
 private:
@@ -673,6 +678,13 @@ private:
 inline TypeSize DataLayout::getTypeSizeInBits(Type *Ty) const {
   assert(Ty->isSized() && "Cannot getTypeInfo() on a type that is unsized!");
   switch (Ty->getTypeID()) {
+    // TVM local begin
+  case Type::TVMSliceID:
+  case Type::TVMBuilderID:
+  case Type::TVMCellID:
+  case Type::TVMTupleID:
+    return TypeSize::Fixed(257);
+  // TVM local end
   case Type::LabelTyID:
     return TypeSize::Fixed(getPointerSizeInBits(0));
   case Type::PointerTyID:

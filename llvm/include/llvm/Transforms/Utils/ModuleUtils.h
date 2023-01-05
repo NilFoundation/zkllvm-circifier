@@ -41,6 +41,10 @@ void appendToGlobalCtors(Module &M, Function *F, int Priority,
 void appendToGlobalDtors(Module &M, Function *F, int Priority,
                          Constant *Data = nullptr);
 
+// TVM local begin
+Function *checkSanitizerInterfaceFunction(Constant *FuncOrBitcast);
+// TVM local end
+
 FunctionCallee declareSanitizerInitFunction(Module &M, StringRef InitName,
                                             ArrayRef<Type *> InitArgTypes);
 

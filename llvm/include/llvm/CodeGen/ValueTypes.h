@@ -211,18 +211,17 @@ namespace llvm {
       return (V==MVT::iAny || V==MVT::fAny || V==MVT::vAny || V==MVT::iPTRAny);
     }
 
-    /// Return true if the bit size is a multiple of 8.
-    bool isByteSized() const {
-      return !isZeroSized() && getSizeInBits().isKnownMultipleOf(8);
-    }
+    // TVM local begin
+    /// Return true if the bit size is a multiple of ByteSizeInBits.
+    bool isByteSized() const { return (getSizeInBits() % ByteSizeInBits) == 0; }
 
     /// Return true if the size is a power-of-two number of bytes.
     bool isRound() const {
-      if (isScalableVector())
-        return false;
       unsigned BitSize = getSizeInBits();
-      return BitSize >= 8 && !(BitSize & (BitSize - 1));
+      return (BitSize >= ByteSizeInBits) && (BitSize % ByteSizeInBits == 0) &&
+             isPowerOf2_32(BitSize / ByteSizeInBits);
     }
+    // TVM local end
 
     /// Return true if this has the same number of bits as VT.
     bool bitsEq(EVT VT) const {

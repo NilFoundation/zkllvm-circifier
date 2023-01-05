@@ -106,6 +106,10 @@ Constant *FoldBitCast(Constant *C, Type *DestTy, const DataLayout &DL) {
          "Invalid constantexpr bitcast!");
 
   // Catch the obvious splat cases.
+  // TVM local begin
+  if (C->isNullValue() && !DestTy->isX86_MMXTy() && !DestTy->isTVMBuiltinTy())
+    return Constant::getNullValue(DestTy);
+  // TVM local end
   if (Constant *Res = ConstantFoldLoadFromUniformValue(C, DestTy))
     return Res;
 

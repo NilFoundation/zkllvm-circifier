@@ -2101,7 +2101,10 @@ bool CallAnalyzer::visitExtractValue(ExtractValueInst &I) {
     return true;
 
   // SROA can't look through these, but they may be free.
-  return Base::visitExtractValue(I);
+  // TVM local begin
+  //return Base::visitExtractValue(I);
+  return false;
+  // TVM local end
 }
 
 bool CallAnalyzer::visitInsertValue(InsertValueInst &I) {
@@ -2110,7 +2113,10 @@ bool CallAnalyzer::visitInsertValue(InsertValueInst &I) {
     return true;
 
   // SROA can't look through these, but they may be free.
-  return Base::visitInsertValue(I);
+  // TVM local begin
+  // return Base::visitExtractValue(I);
+  return false;
+  // TVM local end
 }
 
 /// Try to simplify a call site.
@@ -2945,22 +2951,62 @@ InlineCost llvm::getInlineCost(
     function_ref<BlockFrequencyInfo &(Function &)> GetBFI,
     ProfileSummaryInfo *PSI, OptimizationRemarkEmitter *ORE) {
 
-  auto UserDecision =
-      llvm::getAttributeBasedInliningDecision(Call, Callee, CalleeTTI, GetTLI);
+  // TVM local begin
+  //auto UserDecision =
+  //    llvm::getAttributeBasedInliningDecision(Call, Callee, CalleeTTI, GetTLI);
+  //
+  //if (UserDecision.hasValue()) {
+  //  if (UserDecision->isSuccess())
+  //    return llvm::InlineCost::getAlways("always inline attribute");
+  //  return llvm::InlineCost::getNever(UserDecision->getFailureReason());
+  // }
+  //
+  // Cannot inline indirect calls.
+  if (!Callee)
+    return llvm::InlineCost::getNever("Cannot inline indirect calls");
 
-  if (UserDecision) {
-    if (UserDecision->isSuccess())
-      return llvm::InlineCost::getAlways("always inline attribute");
-    return llvm::InlineCost::getNever(UserDecision->getFailureReason());
+  // Never inline calls with byval arguments that does not have the alloca
+  // address space. Since byval arguments can be replaced with a copy to an
+  // alloca, the inlined code would need to be adjusted to handle that the
+  // argument is in the alloca address space (so it is a little bit complicated
+  // to solve).
+  unsigned AllocaAS = Callee->getParent()->getDataLayout().getAllocaAddrSpace();
+  for (unsigned I = 0, E = Call.arg_size(); I != E; ++I)
+    if (Call.isByValArgument(I)) {
+      PointerType *PTy = cast<PointerType>(Call.getArgOperand(I)->getType());
+      if (PTy->getAddressSpace() != AllocaAS)
+        return llvm::InlineCost::getNever("");
+    }
+
+  if (Call.hasFnAttr(Attribute::AlwaysInline)) {
+    if (isInlineViable(*Callee).isSuccess())
+      return llvm::InlineCost::getAlways("");
+    return llvm::InlineCost::getNever("");
   }
 
-  LLVM_DEBUG(llvm::dbgs() << "      Analyzing call of " << Callee->getName()
-                          << "... (caller:" << Call.getCaller()->getName()
-                          << ")\n");
+  // Never inline functions with conflicting attributes (unless callee has
+  // always-inline attribute).
+  Function *Caller = Call.getCaller();
+  if (!functionsHaveCompatibleAttributes(Caller, Callee, CalleeTTI, GetTLI))
+    return llvm::InlineCost::getNever("");
 
-  InlineCostCallAnalyzer CA(*Callee, Call, Params, CalleeTTI,
-                            GetAssumptionCache, GetBFI, PSI, ORE);
-  InlineResult ShouldInline = CA.analyze();
+  // Don't inline this call if the caller has the optnone attribute.
+  if (Caller->hasFnAttribute(Attribute::OptimizeNone))
+    return llvm::InlineCost::getNever("");
+
+  // Don't inline a function that treats null pointer as valid into a caller
+  // that does not have this attribute.
+  if (!Caller->nullPointerIsDefined() && Callee->nullPointerIsDefined()) {
+    return llvm::InlineCost::getNever("");
+  }
+
+  // Don't inline functions which can be interposed at link-time.  Don't inline
+  // functions marked noinline or call sites marked noinline.
+  // Note: inlining non-exact non-interposable functions is fine, since we know
+  // we have *a* correct implementation of the source level function.
+  if (Callee->isInterposable() || Callee->hasFnAttribute(Attribute::NoInline))
+    return llvm::InlineCost::getNever("");
+  // TVM local end
 
   LLVM_DEBUG(CA.dump());
 
@@ -2986,6 +3032,14 @@ InlineCost llvm::getInlineCost(
 }
 
 InlineResult llvm::isInlineViable(Function &F) {
+  // TVM local begin
+#define CORO_PRESPLIT_ATTR "coroutine.presplit"
+// Disallow inlining of pre-split coroutines
+  if (F.hasFnAttribute(CORO_PRESPLIT_ATTR)) {
+    return InlineResult::failure("contains pre-split attributes");
+  }
+// TVM local end
+
   bool ReturnsTwice = F.hasFnAttribute(Attribute::ReturnsTwice);
   for (BasicBlock &BB : F) {
     // Disallow inlining of functions which contain indirect branches.

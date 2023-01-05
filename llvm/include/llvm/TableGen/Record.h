@@ -858,6 +858,27 @@ public:
     SETDAGOP
   };
 
+  // TVM local begin
+  //enum BinaryOp : uint8_t {
+  //  ADD,
+  //  AND,
+  //  OR,
+  //  SHL,
+  //  SRA,
+  //  SRL,
+  //  LISTCONCAT,
+  //  LISTSPLAT,
+  //  STRCONCAT,
+  //  CONCAT,
+  //  EQ,
+  //  NE,
+  //  LE,
+  //  LT,
+  //  GE,
+  //  GT
+  // };
+  // TVM local end
+
 private:
   Init *LHS, *RHS;
 
@@ -876,6 +897,10 @@ public:
                         RecTy *Type);
   static Init *getStrConcat(Init *lhs, Init *rhs);
   static Init *getListConcat(TypedInit *lhs, Init *rhs);
+
+  // TVM local begin
+  static Init *getListSplat(TypedInit *lhs, Init *rhs);
+  // TVM local end
 
   void Profile(FoldingSetNodeID &ID) const;
 

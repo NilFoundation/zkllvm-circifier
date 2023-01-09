@@ -13981,6 +13981,18 @@ bool FieldExprEvaluator::VisitCastExpr(const CastExpr *E) {
     assert(Value.isInt());
     Result =
         APValue(FieldElem(E->getType()->getLLVMFieldKind(), Value.getInt()));
+    break;
+  }
+  case CK_StringToGaloisField: {
+    APValue Value;
+    SmallString<10> str;
+    if (!SubExpr->EvaluateAsString(str, Info.Ctx))
+      return false;
+    FieldElem FieldVal;
+    if (!llvm::FieldElemFromStr(E->getType()->getLLVMFieldKind(), str, FieldVal))
+      return false;
+    Result = APValue(FieldVal);
+    break;
   }
   }
 
@@ -16509,4 +16521,31 @@ bool Expr::tryEvaluateStrLen(uint64_t &Result, ASTContext &Ctx) const {
   Expr::EvalStatus Status;
   EvalInfo Info(Ctx, Status, EvalInfo::EM_ConstantFold);
   return EvaluateBuiltinStrLen(this, Result, Info);
+}
+
+bool Expr::EvaluateAsString(SmallVectorImpl<char> &Str, ASTContext &Ctx) const {
+  [[maybe_unused]] auto *PT = cast<PointerType>(getType());
+  assert(PT->getPointeeType()->isCharType());
+  assert(PT->getPointeeType().isConstant(Ctx));
+  EvalResult Result;
+  EvalStatus Status;
+  EvalInfo Info(Ctx, Status, EvalInfo::EM_IgnoreSideEffects);
+  if (!::Evaluate(Result.Val, Info, this))
+      return false;
+  LValue Ptr;
+  Ptr.setFrom(Ctx, Result.Val);
+  APValue CurChar;
+  QualType CharTy = Ptr.Designator.getType(Info.Ctx);
+  assert(CharTy->isCharType());
+  // Read characters one by one into the string
+  while (true) {
+    if (!handleLValueToRValueConversion(Info, this, CharTy, Ptr, CurChar))
+      return false;
+    if (!CurChar.getInt())
+      break;
+    Str.push_back(CurChar.getInt().getZExtValue());
+    if (!HandleLValueArrayAdjustment(Info, this, Ptr, CharTy, 1))
+      return false;
+  }
+  return true;
 }

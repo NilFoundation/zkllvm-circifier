@@ -671,6 +671,8 @@ public:
                             SideEffectsKind AllowSideEffects = SE_NoSideEffects,
                             bool InConstantContext = false) const;
 
+  bool EvaluateAsString(SmallVectorImpl<char> &Str, ASTContext &Ctx) const;
+
   /// isEvaluatable - Call EvaluateAsRValue to see if this expression can be
   /// constant folded without side-effects, but discard the result.
   bool isEvaluatable(const ASTContext &Ctx,

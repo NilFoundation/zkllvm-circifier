@@ -4,6 +4,7 @@ set(LLVM_LINK_COMPONENTS
   FrontendOpenMP
   MC
   Support
+  ZK
   )
 
 clang_tablegen(OpenCLBuiltins.inc -gen-clang-opencl-builtins

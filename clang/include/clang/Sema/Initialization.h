@@ -923,7 +923,10 @@ public:
     SK_OCLSamplerInit,
 
     // Initialize a Galois field element from an integer
-    SK_GaloisFieldInit,
+    SK_GaloisFieldIntInit,
+
+    // Initialize a Galois field element from a C string
+    SK_GaloisFieldStringInit,
 
     /// Initialize an opaque OpenCL type (event_t, queue_t, etc.) with zero
     SK_OCLZeroOpaqueType,
@@ -1364,8 +1367,8 @@ public:
   /// constant.
   void AddOCLSamplerInitStep(QualType T);
 
-  // Add a step to initialize a Galois field element from an integer
-  void AddGaloisFieldInitStep(QualType T);
+  // Add a step to initialize a Galois field element
+  void AddGaloisFieldInitStep(QualType T, StepKind Kind);
 
   /// Add a step to initialzie an OpenCL opaque type (event_t, queue_t, etc.)
   /// from a zero constant.

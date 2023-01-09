@@ -41,6 +41,7 @@
 #include "llvm/IR/MatrixBuilder.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/TypeSize.h"
+#include "llvm/ZK/FieldArithmetics.h"
 #include <cstdarg>
 #include <optional>
 
@@ -2457,6 +2458,14 @@ Value *ScalarExprEmitter::VisitCastExpr(CastExpr *CE) {
   case CK_IntToOCLSampler:
     return CGF.CGM.createOpenCLIntToSamplerConversion(E, CGF);
 
+  case CK_StringToGaloisField: {
+    auto FieldTy = cast<llvm::GaloisFieldType>(ConvertType(DestTy));
+    SmallString<10> Str;
+    assert(E->EvaluateAsString(Str, CGF.getContext()));
+    llvm::FieldElem Val;
+    assert(llvm::FieldElemFromStr(FieldTy->getFieldKind(), Str, Val));
+    return llvm::ConstantField::get(FieldTy, Val);
+  }
   } // end of switch
 
   llvm_unreachable("unknown scalar cast");

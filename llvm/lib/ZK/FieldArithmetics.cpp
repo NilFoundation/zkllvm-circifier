@@ -65,4 +65,31 @@ FieldElem FieldBinOp(FieldOperation Op, const FieldElem &LHS, const FieldElem &R
       }
     }
 }
+
+bool FieldElemFromStr(GaloisFieldKind Kind, StringRef StrRef, FieldElem &Result) {
+  int radix = 10;
+  SmallString<10> Str(StrRef);
+  if (Str[0] == '0') {
+    Str.erase(Str.begin());
+    if (Str[0] == 'x') {
+      Str.erase(Str.begin());
+      radix = 16;
+    } else if (Str[0] == 'b') {
+      Str.erase(Str.begin());
+      radix = 2;
+    } else {
+      radix = 8;
+    }
+  }
+  unsigned NumBits = GetNumberBits(Kind);
+  APInt ParsedInt(NumBits, 0);
+  if (Str.str().getAsInteger(radix, ParsedInt))
+    return false;
+  if (ParsedInt.getBitWidth() != NumBits) {
+    // Value was extended during parsing, so field bit width is insufficient
+    return false;
+  }
+  Result = FieldElem(Kind, ParsedInt);
+  return true;
+}
 }

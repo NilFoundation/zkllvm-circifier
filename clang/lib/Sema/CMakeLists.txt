@@ -5,6 +5,7 @@ set(LLVM_LINK_COMPONENTS
   MC
   Support
   TargetParser
+  ZK
   )
 
 clang_tablegen(OpenCLBuiltins.inc -gen-clang-opencl-builtins

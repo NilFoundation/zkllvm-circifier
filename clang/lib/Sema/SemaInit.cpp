@@ -32,6 +32,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/ZK/FieldArithmetics.h"
 
 using namespace clang;
 
@@ -3651,7 +3652,8 @@ void InitializationSequence::Step::Destroy() {
   case SK_StdInitializerList:
   case SK_StdInitializerListConstructorCall:
   case SK_OCLSamplerInit:
-  case SK_GaloisFieldInit:
+  case SK_GaloisFieldIntInit:
+  case SK_GaloisFieldStringInit:
   case SK_OCLZeroOpaqueType:
   case SK_ParenthesizedListInit:
     break;
@@ -3943,9 +3945,9 @@ void InitializationSequence::AddOCLSamplerInitStep(QualType T) {
   Steps.push_back(S);
 }
 
-void InitializationSequence::AddGaloisFieldInitStep(QualType T) {
+void InitializationSequence::AddGaloisFieldInitStep(QualType T, StepKind Kind) {
   Step S;
-  S.Kind = SK_GaloisFieldInit;
+  S.Kind = Kind;
   S.Type = T;
   Steps.push_back(S);
 }
@@ -6039,11 +6041,28 @@ static bool TryGaloisFieldInitialization(Sema &S,
                                         InitializationSequence &Sequence,
                                         QualType DestType,
                                         Expr *Initializer) {
-  if (!DestType->isFieldType() || !Initializer->getType()->isIntegerType())
+  if (!DestType->isFieldType())
     return false;
 
-  Sequence.AddGaloisFieldInitStep(DestType);
-  return true;
+  QualType InitType = Initializer->getType();
+  if (InitType->isIntegerType()) {
+    Sequence.AddGaloisFieldInitStep(DestType, InitializationSequence::SK_GaloisFieldIntInit);
+    return true;
+  }
+  if (auto *PT = dyn_cast<PointerType>(InitType))
+    if (PT->getPointeeType()->isCharType() &&
+        PT->getPointeeType().isConstant(S.Context)) {
+      SmallString<10> Str;
+      if (!Initializer->EvaluateAsString(Str, S.Context))
+        return false;
+      llvm::FieldElem Val;
+      if (!llvm::FieldElemFromStr(DestType->getLLVMFieldKind(), Str, Val))
+        return false;
+      Sequence.AddGaloisFieldInitStep(
+          DestType, InitializationSequence::SK_GaloisFieldStringInit);
+      return true;
+    }
+  return false;;
 }
 
 static bool IsZeroInitializer(Expr *Initializer, Sema &S) {
@@ -8707,7 +8726,8 @@ ExprResult InitializationSequence::Perform(Sema &S,
   case SK_ProduceObjCObject:
   case SK_StdInitializerList:
   case SK_OCLSamplerInit:
-  case SK_GaloisFieldInit:
+  case SK_GaloisFieldIntInit:
+  case SK_GaloisFieldStringInit:
   case SK_OCLZeroOpaqueType: {
     assert(Args.size() == 1 || IsHLSLVectorInit);
     CurInit = Args[0];
@@ -9399,9 +9419,14 @@ ExprResult InitializationSequence::Perform(Sema &S,
                                       CK_IntToOCLSampler);
       break;
     }
-    case SK_GaloisFieldInit: {
+    case SK_GaloisFieldIntInit: {
       Expr *Init = CurInit.get();
       CurInit = S.ImpCastExprToType(Init, DestType, CK_IntToGaloisField);
+      break;
+    }
+    case SK_GaloisFieldStringInit: {
+      Expr *Init = CurInit.get();
+      CurInit = S.ImpCastExprToType(Init, DestType, CK_StringToGaloisField);
       break;
     }
     case SK_OCLZeroOpaqueType: {
@@ -10381,8 +10406,12 @@ void InitializationSequence::dump(raw_ostream &OS) const {
       OS << "OpenCL sampler_t from integer constant";
       break;
 
-    case SK_GaloisFieldInit:
+    case SK_GaloisFieldIntInit:
       OS << "Galois field element from integer constant";
+      break;
+
+    case SK_GaloisFieldStringInit:
+      OS << "Galois field element from a string";
       break;
 
     case SK_OCLZeroOpaqueType:

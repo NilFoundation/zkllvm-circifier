@@ -247,6 +247,8 @@ add_lit_testsuites(LLVM ${CMAKE_CURRENT_SOURCE_DIR}
   )
 
 # Setup an alias for 'check-all'.
-add_custom_target(check)
+if (NOT TARGET check)
+  add_custom_target(check)
+endif()
 add_dependencies(check check-all)
 set_target_properties(check PROPERTIES FOLDER "Tests")

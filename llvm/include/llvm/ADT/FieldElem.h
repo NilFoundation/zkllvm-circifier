@@ -27,10 +27,8 @@ class [[nodiscard]] FieldElem : public APInt {
 
 public:
   FieldElem() : APInt(), Kind(static_cast<GaloisFieldKind>(0)) {}
-  FieldElem(GaloisFieldKind k, APInt v) : APInt(v), Kind(k) {
-    if (v.isSingleWord())
-      APInt::operator=(APInt(GetNumberBits(Kind), v.getZExtValue()));
-  }
+  FieldElem(GaloisFieldKind k, APInt v)
+      : APInt(v.zext(GetNumberBits(k))), Kind(k) {}
 
   GaloisFieldKind getKind() const { return Kind; }
 

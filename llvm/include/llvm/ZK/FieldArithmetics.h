@@ -12,7 +12,10 @@ enum FieldOperation {
   F_Div,
 };
 
-FieldElem FieldBinOp(FieldOperation Op, const FieldElem &LHS, const FieldElem &RHS);
+FieldElem FieldBinOp(FieldOperation Op, const FieldElem &LHS,
+                     const FieldElem &RHS);
+
+bool FieldElemFromStr(GaloisFieldKind Kind, StringRef Str, FieldElem &Result);
 }
 
 

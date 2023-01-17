@@ -24,6 +24,8 @@
 using namespace llvm;
 
 PreservedAnalyses IPSCCPPass::run(Module &M, ModuleAnalysisManager &AM) {
+  // TODO(maksenov): temporarily disabled, fix it
+  return PreservedAnalyses::all();
   const DataLayout &DL = M.getDataLayout();
   auto &FAM = AM.getResult<FunctionAnalysisManagerModuleProxy>(M).getManager();
   auto GetTLI = [&FAM](Function &F) -> const TargetLibraryInfo & {

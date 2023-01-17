@@ -26,6 +26,7 @@ set(LLVM_LINK_COMPONENTS
   Support
   Target
   TransformUtils
+  ZK
   )
 
 add_clang_library(clangCodeGen

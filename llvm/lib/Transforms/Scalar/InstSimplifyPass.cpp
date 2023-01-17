@@ -128,6 +128,8 @@ FunctionPass *llvm::createInstSimplifyLegacyPass() {
 
 PreservedAnalyses InstSimplifyPass::run(Function &F,
                                         FunctionAnalysisManager &AM) {
+  // TODO(maksenov): temporarily disabled, fix it
+  return PreservedAnalyses::all();
   auto &DT = AM.getResult<DominatorTreeAnalysis>(F);
   auto &TLI = AM.getResult<TargetLibraryAnalysis>(F);
   auto &AC = AM.getResult<AssumptionAnalysis>(F);

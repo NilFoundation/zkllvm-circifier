@@ -13,16 +13,25 @@ enum GaloisFieldKind : unsigned {
 inline unsigned GetNumberBits(GaloisFieldKind Kind) {
   // TODO(maksenov): get rid of explicit numbers here
   switch (Kind) {
-  case GALOIS_FIELD_BLS12_381_BASE:
-    return 321;
+  case GALOIS_FIELD_BLS12381_BASE:
+    return 381;
+  case GALOIS_FIELD_BLS12381_SCALAR:
+    return 255;
   case GALOIS_FIELD_PALLAS_BASE:
     return 255;
-  case GALOIS_FIELD_CURVE_25519_BASE:
+  case GALOIS_FIELD_PALLAS_SCALAR:
     return 255;
+  case GALOIS_FIELD_VESTA_BASE:
+    return 255;
+  case GALOIS_FIELD_VESTA_SCALAR:
+    return 255;
+  case GALOIS_FIELD_CURVE25519_BASE:
+    return 255;
+  case GALOIS_FIELD_CURVE25519_SCALAR:
+    return 253;
   }
   llvm_unreachable("Unspecified field kind");
 }
 } // namespace llvm
-
 
 #endif // LLVM_ZK_FIELD_KINDS_H

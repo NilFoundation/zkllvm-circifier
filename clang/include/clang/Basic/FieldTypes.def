@@ -29,7 +29,7 @@ FIELD_TYPE(Name, FrontendId, FrontendId##Ty)
 #define FIELD_TYPE_MARKER(Marker, Value)
 #endif
 
-FIELD_TYPE_MARKER(FieldFirstType, FBls)
-FIELD_TYPE_MARKER(FieldLastType, FCurve25519b)
+FIELD_TYPE_MARKER(FieldFirstType, FPallasbase)
+FIELD_TYPE_MARKER(FieldLastType, FCurve25519scalar)
 
 #undef FIELD_TYPE_MARKER

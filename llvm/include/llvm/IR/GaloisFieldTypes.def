@@ -23,8 +23,16 @@
 #define GALOIS_FIELD_TYPE(Name, EnumId, SingletonId, FrontendId)
 #endif
 
-GALOIS_FIELD_TYPE("field_bls12381b",  GALOIS_FIELD_BLS12_381_BASE,   Bls12381bTy,   FBls)
-GALOIS_FIELD_TYPE("field_pallasb",    GALOIS_FIELD_PALLAS_BASE,      PallasbTy,     FPallasb)
-GALOIS_FIELD_TYPE("field_curve25519b",GALOIS_FIELD_CURVE_25519_BASE, Curve25519bTy, FCurve25519b)
+GALOIS_FIELD_TYPE("__zkllvm_field_pallas_base",    GALOIS_FIELD_PALLAS_BASE,      PallasbaseTy,     FPallasbase)
+GALOIS_FIELD_TYPE("__zkllvm_field_pallas_scalar",    GALOIS_FIELD_PALLAS_SCALAR,      PallasscalarTy,     FPallasscalar)
+
+GALOIS_FIELD_TYPE("__zkllvm_field_vesta_base",    GALOIS_FIELD_VESTA_BASE,      VestabaseTy,     FVestabase)
+GALOIS_FIELD_TYPE("__zkllvm_field_vesta_scalar",    GALOIS_FIELD_VESTA_SCALAR,      VestascalarTy,     FVestascalar)
+
+GALOIS_FIELD_TYPE("__zkllvm_field_bls12381_base",  GALOIS_FIELD_BLS12381_BASE,   BLS12381baseTy,   FBLS12381base)
+GALOIS_FIELD_TYPE("__zkllvm_field_bls12381_scalar",  GALOIS_FIELD_BLS12381_SCALAR,   BLS12381scalarTy,   FBLS12381scalar)
+
+GALOIS_FIELD_TYPE("__zkllvm_field_curve25519_base",GALOIS_FIELD_CURVE25519_BASE, Curve25519baseTy, FCurve25519base)
+GALOIS_FIELD_TYPE("__zkllvm_field_curve25519_scalar",GALOIS_FIELD_CURVE25519_SCALAR, Curve25519scalarTy, FCurve25519scalar)
 
 #undef GALOIS_FIELD_TYPE

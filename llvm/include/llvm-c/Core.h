@@ -169,7 +169,7 @@ typedef enum {
   LLVMTokenTypeKind,     /**< Tokens */
   LLVMScalableVectorTypeKind, /**< Scalable SIMD vector type */
   LLVMBFloatTypeKind,    /**< 16 bit brain floating point type */
-  LLVMX86_AMXTypeKind    /**< X86 AMX */
+  LLVMX86_AMXTypeKind,   /**< X86 AMX */
   // TVM local begin
   LLVMTVMSliceKind,           /**< TVM Slice */
   LLVMTVMBuilderKind,         /**< TVM Builder */

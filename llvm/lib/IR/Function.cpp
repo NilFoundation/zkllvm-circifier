@@ -1052,6 +1052,14 @@ enum IIT_Info {
   IIT_ANYPTR_TO_ELT = 56,
   IIT_I2 = 57,
   IIT_I4 = 58,
+  // TVM local begin
+  IIT_STRUCT8_AND_MORE = 59,
+  IIT_I257 = 60,
+  IIT_TVMSLICE = 61,
+  IIT_TVMBUILDER = 62,
+  IIT_TVMCELL = 63,
+  IIT_TVMTUPLE = 64
+  // TVM local end
 };
 
 static void DecodeIITType(unsigned &NextElt, ArrayRef<unsigned char> Infos,
@@ -1065,6 +1073,23 @@ static void DecodeIITType(unsigned &NextElt, ArrayRef<unsigned char> Infos,
   unsigned StructElts = 2;
 
   switch (Info) {
+    // TVM local begin
+  case IIT_I257:
+    OutputTable.push_back(IITDescriptor::get(IITDescriptor::Integer, 257));
+    return;
+  case IIT_TVMSLICE:
+    OutputTable.push_back(IITDescriptor::get(IITDescriptor::TVMSlice, 0));
+    return;
+  case IIT_TVMBUILDER:
+    OutputTable.push_back(IITDescriptor::get(IITDescriptor::TVMBuilder, 0));
+    return;
+  case IIT_TVMCELL:
+    OutputTable.push_back(IITDescriptor::get(IITDescriptor::TVMCell, 0));
+    return;
+  case IIT_TVMTUPLE:
+    OutputTable.push_back(IITDescriptor::get(IITDescriptor::TVMTuple, 0));
+    return;
+  // TVM local end
   case IIT_Done:
     OutputTable.push_back(IITDescriptor::get(IITDescriptor::Void, 0));
     return;
@@ -1339,6 +1364,12 @@ static Type *DecodeFixedType(ArrayRef<Intrinsic::IITDescriptor> &Infos,
   Infos = Infos.slice(1);
 
   switch (D.Kind) {
+    // TVM local begin
+  case IITDescriptor::TVMSlice: return Type::getTVMSliceTy(Context);
+  case IITDescriptor::TVMBuilder: return Type::getTVMBuilderTy(Context);
+  case IITDescriptor::TVMCell: return Type::getTVMCellTy(Context);
+  case IITDescriptor::TVMTuple: return Type::getTVMTupleTy(Context);
+  // TVM local end
   case IITDescriptor::Void: return Type::getVoidTy(Context);
   case IITDescriptor::VarArg: return Type::getVoidTy(Context);
   case IITDescriptor::MMX: return Type::getX86_MMXTy(Context);
@@ -1471,6 +1502,8 @@ bool Intrinsic::isLeaf(ID id) {
   case Intrinsic::experimental_gc_statepoint:
   case Intrinsic::experimental_patchpoint_void:
   case Intrinsic::experimental_patchpoint_i64:
+  case Intrinsic::coro_tvm_serialize:
+  case Intrinsic::coro_tvm_deserialize:
     return false;
   }
 }
@@ -1524,6 +1557,12 @@ static bool matchIntrinsicType(
   Infos = Infos.slice(1);
 
   switch (D.Kind) {
+  // TVM local begin
+    case IITDescriptor::TVMSlice: return !Ty->isTVMSliceTy();
+    case IITDescriptor::TVMBuilder: return !Ty->isTVMBuilderTy();
+    case IITDescriptor::TVMCell: return !Ty->isTVMCellTy();
+    case IITDescriptor::TVMTuple: return !Ty->isTVMTupleTy();
+    // TVM local end
     case IITDescriptor::Void: return !Ty->isVoidTy();
     case IITDescriptor::VarArg: return true;
     case IITDescriptor::MMX:  return !Ty->isX86_MMXTy();

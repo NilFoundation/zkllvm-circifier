@@ -2326,6 +2326,18 @@ Error BitcodeReader::parseTypeTableBody() {
     case bitc::TYPE_CODE_TOKEN:     // TOKEN
       ResultTy = Type::getTokenTy(Context);
       break;
+    case bitc::TYPE_CODE_TVMSLICE:
+      ResultTy = Type::getTVMSliceTy(Context);
+      break;
+    case bitc::TYPE_CODE_TVMBUILDER:
+      ResultTy = Type::getTVMBuilderTy(Context);
+      break;
+    case bitc::TYPE_CODE_TVMCELL:
+      ResultTy = Type::getTVMCellTy(Context);
+      break;
+    case bitc::TYPE_CODE_TVMTUPLE:
+      ResultTy = Type::getTVMTupleTy(Context);
+      break;
     case bitc::TYPE_CODE_INTEGER: { // INTEGER: [width]
       if (Record.empty())
         return error("Invalid integer record");

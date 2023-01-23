@@ -33,9 +33,9 @@
 
 using namespace llvm;
 
-static cl::opt<bool>
-    OpaquePointersCL("opaque-pointers", cl::desc("Use opaque pointers"),
-                     cl::init(true));
+static cl::opt<bool> OpaquePointersCL("opaque-pointers",
+                                      cl::desc("Use opaque pointers"),
+                                      cl::init(true));
 
 LLVMContextImpl::LLVMContextImpl(LLVMContext &C)
     : DiagHandler(std::make_unique<DiagnosticHandler>()),
@@ -46,14 +46,41 @@ LLVMContextImpl::LLVMContextImpl(LLVMContext &C)
       X86_FP80Ty(C, Type::X86_FP80TyID), FP128Ty(C, Type::FP128TyID),
       PPC_FP128Ty(C, Type::PPC_FP128TyID), X86_MMXTy(C, Type::X86_MMXTyID),
       X86_AMXTy(C, Type::X86_AMXTyID), Int1Ty(C, 1), Int8Ty(C, 8),
-      Int16Ty(C, 16), Int32Ty(C, 32), Int64Ty(C, 64), Int128Ty(C, 128)
-#define GALOIS_FIELD_TYPE(Name, EnumId, SingletonId, FrontendId)  \
-      ,SingletonId(C, EnumId)
+      Int16Ty(C, 16), Int32Ty(C, 32), Int64Ty(C, 64), Int128Ty(C, 128),
+      // TVM local begin
+      TVMSliceTy(C, Type::TVMSliceID), TVMBuilderTy(C, Type::TVMBuilderID),
+      TVMCellTy(C, Type::TVMCellID), TVMTupleTy(C, Type::TVMTupleID),
+      Int257Ty(C, 257), VeryNonStandartByteTy(C, ByteSizeInBits),
+// TVM local end
+#define GALOIS_FIELD_TYPE(Name, EnumId, SingletonId, FrontendId)               \
+  , SingletonId(C, EnumId)
 #include "llvm/IR/GaloisFieldTypes.def"
-#define ELLIPTIC_CURVE_TYPE(Name, EnumId, SingletonId, FrontendId)  \
-      ,SingletonId(C, EnumId)
+#define ELLIPTIC_CURVE_TYPE(Name, EnumId, SingletonId, FrontendId)             \
+  , SingletonId(C, EnumId)
 #include "llvm/IR/EllipticCurveTypes.def"
-  {
+      // TVM local begin
+{
+  switch (ByteSizeInBits) {
+  case 8:
+    ByteTy = &Int8Ty;
+    break;
+  case 16:
+    ByteTy = &Int16Ty;
+    break;
+  case 32:
+    ByteTy = &Int32Ty;
+    break;
+  case 64:
+    ByteTy = &Int64Ty;
+    break;
+  case 257:
+    ByteTy = &Int257Ty;
+    break;
+  default:
+    ByteTy = &VeryNonStandartByteTy;
+    break;
+  }
+
   if (OpaquePointersCL.getNumOccurrences()) {
     OpaquePointers = OpaquePointersCL;
   }
@@ -128,7 +155,8 @@ LLVMContextImpl::~LLVMContextImpl() {
 
   // Destroy attribute node lists.
   for (FoldingSetIterator<AttributeSetNode> I = AttrsSetNodes.begin(),
-         E = AttrsSetNodes.end(); I != E; ) {
+                                            E = AttrsSetNodes.end();
+       I != E;) {
     FoldingSetIterator<AttributeSetNode> Elem = I++;
     delete &*Elem;
   }
@@ -217,7 +245,8 @@ StringMapEntry<uint32_t> *LLVMContextImpl::getOrInsertBundleTag(StringRef Tag) {
   return &*(BundleTagCache.insert(std::make_pair(Tag, NewIdx)).first);
 }
 
-void LLVMContextImpl::getOperandBundleTags(SmallVectorImpl<StringRef> &Tags) const {
+void LLVMContextImpl::getOperandBundleTags(
+    SmallVectorImpl<StringRef> &Tags) const {
   Tags.resize(BundleTagCache.size());
   for (const auto &T : BundleTagCache)
     Tags[T.second] = T.first();
@@ -251,9 +280,7 @@ OptPassGate &LLVMContextImpl::getOptPassGate() const {
   return *OPG;
 }
 
-void LLVMContextImpl::setOptPassGate(OptPassGate& OPG) {
-  this->OPG = &OPG;
-}
+void LLVMContextImpl::setOptPassGate(OptPassGate &OPG) { this->OPG = &OPG; }
 
 bool LLVMContextImpl::hasOpaquePointersValue() {
   return OpaquePointers.has_value();

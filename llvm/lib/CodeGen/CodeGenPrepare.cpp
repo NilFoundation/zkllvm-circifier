@@ -499,6 +499,9 @@ bool CodeGenPrepare::runOnFunction(Function &F) {
   FreshBBs.clear();
 
   TM = &getAnalysis<TargetPassConfig>().getTM<TargetMachine>();
+  const Triple &T = TM->getTargetTriple();
+  if (T.getArch() == Triple::tvm)
+    return false;
   SubtargetInfo = TM->getSubtargetImpl(F);
   TLI = SubtargetInfo->getTargetLowering();
   TRI = SubtargetInfo->getRegisterInfo();

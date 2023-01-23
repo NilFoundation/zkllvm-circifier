@@ -242,6 +242,18 @@ bool Lowerer::shouldElide(Function *F, DominatorTree &DT) const {
         Terminators.insert(&B);
     }
 
+    // Filter out the coro.destroy that lie along exceptional paths.
+    SmallPtrSet<CoroSubFnInst *, 4> DAs;
+    for (CoroSubFnInst *DA : DestroyAddr) {
+      for (Instruction *TI : Terminators) {
+        // We don't need exceptional path check in TVM
+        if (Triple(TheModule.getTargetTriple()).isTVM() || DT.dominates(DA, TI)) {
+        DAs.insert(DA);
+        break;
+        }
+      }
+    }
+
   // Filter out the coro.destroy that lie along exceptional paths.
   SmallPtrSet<CoroBeginInst *, 8> ReferencedCoroBegins;
   for (const auto &It : DestroyAddr) {

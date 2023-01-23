@@ -251,6 +251,13 @@ def llvm_i16_ty        : LLVMType<i16>;
 def llvm_i32_ty        : LLVMType<i32>;
 def llvm_i64_ty        : LLVMType<i64>;
 def llvm_i128_ty       : LLVMType<i128>;
+// TVM local begin
+def llvm_i257_ty       : LLVMType<i257>;
+def llvm_TVMSlice_ty   : LLVMType<TVMSlice>;
+def llvm_TVMBuilder_ty : LLVMType<TVMBuilder>;
+def llvm_TVMCell_ty    : LLVMType<TVMCell>;
+def llvm_TVMTuple_ty   : LLVMType<TVMTuple>;
+// TVM local end
 def llvm_half_ty       : LLVMType<f16>;
 def llvm_bfloat_ty     : LLVMType<bf16>;
 def llvm_float_ty      : LLVMType<f32>;
@@ -1275,9 +1282,9 @@ def int_experimental_gc_get_pointer_offset : DefaultAttrsIntrinsic<
 // These are documented in docs/Coroutines.rst
 
 // Coroutine Structure Intrinsics.
-
+// TVM local begin
 def int_coro_id : DefaultAttrsIntrinsic<[llvm_token_ty],
-    [llvm_i32_ty, llvm_ptr_ty, llvm_ptr_ty, llvm_ptr_ty],
+    [llvm_i257_ty, llvm_i32_ty, llvm_ptr_ty, llvm_ptr_ty, llvm_ptr_ty],
     [IntrArgMemOnly, IntrReadMem, ReadNone<ArgIndex<1>>, ReadOnly<ArgIndex<2>>,
      NoCapture<ArgIndex<2>>]>;
 def int_coro_id_retcon : Intrinsic<[llvm_token_ty],
@@ -1325,7 +1332,7 @@ def int_coro_size : Intrinsic<[llvm_anyint_ty], [], [IntrNoMem]>;
 def int_coro_align : Intrinsic<[llvm_anyint_ty], [], [IntrNoMem]>;
 
 def int_coro_save : Intrinsic<[llvm_token_ty], [llvm_ptr_ty], [IntrNoMerge]>;
-def int_coro_suspend : Intrinsic<[llvm_i8_ty], [llvm_token_ty, llvm_i1_ty], []>;
+def int_coro_suspend : Intrinsic<[llvm_i257_ty, llvm_i8_ty], [llvm_token_ty, llvm_i1_ty], []>;
 def int_coro_suspend_retcon : Intrinsic<[llvm_any_ty], [llvm_vararg_ty], []>;
 def int_coro_prepare_retcon : Intrinsic<[llvm_ptr_ty], [llvm_ptr_ty],
                                         [IntrNoMem]>;
@@ -1333,6 +1340,12 @@ def int_coro_alloca_alloc : Intrinsic<[llvm_token_ty],
                                       [llvm_anyint_ty, llvm_i32_ty], []>;
 def int_coro_alloca_get : Intrinsic<[llvm_ptr_ty], [llvm_token_ty], []>;
 def int_coro_alloca_free : Intrinsic<[], [llvm_token_ty], []>;
+
+// TVM coroutine serialization intrinsics
+def int_coro_tvm_serialize :
+  Intrinsic<[llvm_TVMCell_ty], [llvm_TVMBuilder_ty, llvm_ptr_ty, llvm_ptr_ty], []>;
+def int_coro_tvm_deserialize :
+  Intrinsic<[llvm_ptr_ty], [llvm_TVMSlice_ty, llvm_ptr_ty, llvm_ptr_ty], []>;
 
 // Coroutine Manipulation Intrinsics.
 
@@ -1342,15 +1355,17 @@ def int_coro_done : Intrinsic<[llvm_i1_ty], [llvm_ptr_ty],
                               [IntrArgMemOnly, ReadOnly<ArgIndex<0>>,
                                NoCapture<ArgIndex<0>>]>;
 def int_coro_promise : Intrinsic<[llvm_ptr_ty],
-                                 [llvm_ptr_ty, llvm_i32_ty, llvm_i1_ty],
+                                 [llvm_ptr_ty, llvm_i257_ty, llvm_i32_ty, llvm_i1_ty],
                                  [IntrNoMem, NoCapture<ArgIndex<0>>]>;
 
 // Coroutine Lowering Intrinsics. Used internally by coroutine passes.
 
 def int_coro_subfn_addr : DefaultAttrsIntrinsic<
-    [llvm_ptr_ty], [llvm_ptr_ty, llvm_i8_ty],
+    [llvm_ptr_ty], [llvm_ptr_ty, llvm_i8_ty, llvm_i257_ty],
     [IntrReadMem, IntrArgMemOnly, ReadOnly<ArgIndex<0>>,
      NoCapture<ArgIndex<0>>]>;
+
+// TVM local end
 
 ///===-------------------------- Other Intrinsics --------------------------===//
 //
@@ -2148,3 +2163,4 @@ include "llvm/IR/IntrinsicsSPIRV.td"
 include "llvm/IR/IntrinsicsVE.td"
 include "llvm/IR/IntrinsicsDirectX.td"
 include "llvm/IR/IntrinsicsLoongArch.td"
+include "llvm/IR/IntrinsicsTVM.td"

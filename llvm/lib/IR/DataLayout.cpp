@@ -747,6 +747,13 @@ unsigned DataLayout::getIndexTypeSizeInBits(Type *Ty) const {
 Align DataLayout::getAlignment(Type *Ty, bool abi_or_pref) const {
   assert(Ty->isSized() && "Cannot getTypeInfo() on a type that is unsized!");
   switch (Ty->getTypeID()) {
+    // TVM local begin
+  case Type::TVMSliceID:
+  case Type::TVMBuilderID:
+  case Type::TVMCellID:
+  case Type::TVMTupleID:
+    return 1;
+  // TVM local end
   // Early escape for the non-numeric types.
   case Type::LabelTyID:
     return abi_or_pref ? getPointerABIAlignment(0) : getPointerPrefAlignment(0);

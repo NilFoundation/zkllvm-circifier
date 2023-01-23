@@ -2020,6 +2020,52 @@ static bool materializable(Instruction &V) {
          isa<BinaryOperator>(&V) || isa<CmpInst>(&V) || isa<SelectInst>(&V);
 }
 
+// Check for instructions that we can recreate on resume as opposed to spill
+// the result into a coroutine frame.
+// TVM local begin
+static bool materializable(Instruction &V, Value *ThisPtr) {
+  if (auto *II = dyn_cast<IntrinsicInst>(&V)) {
+    switch (II->getIntrinsicID()) {
+    default:
+      break;
+    case Intrinsic::tvm_pushnull:
+    case Intrinsic::tvm_pushslice_empty:
+    case Intrinsic::tvm_newc:
+    case Intrinsic::tvm_newdict:
+    case Intrinsic::tvm_cast_from_slice:
+    case Intrinsic::tvm_cast_from_builder:
+    case Intrinsic::tvm_cast_from_cell:
+    case Intrinsic::tvm_cast_from_tuple:
+    case Intrinsic::tvm_ctos:
+    case Intrinsic::tvm_stu:
+    case Intrinsic::tvm_sti:
+    case Intrinsic::tvm_stref:
+    case Intrinsic::tvm_stslice:
+      return true;
+    case Intrinsic::tvm_cast_to_slice:
+    case Intrinsic::tvm_cast_to_builder:
+    case Intrinsic::tvm_cast_to_cell:
+    case Intrinsic::tvm_cast_to_tuple: {
+      if (auto *SrcI = dyn_cast<Instruction>(V.getOperand(0)))
+        return materializable(*SrcI, ThisPtr);
+      return true;
+    }
+    }
+  }
+  // Rematerializing load from contract class data for TVM
+  if (auto *Load = dyn_cast<LoadInst>(&V)) {
+    auto *Ptr = Load->getPointerOperand()->stripInBoundsConstantOffsets();
+    if (Ptr == ThisPtr)
+      return true;
+  }
+  if (isa<Constant>(&V))
+    return true;
+
+  return isa<CastInst>(&V) || isa<GetElementPtrInst>(&V) ||
+         isa<BinaryOperator>(&V) || isa<CmpInst>(&V) || isa<SelectInst>(&V);
+}
+// TVM local end
+
 // Check for structural coroutine intrinsics that should not be spilled into
 // the coroutine frame.
 static bool isCoroutineStructureIntrinsic(Instruction &I) {
@@ -2789,6 +2835,11 @@ void coro::buildCoroutineFrame(Function &F, Shape &Shape) {
         if (I.getType()->isTokenTy())
           report_fatal_error(
               "token definition is separated from the use by a suspend point");
+        // TVM local begin
+        if (I.getType()->isTVMTupleTy())
+          report_fatal_error(
+              "TVM tuple definition is separated from the use by a suspend point");
+        // TVM local end
         FrameData.Spills[&I].push_back(cast<Instruction>(U));
       }
   }

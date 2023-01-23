@@ -2412,7 +2412,12 @@ void SelectionDAGBuilder::visitBr(const BranchInst &I) {
 
     // If this is not a fall-through branch or optimizations are switched off,
     // emit the branch.
-    if (Succ0MBB != NextBlock(BrMBB) || TM.getOptLevel() == CodeGenOpt::None)
+    // TVM local change begin
+    // TODO: TVM backend doesn't handle fallthrough properly, so it requires an MBB
+    // to always end up with an explicit terminator instruction.
+    if (Succ0MBB != NextBlock(BrMBB) || TM.getOptLevel() == CodeGenOpt::None ||
+      DAG.getTarget().getTargetTriple().getArch() == Triple::tvm)
+      // TVM local change end
       DAG.setRoot(DAG.getNode(ISD::BR, getCurSDLoc(),
                               MVT::Other, getControlRoot(),
                               DAG.getBasicBlock(Succ0MBB)));
@@ -2445,6 +2450,7 @@ void SelectionDAGBuilder::visitBr(const BranchInst &I) {
   const Instruction *BOp = dyn_cast<Instruction>(CondVal);
   if (!DAG.getTargetLoweringInfo().isJumpExpensive() && BOp &&
       BOp->hasOneUse() && !I.hasMetadata(LLVMContext::MD_unpredictable)) {
+    const auto &Triple = DAG.getTarget().getTargetTriple();
     Value *Vec;
     const Value *BOp0, *BOp1;
     Instruction::BinaryOps Opcode = (Instruction::BinaryOps)0;
@@ -2453,7 +2459,8 @@ void SelectionDAGBuilder::visitBr(const BranchInst &I) {
     else if (match(BOp, m_LogicalOr(m_Value(BOp0), m_Value(BOp1))))
       Opcode = Instruction::Or;
 
-    if (Opcode && !(match(BOp0, m_ExtractElt(m_Value(Vec), m_Value())) &&
+    if (Triple.getArch() != Triple::tvm && Opcode && !(match(BOp0,
+                                                             m_ExtractElt(m_Value(Vec), m_Value())) &&
                     match(BOp1, m_ExtractElt(m_Specific(Vec), m_Value())))) {
       FindMergedConditions(BOp, Succ0MBB, Succ1MBB, BrMBB, BrMBB, Opcode,
                            getEdgeProbability(BrMBB, Succ0MBB),
@@ -2570,10 +2577,13 @@ void SelectionDAGBuilder::visitSwitchCase(CaseBlock &CB,
 
   // If the lhs block is the next block, invert the condition so that we can
   // fall through to the lhs instead of the rhs block.
-  if (CB.TrueBB == NextBlock(SwitchBB)) {
-    std::swap(CB.TrueBB, CB.FalseBB);
-    SDValue True = DAG.getConstant(1, dl, Cond.getValueType());
-    Cond = DAG.getNode(ISD::XOR, dl, Cond.getValueType(), Cond, True);
+  const auto &Triple = DAG.getTarget().getTargetTriple();
+  if (Triple.getArch() != Triple::tvm) {
+    if (CB.TrueBB == NextBlock(SwitchBB)) {
+      std::swap(CB.TrueBB, CB.FalseBB);
+      SDValue True = DAG.getConstant(1, dl, Cond.getValueType());
+      Cond = DAG.getNode(ISD::XOR, dl, Cond.getValueType(), Cond, True);
+    }
   }
 
   SDValue BrCond = DAG.getNode(ISD::BRCOND, dl,

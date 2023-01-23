@@ -49,6 +49,12 @@ Type *Type::getPrimitiveType(LLVMContext &C, TypeID IDNumber) {
   case X86_MMXTyID   : return getX86_MMXTy(C);
   case X86_AMXTyID   : return getX86_AMXTy(C);
   case TokenTyID     : return getTokenTy(C);
+    // TVM local begin
+  case TVMSliceID    : return getTVMSliceTy(C);
+  case TVMBuilderID  : return getTVMBuilderTy(C);
+  case TVMCellID     : return getTVMCellTy(C);
+  case TVMTupleID    : return getTVMTupleTy(C);
+  // TVM local end
   default:
     return nullptr;
   }
@@ -163,6 +169,15 @@ bool Type::isEmptyTy() const {
 
 TypeSize Type::getPrimitiveSizeInBits() const {
   switch (getTypeID()) {
+    // TVM local begin
+  // We don't model slice/builder/cell/tuple internal data.
+  // Just keep them as "handles", bitcast'able to i257, so bit size is 257.
+  case Type::TVMSliceID:
+  case Type::TVMBuilderID:
+  case Type::TVMCellID:
+  case Type::TVMTupleID:
+    return TypeSize::Fixed(257);
+  // TVM local end
   case Type::HalfTyID: return TypeSize::Fixed(16);
   case Type::BFloatTyID: return TypeSize::Fixed(16);
   case Type::FloatTyID: return TypeSize::Fixed(32);
@@ -233,12 +248,24 @@ Type *Type::getPPC_FP128Ty(LLVMContext &C) { return &C.pImpl->PPC_FP128Ty; }
 Type *Type::getX86_MMXTy(LLVMContext &C) { return &C.pImpl->X86_MMXTy; }
 Type *Type::getX86_AMXTy(LLVMContext &C) { return &C.pImpl->X86_AMXTy; }
 
+// TVM local begin
+Type *Type::getTVMSliceTy(LLVMContext &C) { return &C.pImpl->TVMSliceTy; }
+Type *Type::getTVMBuilderTy(LLVMContext &C) { return &C.pImpl->TVMBuilderTy; }
+Type *Type::getTVMCellTy(LLVMContext &C) { return &C.pImpl->TVMCellTy; }
+Type *Type::getTVMTupleTy(LLVMContext &C) { return &C.pImpl->TVMTupleTy; }
+// TVM local end
+
 IntegerType *Type::getInt1Ty(LLVMContext &C) { return &C.pImpl->Int1Ty; }
 IntegerType *Type::getInt8Ty(LLVMContext &C) { return &C.pImpl->Int8Ty; }
 IntegerType *Type::getInt16Ty(LLVMContext &C) { return &C.pImpl->Int16Ty; }
 IntegerType *Type::getInt32Ty(LLVMContext &C) { return &C.pImpl->Int32Ty; }
 IntegerType *Type::getInt64Ty(LLVMContext &C) { return &C.pImpl->Int64Ty; }
 IntegerType *Type::getInt128Ty(LLVMContext &C) { return &C.pImpl->Int128Ty; }
+
+// TVM local begin
+IntegerType *Type::getInt257Ty(LLVMContext &C) { return &C.pImpl->Int257Ty; }
+IntegerType *Type::getByteTy(LLVMContext &C) { return C.pImpl->ByteTy; }
+// TVM local end
 
 IntegerType *Type::getIntNTy(LLVMContext &C, unsigned N) {
   return IntegerType::get(C, N);

@@ -2221,6 +2221,13 @@ template<typename T> static InstructionCost costAndCollectOperands(
   return Cost;
 }
 
+// TVM local begin
+static bool TVMHighCostCast(const DataLayout &DL, const SCEV *S) {
+  auto Ty = cast<SCEVCastExpr>(S)->getType();
+  return Ty->isIntegerTy() && !DL.fitsInLegalInteger(Ty->getIntegerBitWidth());
+}
+// TVM local end
+
 bool SCEVExpander::isHighCostExpansionHelper(
     const SCEVOperand &WorkItem, Loop *L, const Instruction &At,
     InstructionCost &Cost, unsigned Budget, const TargetTransformInfo &TTI,

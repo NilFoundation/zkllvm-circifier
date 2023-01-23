@@ -290,7 +290,7 @@ public:
   bool isSingleValueType() const {
     return isFloatingPointTy() || isX86_MMXTy() || isIntegerTy() ||
            isPointerTy() || isVectorTy() || isX86_AMXTy() || isFieldTy() ||
-           isCurveTy();
+           isCurveTy() || isTVMBuiltinTy();
   }
 
   /// Return true if the type is an aggregate type. This means it is valid as

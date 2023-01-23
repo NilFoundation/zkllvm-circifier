@@ -535,6 +535,16 @@ LLVMTypeKind LLVMGetTypeKind(LLVMTypeRef Ty) {
     return LLVMScalableVectorTypeKind;
   case Type::TypedPointerTyID:
     llvm_unreachable("Typed pointers are unsupported via the C API");
+    // TVM local begin
+  case Type::TVMSliceID:
+    return LLVMTVMSliceKind;
+  case Type::TVMBuilderID:
+    return LLVMTVMBuilderKind;
+  case Type::TVMCellID:
+    return LLVMTVMCellKind;
+  case Type::TVMTupleID:
+    return LLVMTVMTupleKind;
+    // TVM local end
   }
   llvm_unreachable("Unhandled TypeID.");
 }
@@ -645,6 +655,21 @@ LLVMTypeRef LLVMX86MMXTypeInContext(LLVMContextRef C) {
 LLVMTypeRef LLVMX86AMXTypeInContext(LLVMContextRef C) {
   return (LLVMTypeRef) Type::getX86_AMXTy(*unwrap(C));
 }
+
+// TVM local begin
+LLVMTypeRef LLVMTVMSliceInContext(LLVMContextRef C) {
+  return (LLVMTypeRef) Type::getTVMSliceTy(*unwrap(C));
+}
+LLVMTypeRef LLVMTVMBuilderInContext(LLVMContextRef C) {
+  return (LLVMTypeRef) Type::getTVMBuilderTy(*unwrap(C));
+}
+LLVMTypeRef LLVMTVMCellInContext(LLVMContextRef C) {
+  return (LLVMTypeRef) Type::getTVMCellTy(*unwrap(C));
+}
+LLVMTypeRef LLVMTVMTupleInContext(LLVMContextRef C) {
+  return (LLVMTypeRef) Type::getTVMTupleTy(*unwrap(C));
+}
+// TVM local end
 
 LLVMTypeRef LLVMHalfType(void) {
   return LLVMHalfTypeInContext(LLVMGetGlobalContext());

@@ -1470,13 +1470,20 @@ public:
   Type VoidTy, LabelTy, HalfTy, BFloatTy, FloatTy, DoubleTy, MetadataTy,
       TokenTy;
   Type X86_FP80Ty, FP128Ty, PPC_FP128Ty, X86_MMXTy, X86_AMXTy;
-  IntegerType Int1Ty, Int8Ty, Int16Ty, Int32Ty, Int64Ty, Int128Ty;
 #define GALOIS_FIELD_TYPE(Name, EnumId, SingletonId, FrontendId)  \
   GaloisFieldType SingletonId;
 #include "llvm/IR/GaloisFieldTypes.def"
 #define ELLIPTIC_CURVE_TYPE(Name, EnumId, SingletonId, FrontendId)             \
   EllipticCurveType SingletonId;
 #include "llvm/IR/EllipticCurveTypes.def"
+
+  // TVM local begin
+  Type TVMSliceTy, TVMBuilderTy, TVMCellTy, TVMTupleTy;
+  IntegerType Int1Ty, Int8Ty, Int16Ty, Int32Ty, Int64Ty, Int128Ty, Int257Ty;
+  // If ByteTy is not one of standart integer types
+  IntegerType VeryNonStandartByteTy;
+  IntegerType *ByteTy;
+  // TVM local end
 
   std::unique_ptr<ConstantTokenNone> TheNoneToken;
 

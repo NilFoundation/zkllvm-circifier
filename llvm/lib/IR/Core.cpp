@@ -674,6 +674,58 @@ LLVMTypeRef LLVMX86AMXType(void) {
   return LLVMX86AMXTypeInContext(LLVMGetGlobalContext());
 }
 
+/*--.. Operations on field types ............................................--*/
+
+LLVMTypeRef LLVMGaloisFieldPallasbaseTypeInContext(LLVMContextRef C) {
+  return (LLVMTypeRef) GaloisFieldType::get(*unwrap(C), GaloisFieldKind::GALOIS_FIELD_BLS12381_BASE);
+}
+LLVMTypeRef LLVMGaloisFieldPallasscalarTypeInContext(LLVMContextRef C) {
+  return (LLVMTypeRef) GaloisFieldType::get(*unwrap(C), GaloisFieldKind::GALOIS_FIELD_BLS12381_SCALAR);
+}
+LLVMTypeRef LLVMGaloisFieldVestabaseTypeInContext(LLVMContextRef C) {
+  return (LLVMTypeRef) GaloisFieldType::get(*unwrap(C), GaloisFieldKind::GALOIS_FIELD_VESTA_BASE);
+}
+LLVMTypeRef LLVMGaloisFieldVestascalarTypeInContext(LLVMContextRef C) {
+  return (LLVMTypeRef) GaloisFieldType::get(*unwrap(C), GaloisFieldKind::GALOIS_FIELD_VESTA_SCALAR);
+}
+LLVMTypeRef LLVMGaloisFieldBLS12381baseTypeInContext(LLVMContextRef C) {
+  return (LLVMTypeRef) GaloisFieldType::get(*unwrap(C), GaloisFieldKind::GALOIS_FIELD_BLS12381_BASE);
+}
+LLVMTypeRef LLVMGaloisFieldBLS12381scalarTypeInContext(LLVMContextRef C) {
+  return (LLVMTypeRef) GaloisFieldType::get(*unwrap(C), GaloisFieldKind::GALOIS_FIELD_BLS12381_SCALAR);
+}
+LLVMTypeRef LLVMGaloisFieldCurve25519baseTypeInContext(LLVMContextRef C) {
+  return (LLVMTypeRef) GaloisFieldType::get(*unwrap(C), GaloisFieldKind::GALOIS_FIELD_CURVE25519_BASE);
+}
+LLVMTypeRef LLVMGaloisFieldCurve25519scalarTypeInContext(LLVMContextRef C) {
+  return (LLVMTypeRef) GaloisFieldType::get(*unwrap(C), GaloisFieldKind::GALOIS_FIELD_CURVE25519_SCALAR);
+}
+
+LLVMTypeRef LLVMGaloisFieldPallasbaseType(void) {
+  return LLVMGaloisFieldPallasbaseTypeInContext(LLVMGetGlobalContext());
+}
+LLVMTypeRef LLVMGaloisFieldPallasscalarType(void) {
+  return LLVMGaloisFieldPallasscalarTypeInContext(LLVMGetGlobalContext());
+}
+LLVMTypeRef LLVMGaloisFieldVestabaseType(void) {
+  return LLVMGaloisFieldVestabaseTypeInContext(LLVMGetGlobalContext());
+}
+LLVMTypeRef LLVMGaloisFieldVestascalar(void) {
+  return LLVMGaloisFieldVestascalarTypeInContext(LLVMGetGlobalContext());
+}
+LLVMTypeRef LLVMGaloisFieldBLS12381baseType(void) {
+  return LLVMGaloisFieldBLS12381baseTypeInContext(LLVMGetGlobalContext());
+}
+LLVMTypeRef LLVMGaloisFieldBLS12381scalar(void) {
+  return LLVMGaloisFieldBLS12381scalarTypeInContext(LLVMGetGlobalContext());
+}
+LLVMTypeRef LLVMGaloisFieldCurve25519baseType(void) {
+  return LLVMGaloisFieldPallasbaseTypeInContext(LLVMGetGlobalContext());
+}
+LLVMTypeRef LLVMGaloisFieldCurve25519scalarType(void) {
+  return LLVMGaloisFieldCurve25519scalarTypeInContext(LLVMGetGlobalContext());
+}
+
 /*--.. Operations on function types ........................................--*/
 
 LLVMTypeRef LLVMFunctionType(LLVMTypeRef ReturnType,

@@ -1246,6 +1246,38 @@ LLVMTypeRef LLVMFP128Type(void);
 LLVMTypeRef LLVMPPCFP128Type(void);
 
 /**
+ * @defgroup LLVMCCoreTypeGaloisField Galois Field Types
+ *
+ * Functions in this section operate on galois field types.
+ *
+ * @{
+ */
+
+/**
+ * Obtain an galois field type from a context.
+ */
+LLVMTypeRef LLVMGaloisFieldPallasbaseTypeInContext(LLVMContextRef C);
+LLVMTypeRef LLVMGaloisFieldPallasscalarTypeInContext(LLVMContextRef C);
+LLVMTypeRef LLVMGaloisFieldVestabaseTypeInContext(LLVMContextRef C);
+LLVMTypeRef LLVMGaloisFieldVestascalarTypeInContext(LLVMContextRef C);
+LLVMTypeRef LLVMGaloisFieldBLS12381baseTypeInContext(LLVMContextRef C);
+LLVMTypeRef LLVMGaloisFieldBLS12381scalarTypeInContext(LLVMContextRef C);
+LLVMTypeRef LLVMGaloisFieldCurve25519baseTypeInContext(LLVMContextRef C);
+LLVMTypeRef LLVMGaloisFieldCurve25519scalarTypeInContext(LLVMContextRef C);
+
+/**
+ * Obtain an galois field type from the global context.
+ */
+LLVMTypeRef LLVMGaloisFieldPallasbaseType(void);
+LLVMTypeRef LLVMGaloisFieldPallasscalarType(void);
+LLVMTypeRef LLVMGaloisFieldVestabaseType(void);
+LLVMTypeRef LLVMGaloisFieldVestascalar(void);
+LLVMTypeRef LLVMGaloisFieldBLS12381baseType(void);
+LLVMTypeRef LLVMGaloisFieldBLS12381scalar(void);
+LLVMTypeRef LLVMGaloisFieldCurve25519baseType(void);
+LLVMTypeRef LLVMGaloisFieldCurve25519scalarType(void);
+
+/**
  * @}
  */
 

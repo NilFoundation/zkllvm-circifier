@@ -576,8 +576,10 @@ Value *SCEVExpander::expandAddToGEP(const SCEV *const *op_begin,
     // Fold a GEP with constant operands.
     if (Constant *CLHS = dyn_cast<Constant>(V))
       if (Constant *CRHS = dyn_cast<Constant>(Idx))
-        return ConstantExpr::getGetElementPtr(Type::getInt8Ty(Ty->getContext()),
+        // TVM local begin
+        return ConstantExpr::getGetElementPtr(Type::getByteTy(Ty->getContext()),
                                               CLHS, CRHS);
+        // TVM local end
 
     // Do a quick scan to see if we have this GEP nearby.  If so, reuse it.
     unsigned ScanLimit = 6;
@@ -997,7 +999,9 @@ Instruction *SCEVExpander::getIVIncOperand(Instruction *IncV,
         return nullptr;
       unsigned AS = cast<PointerType>(IncV->getType())->getAddressSpace();
       if (IncV->getType() != Type::getInt1PtrTy(SE.getContext(), AS)
-          && IncV->getType() != Type::getInt8PtrTy(SE.getContext(), AS))
+          // TVM local begin
+          && IncV->getType() != Type::getIntBytePtrTy(SE.getContext(), AS))
+        // TVM local end
         return nullptr;
       break;
     }

@@ -242,7 +242,7 @@ struct CoroTVMExpand : FunctionPass {
 
   bool doInitialization(Module &M) override {
     if (coro::declaresIntrinsics(M, {"llvm.coro.tvm.serialize", "llvm.coro.tvm.deserialize"}))
-      L = llvm::make_unique<Lowerer>(M);
+      L = std::make_unique<Lowerer>(M);
     return false;
   }
 

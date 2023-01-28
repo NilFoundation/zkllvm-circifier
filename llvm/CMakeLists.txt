@@ -423,6 +423,7 @@ set(LLVM_ALL_TARGETS
   RISCV
   Sparc
   SystemZ
+  TVM
   VE
   WebAssembly
   X86
@@ -1370,3 +1371,8 @@ endif()
 if (LLVM_INCLUDE_UTILS AND LLVM_INCLUDE_TOOLS)
   add_subdirectory(utils/llvm-locstats)
 endif()
+
+# TVM local begin
+add_custom_target(check-tvm
+                  DEPENDS check-llvm-codegen-tvm check-clang-codegen-tvm check-clang-driver-tvm)
+# TVM local end

@@ -3491,6 +3491,14 @@ void AsmPrinter::emitGlobalConstant(const DataLayout &DL, const Constant *CV,
   }
 }
 
+// TVM local begin
+/// Print a big LLVM constant int (>64 bit) to the .s file.
+void AsmPrinter::EmitBigInt(const ConstantInt *CI) {
+  (void)CI;
+  llvm_unreachable("unimplemented");
+}
+// TVM local end
+
 void AsmPrinter::emitMachineConstantPoolValue(MachineConstantPoolValue *MCPV) {
   // Target doesn't support this yet!
   llvm_unreachable("Target does not support EmitMachineConstantPoolValue");

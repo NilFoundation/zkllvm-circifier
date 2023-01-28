@@ -333,6 +333,12 @@ class ASTContext : public RefCountedBase<ASTContext> {
   /// data member.
   mutable std::string CUIDHash;
 
+  // TVM local begin
+  /// A cache mapping from CXXMethodDecl to its TVM arguments structure.
+  mutable llvm::DenseMap<const CXXMethodDecl*, QualType>
+      TVMMethodArgStructs;
+  // TVM local end
+
   /// Representation of a "canonical" template template parameter that
   /// is used in canonical template names.
   class CanonicalTemplateTemplateParm : public llvm::FoldingSetNode {
@@ -416,6 +422,11 @@ class ASTContext : public RefCountedBase<ASTContext> {
 
   QualType ObjCNSStringType;
 
+  // TVM local begin
+  QualType TVMTuples[256];
+  QualType TVMTuplePop;
+  // TVM local end
+
   /// The typedef declaration for the Objective-C "instancetype" type.
   TypedefDecl *ObjCInstanceTypeDecl = nullptr;
 
@@ -484,6 +495,10 @@ class ASTContext : public RefCountedBase<ASTContext> {
   ASTContext &this_() { return *this; }
 
 public:
+  // TVM local begin
+  static constexpr unsigned TVM_max_tuple_size = 255;
+  // TVM local end
+
   /// A type synonym for the TemplateOrInstantiation mapping.
   using TemplateOrSpecializationInfo =
       llvm::PointerUnion<VarTemplateDecl *, MemberSpecializationInfo *>;
@@ -1163,6 +1178,10 @@ public:
   CanQualType SingletonId;
 #include "llvm/IR/EllipticCurveTypes.def"
 
+  // TVM local begin
+  CanQualType TVMSliceTy, TVMBuilderTy, TVMCellTy, TVMTupleTy;
+  // TVM local end
+
   // Types for deductions in C++0x [stmt.ranged]'s desugaring. Built on demand.
   mutable QualType AutoDeductTy;     // Deduction against 'auto'.
   mutable QualType AutoRRefDeductTy; // Deduction against 'auto &&'.
@@ -1528,6 +1547,33 @@ public:
   /// \pre \p VectorType must be a built-in type.
   QualType getExtVectorType(QualType VectorType, unsigned NumElts) const;
 
+  // TVM local begin
+  /// Return the unique reference to a structure type
+  /// of the specified element type (equal type fields) and size.
+  ///
+  /// \pre \p ElemType must be a built-in type.
+  QualType getSplatStructType(QualType ElemType, unsigned NumFields,
+                              StringRef StructName, StringRef FieldName) const;
+
+  /// Creating { tuple, i257 } literal struct for tvm tpop result
+  QualType prepareTVMTuplePopStructType(StringRef StructName) const;
+
+  /// Creating literal struct with Elems
+  ///  (for builtin functions with struct returns)
+  QualType prepareTVMLiteralStructType(ArrayRef<QualType> Elems,
+                                       StringRef ElemsStr) const;
+
+  /// Creating struct with combined arguments for Method (without `this`)
+  QualType prepareTVMArgumentsStructType(const CXXMethodDecl *Method,
+                                         SourceLocation Loc) const;
+  QualType getTVMArgumentsStructType(const CXXMethodDecl *Method,
+                                     SourceLocation Loc) const;
+
+  /// Creating struct with adapted smart interface for contract interface
+  QualType prepareTVMSmartInterfaceType(CXXRecordDecl *Rec) const;
+  QualType getTVMSmartInterfaceType(CXXRecordDecl *Rec) const;
+  // TVM local end
+
   /// \pre Return a non-unique reference to the type for a dependently-sized
   /// vector of the specified element type.
   ///
@@ -1847,6 +1893,17 @@ public:
   void setObjCNSStringType(QualType T) {
     ObjCNSStringType = T;
   }
+
+  // TVM local begin
+  QualType getTVMTuple(unsigned Size) const {
+    assert(Size > 0 && Size < 256 && "Wrong size for TVMTuple");
+    return TVMTuples[Size - 1];
+  }
+
+  QualType getTVMTuplePop() const {
+    return TVMTuplePop;
+  }
+  // TVM local end
 
   /// Retrieve the type that \c id has been defined to, which may be
   /// different from the built-in \c id if \c id has been typedef'd.

@@ -2463,7 +2463,10 @@ static const auto &getFrontendActionTable() {
       {frontend::EmitCodeGenOnly, OPT_emit_codegen_only},
       {frontend::EmitObj, OPT_emit_obj},
       {frontend::ExtractAPI, OPT_extract_api},
-
+      // TVM local begin
+      {frontend::EmitTextConst, OPT_emit_text_const},
+      {frontend::ImportJsonAbi, OPT_import_json_abi},
+      // TVM local end
       {frontend::FixIt, OPT_fixit_EQ},
       {frontend::FixIt, OPT_fixit},
 

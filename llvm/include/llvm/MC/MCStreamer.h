@@ -360,7 +360,7 @@ public:
   virtual raw_ostream &getCommentOS();
 
   // TVM local begin
-  virtual raw_ostream &GetOS() { return GetCommentOS(); }
+  virtual raw_ostream &GetOS() { return getCommentOS(); }
   // TVM local end
 
   /// Print T and prefix it with the comment string (normally #) and

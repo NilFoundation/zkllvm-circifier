@@ -332,6 +332,13 @@ TypeSpecifierType BuiltinTypeLoc::getWrittenTypeSpec() const {
   if (needsExtraLocalData())
     return static_cast<TypeSpecifierType>(getWrittenBuiltinSpecs().Type);
   switch (getTypePtr()->getKind()) {
+    // TVM local begin
+  case BuiltinType::TVMSlice:
+  case BuiltinType::TVMBuilder:
+  case BuiltinType::TVMCell:
+  case BuiltinType::TVMTuple:
+    return TST_unspecified;
+  // TVM local end
   case BuiltinType::Void:
     return TST_void;
   case BuiltinType::Bool:

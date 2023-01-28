@@ -5783,6 +5783,9 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
     } else {
       A->render(Args, CmdArgs);
     }
+  // TVM local begin
+  } else if (Triple.isTVM())  {
+    CmdArgs.push_back("-O3");
   }
 
   // Warn about ignored options to clang.
@@ -6489,6 +6492,14 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   if (TC.IsEncodeExtendedBlockSignatureDefault())
     CmdArgs.push_back("-fencode-extended-block-signature");
 
+  // TVM local begin
+  if (Args.hasFlag(options::OPT_fcoroutines_ts, options::OPT_fno_coroutines_ts,
+                   Triple.isTVM()) &&
+      types::isCXX(InputType)) {
+    CmdArgs.push_back("-fcoroutines-ts");
+  }
+  // TVM local end
+
   if (Args.hasFlag(options::OPT_fcoroutines_ts, options::OPT_fno_coroutines_ts,
                    false) &&
       types::isCXX(InputType)) {
@@ -6550,7 +6561,9 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
 
   // -fms-extensions=0 is default.
   if (Args.hasFlag(options::OPT_fms_extensions, options::OPT_fno_ms_extensions,
-                   IsWindowsMSVC))
+    // TVM local begin
+                   IsWindowsMSVC || (getToolChain().getArch() == llvm::Triple::tvm)))
+    // TVM local end
     CmdArgs.push_back("-fms-extensions");
 
   // -fms-compatibility=0 is default.
@@ -6642,6 +6655,15 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
     CmdArgs.push_back("-fdeclspec");
   else if (Args.hasArg(options::OPT_fno_declspec))
     CmdArgs.push_back("-fno-declspec"); // Explicitly disabling __declspec.
+
+  // TVM local begin
+  if (Args.hasFlag(options::OPT_fdecomposition_binding_override,
+                   options::OPT_fno_decomposition_binding_override,
+                   (getToolChain().getArch() == llvm::Triple::tvm)))
+    CmdArgs.push_back("-fdecomposition-binding-override");
+  else if (Args.hasArg(options::OPT_fno_decomposition_binding_override))
+    CmdArgs.push_back("-fno-decomposition-binding-override");
+  // TVM local end
 
   // -fthreadsafe-static is default, except for MSVC compatibility versions less
   // than 19.

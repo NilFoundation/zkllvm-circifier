@@ -190,6 +190,9 @@ namespace {
       llvm::raw_string_ostream os(buf);
       (void) llvm::createPrintModulePass(os);
       (void) llvm::createPrintFunctionPass(os);
+      // TVM local begin
+      (void) llvm::createPrintTextConstantPass(os);
+      // TVM local end
       (void) llvm::createModuleDebugInfoPrinterPass();
       (void) llvm::createPartialInliningPass();
       (void) llvm::createLintLegacyPassPass();

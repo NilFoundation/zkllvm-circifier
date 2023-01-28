@@ -92,6 +92,12 @@ void LangOptions::setLangDefaults(LangOptions &Opts, Language Lang,
   if (Lang == Language::Asm) {
     Opts.AsmPreprocessor = 1;
   } else if (Lang == Language::ObjC || Lang == Language::ObjCXX) {
+    // TVM local begin
+    if (T.getArch() == llvm::Triple::tvm) {
+      LangStd = LangStandard::lang_cxx17;
+      return;
+    }
+    // TVM local end
     Opts.ObjC = 1;
   }
 

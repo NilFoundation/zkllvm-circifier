@@ -1077,6 +1077,17 @@ enum PredefinedTypeIDs {
   /// \brief The '__ibm128' type
   PREDEF_TYPE_IBM128_ID = 74,
 
+  // TVM local begin
+  /// TVM Slice type
+  PREDEF_TYPE_TVM_SLICE_ID = 75,
+  /// TVM Builder type
+  PREDEF_TYPE_TVM_BUILDER_ID = 76,
+  /// TVM Cell type
+  PREDEF_TYPE_TVM_CELL_ID = 77,
+  /// TVM Tuple type
+  PREDEF_TYPE_TVM_TUPLE_ID = 78,
+// TVM local end
+
 /// OpenCL image types with auto numeration
 #define IMAGE_TYPE(ImgType, Id, SingletonId, Access, Suffix)                   \
   PREDEF_TYPE_##Id##_ID,

@@ -468,6 +468,20 @@ llvm::Type *CodeGenTypes::ConvertType(QualType T) {
 
   case Type::Builtin: {
     switch (cast<BuiltinType>(Ty)->getKind()) {
+      // TVM local begin
+    case BuiltinType::TVMSlice:
+      ResultType = llvm::Type::getTVMSliceTy(getLLVMContext());
+      break;
+    case BuiltinType::TVMBuilder:
+      ResultType = llvm::Type::getTVMBuilderTy(getLLVMContext());
+      break;
+    case BuiltinType::TVMCell:
+      ResultType = llvm::Type::getTVMCellTy(getLLVMContext());
+      break;
+    case BuiltinType::TVMTuple:
+      ResultType = llvm::Type::getTVMTupleTy(getLLVMContext());
+      break;
+    // TVM local end
     case BuiltinType::Void:
     case BuiltinType::ObjCId:
     case BuiltinType::ObjCClass:
@@ -876,8 +890,22 @@ llvm::StructType *CodeGenTypes::ConvertRecordDeclType(const RecordDecl *RD) {
   // If this is still a forward declaration, or the LLVM type is already
   // complete, there's nothing more to do.
   RD = RD->getDefinition();
-  if (!RD || !RD->isCompleteDefinition() || !Ty->isOpaque())
+  // TVM local begin
+  if (!RD || !RD->isCompleteDefinition())
     return Ty;
+  if (!Ty->isOpaque()) {
+    if ((RD->isLiteral() || RD->hasAttr<TVMTupleStructAttr>()) &&
+        !Ty->isLiteral()) {
+      Entry = Ty = llvm::StructType::get(Ty->getContext(), Ty->elements(),
+                                         Ty->isPacked());
+      // TVM local begin
+      RecordDeclTypes[Key] = Entry;
+      // TVM local end
+      CGRecordLayouts[Key]->updateToLiteralType(Ty);
+    }
+    return Ty;
+  }
+  // TVM local end
 
   // If converting this type would cause us to infinitely loop, don't do it!
   if (!isSafeToConvert(RD, *this)) {
@@ -917,6 +945,16 @@ llvm::StructType *CodeGenTypes::ConvertRecordDeclType(const RecordDecl *RD) {
   if (RecordsBeingLaidOut.empty())
     while (!DeferredRecords.empty())
       ConvertRecordDeclType(DeferredRecords.pop_back_val());
+
+  // TVM local begin
+  // Converting into literal llvm struct
+  if (RD->isLiteral() || RD->hasAttr<TVMTupleStructAttr>()) {
+    Entry = Ty = llvm::StructType::get(Ty->getContext(), Ty->elements(),
+                                       Ty->isPacked());
+    RecordDeclTypes[Key] = Entry;
+    CGRecordLayouts[Key]->updateToLiteralType(Ty);
+  }
+  // TVM local end
 
   return Ty;
 }

@@ -37,6 +37,7 @@
 #include "Targets/Sparc.h"
 #include "Targets/SystemZ.h"
 #include "Targets/TCE.h"
+#include "Targets/TVM.h"
 #include "Targets/VE.h"
 #include "Targets/WebAssembly.h"
 #include "Targets/X86.h"
@@ -686,6 +687,13 @@ TargetInfo *AllocateTarget(const llvm::Triple &Triple,
     default:
       return new LoongArch64TargetInfo(Triple, Opts);
     }
+  case llvm::Triple::tvm:
+    if (Triple.getSubArch() != llvm::Triple::NoSubArch ||
+        Triple.getVendor() != llvm::Triple::UnknownVendor ||
+        Triple.getOS() != llvm::Triple::UnknownOS ||
+        Triple.getEnvironment() != llvm::Triple::UnknownEnvironment)
+      return nullptr;
+    return new TVMOSTargetInfo<TVMTargetInfo>(Triple, Opts);
   }
 }
 } // namespace targets

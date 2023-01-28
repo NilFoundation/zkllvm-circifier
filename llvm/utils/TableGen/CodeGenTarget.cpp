@@ -55,6 +55,12 @@ StringRef llvm::getName(MVT::SimpleValueType T) {
 StringRef llvm::getEnumName(MVT::SimpleValueType T) {
   // clang-format off
   switch (T) {
+// TVM local begin
+  case MVT::TVMSlice:   return "MVT::TVMSlice";
+  case MVT::TVMBuilder: return "MVT::TVMBuilder";
+  case MVT::TVMCell:    return "MVT::TVMCell";
+  case MVT::TVMTuple:   return "MVT::TVMTuple";
+  // TVM local end
   case MVT::Other:    return "MVT::Other";
   case MVT::i1:       return "MVT::i1";
   case MVT::i2:       return "MVT::i2";

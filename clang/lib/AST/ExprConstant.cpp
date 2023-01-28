@@ -11415,6 +11415,14 @@ EvaluateBuiltinClassifyType(QualType T, const LangOptions &LangOpts) {
 #include "llvm/IR/EllipticCurveTypes.def"
       return GCCTypeClass::None;
 
+      // TVM local begin
+    case BuiltinType::TVMSlice:
+    case BuiltinType::TVMBuilder:
+    case BuiltinType::TVMCell:
+    case BuiltinType::TVMTuple:
+      return GCCTypeClass::None;
+      // TVM local end
+
     case BuiltinType::Dependent:
       llvm_unreachable("unexpected dependent type");
     };

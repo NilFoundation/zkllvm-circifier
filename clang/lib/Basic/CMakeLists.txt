@@ -95,6 +95,7 @@ add_clang_library(clangBasic
   Targets/Sparc.cpp
   Targets/SystemZ.cpp
   Targets/TCE.cpp
+  Targets/TVM.cpp
   Targets/VE.cpp
   Targets/WebAssembly.cpp
   Targets/X86.cpp

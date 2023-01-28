@@ -66,6 +66,14 @@ enum ActionKind {
   /// Emit a .ll file.
   EmitLLVM,
 
+  // TVM local begin
+  /// Emit text global constant.
+  EmitTextConst,
+
+  /// Import TVM Json Abi.
+  ImportJsonAbi,
+  // TVM local end
+
   /// Generate LLVM IR, but do not emit anything.
   EmitLLVMOnly,
 
@@ -508,6 +516,11 @@ public:
 
   /// Path which stores the output files for -ftime-trace
   std::string TimeTracePath;
+
+  // TVM local begin
+  /// Name for imported interface structure
+  std::string TVMJsonAbiStructName;
+  // TVM local end
 
 public:
   FrontendOptions()

@@ -1937,6 +1937,10 @@ private:
 
   unsigned ODRHash;
 
+  // TVM local begin
+  unsigned TVMFuncId = 0;
+  // TVM local end
+
   /// End part of this FunctionDecl's source range.
   ///
   /// We could compute the full range in getSourceRange(). However, when we're
@@ -2879,6 +2883,11 @@ public:
   /// the corresponding Builtin ID. If the function is not a memory function,
   /// returns 0.
   unsigned getMemoryFunctionKind() const;
+
+  // TVM local begin
+  void setTVMFuncId(unsigned FuncId) { TVMFuncId = FuncId; }
+  unsigned getTVMFuncId() const { return TVMFuncId; }
+  // TVM local end
 
   /// Returns ODRHash of the function.  This value is calculated and
   /// stored on first call, then the stored value returned on the other calls.

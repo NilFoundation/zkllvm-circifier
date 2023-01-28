@@ -48,6 +48,7 @@
 #include "ToolChains/SPIRV.h"
 #include "ToolChains/Solaris.h"
 #include "ToolChains/TCE.h"
+#include "ToolChains/TVM.h"
 #include "ToolChains/VEToolchain.h"
 #include "ToolChains/WebAssembly.h"
 #include "ToolChains/XCore.h"
@@ -1908,6 +1909,23 @@ void Driver::PrintVersion(const Compilation &C, raw_ostream &OS) const {
   } else
     OS << "Thread model: " << TC.getThreadModel();
   OS << '\n';
+
+  // TVM local begin
+  // Don't display target and the thread model if the compiler is built
+  // with cmake/Cache/ton-compiler.cmake
+  if (!TC.getTriple().isTVM()) {
+    OS << "Target: " << TC.getTripleString() << '\n';
+
+    // Print the threading model.
+    if (Arg *A = C.getArgs().getLastArg(options::OPT_mthread_model)) {
+      // Don't print if the ToolChain would have barfed on it already
+      if (TC.isThreadModelSupported(A->getValue()))
+        OS << "Thread model: " << A->getValue();
+    } else
+      OS << "Thread model: " << TC.getThreadModel();
+    OS << '\n';
+  }
+  // TVM local end
 
   // Print out the install directory.
   OS << "InstalledDir: " << InstalledDir << '\n';
@@ -3808,6 +3826,15 @@ void Driver::handleArguments(Compilation &C, DerivedArgList &Args,
   Arg *FinalPhaseArg;
   phases::ID FinalPhase = getFinalPhase(Args, &FinalPhaseArg);
 
+  // TVM local change begin
+  if (C.getDefaultToolChain().getTriple().isTVM() &&
+      FinalPhase == phases::Assemble && !Args.hasArg(options::OPT_emit_llvm)) {
+    Diag(clang::diag::warn_tvm_unsupported_assembler);
+    FinalPhase = phases::Link;
+    FinalPhaseArg = nullptr;
+  }
+  // TVM local change end
+
   if (FinalPhase == phases::Link) {
     // Emitting LLVM while linking disabled except in HIPAMD Toolchain
     if (Args.hasArg(options::OPT_emit_llvm) && !Args.hasArg(options::OPT_hip_link))
@@ -3966,6 +3993,17 @@ void Driver::BuildActions(Compilation &C, DerivedArgList &Args,
   for (auto &I : Inputs) {
     types::ID InputType = I.first;
     const Arg *InputArg = I.second;
+
+    // TVM local begin
+    // The only "objects" that are possible for TVM are really -Xlinker / -Wl
+    // options, so ignore them as "inputs" and make the linker responsible for
+    // their proper handling.
+    if (C.getDefaultToolChain().getTriple().isTVM() &&
+        InputType == types::TY_Object) {
+      InputArg->claim();
+      continue;
+    }
+    // TVM local end
 
     auto PL = types::getCompilationPhases(*this, Args, InputType);
     if (PL.empty())
@@ -4471,6 +4509,11 @@ Action *Driver::ConstructPhaseAction(
   if (Phase == phases::Assemble && Input->getType() != types::TY_PP_Asm)
     return Input;
 
+  // TVM local change begin
+  if (Phase == phases::Assemble && C.getDefaultToolChain().getTriple().isTVM())
+    return Input;
+  // TVM local change end
+
   // Build the appropriate action.
   switch (Phase) {
   case phases::Link:
@@ -4572,6 +4615,17 @@ Action *Driver::ConstructPhaseAction(
           Args.hasArg(options::OPT_S) ? types::TY_LLVM_IR : types::TY_LLVM_BC;
       return C.MakeAction<BackendJobAction>(Input, Output);
     }
+    // TVM local begin
+    if (Args.hasArg(options::OPT_emit_text_const) ||
+        Args.hasArg(options::OPT_export_json_abi)) {
+      types::ID Output = types::TY_TextConst;
+      return C.MakeAction<BackendJobAction>(Input, Output);
+    }
+    if (C.getDefaultToolChain().getTriple().isTVM()) {
+      if (!Args.hasArg(options::OPT_S))
+        return C.MakeAction<BackendJobAction>(Input, types::TY_LLVM_BC);
+    }
+    // TVM local end
     return C.MakeAction<BackendJobAction>(Input, types::TY_PP_Asm);
   }
   case phases::Assemble:
@@ -6026,6 +6080,9 @@ const ToolChain &Driver::getToolChain(const ArgList &Args,
       case llvm::Triple::wasm32:
       case llvm::Triple::wasm64:
         TC = std::make_unique<toolchains::WebAssembly>(*this, Target, Args);
+        break;
+      case llvm::Triple::tvm:
+        TC = std::make_unique<toolchains::TVM>(*this, Target, Args);
         break;
       case llvm::Triple::avr:
         TC = std::make_unique<toolchains::AVRToolChain>(*this, Target, Args);

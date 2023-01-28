@@ -950,6 +950,11 @@ static llvm::Value *EmitBitTestIntrinsic(CodeGenFunction &CGF,
   if (CGF.getTarget().getTriple().isX86())
     return EmitX86BitTestIntrinsic(CGF, BT, E, BitBase, BitPos);
 
+  // TVM local begin
+  if (Arch == llvm::Triple::tvm)
+    llvm_unreachable("Unimplemented bittest support for TVM");
+  // TVM local end
+
   // Otherwise, use generic code to load one byte and test the bit. Use all but
   // the bottom three bits as the array index, and the bottom three bits to form
   // a mask.
@@ -4693,6 +4698,13 @@ RValue CodeGenFunction::EmitBuiltinExpr(const GlobalDecl GD, unsigned BuiltinID,
   case Builtin::BI__builtin_coro_align:
     return EmitCoroutineIntrinsic(E, Intrinsic::coro_align);
 
+    // TVM local begin
+  case Builtin::BI__builtin_coro_tvm_serialize:
+    return EmitCoroutineIntrinsic(E, Intrinsic::coro_tvm_serialize);
+  case Builtin::BI__builtin_coro_tvm_deserialize:
+    return EmitCoroutineIntrinsic(E, Intrinsic::coro_tvm_deserialize);
+  // TVM local end
+
   // OpenCL v2.0 s6.13.16.2, Built-in pipe read and write functions
   case Builtin::BIread_pipe:
   case Builtin::BIwrite_pipe: {
@@ -5309,6 +5321,58 @@ RValue CodeGenFunction::EmitBuiltinExpr(const GlobalDecl GD, unsigned BuiltinID,
     llvm::FunctionType *FTy = F->getFunctionType();
 
     for (unsigned i = 0, e = E->getNumArgs(); i != e; ++i) {
+      // TVM local begin
+
+      // If the intrinsic arg type is different from the builtin arg type
+      // we need to do a bit cast.
+      auto DoCast = [&](llvm::Value *Val, unsigned i) -> llvm::Value * {
+        if (i < FTy->getNumParams()) {
+          llvm::Type *PTy = FTy->getParamType(i);
+          if (PTy != Val->getType()) {
+            assert(PTy->canLosslesslyBitCastTo(FTy->getParamType(i)) &&
+                   "Must be able to losslessly bit cast to param");
+            return Builder.CreateBitCast(Val, PTy);
+          }
+        }
+        return Val;
+      };
+      if ((ICEArguments & (1 << i)) == 0) {
+        auto ArgExpr = E->getArg(i);
+        // If it is literal record, unpack it into elements.
+        auto Ty = ArgExpr->getType();
+        const auto *RT = ArgExpr->getType()->getAs<RecordType>();
+        if (RT && RT->getDecl()->isLiteral()) {
+          int64_t Size = getContext().getTypeSizeInChars(Ty).getQuantity();
+          auto TupTy = getContext().getTVMTuple(static_cast<unsigned>(Size));
+          auto *llvmTupTy = CGM.getTypes().ConvertType(TupTy);
+          LValue LV = EmitLValue(ArgExpr);
+          Address This = LV.getAddress();
+          This = Address(Builder.CreateBitCast(This.getPointer(),
+                                               llvmTupTy->getPointerTo()),
+                         This.getAlignment());
+          auto *StructVal = Builder.CreateLoad(This);
+          auto e = llvmTupTy->getStructNumElements();
+          for (unsigned i = 0; i != e; ++i) {
+            Value *CurVal = Builder.CreateExtractValue(StructVal, i);
+            Args.push_back(CurVal);
+          }
+        } else {
+          // If this is a normal argument, just emit it as a scalar.
+          Value *ArgValue = EmitScalarExpr(ArgExpr);
+          Args.push_back(DoCast(ArgValue, Args.size()));
+        }
+      } else {
+        // If this is required to be a constant, constant fold it so that we
+        // know that the generated intrinsic gets a ConstantInt.
+        llvm::APSInt Result;
+        bool IsConst = E->getArg(i)->isIntegerConstantExpr(Result,getContext());
+        assert(IsConst && "Constant arg isn't actually constant?");
+        (void)IsConst;
+        Value *ArgValue = llvm::ConstantInt::get(getLLVMContext(), Result);
+        Args.push_back(DoCast(ArgValue, Args.size()));
+      }
+      // TVM local end
+
       Value *ArgValue;
       // If this is a normal argument, just emit it as a scalar.
       if ((ICEArguments & (1 << i)) == 0) {

@@ -3014,11 +3014,12 @@ InlineCost llvm::getInlineCost(
   // We use always/never here since threshold is not meaningful,
   // as it's not what drives cost-benefit analysis.
   if (CA.wasDecidedByCostBenefit()) {
-    if (ShouldInline.isSuccess())
+    if (ShouldInline.isSuccess()) {
       return InlineCost::getAlways("benefit over cost",
                                    CA.getCostBenefitPair());
-    else
+    } else {
       return InlineCost::getNever("cost over benefit", CA.getCostBenefitPair());
+    }
   }
 
   if (CA.wasDecidedByCostThreshold())

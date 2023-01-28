@@ -802,6 +802,13 @@ public:
   /// \p StartInfo - the subtarget info before parsing inline asm
   virtual void emitInlineAsmStart() const;
 
+  // TVM local begin
+protected:
+  /// This method emits the header for the current function.
+  virtual void EmitFunctionHeader();
+private:
+  // TVM local end
+
   /// Let the target do anything it needs to do after emitting inlineasm.
   /// This callback can be used restore the original mode in case the
   /// inlineasm contains directives to switch modes.

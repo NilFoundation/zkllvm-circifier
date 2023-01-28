@@ -6847,6 +6847,18 @@ QualType ASTReader::GetType(TypeID ID) {
   if (Index < NUM_PREDEF_TYPE_IDS) {
     QualType T;
     switch ((PredefinedTypeIDs)Index) {
+    case PREDEF_TYPE_TVM_SLICE_ID:
+      T = Context.TVMSliceTy;
+      break;
+    case PREDEF_TYPE_TVM_BUILDER_ID:
+      T = Context.TVMBuilderTy;
+      break;
+    case PREDEF_TYPE_TVM_CELL_ID:
+      T = Context.TVMCellTy;
+      break;
+    case PREDEF_TYPE_TVM_TUPLE_ID:
+      T = Context.TVMTupleTy;
+      break;
     case PREDEF_TYPE_NULL_ID:
       return QualType();
     case PREDEF_TYPE_VOID_ID:

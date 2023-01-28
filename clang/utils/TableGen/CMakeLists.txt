@@ -1,4 +1,4 @@
-set(LLVM_LINK_COMPONENTS Support)
+set(LLVM_LINK_COMPONENTS TableGen Support)
 
 add_tablegen(clang-tblgen CLANG
   DESTINATION "${CLANG_TOOLS_INSTALL_DIR}"
@@ -23,6 +23,7 @@ add_tablegen(clang-tblgen CLANG
   RISCVVEmitter.cpp
   SveEmitter.cpp
   TableGen.cpp
+  TVMInstMappingInfoEmitter.cpp
   )
 
 target_link_libraries(clang-tblgen PRIVATE clangSupport_tablegen)

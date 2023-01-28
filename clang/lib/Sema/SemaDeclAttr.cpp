@@ -7973,6 +7973,20 @@ static void handleDeprecatedAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
   D->addAttr(::new (S.Context) DeprecatedAttr(S.Context, AL, Str, Replacement));
 }
 
+// TVM local begin
+static void handleReturnNameAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
+  // Handle the cases where the attribute has a text message.
+  StringRef Str;
+  if (AL.isArgExpr(0) && AL.getArgAsExpr(0) &&
+      !S.checkStringLiteralArgumentAttr(AL, 0, Str))
+    return;
+
+  D->addAttr(::new (S.Context)
+                 TVMReturnNameFuncAttr(AL.getRange(), S.Context, Str,
+                                       AL.getAttributeSpellingListIndex()));
+}
+// TVM local end
+
 static bool isGlobalVar(const Decl *D) {
   if (const auto *S = dyn_cast<VarDecl>(D))
     return S->hasGlobalStorage();
@@ -8948,6 +8962,61 @@ ProcessDeclAttribute(Sema &S, Scope *scope, Decl *D, const ParsedAttr &AL,
   case ParsedAttr::AT_ObjCIndependentClass:
     handleObjCIndependentClass(S, D, AL);
     break;
+  case ParsedAttr::AT_TVMTupleStruct:
+    handleSimpleAttribute<TVMTupleStructAttr>(S, D, AL);
+    D->setLiteral();
+    break;
+  case ParsedAttr::AT_TVMNoPubkeyInterface:
+    handleSimpleAttribute<TVMNoPubkeyInterfaceAttr>(S, D, AL);
+    break;
+  case ParsedAttr::AT_TVMNoTimestampInterface:
+    handleSimpleAttribute<TVMNoTimestampInterfaceAttr>(S, D, AL);
+    break;
+  case ParsedAttr::AT_TVMNoExpireInterface:
+    handleSimpleAttribute<TVMNoExpireInterfaceAttr>(S, D, AL);
+    break;
+  case ParsedAttr::AT_TVMRawFunc:
+    handleSimpleAttribute<TVMRawFuncAttr>(S, D, AL);
+    break;
+  case ParsedAttr::AT_TVMInternalFunc:
+    handleSimpleAttribute<TVMInternalFuncAttr>(S, D, AL);
+    break;
+  case ParsedAttr::AT_TVMAnswerIdFunc:
+    handleSimpleAttribute<TVMAnswerIdFuncAttr>(S, D, AL);
+    break;
+  case ParsedAttr::AT_TVMExternalFunc:
+    handleSimpleAttribute<TVMExternalFuncAttr>(S, D, AL);
+    break;
+  case ParsedAttr::AT_TVMGetterFunc:
+    handleSimpleAttribute<TVMGetterFuncAttr>(S, D, AL);
+    // Applying also no_write_persistent for getter methods
+    handleSimpleAttribute<TVMNoWritePersistentFuncAttr>(S, D, AL);
+    break;
+  case ParsedAttr::AT_TVMNoAcceptFunc:
+    handleSimpleAttribute<TVMNoAcceptFuncAttr>(S, D, AL);
+    break;
+  case ParsedAttr::AT_TVMImplicitFuncIdFunc:
+    handleSimpleAttribute<TVMImplicitFuncIdFuncAttr>(S, D, AL);
+    break;
+  case ParsedAttr::AT_TVMDynChainParseFunc:
+    handleSimpleAttribute<TVMDynChainParseFuncAttr>(S, D, AL);
+    break;
+  case ParsedAttr::AT_TVMDeployFunc:
+    handleSimpleAttribute<TVMDeployFuncAttr>(S, D, AL);
+    break;
+  case ParsedAttr::AT_TVMReturnNameFunc:
+    handleReturnNameAttr(S, D, AL);
+    break;
+  case ParsedAttr::AT_TVMNoReadPersistentFunc:
+    handleSimpleAttribute<TVMNoReadPersistentFuncAttr>(S, D, AL);
+    break;
+  case ParsedAttr::AT_TVMNoWritePersistentFunc:
+    handleSimpleAttribute<TVMNoWritePersistentFuncAttr>(S, D, AL);
+    break;
+  case ParsedAttr::AT_TVMNoPersistentFunc:
+    handleSimpleAttribute<TVMNoReadPersistentFuncAttr>(S, D, AL);
+    handleSimpleAttribute<TVMNoWritePersistentFuncAttr>(S, D, AL);
+    break;
   case ParsedAttr::AT_Blocks:
     handleBlocksAttr(S, D, AL);
     break;
@@ -9320,10 +9389,20 @@ void Sema::ProcessDeclAttributeList(
 void Sema::ProcessDeclAttributeDelayed(Decl *D,
                                        const ParsedAttributesView &AttrList) {
   for (const ParsedAttr &AL : AttrList)
+    // TVM local begin
     if (AL.getKind() == ParsedAttr::AT_TransparentUnion) {
       handleTransparentUnionAttr(*this, D, AL);
+    } else if (AL.getKind() == ParsedAttr::AT_TVMTupleStruct) {
+      if (auto *RD = dyn_cast<RecordDecl>(D)) {
+        if (!RD->canPassInRegisters()) {
+          Diag(AL.getLoc(), diag::err_attribute_invalid_for_non_pod)
+              << AL.getName();
+        }
+        RD->setLiteral(true);
+      }
       break;
     }
+  // TVM local end
 
   // For BPFPreserveAccessIndexAttr, we want to populate the attributes
   // to fields and inner records as well.

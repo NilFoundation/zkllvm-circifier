@@ -1116,6 +1116,20 @@ def emit_merged_ifs : Flag<["-"], "emit-merged-ifs">,
 def end_no_unused_arguments : Flag<["--"], "end-no-unused-arguments">, Flags<[CoreOption]>,
   HelpText<"Start emitting warnings for unused driver arguments">;
 def interface_stub_version_EQ : JoinedOrSeparate<["-"], "interface-stub-version=">, Flags<[CC1Option]>;
+// TVM local begin
+def emit_text_const : Joined<["-"], "emit-text-const=">, Flags<[CC1Option]>, Group<Action_Group>,
+  HelpText<"Emit text global constant">;
+def export_json_abi : Flag<["-"], "export-json-abi">, Flags<[CC1Option]>, Group<Action_Group>,
+  HelpText<"Print json abi for TVM c++ contract">;
+def import_json_abi : Flag<["-"], "import-json-abi">, Flags<[CC1Option]>, Group<Action_Group>,
+  HelpText<"Import json abi for TVM contract">;
+def import_json_name : Joined<["-"], "import-json-name=">, Flags<[CC1Option]>,
+  HelpText<"Override name for imported interface structure (file name by default)">;
+def lto_S : Flag<["-"], "lto-S">, Flags<[CC1Option]>, Group<Action_Group>,
+  HelpText<"Emit after lto assembly">;
+def tvm_refunc : Flag<["-"], "mtvm-refunc">, Group<m_Group>, Flags<[DriverOption,CC1Option]>,
+  HelpText<"Enable TVM ReFunc pass">;
+// TVM local end
 def exported__symbols__list : Separate<["-"], "exported_symbols_list">;
 def extract_api : Flag<["-"], "extract-api">, Flags<[CC1Option]>, Group<Action_Group>,
   HelpText<"Extract API information">;

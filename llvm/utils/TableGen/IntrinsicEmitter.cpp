@@ -257,6 +257,14 @@ enum IIT_Info {
   IIT_ANYPTR_TO_ELT = 56,
   IIT_I2 = 57,
   IIT_I4 = 58,
+  // TVM local begin
+  IIT_STRUCT8_AND_MORE = 59,
+  IIT_I257 = 60,
+  IIT_TVMSLICE = 61,
+  IIT_TVMBUILDER = 62,
+  IIT_TVMCELL = 63,
+  IIT_TVMTUPLE = 64,
+  // TVM local end
 };
 
 static void EncodeFixedValueType(MVT::SimpleValueType VT,
@@ -279,6 +287,12 @@ static void EncodeFixedValueType(MVT::SimpleValueType VT,
 
   switch (VT) {
   default: PrintFatalError("unhandled MVT in intrinsic!");
+// TVM local begin
+  case MVT::TVMSlice: return Sig.push_back(IIT_TVMSLICE);
+  case MVT::TVMBuilder: return Sig.push_back(IIT_TVMBUILDER);
+  case MVT::TVMCell: return Sig.push_back(IIT_TVMCELL);
+  case MVT::TVMTuple: return Sig.push_back(IIT_TVMTUPLE);
+  // TVM local end
   case MVT::f16: return Sig.push_back(IIT_F16);
   case MVT::bf16: return Sig.push_back(IIT_BF16);
   case MVT::f32: return Sig.push_back(IIT_F32);

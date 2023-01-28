@@ -1,3 +1,5 @@
+add_llvm_component_group(TVM)
+
 set(LLVM_TARGET_DEFINITIONS TVM.td)
 
 tablegen(LLVM TVMGenAsmWriter.inc -gen-asm-writer)

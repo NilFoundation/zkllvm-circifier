@@ -1474,6 +1474,23 @@ void ASTContext::InitBuiltinTypes(const TargetInfo &Target,
   InitBuiltinType(SingletonId, BuiltinType::FrontendId);
 #include "llvm/IR/EllipticCurveTypes.def"
 
+  // TVM local begin
+  InitBuiltinType(TVMSliceTy, BuiltinType::TVMSlice);
+  InitBuiltinType(TVMBuilderTy, BuiltinType::TVMBuilder);
+  InitBuiltinType(TVMCellTy, BuiltinType::TVMCell);
+  InitBuiltinType(TVMTupleTy, BuiltinType::TVMTuple);
+
+  if (Target.getTriple().getArch() == llvm::Triple::tvm) {
+    for (unsigned i = 0; i < TVM_max_tuple_size; ++i) {
+      unsigned Size = i + 1;
+      std::string TupleName = "__tvm_tuple";
+      TupleName += std::to_string(Size);
+      TVMTuples[i] = getSplatStructType(IntTy, Size, TupleName, "v");
+    }
+    TVMTuplePop = prepareTVMTuplePopStructType("__tvm_tpop");
+  }
+  // TVM local end
+
   // Builtin type for __objc_yes and __objc_no
   ObjCBuiltinBoolTy = (Target.useSignedCharForObjCBool() ?
                        SignedCharTy : BoolTy);
@@ -2081,6 +2098,15 @@ TypeInfo ASTContext::getTypeInfoImpl(const Type *T) const {
   case Type::Builtin:
     switch (cast<BuiltinType>(T)->getKind()) {
     default: llvm_unreachable("Unknown builtin type!");
+      // TVM local begin
+    case BuiltinType::TVMSlice:
+    case BuiltinType::TVMBuilder:
+    case BuiltinType::TVMCell:
+    case BuiltinType::TVMTuple:
+      Width = Target->getIntWidth();
+      Align = Target->getIntAlign();
+      break;
+    // TVM local end
     case BuiltinType::Void:
       // GCC extension: alignof(void) = 8 bits.
       Width = 0;
@@ -4193,6 +4219,149 @@ QualType ASTContext::getExtVectorType(QualType vecType,
   Types.push_back(New);
   return QualType(New, 0);
 }
+
+// TVM local begin
+/// Return the unique reference to a structure type
+/// of the specified element type (equal type fields) and size.
+///
+/// \pre \p ElemType must be a built-in type.
+QualType ASTContext::getSplatStructType(QualType ElemType, unsigned NumFields,
+                                        StringRef StructName,
+                                        StringRef FieldName) const {
+  auto *RecDecl = buildImplicitRecord(StructName.str() + "_Tag");
+  RecDecl->setLiteral();
+  RecDecl->startDefinition();
+
+  // Create fields
+  for (unsigned i = 0; i < NumFields; ++i) {
+
+    std::string fName = FieldName.str() + std::to_string(i);
+    FieldDecl *Field = FieldDecl::Create(*this, RecDecl,
+                                         SourceLocation(),
+                                         SourceLocation(),
+                                         &Idents.get(fName),
+                                         ElemType, /*TInfo=*/nullptr,
+                                         /*BitWidth=*/nullptr,
+                                         /*Mutable=*/false,
+                                         ICIS_NoInit);
+    Field->setAccess(AS_public);
+    RecDecl->addDecl(Field);
+  }
+  RecDecl->completeDefinition();
+  TUDecl->addDecl(RecDecl);
+  auto tagType = getTagDeclType(RecDecl);
+  auto TypedefDec = buildImplicitTypedef(tagType, StructName);
+  TUDecl->addDecl(TypedefDec);
+  return getTypeDeclType(TypedefDec);
+}
+
+/// Creating { tuple, i257 } literal struct for tvm tpop result
+QualType ASTContext::prepareTVMTuplePopStructType(StringRef StructName) const {
+  auto *RecDecl = buildImplicitRecord(StructName.str() + "_Tag");
+  RecDecl->setLiteral();
+  RecDecl->startDefinition();
+
+  FieldDecl *Field0 = FieldDecl::Create(*this, RecDecl,
+                                        SourceLocation(),
+                                        SourceLocation(),
+                                        &Idents.get("tuple"),
+                                        TVMTupleTy, /*TInfo=*/nullptr,
+                                        /*BitWidth=*/nullptr,
+                                        /*Mutable=*/false,
+                                        ICIS_NoInit);
+  Field0->setAccess(AS_public);
+  RecDecl->addDecl(Field0);
+
+  FieldDecl *Field1 = FieldDecl::Create(*this, RecDecl,
+                                        SourceLocation(),
+                                        SourceLocation(),
+                                        &Idents.get("value"),
+                                        IntTy, /*TInfo=*/nullptr,
+                                        /*BitWidth=*/nullptr,
+                                        /*Mutable=*/false,
+                                        ICIS_NoInit);
+  Field1->setAccess(AS_public);
+  RecDecl->addDecl(Field1);
+
+  RecDecl->completeDefinition();
+  TUDecl->addDecl(RecDecl);
+  auto tagType = getTagDeclType(RecDecl);
+  auto TypedefDec = buildImplicitTypedef(tagType, StructName);
+  TUDecl->addDecl(TypedefDec);
+  return getTypeDeclType(TypedefDec);
+}
+
+/// Creating literal struct with Elems
+///  (for builtin functions with struct returns)
+QualType ASTContext::prepareTVMLiteralStructType(ArrayRef<QualType> Elems,
+                                                 StringRef ElemsStr) const {
+  auto StructName = "__tvm_literal_struct_" + ElemsStr.str();
+  auto *RecDecl = buildImplicitRecord(StructName + "_Tag");
+  RecDecl->setLiteral();
+  RecDecl->startDefinition();
+
+  std::string Name = "v";
+  for (unsigned i = 0, sz = Elems.size(); i < sz; ++i) {
+    QualType Ty = Elems[i];
+    FieldDecl *F = FieldDecl::Create(*this, RecDecl,
+                                     SourceLocation(),
+                                     SourceLocation(),
+                                     &Idents.get(Name + std::to_string(i)),
+                                     Ty, /*TInfo=*/nullptr,
+                                     /*BitWidth=*/nullptr,
+                                     /*Mutable=*/false,
+                                     ICIS_NoInit);
+    F->setAccess(AS_public);
+    RecDecl->addDecl(F);
+  }
+  RecDecl->completeDefinition();
+  TUDecl->addDecl(RecDecl);
+  auto tagType = getTagDeclType(RecDecl);
+  auto TypedefDec = buildImplicitTypedef(tagType, StructName);
+  TUDecl->addDecl(TypedefDec);
+  return getTypeDeclType(TypedefDec);
+}
+
+QualType ASTContext::getTVMArgumentsStructType(const CXXMethodDecl *Method,
+                                               SourceLocation Loc) const {
+  auto it = TVMMethodArgStructs.find(Method);
+  if (it != TVMMethodArgStructs.end())
+    return it->second;
+  auto ArgTy = prepareTVMArgumentsStructType(Method, Loc);
+  [[maybe_unused]] auto [It, Ok] = TVMMethodArgStructs.insert(std::make_pair(Method, ArgTy));
+  assert(Ok && "can't update TVMMethodArgStructs");
+  return ArgTy;
+}
+
+/// Creating struct with combined arguments for Method (no `this`)
+QualType
+ASTContext::prepareTVMArgumentsStructType(const CXXMethodDecl *Method,
+                                          SourceLocation Loc) const {
+  auto StructName = ("__tvm_arguments_struct_" + Method->getName()).str();
+  auto *RecDecl = buildImplicitRecord(StructName + "_Tag", TTK_Struct, Loc);
+  RecDecl->startDefinition();
+
+  for (auto Param : Method->parameters()) {
+    QualType FieldType = Param->getOriginalType();
+    FieldDecl *F = FieldDecl::Create(*this, RecDecl,
+                                     Loc,
+                                     Loc,
+                                     &Idents.get(Param->getName()),
+                                     FieldType, /*TInfo=*/nullptr,
+                                     /*BitWidth=*/nullptr,
+                                     /*Mutable=*/false,
+                                     ICIS_NoInit);
+    F->setAccess(AS_public);
+    RecDecl->addDecl(F);
+  }
+  RecDecl->completeDefinition();
+  TUDecl->addDecl(RecDecl);
+  auto tagType = getTagDeclType(RecDecl);
+  auto TypedefDec = buildImplicitTypedef(tagType, StructName);
+  TUDecl->addDecl(TypedefDec);
+  return getTypeDeclType(TypedefDec);
+}
+// TVM local end
 
 QualType
 ASTContext::getDependentSizedExtVectorType(QualType vecType,
@@ -8029,6 +8198,14 @@ static char getObjCEncodingForPrimitiveType(const ASTContext *C,
     case BuiltinType::LongDouble: return 'D';
     case BuiltinType::NullPtr:    return '*'; // like char*
 
+      // TVM local begin
+    case BuiltinType::TVMSlice:
+    case BuiltinType::TVMBuilder:
+    case BuiltinType::TVMCell:
+    case BuiltinType::TVMTuple:
+      llvm_unreachable("invalid builtin type for objc @encode");
+      // TVM local end
+
     case BuiltinType::BFloat16:
     case BuiltinType::Float16:
     case BuiltinType::Float128:
@@ -11100,6 +11277,42 @@ static QualType DecodeTypeFromStr(const char *&Str, const ASTContext &Context,
                                   ASTContext::GetBuiltinTypeError &Error,
                                   bool &RequiresICE,
                                   bool AllowTypeModifiers) {
+  // TVM local begin
+  if (Str[0] == '{') {
+    const char *BeginStr = ++Str;
+    SmallVector<QualType, 4> Elems;
+    while (Str[0] && Str[0] != '}') {
+      auto Ty = DecodeTypeFromStr(Str, Context, Error, RequiresICE,
+                                  AllowTypeModifiers);
+      Elems.push_back(Ty);
+    }
+    const char *EndStr = Str;
+    if (Str[0] == '}')
+      ++Str;
+    return Context.prepareTVMLiteralStructType(
+        Elems, StringRef(BeginStr, EndStr - BeginStr));
+  }
+  if (Str[0] == 'T') {
+    switch (Str[1]) {
+    case 's': Str += 2; return Context.TVMSliceTy;
+    case 'b': Str += 2; return Context.TVMBuilderTy;
+    case 'c': Str += 2; return Context.TVMCellTy;
+    case 't': Str += 2; return Context.TVMTupleTy;
+    case 'p': Str += 2; return Context.getTVMTuplePop();
+    }
+    if (isdigit(Str[1])) {
+      char *End;
+      unsigned Num = strtoul(Str + 1, &End, 10);
+      assert(End != Str && "Missing tuple size");
+      Str = End;
+
+      assert(Num <= ASTContext::TVM_max_tuple_size &&
+             "Too big tuple struct size");
+      return Context.getTVMTuple(Num);
+    }
+  }
+  // TVM local end
+
   // Modifiers.
   int HowLong = 0;
   bool Signed = false, Unsigned = false;

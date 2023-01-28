@@ -5949,6 +5949,25 @@ void InitializationSequence::InitializeFrom(Sema &S,
   bool allowObjCWritebackConversion = S.getLangOpts().ObjCAutoRefCount &&
          Entity.isParameterKind();
 
+  // TVM local begin
+  if (DestType->isRecordType()) {
+    if (!SourceType.isNull() && DestType->isTVMTupleStructType()) {
+      if (SourceType->isRecordType()) {
+        const RecordType *RecordTy = SourceType->getAs<RecordType>();
+        if (RecordTy->getDecl()->isLiteral() &&
+            !SourceType->isTVMTupleStructType()) {
+          unsigned SrcSz = Context.getTypeSizeInChars(SourceType).getQuantity();
+          unsigned DstSz = Context.getTypeSizeInChars(DestType).getQuantity();
+          if (SrcSz == DstSz) {
+            AddQualificationConversionStep(DestType, VK_RValue);
+            return;
+          }
+        }
+      }
+    }
+  }
+  // TVM local end
+
   if (TryOCLSamplerInitialization(S, *this, DestType, Initializer))
     return;
 

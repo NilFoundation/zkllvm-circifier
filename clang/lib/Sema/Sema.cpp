@@ -449,6 +449,23 @@ void Sema::Initialize() {
   addImplicitTypedef(Name, Context.SingletonId);
 #include "llvm/IR/EllipticCurveTypes.def"
 
+  // TVM local begin
+  if (Context.getTargetInfo().getTriple().getArch() == llvm::Triple::tvm) {
+    addImplicitTypedef("__tvm_slice", Context.TVMSliceTy);
+    addImplicitTypedef("__tvm_builder", Context.TVMBuilderTy);
+    addImplicitTypedef("__tvm_cell", Context.TVMCellTy);
+    addImplicitTypedef("__tvm_tuple", Context.TVMTupleTy);
+
+    for (unsigned i = 0; i < ASTContext::TVM_max_tuple_size; ++i) {
+      unsigned Size = i + 1;
+      char TupleName[32];
+      sprintf(TupleName, "__tvm_tuple%d", Size);
+      addImplicitTypedef(TupleName, Context.getTVMTuple(Size));
+    }
+    addImplicitTypedef("__tvm_tpop", Context.getTVMTuplePop());
+  }
+  // TVM local end
+
   if (Context.getTargetInfo().hasBuiltinMSVaList()) {
     DeclarationName MSVaList = &Context.Idents.get("__builtin_ms_va_list");
     if (IdResolver.begin(MSVaList) == IdResolver.end())

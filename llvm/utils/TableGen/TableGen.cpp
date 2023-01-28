@@ -58,6 +58,7 @@ enum ActionType {
   GenDirectivesEnumDecl,
   GenDirectivesEnumImpl,
   GenDXILOperation,
+  GenTVMInstMappingInfo,
 };
 
 namespace llvm {
@@ -141,7 +142,9 @@ cl::opt<ActionType> Action(
         clEnumValN(GenDirectivesEnumImpl, "gen-directive-impl",
                    "Generate directive related implementation code"),
         clEnumValN(GenDXILOperation, "gen-dxil-operation",
-                   "Generate DXIL operation information")));
+                   "Generate DXIL operation information"),
+        clEnumValN(GenTVMInstMappingInfo, "gen-tvm-instr-mapping-info",
+                   "Generate TVM tables")));
 
 cl::OptionCategory PrintEnumsCat("Options for -print-enums");
 cl::opt<std::string> Class("class", cl::desc("Print Enum list for this class"),
@@ -214,6 +217,9 @@ bool LLVMTableGenMain(raw_ostream &OS, RecordKeeper &Records) {
     break;
   case GenOptRST:
     EmitOptRST(Records, OS);
+    break;
+  case GenTVMInstMappingInfo:
+    EmitTVMInstMappingInfo(Records, OS);
     break;
   case PrintEnums:
   {

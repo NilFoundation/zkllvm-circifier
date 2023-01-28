@@ -855,7 +855,21 @@ void AggExprEmitter::VisitCastExpr(CastExpr *E) {
 
   case CK_NoOp:
   case CK_UserDefinedConversion:
-  case CK_ConstructorConversion:
+  case CK_ConstructorConversion: {
+    // TVM local begin
+    auto SrcTy = E->getSubExpr()->getType();
+    auto DstTy = E->getType();
+    [[maybe_unused]] bool TVMTupleConv =
+        ((SrcTy->isTVMTupleStructType() && DstTy->isTVMLiteralStructType()) ||
+         (DstTy->isTVMTupleStructType() && SrcTy->isTVMLiteralStructType())) &&
+        (CGF.getContext().getTypeSizeInChars(SrcTy).getQuantity() ==
+         CGF.getContext().getTypeSizeInChars(DstTy).getQuantity());
+    assert((TVMTupleConv ||
+            CGF.getContext().hasSameUnqualifiedType(SrcTy, DstTy)) &&
+           "Implicit cast types must be compatible");
+    Visit(E->getSubExpr());
+  }
+  // TVM local end
     assert(CGF.getContext().hasSameUnqualifiedType(E->getSubExpr()->getType(),
                                                    E->getType()) &&
            "Implicit cast types must be compatible");

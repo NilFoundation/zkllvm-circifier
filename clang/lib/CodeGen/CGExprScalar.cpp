@@ -2486,9 +2486,11 @@ Value *ScalarExprEmitter::VisitCastExpr(CastExpr *CE) {
   case CK_StringToGaloisField: {
     auto FieldTy = cast<llvm::GaloisFieldType>(ConvertType(DestTy));
     SmallString<10> Str;
-    assert(E->EvaluateAsString(Str, CGF.getContext()));
+    bool result = E->EvaluateAsString(Str, CGF.getContext());
+    assert(result);
     llvm::FieldElem Val;
-    assert(llvm::FieldElemFromStr(FieldTy->getFieldKind(), Str, Val));
+    result = llvm::FieldElemFromStr(FieldTy->getFieldKind(), Str, Val);
+    assert(result);
     return llvm::ConstantField::get(FieldTy, Val);
   }
   } // end of switch

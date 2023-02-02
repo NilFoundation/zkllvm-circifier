@@ -33,6 +33,7 @@ StringRef Triple::getArchTypeName(ArchType Kind) {
   case arc:            return "arc";
   case arm:            return "arm";
   case armeb:          return "armeb";
+  case assigner:       return "assigner";
   case avr:            return "avr";
   case bpfeb:          return "bpfeb";
   case bpfel:          return "bpfel";
@@ -520,6 +521,7 @@ static Triple::ArchType parseArch(StringRef ArchName) {
     .Case("loongarch64", Triple::loongarch64)
     .Case("dxil", Triple::dxil)
     .Case("xtensa", Triple::xtensa)
+    .Case("assigner", Triple::assigner)
     .Default(Triple::UnknownArch);
 
   // Some architectures require special parsing logic just to compute the
@@ -803,6 +805,7 @@ static Triple::ObjectFormatType getDefaultFormat(const Triple &T) {
   case Triple::thumb:
   case Triple::x86:
   case Triple::x86_64:
+  case Triple::assigner:
     if (T.isOSDarwin())
       return Triple::MachO;
     else if (T.isOSWindows())
@@ -1461,6 +1464,7 @@ static unsigned getArchPointerBitWidth(llvm::Triple::ArchType Arch) {
   case llvm::Triple::ve:
   case llvm::Triple::wasm64:
   case llvm::Triple::x86_64:
+  case llvm::Triple::assigner:
     return 64;
   }
   llvm_unreachable("Invalid architecture value");
@@ -1489,6 +1493,7 @@ Triple Triple::get32BitArchVariant() const {
   case Triple::msp430:
   case Triple::systemz:
   case Triple::ve:
+  case Triple::assigner:
     T.setArch(UnknownArch);
     break;
 
@@ -1578,6 +1583,7 @@ Triple Triple::get64BitArchVariant() const {
   case Triple::tcele:
   case Triple::xcore:
   case Triple::xtensa:
+  case Triple::assigner:
     T.setArch(UnknownArch);
     break;
 

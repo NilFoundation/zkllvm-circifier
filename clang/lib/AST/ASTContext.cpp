@@ -2268,7 +2268,7 @@ TypeInfo ASTContext::getTypeInfoImpl(const Type *T) const {
 #define ELLIPTIC_CURVE_TYPE(Name, EnumId, SingletonId, FrontendId) \
   case BuiltinType::FrontendId:
 #include "llvm/IR/EllipticCurveTypes.def"
-    Width = 8;
+    Width = 32;
     Align = 8;
     break;
     }

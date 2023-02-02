@@ -38,6 +38,23 @@ public:
     assert(!isSingleWord());
     return U.pVal;
   }
+
+private:
+  static inline FieldElem getEmptyKey() {
+    FieldElem key;
+    key.BitWidth = 0;
+    key.U.VAL = ~0ULL;
+    return key;
+  }
+
+  static inline FieldElem getTombstoneKey() {
+    FieldElem key;
+    key.BitWidth = 0;
+    key.U.VAL = ~1ULL;
+    return key;
+  }
+
+  friend struct DenseMapInfo<FieldElem, void>;
 };
 
 inline FieldElem operator+(FieldElem a, const FieldElem &b) {
@@ -48,11 +65,11 @@ inline FieldElem operator+(FieldElem a, const FieldElem &b) {
 /// Provide DenseMapInfo for APSInt, using the DenseMapInfo for APInt.
 template <> struct DenseMapInfo<FieldElem, void> {
   static inline FieldElem getEmptyKey() {
-    return FieldElem(static_cast<GaloisFieldKind>(0), DenseMapInfo<APInt, void>::getEmptyKey());
+    return FieldElem::getEmptyKey();
   }
 
   static inline FieldElem getTombstoneKey() {
-    return FieldElem(static_cast<GaloisFieldKind>(0), DenseMapInfo<APInt, void>::getTombstoneKey());
+    return FieldElem::getTombstoneKey();
   }
 
   static unsigned getHashValue(const FieldElem &Key) {

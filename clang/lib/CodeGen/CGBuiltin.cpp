@@ -5458,6 +5458,8 @@ static Value *EmitTargetArchBuiltinExpr(CodeGenFunction *CGF,
   case llvm::Triple::loongarch32:
   case llvm::Triple::loongarch64:
     return CGF->EmitLoongArchBuiltinExpr(BuiltinID, E);
+  case llvm::Triple::assigner:
+    return CGF->EmitAssignerBuiltinExpr(BuiltinID, E);
   default:
     return nullptr;
   }
@@ -19654,5 +19656,27 @@ Value *CodeGenFunction::EmitLoongArchBuiltinExpr(unsigned BuiltinID,
   assert(ID != Intrinsic::not_intrinsic);
 
   llvm::Function *F = CGM.getIntrinsic(ID);
+  return Builder.CreateCall(F, Ops);
+}
+
+Value *CodeGenFunction::EmitAssignerBuiltinExpr(unsigned int BuiltinID,
+                                                const CallExpr *E) {
+  SmallVector<Value *, 2> Ops;
+
+  for (unsigned i = 0, e = E->getNumArgs(); i != e; i++)
+    Ops.push_back(EmitScalarExpr(E->getArg(i)));
+
+  Intrinsic::ID ID = Intrinsic::not_intrinsic;
+  switch (BuiltinID) {
+  default:
+    llvm_unreachable("unexpected builtin ID.");
+  case assigner::BI__builtin_assigner_malloc:
+    ID = Intrinsic::assigner_malloc;
+    break;
+  }
+
+  assert(ID != Intrinsic::not_intrinsic);
+
+  llvm::Function *F = CGM.getIntrinsic(ID, ConvertType(E->getType()));
   return Builder.CreateCall(F, Ops);
 }

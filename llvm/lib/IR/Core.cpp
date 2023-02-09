@@ -1475,6 +1475,13 @@ double LLVMConstRealGetDouble(LLVMValueRef ConstantVal, LLVMBool *LosesInfo) {
   return APF.convertToDouble();
 }
 
+/*--.. Operations on field constants .......................................--*/
+
+LLVMValueRef LLVMConstField(LLVMTypeRef FieldTy, LLVMValueRef ConstantVal) {
+  APInt *ap_int = unwrap<APInt>(ConstantVal) ;
+  return wrap(ConstantField::get(unwrap<GaloisFieldType>(FieldTy), *ap_int));
+}
+
 /*--.. Operations on composite constants ...................................--*/
 
 LLVMValueRef LLVMConstStringInContext(LLVMContextRef C, const char *Str,

@@ -2,7 +2,7 @@
 // EVM_RUN: function: fib, input: [2], result: 1
 // EVM_RUN: function: fib, input: [10], result: 55
 
-int fib(int n)
+[[evm]] int fib(int n)
 {
   if (n <= 1)
     return n;

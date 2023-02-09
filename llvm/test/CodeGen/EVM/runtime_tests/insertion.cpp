@@ -2,7 +2,7 @@
 
 void insertionSort(long arr[], long n);
 
-long test() {
+[[evm]] long test() {
   long a[5]; 
   a[0] = 5;
   a[1] = 4;

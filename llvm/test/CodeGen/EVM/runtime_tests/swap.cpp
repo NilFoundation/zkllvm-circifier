@@ -2,7 +2,7 @@
 
 void swap(long *xp, long *yp);
 
-long test(long a, long b) {
+[[evm]] long test(long a, long b) {
   long aa =a;
   long bb =b;
   swap(&a, &b);
@@ -14,7 +14,7 @@ long test(long a, long b) {
 }
 
 
-void swap(long *xp, long *yp)  
+[[evm]] void swap(long *xp, long *yp)
 {  
     long temp = *xp;  
     *xp = *yp;  

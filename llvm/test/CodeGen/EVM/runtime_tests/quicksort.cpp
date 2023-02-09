@@ -2,7 +2,7 @@
 
 void quicksort(long* number,long first,long last);
 
-long sort() {
+[[evm]] long sort() {
   long a[5];
   a[0] = 5;
   a[1] = 4;

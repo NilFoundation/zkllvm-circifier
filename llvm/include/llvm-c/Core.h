@@ -2097,6 +2097,25 @@ double LLVMConstRealGetDouble(LLVMValueRef ConstantVal, LLVMBool *losesInfo);
  */
 
 /**
+ * @defgroup LLVMCCoreValueConstantField Field Constants
+ *
+ * Functions in this group operate on field constants.
+ *
+ * @{
+ */
+
+/**
+ * Create a ConstantField and initialize it with a APInt.
+ *
+ * @see llvm::ConstantField::get()
+ */
+LLVMValueRef LLVMConstField(LLVMTypeRef FieldTy, LLVMValueRef ConstantVal);
+
+/**
+ * @}
+ */
+
+/**
  * @defgroup LLVMCCoreValueConstantComposite Composite Constants
  *
  * Functions in this group operate on composite constants.

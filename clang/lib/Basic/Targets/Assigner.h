@@ -64,6 +64,10 @@ public:
   }
 
   bool allowDebugInfoForExternalRef() const override { return true; }
+
+  bool hasInt256Type() const override {
+    return true;
+  }
 };
 } // namespace targets
 } // namespace clang

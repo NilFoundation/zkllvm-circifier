@@ -4098,6 +4098,9 @@ ExprResult Sema::ActOnNumericConstant(const Token &Tok, Scope *UDLScope) {
         Literal.isBitInt ? llvm::APInt::getSufficientBitsNeeded(
                                Literal.getLiteralDigits(), Literal.getRadix())
                          : Context.getTargetInfo().getIntMaxTWidth();
+    if (Literal.isBigInt)
+      BitsNeeded = 256;
+
     llvm::APInt ResultVal(BitsNeeded, 0);
 
     if (Literal.GetIntegerValue(ResultVal)) {
@@ -4128,6 +4131,11 @@ ExprResult Sema::ActOnNumericConstant(const Token &Tok, Scope *UDLScope) {
           Ty = Context.getIntTypeForBitwidth(Width,
                                              /*Signed=*/!Literal.isUnsigned);
         }
+      }
+
+      if (Ty.isNull() && Literal.isBigInt) {
+        Ty = Context.UnsignedInt256Ty;
+        Width = 256;
       }
 
       // Bit-precise integer literals are automagically-sized based on the

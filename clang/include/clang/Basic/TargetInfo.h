@@ -619,6 +619,11 @@ public:
            getTargetOpts().ForceEnableInt128;
   } // FIXME
 
+  /// Determine whether the __int256 type is supported on this target.
+  virtual bool hasInt256Type() const {
+    return false;
+  }
+
   /// Determine whether the _BitInt type is supported on this target. This
   /// limitation is put into place for ABI reasons.
   /// FIXME: _BitInt is a required type in C23, so there's not much utility in

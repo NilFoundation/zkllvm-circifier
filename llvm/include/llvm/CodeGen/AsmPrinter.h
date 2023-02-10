@@ -530,6 +530,7 @@ public:
   /// Emit the stack maps.
   void emitStackMaps();
 
+  virtual bool emitBigInt(const ConstantInt *CI) { return false; }
   //===------------------------------------------------------------------===//
   // Overridable Hooks
   //===------------------------------------------------------------------===//

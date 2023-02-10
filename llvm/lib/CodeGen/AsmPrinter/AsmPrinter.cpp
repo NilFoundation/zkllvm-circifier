@@ -3533,7 +3533,8 @@ static void emitGlobalConstantImpl(const DataLayout &DL, const Constant *CV,
             << format("0x%" PRIx64 "\n", CI->getZExtValue());
       AP.OutStreamer->emitIntValue(CI->getZExtValue(), StoreSize);
     } else {
-      emitGlobalConstantLargeInt(CI, AP);
+      if (!AP.emitBigInt(CI))
+        emitGlobalConstantLargeInt(CI, AP);
     }
 
     // Emit tail padding if needed
@@ -3566,7 +3567,7 @@ static void emitGlobalConstantImpl(const DataLayout &DL, const Constant *CV,
     if (CE->getOpcode() == Instruction::BitCast)
       return emitGlobalConstantImpl(DL, CE->getOperand(0), AP);
 
-    if (Size > 8) {
+    if (Size > DL.getPointerSize()) {
       // If the constant expression's size is greater than 64-bits, then we have
       // to emit the value in chunks. Try to constant fold the value and emit it
       // that way.

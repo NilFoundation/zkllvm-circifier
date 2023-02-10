@@ -140,37 +140,10 @@ void EVM::addClangTargetOptions(const ArgList &DriverArgs,
     CC1Args.push_back("-fno-use-init-array");
 
   // '-pthread' implies atomics, bulk-memory, mutable-globals, and sign-ext
-  if (DriverArgs.hasFlag(options::OPT_pthread, options::OPT_no_pthread,
-                         false)) {
-    if (DriverArgs.hasFlag(options::OPT_mno_atomics, options::OPT_matomics,
-                           false))
-      getDriver().Diag(diag::err_drv_argument_not_allowed_with)
-          << "-pthread"
-          << "-mno-atomics";
-    if (DriverArgs.hasFlag(options::OPT_mno_bulk_memory,
-                           options::OPT_mbulk_memory, false))
-      getDriver().Diag(diag::err_drv_argument_not_allowed_with)
-          << "-pthread"
-          << "-mno-bulk-memory";
-    if (DriverArgs.hasFlag(options::OPT_mno_mutable_globals,
-                           options::OPT_mmutable_globals, false))
-      getDriver().Diag(diag::err_drv_argument_not_allowed_with)
-          << "-pthread"
-          << "-mno-mutable-globals";
-    if (DriverArgs.hasFlag(options::OPT_mno_sign_ext, options::OPT_msign_ext,
-                           false))
-      getDriver().Diag(diag::err_drv_argument_not_allowed_with)
-          << "-pthread"
-          << "-mno-sign-ext";
-    CC1Args.push_back("-target-feature");
-    CC1Args.push_back("+atomics");
-    CC1Args.push_back("-target-feature");
-    CC1Args.push_back("+bulk-memory");
-    CC1Args.push_back("-target-feature");
-    CC1Args.push_back("+mutable-globals");
-    CC1Args.push_back("-target-feature");
-    CC1Args.push_back("+sign-ext");
-  }
+  CC1Args.push_back("-fc++-abi=evm");
+  CC1Args.push_back("-D__EVM__");
+  // EVM doesn't support RTTI
+  CC1Args.push_back("-fno-rtti");
 
   if (!DriverArgs.hasFlag(options::OPT_mmutable_globals,
                           options::OPT_mno_mutable_globals, false)) {

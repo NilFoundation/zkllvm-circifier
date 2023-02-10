@@ -17,6 +17,7 @@
 
 #include "EVMInstrInfo.h"
 #include "llvm/ADT/BitVector.h"
+#include "llvm/BinaryFormat/EVM.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Type.h"
 
@@ -24,9 +25,14 @@ namespace llvm {
 
 namespace EVM {
 
-uint32_t getFunctionSignature(Function* F);
+static constexpr unsigned RelocPushSize = 4;
+using RelocUnsignedType = uint32_t;
 
-unsigned getEncodedSize(Function &F);
+uint32_t getFunctionSignatureHash(Function* F);
+
+std::string getFunctionSignature(Function* F);
+
+EVMSignature getSignatureFromFunction(const Function& F);
 
 std::string getCanonicalName(Type* input);
 
@@ -34,6 +40,8 @@ uint32_t BuildCommentFlags(AsmComments commentFlag, uint16_t value);
 
 void ParseCommentFlags(uint32_t input, AsmComments &commentFlag,
                        uint16_t &value);
+
+ValType valTypeFromMVT(MVT T);
 
 } // end namespace EVM
 

@@ -119,7 +119,7 @@ void EVMConvertRegToStack::convertMOVE(MachineInstr* MI) const {
 void EVMConvertRegToStack::convertSWAP(MachineInstr* MI) const {
   unsigned swapIdx = MI->getOperand(0).getImm();
   swapIdx = (swapIdx > 16) ? 16 : swapIdx;
-  //assert(swapIdx <= 16 && "invalid SWAP");
+  assert(swapIdx <= 16 && "invalid SWAP");
 
   unsigned opc = getSWAPOpcode(swapIdx);
 
@@ -157,7 +157,8 @@ bool EVMConvertRegToStack::runOnMachineFunction(MachineFunction &MF) {
         if (!MI.getOperand(1).isReg()) {
           BuildMI(MBB, MI, MI.getDebugLoc(), TII->get(EVM::PUSH32)).add(MI.getOperand(1));
         } else {
-          BuildMI(MBB, MI, MI.getDebugLoc(), TII->get(EVM::DUP1));
+          // TODO: Legacy, lead to failures in some tests. Need to rework.
+          // BuildMI(MBB, MI, MI.getDebugLoc(), TII->get(EVM::DUP1));
         }
         MI.eraseFromParent();
         continue;

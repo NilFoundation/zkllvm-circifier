@@ -364,6 +364,14 @@ class ASTContext : public RefCountedBase<ASTContext> {
   /// The typedef for the __uint128_t type.
   mutable TypedefDecl *UInt128Decl = nullptr;
 
+  // EVM_BEGIN
+  /// The typedef for the __int256_t type.
+  mutable TypedefDecl *Int256Decl = nullptr;
+
+  /// The typedef for the __uint256_t type.
+  mutable TypedefDecl *UInt256Decl = nullptr;
+  // EVM_END
+
   /// The typedef for the target specific predefined
   /// __builtin_va_list type.
   mutable TypedefDecl *BuiltinVaListDecl = nullptr;
@@ -1226,6 +1234,14 @@ public:
 
   /// Retrieve the declaration for the 128-bit unsigned integer type.
   TypedefDecl *getUInt128Decl() const;
+
+  // EVM_BEGIN
+  /// Retrieve the declaration for the 256-bit signed integer type.
+  TypedefDecl *getInt256Decl() const;
+
+  /// Retrieve the declaration for the 256-bit unsigned integer type.
+  TypedefDecl *getUInt256Decl() const;
+  // EVM_END
 
   //===--------------------------------------------------------------------===//
   //                           Type Constructors

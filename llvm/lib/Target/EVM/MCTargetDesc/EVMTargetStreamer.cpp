@@ -17,6 +17,7 @@
 #include "EVMMCTargetDesc.h"
 #include "llvm/MC/MCContext.h"
 #include "llvm/MC/MCSubtargetInfo.h"
+#include "llvm/MC/MCSymbolEVM.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FormattedStream.h"
@@ -28,5 +29,24 @@ EVMTargetStreamer::EVMTargetStreamer(MCStreamer &S)
 
 EVMTargetAsmStreamer::EVMTargetAsmStreamer(
     MCStreamer &S, formatted_raw_ostream &OS)
-    : EVMTargetStreamer(S) {}
+    : EVMTargetStreamer(S), OS(OS) {}
 
+void EVMTargetAsmStreamer::emitFunctionType(const MCSymbolEVM *Sym) {
+  OS << "\t.functype\t" << Sym->getName() << ", (";
+  auto Sep = "";
+  for (auto Param : Sym->getSignature()->Params) {
+    OS << Sep << ValTypeToString(Param);
+    Sep = ", ";
+  }
+  Sep = "";
+  OS << ")->(";
+  for (auto Return : Sym->getSignature()->Returns) {
+    OS << Sep << ValTypeToString(Return);
+    Sep = ", ";
+  }
+  OS << ")\n";
+}
+
+void EVMTargetAsmStreamer::emitType(const MCSymbolEVM *Sym, std::string_view Type) {
+  OS << "\t.type\t" << Sym->getName() << "," << Type << '\n';
+}

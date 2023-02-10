@@ -183,6 +183,10 @@ bool FunctionPass::skipFunction(const Function &F) const {
   return false;
 }
 
+void FunctionPass::dumpIR(raw_ostream &OS, Function &F) {
+  F.print(OS);
+}
+
 const PassInfo *Pass::lookupPassInfo(const void *TI) {
   return PassRegistry::getPassRegistry()->getPassInfo(TI);
 }

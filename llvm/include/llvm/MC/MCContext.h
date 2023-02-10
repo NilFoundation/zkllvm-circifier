@@ -144,6 +144,7 @@ private:
   SpecificBumpPtrAllocator<MCSectionWasm> WasmAllocator;
   SpecificBumpPtrAllocator<MCSectionXCOFF> XCOFFAllocator;
   SpecificBumpPtrAllocator<MCInst> MCInstAllocator;
+  SpecificBumpPtrAllocator<MCSectionEVM> EvmAllocator;
 
   /// Bindings of names to symbols.
   SymbolTable Symbols;
@@ -362,7 +363,7 @@ private:
   std::map<XCOFFSectionKey, MCSectionXCOFF *> XCOFFUniquingMap;
   StringMap<MCSectionDXContainer *> DXCUniquingMap;
   StringMap<bool> RelSecNames;
-  std::unique_ptr<MCSectionEVM> EVMSection;
+  std::map<std::string, MCSectionEVM *> EvmUniquingMap;
 
   SpecificBumpPtrAllocator<MCSubtargetInfo> MCSubtargetAllocator;
 
@@ -690,7 +691,7 @@ public:
       bool MultiSymbolsAllowed = false, const char *BeginSymName = nullptr,
       Optional<XCOFF::DwarfSectionSubtypeFlags> DwarfSubtypeFlags = None);
 
-  MCSectionEVM *getEVMSection();
+  MCSectionEVM *getEVMSection(StringRef Section);
 
   // Create and save a copy of STI and return a reference to the copy.
   MCSubtargetInfo &getSubtargetCopy(const MCSubtargetInfo &STI);

@@ -371,3 +371,6 @@ def : MergeRule<"adjustCallerStackProbeSize">;
 def : MergeRule<"adjustMinLegalVectorWidth">;
 def : MergeRule<"adjustNullPointerValidAttr">;
 def : MergeRule<"setAND<MustProgressAttr>">;
+
+/// EVM function
+def EvmFunc : EnumAttr<"evm", [FnAttr]>;

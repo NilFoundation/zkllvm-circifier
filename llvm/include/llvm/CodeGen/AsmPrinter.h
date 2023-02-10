@@ -498,7 +498,9 @@ public:
 
   /// Emit the stack maps.
   void emitStackMaps(StackMaps &SM);
-
+  // EVM_BEGIN
+  virtual bool emitBigInt(const ConstantInt *CI) { return false; }
+  // EVM_END
   //===------------------------------------------------------------------===//
   // Overridable Hooks
   //===------------------------------------------------------------------===//

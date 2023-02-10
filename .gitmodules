@@ -1,3 +1,6 @@
 [submodule "llvm/utils/crypto/hash"]
 	path = llvm/utils/crypto/hash
 	url = https://github.com/NilFoundation/crypto3-hash.git
+[submodule "llvm/projects/evm-sdk/cpp-stdlib"]
+	path = llvm/projects/evm-sdk/cpp-stdlib
+	url = git@github.com:NilFoundation/zkllvm-stdlib.git

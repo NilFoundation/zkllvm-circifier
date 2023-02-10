@@ -23,7 +23,10 @@ class EVMMCAsmInfo : public MCAsmInfo {
 public:
   explicit EVMMCAsmInfo(const Triple &TT, const MCTargetOptions &Options) {
     StackGrowsUp = true;
-    HasDotTypeDotSizeDirective = false;
+    // EVM doesn't have function alignment. If left this as is(true by default),
+    // then AsmPrinter will start changing DataFragment before functions
+    // compilation, that is unacceptable for EVM.
+    HasFunctionAlignment = false;
   }
 };
 }

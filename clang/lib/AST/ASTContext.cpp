@@ -906,6 +906,7 @@ CXXABI *ASTContext::createCXXABI(const TargetInfo &T) {
   case TargetCXXABI::GenericMIPS:
   case TargetCXXABI::GenericItanium:
   case TargetCXXABI::WebAssembly:
+  case TargetCXXABI::EVM:
   case TargetCXXABI::XL:
     return CreateItaniumCXXABI(*this);
   case TargetCXXABI::Microsoft:
@@ -1273,6 +1274,20 @@ TypedefDecl *ASTContext::getUInt128Decl() const {
   return UInt128Decl;
 }
 
+// EVM_BEGIN
+TypedefDecl *ASTContext::getInt256Decl() const {
+  if (!Int256Decl)
+    Int256Decl = buildImplicitTypedef(Int256Ty, "__int256_t");
+  return Int256Decl;
+}
+
+TypedefDecl *ASTContext::getUInt256Decl() const {
+  if (!UInt256Decl)
+    UInt256Decl = buildImplicitTypedef(UnsignedInt256Ty, "__uint256_t");
+  return UInt256Decl;
+}
+// EVM_END
+
 void ASTContext::InitBuiltinType(CanQualType &R, BuiltinType::Kind K) {
   auto *Ty = new (*this, TypeAlignment) BuiltinType(K);
   R = CanQualType::CreateUnsafe(QualType(Ty, 0));
@@ -1359,6 +1374,12 @@ void ASTContext::InitBuiltinTypes(const TargetInfo &Target,
   // GNU extension, 128-bit integers.
   InitBuiltinType(Int128Ty,            BuiltinType::Int128);
   InitBuiltinType(UnsignedInt128Ty,    BuiltinType::UInt128);
+
+  // EVM_BEGIN
+  // 256-bit integers.
+  InitBuiltinType(Int256Ty,            BuiltinType::Int256);
+  InitBuiltinType(UnsignedInt256Ty,    BuiltinType::UInt256);
+  // EVM_END
 
   // C++ 3.9.1p5
   if (TargetInfo::isTypeSigned(Target.getWCharType()))
@@ -1879,7 +1900,16 @@ static getConstantArrayInfoInChars(const ASTContext &Context,
   assert((Size == 0 || static_cast<uint64_t>(EltInfo.Width.getQuantity()) <=
               (uint64_t)(-1)/Size) &&
          "Overflow in array type char size evaluation");
-  uint64_t Width = EltInfo.Width.getQuantity() * Size;
+  // EVM_BEGIN
+  uint64_t Width;
+  if (Context.getCXXABIKind() == clang::TargetCXXABI::EVM) {
+    // We must align size of each element to 256-bits word.
+    Width = llvm::alignTo(EltInfo.Width.getQuantity(),
+                          EltInfo.Align.getQuantity()) * Size;
+  } else {
+    Width = EltInfo.Width.getQuantity() * Size;
+  }
+  // EVM_END
   unsigned Align = EltInfo.Align.getQuantity();
   if (!Context.getTargetInfo().getCXXABI().isMicrosoft() ||
       Context.getTargetInfo().getPointerWidth(0) == 64)
@@ -1989,8 +2019,11 @@ TypeInfo ASTContext::getTypeInfoImpl(const Type *T) const {
     Width = EltInfo.Width * Size;
     Align = EltInfo.Align;
     AlignRequirement = EltInfo.AlignRequirement;
-    if (!getTargetInfo().getCXXABI().isMicrosoft() ||
-        getTargetInfo().getPointerWidth(0) == 64)
+    // EVM_BEGIN
+    if ((!getTargetInfo().getCXXABI().isMicrosoft() ||
+        getTargetInfo().getPointerWidth(0) == 64) &&
+        getCXXABIKind() != TargetCXXABI::EVM)
+      // EVM_BEND
       Width = llvm::alignTo(Width, Align);
     break;
   }
@@ -2093,6 +2126,13 @@ TypeInfo ASTContext::getTypeInfoImpl(const Type *T) const {
       Width = 128;
       Align = Target->getInt128Align();
       break;
+    // EVM_BEGIN
+    case BuiltinType::Int256:
+    case BuiltinType::UInt256:
+      Width = 256;
+      Align = 256; // TODO: FIXME
+      break;
+    // EVM_END
     case BuiltinType::ShortAccum:
     case BuiltinType::UShortAccum:
     case BuiltinType::SatShortAccum:
@@ -6986,6 +7026,11 @@ unsigned ASTContext::getIntegerRank(const Type *T) const {
   case BuiltinType::Int128:
   case BuiltinType::UInt128:
     return 7 + (getIntWidth(Int128Ty) << 3);
+  // EVM_BEGIN
+  case BuiltinType::Int256:
+  case BuiltinType::UInt256:
+    return 8 + (getIntWidth(Int256Ty) << 3);
+  // EVM_END
   }
 }
 
@@ -7882,6 +7927,9 @@ static char getObjCEncodingForPrimitiveType(const ASTContext *C,
     case BuiltinType::ULong:
         return C->getTargetInfo().getLongWidth() == 32 ? 'L' : 'Q';
     case BuiltinType::UInt128:    return 'T';
+    // EVM_BEGIN
+    case BuiltinType::UInt256:    return 'X';
+    // EVM_END
     case BuiltinType::ULongLong:  return 'Q';
     case BuiltinType::Char_S:
     case BuiltinType::SChar:      return 'c';
@@ -7893,13 +7941,14 @@ static char getObjCEncodingForPrimitiveType(const ASTContext *C,
       return C->getTargetInfo().getLongWidth() == 32 ? 'l' : 'q';
     case BuiltinType::LongLong:   return 'q';
     case BuiltinType::Int128:     return 't';
+    // EVM_BEGIN
+    case BuiltinType::Int256:     return 'x';
+    // EVM_END
     case BuiltinType::Float:      return 'f';
     case BuiltinType::Double:     return 'd';
     case BuiltinType::LongDouble: return 'D';
     case BuiltinType::NullPtr:    return '*'; // like char*
 
-    case BuiltinType::Int256:
-    case BuiltinType::UInt256:
     case BuiltinType::BFloat16:
     case BuiltinType::Float16:
     case BuiltinType::Float128:
@@ -10821,6 +10870,10 @@ QualType ASTContext::getCorrespondingUnsignedType(QualType T) const {
     return UnsignedLongLongTy;
   case BuiltinType::Int128:
     return UnsignedInt128Ty;
+  // EVM_BEGIN
+  case BuiltinType::Int256:
+    return Int256Ty;
+  // EVM_END
   // wchar_t is special. It is either signed or not, but when it's signed,
   // there's no matching "unsigned wchar_t". Therefore we return the unsigned
   // version of it's underlying type instead.
@@ -10889,6 +10942,10 @@ QualType ASTContext::getCorrespondingSignedType(QualType T) const {
     return LongLongTy;
   case BuiltinType::UInt128:
     return Int128Ty;
+  // EVM_BEGIN
+  case BuiltinType::UInt256:
+    return UnsignedInt256Ty;
+  // EVM_END
   // wchar_t is special. It is either unsigned or not, but when it's unsigned,
   // there's no matching "signed wchar_t". Therefore we return the signed
   // version of it's underlying type instead.
@@ -11762,6 +11819,7 @@ MangleContext *ASTContext::createMangleContext(const TargetInfo *T) {
   case TargetCXXABI::GenericMIPS:
   case TargetCXXABI::iOS:
   case TargetCXXABI::WebAssembly:
+  case TargetCXXABI::EVM:
   case TargetCXXABI::WatchOS:
   case TargetCXXABI::XL:
     return ItaniumMangleContext::create(*this, getDiagnostics());
@@ -11783,6 +11841,7 @@ MangleContext *ASTContext::createDeviceMangleContext(const TargetInfo &T) {
   case TargetCXXABI::GenericMIPS:
   case TargetCXXABI::iOS:
   case TargetCXXABI::WebAssembly:
+  case TargetCXXABI::EVM:
   case TargetCXXABI::WatchOS:
   case TargetCXXABI::XL:
     return ItaniumMangleContext::create(
@@ -11828,6 +11887,10 @@ QualType ASTContext::getIntTypeForBitwidth(unsigned DestWidth,
   CanQualType QualTy = getFromTargetType(Ty);
   if (!QualTy && DestWidth == 128)
     return Signed ? Int128Ty : UnsignedInt128Ty;
+  // EVM_BEGIN
+  if (!QualTy && DestWidth == 256)
+    return Signed ? Int256Ty : UnsignedInt256Ty;
+  // EVM_END
   return QualTy;
 }
 

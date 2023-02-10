@@ -27,8 +27,6 @@ class LLVM_LIBRARY_VISIBILITY EVMTargetInfo : public TargetInfo {
 public:
   EVMTargetInfo(const llvm::Triple &Triple, const TargetOptions &)
       : TargetInfo(Triple) {
-    HasEVMTypes = true;
-    NoAsmVariants = true;
     SuitableAlign = 256;
     FloatAlign = 256;
     DoubleAlign = 256;
@@ -37,38 +35,31 @@ public:
     SimdDefaultAlign = 256;
     PointerAlign = 256;
     BoolAlign = 256;
+    CharAlign = 256;
     IntAlign = 256;
     LongAlign = 256;
     LongLongAlign = 256;
+    Int128Align = 256;
 
-    LargeArrayMinWidth = 128;
-    SigAtomicType = SignedLong;
+    PointerWidth = 64;
+    BoolWidth = 8;
+    CharWidth = 8;
+    IntWidth = 32;
+    LongWidth = 64;
+    LongLongWidth = 64;
+    MaxBitIntWidth = 64;
 
-    FloatWidth = 256;
-    DoubleWidth = 256;
-    LongDoubleWidth = 256;
-    LongDoubleFormat = &llvm::APFloat::IEEEquad();
+    resetDataLayout("e-a:256:256-p:256:256-i1:256:256-i8:256:256-i16:256:256-i32"
+                    ":256:256-i64:256:256-i128:256:256-i256:256:256-S256");
 
-    MaxAtomicPromoteWidth = MaxAtomicInlineWidth = 256;
-    PointerWidth = 256;
-    BoolWidth = 256;
-    IntWidth = 256;
-    LongWidth = 256;
-    LongLongWidth = 256;
-
-    MaxBitIntWidth = 256;
-
-    SizeType = UnsignedLong;
-    PtrDiffType = SignedLong;
-    IntPtrType = SignedLong;
-    WCharType = UnsignedLong;
-    Char16Type = UnsignedLong;
-    Char32Type = UnsignedLong;
-    resetDataLayout("e-S256-i:256:256-p:256:256-a:256:256");
   }
 
   void getTargetDefines(const LangOptions &Opts,
                         MacroBuilder &Builder) const override;
+
+  bool hasInt256Type() const override {
+    return true;
+  }
 
   bool hasFeature(StringRef Feature) const override {
     return Feature == "evm";
@@ -120,6 +111,10 @@ public:
   bool setCPU(const std::string &Name) override {
     StringRef CPUName(Name);
     return isValidCPUName(CPUName);
+  }
+
+  unsigned getExnObjectAlignment() const override {
+    return 32;
   }
 };
 } // namespace targets

@@ -15,3 +15,12 @@ void EVMELFTargetObjectFile::Initialize(MCContext &Ctx,
                                           const TargetMachine &TM) {
   TargetLoweringObjectFile::Initialize(Ctx, TM);
 }
+
+MCSection *EVMELFTargetObjectFile::SelectSectionForGlobal(const GlobalObject *GO,
+                                  SectionKind Kind,
+                                  const TargetMachine &TM) const {
+  if (auto *GVar = dyn_cast<GlobalVariable>(GO)) {
+    return getDataSection();
+  }
+  return getTextSection();
+}

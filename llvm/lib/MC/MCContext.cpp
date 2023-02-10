@@ -278,8 +278,7 @@ MCSymbol *MCContext::createSymbolImpl(const StringMapEntry<bool> *Name,
     return new (Name, *this)
         MCSymbol(MCSymbol::SymbolKindUnset, Name, IsTemporary);
   case MCContext::IsEVM:
-    return new (Name, *this)
-        MCSymbol(MCSymbol::SymbolKindEVM, Name, IsTemporary);
+    return new (Name, *this) MCSymbolEVM(Name, IsTemporary);
   }
   return new (Name, *this)
       MCSymbol(MCSymbol::SymbolKindUnset, Name, IsTemporary);
@@ -859,15 +858,30 @@ MCSectionDXContainer *MCContext::getDXContainerSection(StringRef Section,
   return MapIt->second;
 }
 
-MCSectionEVM *MCContext::getEVMSection() {
-  if (!EVMSection) {
-    EVMSection = std::make_unique<MCSectionEVM>(
-        SectionKind::getText(), nullptr);
-    auto *F = new MCDataFragment();
-    EVMSection->getFragmentList().insert(EVMSection->begin(), F);
-    F->setParent(EVMSection.get());
+MCSectionEVM *MCContext::getEVMSection(StringRef Section) {
+  auto It = EvmUniquingMap.insert(std::make_pair(Section, nullptr));
+  auto &Entry = *It.first;
+  if (!It.second)
+    return Entry.second;
+
+  SectionKind Kind;
+  if (Section == ".text") {
+    Kind = SectionKind::getText();
+  } else if (Section == ".data") {
+    Kind = SectionKind::getData();
+  } else {
+    llvm_unreachable("Unsupported EVM section");
   }
-  return EVMSection.get();
+
+  auto NewSection = new (EvmAllocator.Allocate()) MCSectionEVM(
+                    Section, Kind, nullptr);
+
+  Entry.second = NewSection;
+  auto *F = new MCDataFragment();
+  NewSection->getFragmentList().insert(NewSection->begin(), F);
+  F->setParent(NewSection);
+
+  return NewSection;
 }
 
 MCSubtargetInfo &MCContext::getSubtargetCopy(const MCSubtargetInfo &STI) {

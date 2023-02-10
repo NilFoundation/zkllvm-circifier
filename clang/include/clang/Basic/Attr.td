@@ -4075,3 +4075,10 @@ def FunctionReturnThunks : InheritableAttr,
   let Subjects = SubjectList<[Function]>;
   let Documentation = [FunctionReturnThunksDocs];
 }
+
+def EVMFunc : InheritableAttr {
+  let Spellings = [GCC<"evm">, CXX11<"", "evm", 123>,
+                   C2x<"", "evm", 123>];
+  let Documentation = [Undocumented];
+  let MeaningfulToClassTemplateDefinition = 1;
+}

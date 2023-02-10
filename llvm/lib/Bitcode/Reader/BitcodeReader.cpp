@@ -1725,6 +1725,10 @@ static uint64_t getRawAttributeMask(Attribute::AttrKind Val) {
     return 1ULL << 62;
   case Attribute::NoFree:
     return 1ULL << 63;
+  // EVM_BEGIN
+  case Attribute::EvmFunc:
+    return 1ULL << 64;
+  // EVM_END
   default:
     // Other attributes are not supported in the raw format,
     // as we ran out of space.
@@ -2005,6 +2009,10 @@ static Attribute::AttrKind getAttrFromCode(uint64_t Code) {
     return Attribute::Hot;
   case bitc::ATTR_KIND_PRESPLIT_COROUTINE:
     return Attribute::PresplitCoroutine;
+  // EVM_BEGIN
+  case bitc::ATTR_KIND_EVM:
+    return Attribute::EvmFunc;
+  // EVM_END
   }
 }
 

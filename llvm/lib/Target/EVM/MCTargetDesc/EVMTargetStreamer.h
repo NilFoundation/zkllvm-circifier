@@ -22,20 +22,27 @@
 
 namespace llvm {
 
+class MCSymbolEVM;
+
 /// EVM-specific streamer interface, to implement support
 /// EVM-specific assembly directives.
 class EVMTargetStreamer : public MCTargetStreamer {
 public:
   explicit EVMTargetStreamer(MCStreamer &S);
 
-  // TODO
+  virtual void emitFunctionType(const MCSymbolEVM *Sym) = 0;
+  virtual void emitType(const MCSymbolEVM *Sym, std::string_view Type) = 0;
 };
 
 /// This part is for ascii assembly output
 class EVMTargetAsmStreamer final : public EVMTargetStreamer {
+  formatted_raw_ostream &OS;
 
 public:
   EVMTargetAsmStreamer(MCStreamer &S, formatted_raw_ostream &OS);
+
+  void emitFunctionType(const MCSymbolEVM *Sym) override;
+  void emitType(const MCSymbolEVM *Sym, std::string_view Type) override;
 };
 
 /// This part is for null output
@@ -43,6 +50,9 @@ class EVMTargetNullStreamer final : public EVMTargetStreamer {
 public:
   explicit EVMTargetNullStreamer(MCStreamer &S)
       : EVMTargetStreamer(S) {}
+
+  void emitFunctionType(const MCSymbolEVM *Sym) override {}
+  void emitType(const MCSymbolEVM *Sym, std::string_view Type) override {}
 };
 
 // TODO: add JSON output streamer.

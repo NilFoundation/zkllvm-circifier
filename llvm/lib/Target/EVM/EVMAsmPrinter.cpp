@@ -16,6 +16,7 @@
 #include "MCTargetDesc/EVMInstPrinter.h"
 #include "EVMTargetMachine.h"
 #include "EVMUtils.h"
+#include "llvm/CodeGen/Analysis.h"
 #include "llvm/CodeGen/AsmPrinter.h"
 #include "llvm/CodeGen/MachineConstantPool.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
@@ -32,9 +33,11 @@
 
 #include "llvm/MC/MCAssembler.h"
 
-#include "llvm/MC/MCInstBuilder.h"
+#include "MCTargetDesc/EVMTargetStreamer.h"
 
+#include <optional>
 using namespace llvm;
+using namespace EVM;
 
 #define DEBUG_TYPE "evm-asm-printer"
 
@@ -50,6 +53,13 @@ public:
   StringRef getPassName() const override { return "EVM Assembly Printer"; }
 
   void emitInstruction(const MachineInstr *MI) override;
+
+  void emitConstantPool() override;
+
+  void emitXXStructorList(const DataLayout &DL, const Constant *List,
+                          bool IsCtor) override;
+
+  bool emitBigInt(const ConstantInt *CI) override;
 
   void printOperand(const MachineInstr *MI, unsigned OpNo, raw_ostream &OS);
 
@@ -70,6 +80,7 @@ public:
 
 private:
   MCSymbol* createSymbol(std::string name) const;
+  MachineFunction* CurrentFunc{nullptr};
 
   std::unique_ptr<MCSubtargetInfo> STI;
   MCContext* ctx;
@@ -77,20 +88,35 @@ private:
 }
 
 bool EVMAsmPrinter::runOnMachineFunction(MachineFunction &MF) {
-  auto Section = OutStreamer->getContext().getEVMSection();
+  auto Section = OutStreamer->getContext().getEVMSection(".text");
   auto& Fragment = cast<MCDataFragment>(*Section->getFragmentList().begin());
   unsigned offset = Fragment.getContents().size();
 
   auto &F = MF.getFunction();
-  // TODO: currently we allow only integer types in functions' parameters.
-  bool isSuitable = std::all_of(F.arg_begin(), F.arg_end(), [](auto& Arg) {
-    return Arg.getType()->isIntegerTy();
-  });
-  if (isSuitable) {
-    Section->addFunction(&MF.getFunction(), offset);
+
+  CurrentFunc = &MF;
+
+  auto Sym = static_cast<MCSymbolEVM*>(getSymbol(&F));
+  bool isEvm = F.getAttributes().hasFnAttr(Attribute::EvmFunc);
+  Sym->setKind(MCSymbolEVM::KindFunction);
+  Sym->setOffset(Fragment.getContents().size());
+  if (isEvm) {
+    Sym->setHidden(false);
+    F.setVisibility(llvm::GlobalValue::DefaultVisibility);
+  } else if (!F.hasLocalLinkage()) {
+    Sym->setHidden(true);
+    F.setVisibility(llvm::GlobalValue::HiddenVisibility);
   }
+
+
+  // TODO: currently we allow only integer types in functions' parameters.
   SetupMachineFunction(MF);
   emitFunctionBody();
+
+  Section->addFunction(&MF.getFunction(), offset,
+                       Fragment.getContents().size() - offset);
+
+  Sym->setSize(Fragment.getContents().size() - Sym->getOffset());
 
   return false;
 }
@@ -140,6 +166,52 @@ void EVMAsmPrinter::emitInstruction(const MachineInstr *MI) {
   if (commented) {
     OutStreamer->addBlankLine();
   }
+}
+
+void EVMAsmPrinter::emitXXStructorList(const DataLayout &DL, const Constant *List,
+                                       bool IsCtor) {
+  // TODO:IMPLEMENT!!!
+}
+
+void EVMAsmPrinter::emitConstantPool() {
+  auto &F = CurrentFunc->getFunction();
+  if (F.isIntrinsic())
+    return;
+
+  auto Sym = cast<MCSymbolEVM>(getSymbol(&F));
+  auto Streamer =
+      static_cast<EVMTargetStreamer*>(OutStreamer->getTargetStreamer());
+  Streamer->emitType(Sym, "function");
+
+  // Emit function signature only for functions with [[evm]] attribute.
+  if (!F.getAttributes().hasFnAttr(Attribute::EvmFunc))
+    return;
+
+  const DataLayout &DL(F.getParent()->getDataLayout());
+  SmallVector<EVT, 4> EResults;
+  SmallVector<EVT, 4> EParams;
+  const EVMTargetLowering &TLI =
+      *TM.getSubtarget<EVMSubtarget>(F).getTargetLowering();
+  auto Signature = Sym->getSignature();
+
+  for (auto *Param : F.getFunctionType()->params())
+    ComputeValueVTs(TLI, DL, Param, EParams);
+  for (EVT VT : EParams) {
+    auto RegisterVT = TLI.getRegisterType(F.getContext(), VT);
+    Signature->Params.push_back(valTypeFromMVT(RegisterVT));
+  }
+
+  ComputeValueVTs(TLI, DL, F.getFunctionType()->getReturnType(), EResults);
+  for (EVT VT : EResults) {
+    auto RegisterVT = TLI.getRegisterType(F.getContext(), VT);
+    Signature->Returns.push_back(valTypeFromMVT(RegisterVT));
+  }
+  Streamer->emitFunctionType(Sym);
+}
+
+bool EVMAsmPrinter::emitBigInt(const ConstantInt *CI) {
+  OutStreamer->emitIntValue(CI->getValue());
+  return true;
 }
 
 void EVMAsmPrinter::printOperand(const MachineInstr *MI, unsigned OpNo,

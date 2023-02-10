@@ -1318,6 +1318,14 @@ void ItaniumRecordLayoutBuilder::InitializeLayout(const Decl *D) {
     IsMsStruct = RD->isMsStruct(Context);
   }
 
+  // EVM_BEGIN
+  if (Context.getCXXABIKind() == clang::TargetCXXABI::EVM) {
+    // For EVM all alignments are equal to 256 bits.
+    UpdateAlignment(
+        Context.toCharUnitsFromBits(Context.getTargetInfo().getCharAlign()));
+  }
+  // EVM_END
+
   Packed = D->hasAttr<PackedAttr>();
 
   // Honor the default struct packing maximum alignment flag.
@@ -2138,8 +2146,17 @@ void ItaniumRecordLayoutBuilder::FinishLayout(const NamedDecl *D) {
       // Compatibility with gcc requires a class (pod or non-pod)
       // which is not empty but of size 0; such as having fields of
       // array of zero-length, remains of Size 0
-      if (RD->isEmpty())
-        setSize(CharUnits::One());
+      // EVM_BEGIN
+      if (RD->isEmpty()) {
+        if (Context.getCXXABIKind() == clang::TargetCXXABI::EVM) {
+          // Size of empty struct must be one EVM word, which is 256-bits width
+          setSize(Context.toCharUnitsFromBits(
+              Context.getTargetInfo().getPointerAlign(0)));
+        } else {
+          setSize(CharUnits::One());
+        }
+      }
+      // EVM_END
     }
     else
       setSize(CharUnits::One());

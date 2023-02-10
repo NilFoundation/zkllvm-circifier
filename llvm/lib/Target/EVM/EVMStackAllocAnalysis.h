@@ -40,6 +40,9 @@ typedef struct StackAssignment_ {
   StackRegion region;
   // For memory allocation
   unsigned slot;
+  bool operator==(const StackAssignment_& RHS) const {
+    return region == RHS.region && slot == slot;
+  }
 } StackAssignment;
 
 // The stack arrangement is as follows:
@@ -199,6 +202,8 @@ private:
   MachineFunction *F;
   MachineRegisterInfo *MRI;
 
+  MachineInstr *CurrentInstr{nullptr};
+
   // edge set information
   EdgeSets edgeSets;
 
@@ -295,8 +300,8 @@ private:
   void insertStoreToMemoryBefore(unsigned reg, MachineInstr &MI, unsigned memSlot);
   void insertDupBefore(unsigned index, MachineInstr &MI);
   void insertSwapBefore(unsigned index, MachineInstr &MI);
-  void insertSwapAfter(unsigned index, MachineInstr &MI);
-  void insertPopAfter(MachineInstr &MI);
+  MachineInstr* insertSwapAfter(unsigned index, MachineInstr &MI);
+  MachineInstr* insertPopAfter(MachineInstr &MI, bool TouchStack);
   void insertPopBefore(MachineInstr &MI);
 
   void handleUnaryOpcode(MOPUseType useTypes, MachineInstr &MI);

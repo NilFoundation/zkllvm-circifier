@@ -16,26 +16,39 @@
 
 #include <sstream>
 
-using namespace llvm;
-
-unsigned EVM::getEncodedSize(Function &F) {
-	// for now we just use a place holder
-	return 32;
-}
-
 #define COMMENT_FLAG_BITSHIFT 4
-#define VALUE_FLAG_BITWIDTH   4
-#define VALUE_FLAG_BITSHIFT  16
+#define VALUE_FLAG_BITWIDTH 4
+#define VALUE_FLAG_BITSHIFT 16
 
-uint32_t EVM::BuildCommentFlags(AsmComments commentFlag, uint16_t value) {
+namespace llvm::EVM {
+
+uint32_t BuildCommentFlags(AsmComments commentFlag, uint16_t value) {
   return MachineInstr::TAsmComments | (commentFlag << COMMENT_FLAG_BITSHIFT) |
          (value << VALUE_FLAG_BITSHIFT);
 }
 
-void EVM::ParseCommentFlags(uint32_t input, AsmComments &commentFlag,
+void ParseCommentFlags(uint32_t input, AsmComments &commentFlag,
                             uint16_t &value) {
   assert(input & MachineInstr::TAsmComments);
   value = (input >> VALUE_FLAG_BITSHIFT);
   commentFlag = (AsmComments)((input >> COMMENT_FLAG_BITSHIFT) &
                               (1 << (VALUE_FLAG_BITWIDTH - 1)));
 }
+
+ValType valTypeFromMVT(MVT T) {
+  switch (T.SimpleTy) {
+  case MVT::i32:
+    return ValType::I32;
+  case MVT::i64:
+    return ValType::I64;
+  case MVT::i128:
+    return ValType::I128;
+  case MVT::i256:
+    return ValType::I256;
+  default:
+    llvm_unreachable("unexpected type");
+  }
+}
+
+}  // namespace llvm::EVM
+

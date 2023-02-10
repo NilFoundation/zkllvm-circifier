@@ -332,7 +332,8 @@ void MCObjectFileInfo::initMachOMCObjectFileInfo(const Triple &T) {
 }
 
 void MCObjectFileInfo::initEVMMCObjectFileInfo(const Triple &T) {
-  TextSection = Ctx->getEVMSection();
+  TextSection = Ctx->getEVMSection(".text");
+  DataSection = Ctx->getEVMSection(".data");
 }
 
 void MCObjectFileInfo::initELFMCObjectFileInfo(const Triple &T, bool Large) {

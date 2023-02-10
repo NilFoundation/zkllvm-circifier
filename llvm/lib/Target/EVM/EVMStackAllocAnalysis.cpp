@@ -19,6 +19,18 @@
 
 using namespace llvm;
 
+struct ScopePrint {
+  ScopePrint(const char* msg) : Message(msg) {
+    if (::llvm::DebugFlag)
+      errs() << "[start] " << msg << '\n';
+  }
+  ~ScopePrint() {
+    if (::llvm::DebugFlag)
+      errs() << "[finish] " << Message << '\n';
+  }
+  const char* Message;
+};
+
 #define DEBUG_TYPE "evm-stackalloc"
 
 // Register this pass...
@@ -101,15 +113,11 @@ unsigned EVMStackStatus::findRegDepth(unsigned reg) const {
   for (unsigned d = 0; d < curHeight; ++d) {
     unsigned stackReg = get(d);
     if (stackReg == reg) {
-      /*
-      LLVM_DEBUG({
-        dbgs() << "    Found %" << Register::virtReg2Index(reg)
-               << " at depth: " << d << "\n";
-      });
-      */
       return d;
     }
   }
+  dump();
+  errs() << "Register not found: %" << Register::virtReg2Index(reg) << '\n';
   llvm_unreachable("Cannot find register on stack");
 }
 
@@ -595,6 +603,8 @@ void EVMStackAlloc::analyzeBasicBlock(MachineBasicBlock *MBB) {
   MachineInstr &BeginMI = tryToAnalyzeStackArgs(MBB);
   beginOfBlockUpdates(MBB);
 
+  assert(MBB->getNumber() == 0 || stack.getStackDepth() == 0);
+
   LLVM_DEBUG({
     dbgs() << "    X Stack dump: (size: " << stack.getStackDepth() << ") \n";
     stack.dump();
@@ -604,7 +614,8 @@ void EVMStackAlloc::analyzeBasicBlock(MachineBasicBlock *MBB) {
   for (MachineBasicBlock::iterator I(BeginMI), E = MBB->end(); I != E;) {
     MachineInstr &MI = *I++;
     assert(MI.getOpcode() != EVM::pSTACKARG_r);
-    LLVM_DEBUG({ dbgs() << "\n  Instr: "; MI.dump();});
+    LLVM_DEBUG({ dbgs() << "====================================================\n  Instr: "; MI.dump();});
+    CurrentInstr = &MI;
 
     // First consume, then create
     handleUses(MI);
@@ -623,27 +634,28 @@ void EVMStackAlloc::cleanUpDeadRegisters(MachineInstr &MI) {
   if (MI.getNumExplicitOperands() - MI.getNumExplicitDefs() <= 2) {
     return;
   }
+  ScopePrint print("cleanUpDeadRegisters");
 
   std::vector<MOPUseType> useTypes;
   unsigned uses = calculateUseRegs(MI, useTypes);
   assert(uses > 2 && useTypes.size() > 2);
 
-  MachineBasicBlock::iterator insertPoint(MI);
+  MachineBasicBlock::iterator insertPoint(*CurrentInstr);
   insertPoint++;
   MachineBasicBlock *MBB = MI.getParent();
   for (MOPUseType mut : useTypes) {
-    if (mut.second.isLastUse) {
+    if (mut.second.isLastUse && !mut.second.isMemUse) {
       unsigned depth = stack.findRegDepth(mut.second.reg);
 
       if (depth != 0) {
         if (insertPoint == MBB->end()) {
-          insertSwapAfter(depth, MI);
+          CurrentInstr = insertSwapAfter(depth, *CurrentInstr);
         } else {
           insertSwapBefore(depth, *insertPoint);
         }
       }
       if (insertPoint == MBB->end()) {
-        insertPopAfter(MI);
+        CurrentInstr = insertPopAfter(*CurrentInstr, true);
       } else {
         insertPopBefore(*insertPoint);
       }
@@ -755,6 +767,8 @@ void EVMStackAlloc::handleDef(MachineInstr &MI) {
     return;
   }
 
+  ScopePrint print("handleDefs");
+
   unsigned defReg = getDefRegister(MI);
 
   // case: multiple defs:
@@ -767,7 +781,7 @@ void EVMStackAlloc::handleDef(MachineInstr &MI) {
       LLVM_DEBUG(dbgs() << "    Allocating %"
                         << Register::virtReg2Index(defReg)
                         << " to NO_ALLOCATION.\n");
-      insertPopAfter(MI);
+      CurrentInstr = insertPopAfter(MI, false);
       return;
     }
 
@@ -874,6 +888,7 @@ unsigned EVMStackAlloc::calculateUseRegs(MachineInstr &MI, std::vector<MOPUseTyp
         dbgs() << "found sar_r\n";
       });
   }
+  std::unordered_set<unsigned> SeenRegs;
   unsigned index = 0;
   for (const MachineOperand &MOP : MI.explicit_uses()) {
     if (!MOP.isReg()) {
@@ -891,16 +906,15 @@ unsigned EVMStackAlloc::calculateUseRegs(MachineInstr &MI, std::vector<MOPUseTyp
     }
 
     unsigned useReg = MOP.getReg();
+    bool alreadySeen = SeenRegs.find(useReg) != SeenRegs.end();
+
     // get stack assignment
     assert(regAssignments.find(useReg) != regAssignments.end());
     StackAssignment SA = regAssignments.lookup(useReg);
     assert(SA.region != NO_ALLOCATION && "Cannot see unused register use.");
 
     bool isMemUse = false;
-    bool isLastUse = false;
-    if (regIsLastUse(MOP)) {
-      isLastUse = true;
-    }
+    bool isLastUse = regIsLastUse(MOP) && !alreadySeen;
 
     RegUseType RUT;
     if (SA.region == NONSTACK) {
@@ -912,6 +926,7 @@ unsigned EVMStackAlloc::calculateUseRegs(MachineInstr &MI, std::vector<MOPUseTyp
       RUT = {isLastUse, isMemUse, depth, useReg};
     }
 
+    SeenRegs.insert(useReg);
     useTypes.push_back({index, RUT});
     ++index;
   }
@@ -919,7 +934,7 @@ unsigned EVMStackAlloc::calculateUseRegs(MachineInstr &MI, std::vector<MOPUseTyp
 }
 
 void EVMStackAlloc::handleUses(MachineInstr &MI) {
-
+  ScopePrint print("handleUses");
   // Collect reg use info
   std::vector<MOPUseType> useTypes;
   calculateUseRegs(MI, useTypes);
@@ -984,6 +999,7 @@ void EVMStackAlloc::insertLoadFromMemoryBefore(unsigned reg, MachineInstr &MI,
 
 void EVMStackAlloc::insertDupBefore(unsigned index, MachineInstr &MI) {
   assert(index > 0);
+  assert(index <= 16);
   MachineBasicBlock *MBB = MI.getParent();
   MachineFunction &MF = *MBB->getParent();
   MachineInstrBuilder dup = BuildMI(MF, MI.getDebugLoc(), TII->get(EVM::DUP_r)).addImm(index);
@@ -1007,6 +1023,7 @@ void EVMStackAlloc::insertStoreToMemoryAfter(unsigned reg, MachineInstr &MI,
   // TODO: insert this new put local to LiveIntervals
   LLVM_DEBUG(dbgs() << "    >>> AFTER PUTLOCAL(" << memSlot << ") <= %"
                     << Register::virtReg2Index(reg) << "\n");
+  CurrentInstr = putlocal.getInstr();
 }
 
 void EVMStackAlloc::insertStoreToMemoryBefore(unsigned reg, MachineInstr &MI,
@@ -1026,18 +1043,27 @@ void EVMStackAlloc::insertStoreToMemoryBefore(unsigned reg, MachineInstr &MI,
                     << Register::virtReg2Index(reg) << "\n");
 }
 
-void EVMStackAlloc::insertPopAfter(MachineInstr &MI) {
+MachineInstr* EVMStackAlloc::insertPopAfter(MachineInstr &MI, bool TouchStack) {
   // TODO: this is buggy, we should only use it when the MI is the last
   // instruction in the MBB.
+  LLVM_DEBUG({
+    dbgs() << "=== insertPopAfter "; MI.dump();
+  });
   MachineBasicBlock *MBB = MI.getParent();
   MachineFunction &MF = *MBB->getParent();
   MachineInstrBuilder pop = BuildMI(MF, MI.getDebugLoc(), TII->get(EVM::POP_r));
   MBB->insertAfter(MachineBasicBlock::iterator(MI), pop);
   LIS->InsertMachineInstrInMaps(*pop);
-  stack.pop();
+  if (TouchStack) {
+    stack.pop();
+  }
+  return pop.getInstr();
 }
 
 void EVMStackAlloc::insertPopBefore(MachineInstr &MI) {
+  LLVM_DEBUG({
+    dbgs() << "=== insertPopBefore "; MI.dump();
+  });
   MachineBasicBlock *MBB = MI.getParent();
   MachineInstrBuilder pop =
       BuildMI(*MBB->getParent(), MI.getDebugLoc(), TII->get(EVM::POP_r));
@@ -1046,9 +1072,12 @@ void EVMStackAlloc::insertPopBefore(MachineInstr &MI) {
   stack.pop();
 }
 
-void EVMStackAlloc::insertSwapAfter(unsigned index, MachineInstr &MI) {
+MachineInstr* EVMStackAlloc::insertSwapAfter(unsigned index, MachineInstr &MI) {
   // TODO: this is buggy, we should only use it when the MI is the last
   // instruction in the MBB.
+  LLVM_DEBUG({
+    dbgs() << "=== insertSwapAfter "; MI.dump();
+  });
   MachineBasicBlock *MBB = MI.getParent();
   MachineInstrBuilder swap =
       BuildMI(*MBB->getParent(), MI.getDebugLoc(), TII->get(EVM::SWAP_r))
@@ -1056,9 +1085,13 @@ void EVMStackAlloc::insertSwapAfter(unsigned index, MachineInstr &MI) {
   MBB->insertAfter(MachineBasicBlock::iterator(MI), swap);
   LIS->InsertMachineInstrInMaps(*swap);
   stack.swap(index);
+  return swap.getInstr();
 }
 
 void EVMStackAlloc::insertSwapBefore(unsigned index, MachineInstr &MI) {
+  LLVM_DEBUG({
+    dbgs() << "=== insertSwapBefore "; MI.dump();
+  });
   MachineBasicBlock *MBB = MI.getParent();
   MachineInstrBuilder swap =
       BuildMI(*MBB->getParent(), MI.getDebugLoc(), TII->get(EVM::SWAP_r))
@@ -1408,6 +1441,13 @@ void EVMStackAlloc::handleBinaryOpcode(EVMStackAlloc::MOPUseType op1, MOPUseType
 
     unsigned depth1 = stack.findRegDepth(reg1);
     unsigned depth2 = stack.findRegDepth(reg2);
+    if (depth1 == depth2) {
+      assert(MI.getOpcode() == EVM::EQ_r);
+      assert(reg1 == reg2);
+      insertDupBefore(depth1 + 1, MI);
+      depth1 = 0;
+      depth2++;
+    }
 
     bool lastUse1 = regIsLastUse(MOP1);
     bool lastUse2 = regIsLastUse(MOP2);

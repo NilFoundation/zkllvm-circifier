@@ -1,6 +1,6 @@
 // EVM_RUN: function: bits, input: [0xffffffff], result: 1
 // EVM_RUN: function: bits, input: [0xfff8ffff], result: 0
-long bits(long num)
+[[evm]] long bits(long num)
 {
   long count = 0, n = 0, i = 0;
 
@@ -29,7 +29,7 @@ long bits(long num)
 }
 
 // EVM_RUN: function: changebits, input: [0x11223344, 0x55667788, 0x00000000C, 0x00000013], result: 0x11267344
-long changebits(long num1, long num2, long pos1, long pos2)
+[[evm]] long changebits(long num1, long num2, long pos1, long pos2)
 {
   long temp1, temp_1, buffer2, bit1 = 0, bit2 = 0, counter = 0, a = 1;
 
@@ -71,14 +71,14 @@ long changebits(long num1, long num2, long pos1, long pos2)
 
 // EVM_RUN: function: n_bit_position, input: [0x87654321, 15], result: 0
 // EVM_RUN: function: n_bit_position, input: [0x87654321, 14], result: 1
-long n_bit_position(long number,long position)
+[[evm]] long n_bit_position(long number,long position)
 {
   long result = (number>>(position));
   return result & 1;
 }
 
 // EVM_RUN: function: num_bits, input: [0x12345678, 0x87654321], result: 0xe
-int num_bits(int n, int m)
+[[evm]] int num_bits(int n, int m)
 {
   int i, count = 0, a, b;
 
@@ -93,7 +93,7 @@ int num_bits(int n, int m)
 }
 
 // EVM_RUN: function: swap, input: [0x00000001, 0x00000000, 0x00000001F], result: 0x80000000
-long  swap(long n, long p, long q)
+[[evm]] long  swap(long n, long p, long q)
 {
   // see if the bits are same. we use XOR operator to do so.
   if (((n & ((long)1 << p)) >> p) ^ ((n & ((long)1 << q)) >> q))

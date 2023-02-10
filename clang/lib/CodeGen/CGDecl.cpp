@@ -357,6 +357,13 @@ CodeGenFunction::AddInitializerToStaticVarDecl(const VarDecl &D,
 #ifndef NDEBUG
   CharUnits VarSize = CGM.getContext().getTypeSizeInChars(D.getType()) +
                       D.getFlexibleArrayInitChars(getContext());
+  // EVM_BEGIN
+  if (getContext().getCXXABIKind() == TargetCXXABI::EVM) {
+    auto Align =
+        CGM.getContext().toCharUnitsFromBits(getTarget().getPointerAlign(0));
+    VarSize = VarSize.alignTo(Align);
+  }
+  // EVM_END
   CharUnits CstSize = CharUnits::fromQuantity(
       CGM.getDataLayout().getTypeAllocSize(Init->getType()));
   assert(VarSize == CstSize && "Emitted constant has unexpected size");

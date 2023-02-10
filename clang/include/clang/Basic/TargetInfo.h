@@ -69,6 +69,7 @@ enum class FloatModeKind {
 struct TransferrableTargetInfo {
   unsigned short PointerWidth, PointerAlign;
   unsigned short BoolWidth, BoolAlign;
+  unsigned short CharWidth, CharAlign;
   unsigned short IntWidth, IntAlign;
   unsigned short HalfWidth, HalfAlign;
   unsigned short BFloat16Width, BFloat16Align;
@@ -449,8 +450,8 @@ public:
   /// Return the alignment of '_Bool' and C++ 'bool' for this target.
   unsigned getBoolAlign() const { return BoolAlign; }
 
-  unsigned getCharWidth() const { return 8; } // FIXME
-  unsigned getCharAlign() const { return 8; } // FIXME
+  unsigned getCharWidth() const { return CharWidth; } // FIXME
+  unsigned getCharAlign() const { return CharAlign; } // FIXME
 
   /// Return the size of 'signed short' and 'unsigned short' for this
   /// target, in bits.
@@ -595,6 +596,13 @@ public:
   virtual bool hasInt128Type() const {
     return (getPointerWidth(0) >= 64) || getTargetOpts().ForceEnableInt128;
   } // FIXME
+
+  // EVM_BEGIN
+  /// Determine whether the __int256 type is supported on this target.
+  virtual bool hasInt256Type() const {
+    return false;
+  }
+  // EVM_E
 
   /// Determine whether the _BitInt type is supported on this target. This
   /// limitation is put into place for ABI reasons.

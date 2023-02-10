@@ -494,6 +494,16 @@ private:
   bool canCallMismatchedFunctionType() const override { return false; }
 };
 
+class EVMCXXABI final : public ItaniumCXXABI {
+public:
+  explicit EVMCXXABI(CodeGen::CodeGenModule &CGM)
+      : ItaniumCXXABI(CGM, /*UseARMMethodPtrABI=*/false,
+      /*UseARMGuardVarABI=*/false) {}
+
+private:
+
+};
+
 class XLCXXABI final : public ItaniumCXXABI {
 public:
   explicit XLCXXABI(CodeGen::CodeGenModule &CGM)
@@ -554,6 +564,9 @@ CodeGen::CGCXXABI *CodeGen::CreateItaniumCXXABI(CodeGenModule &CGM) {
 
   case TargetCXXABI::Microsoft:
     llvm_unreachable("Microsoft ABI is not Itanium-based");
+
+  case TargetCXXABI::EVM:
+    return new EVMCXXABI(CGM);
   }
   llvm_unreachable("bad ABI kind");
 }

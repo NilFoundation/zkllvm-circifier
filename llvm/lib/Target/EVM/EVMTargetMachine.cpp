@@ -36,12 +36,13 @@ extern "C" void LLVMInitializeEVMTarget() {
 
 static std::string computeDataLayout(const Triple &TT) {
   // TODO: modify this.
-  return "e-S256-i:256:256-p:256:256-a:256:256";
+  return "e-a:256:256-p:256:256-i1:256:256-i8:256:256-i16:256:256-i32"
+         ":256:256-i64:256:256-i128:256:256-i256:256:256-S256";
 }
 
 static Reloc::Model getEffectiveRelocModel(const Triple &TT,
                                            Optional<Reloc::Model> RM) {
-  if (!RM.hasValue())
+  if (!RM.has_value())
     return Reloc::Static;
   return *RM;
 }
@@ -80,7 +81,7 @@ public:
 
   // No reg alloc
   bool addRegAssignAndRewriteFast() override { return false; }
-  // No reg alloc
+  // EVM doesn't use reg alloc
   bool addRegAssignAndRewriteOptimized() override { return false; }
 };
 } // namespace
@@ -116,6 +117,8 @@ void EVMPassConfig::addPreEmitPass() {
     // addPass(createEVMPrepareStackification());
     //  This is the major pass we will use to stackify registers
     addPass(createEVMStackAllocPass());
+    // TODO: Replace with reworked Stack Allocator
+    // addPass(createEVMStackAllocationPass());
   } else {
     // In this pass we assign un-stackified registers
     // with an explicit memory location for storage.

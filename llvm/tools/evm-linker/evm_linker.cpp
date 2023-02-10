@@ -22,107 +22,443 @@
 // SOFTWARE.
 //---------------------------------------------------------------------------//
 
+#include "evm_builder.h"
 #include "evm_opcodes.h"
+#include "evm_file.h"
 #include "nil/crypto3/hash/algorithm/hash.hpp"
 #include "nil/crypto3/hash/keccak.hpp"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/JSON.h"
-#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/ToolOutputFile.h"
 #include "llvm/Support/WithColor.h"
 
-#include <fstream>
-#include <unordered_map>
-#include <variant>
+#include <filesystem>
+#include <numeric>
 
 using namespace llvm;
+using namespace nil::crypto3;
 
-static cl::opt<std::string>
-    InputFilename(cl::Positional, cl::desc("<input file>"), cl::init("-"));
-
+static cl::list<std::string> InputFilenames(cl::Positional, cl::OneOrMore,
+                                            cl::desc("<input file>"));
 static cl::opt<std::string> OutputFilename("o", cl::desc("Output filename"),
                                            cl::value_desc("filename"));
+static cl::opt<bool> NoCtor("no-ctor",
+                            cl::desc("Don't generate contract constructor"),
+                            llvm::cl::init(false));
+static cl::opt<bool> BinaryOutput("binary-output",
+                                  cl::desc("Output is raw binary data"),
+                                  llvm::cl::init(false));
+static cl::opt<bool> KeepUnused("keep-unused",
+                                cl::desc("Keep unused symbols in result file"),
+                                llvm::cl::init(false));
+static cl::opt<bool> OptVerbose("verbose",
+                                cl::desc("Verbose output"),
+                                llvm::cl::init(false));
 
-static uint32_t getSignatureHash(const std::string &Name) {
-  using namespace nil::crypto3;
+static std::unique_ptr<ToolOutputFile> OpenOutputFile(std::string_view Path);
+static void WriteDataToStream(raw_fd_ostream& OS, const void* Data, size_t Size);
 
-  accumulator_set<hashes::keccak_1600<256>> acc;
-  hash<hashes::keccak_1600<256>>(Name.begin(), Name.end(), acc);
-  auto sha3 = accumulators::extract::hash<hashes::keccak_1600<256>>(acc);
-
-  return (sha3[0] << 24) | (sha3[1] << 16) | (sha3[2] << 8) | sha3[3];
-}
-
-struct JumpTarget;
-
-struct EVMInst {
-  EVMInst(unsigned O) : Opcode(O) {}
-  template <typename T> EVMInst(unsigned O, T V) : Opcode(O), Operand(V) {}
-
-  bool hasOperand() const {
-    return !std::holds_alternative<std::monostate>(Operand);
-  }
-
-  bool hasImmediate() const { return std::holds_alternative<int64_t>(Operand); }
-
-  int64_t getImmediate() const { return std::get<int64_t>(Operand); }
-
-  bool hasJumpTarget() const {
-    return std::holds_alternative<JumpTarget *>(Operand);
-  }
-
-  JumpTarget *getJumpTarget() const { return std::get<JumpTarget *>(Operand); }
-
-  unsigned Opcode;
-  std::variant<std::monostate, int64_t, JumpTarget *> Operand;
-};
-
-struct JumpTarget {
-  std::vector<unsigned> PatchOffsets;
-  unsigned Offset{0};
-  bool FunctionTarget{false};
-};
-
-class InstBuilder {
+class EvmLinker {
 public:
-  EVMInst &inst(unsigned Opcode) { return Instructions.emplace_back(Opcode); }
+  int run();
 
-  void inst(unsigned Opcode, int64_t Imm) {
-    Instructions.emplace_back(Opcode, Imm);
-  }
+  void collectFilesInfo();
 
-  void inst(unsigned Opcode, const std::string &Target) {
-    auto &JT = JumpMap[Target];
-    Instructions.emplace_back(Opcode, &JT);
-  }
+  void buildDispatcher();
 
-  void push_target(const std::string &Target) { inst(opcodes::PUSH2, Target); }
+  void buildConstructor();
 
-  void push_func(const std::string &Target, unsigned Offset) {
-    auto &JT = JumpMap[Target];
-    JT.FunctionTarget = true;
-    JT.Offset = Offset;
-    inst(opcodes::PUSH2, Target);
-  }
+  void removeUnreachable();
 
-  auto &getInstructions() { return Instructions; }
-  auto &getJumpMap() { return JumpMap; }
+  void resolve(bool CheckReachable);
+
+
+  void emit();
 
 private:
-  std::unordered_map<std::string, JumpTarget> JumpMap;
-  std::vector<EVMInst> Instructions;
+  evm::Builder Dispatcher;
+  evm::Builder Constructor;
+  std::vector<std::unique_ptr<EvmFile>> Files;
+  std::vector<uint8_t> InitData;
+  SymbolMap SymbolMap;
+  SymbolManager SymManager;
+  unsigned GlobalsSectionSize{0};
+  unsigned CodeSize{0};
 };
 
-static std::unique_ptr<ToolOutputFile> GetOutputStream() {
-  std::string Path;
-  if (OutputFilename.empty()) {
-    Path = InputFilename + ".eb";
-    WithColor::note() << "Output file is not specified, writing to " << Path
-                      << '\n';
-  } else {
-    Path = OutputFilename;
+int EvmLinker::run() {
+  Files.reserve(InputFilenames.size());
+  for (auto& InputFile : InputFilenames) {
+    auto File = EvmFile::Create(InputFile, SymManager);
+    if (!File) {
+      LOG() << "Failed to load input file `" << InputFile << '\n';
+      return 1;
+    }
+    Files.push_back(std::move(File));
   }
+
+  buildDispatcher();
+  if (!NoCtor) {
+    buildConstructor();
+  }
+
+  SymbolMap.clear();
+  for (auto& File : Files) {
+    for (auto& Func: File->getFunctions()) {
+      auto InsRes = SymbolMap.insert(std::make_pair(Func->Name, Func.get()));
+      if (!InsRes.second) {
+        report_fatal_error(Twine("Duplicated symbol(function): ") + Func->Name);
+      }
+    }
+    for (auto& G: File->getGlobals()) {
+      auto InsRes = SymbolMap.insert(std::make_pair(G->Name, G.get()));
+      if (!InsRes.second) {
+        report_fatal_error(Twine("Duplicated symbol(global): ") + G->Name);
+      }
+    }
+  }
+
+  removeUnreachable();
+  resolve(true);
+  emit();
+
+  return 0;
+}
+
+
+void EvmLinker::buildDispatcher() {
+  Dispatcher.push("stack_start");
+  Dispatcher.inst(opcodes::PUSH1, 0x00);
+  Dispatcher.inst(opcodes::MSTORE);
+  Dispatcher.push("init_data_size");
+  Dispatcher.push("init_data_code_offset");
+  Dispatcher.push("init_data_mem_offset");
+  Dispatcher.inst(opcodes::CODECOPY);
+  // Check that there are at least 4 bytes for function's hash
+  Dispatcher.inst(opcodes::PUSH1, 0x4);
+  Dispatcher.inst(opcodes::CALLDATASIZE);
+  Dispatcher.inst(opcodes::LT);
+  Dispatcher.push("fail");
+  Dispatcher.inst(opcodes::JUMPI);
+
+  // Load callee function's hash
+  Dispatcher.inst(opcodes::PUSH1, 0);
+  Dispatcher.inst(opcodes::CALLDATALOAD);
+  Dispatcher.inst(opcodes::PUSH1, 0xe0);
+  Dispatcher.inst(opcodes::SHR);
+
+  // Switch table over all functions
+  for (auto& File : Files) {
+    for (auto& Func : File->getFunctions()) {
+      if (!Func->Visible) {
+        continue;
+      }
+
+      // Calculate function hash form its signature.
+      // Example of signature: some_function(uint256,uint32[],bytes10,bytes)
+      accumulator_set<hashes::keccak_1600<256>> Acc;
+      auto addHash = [&Acc](const std::string& S) {
+        hash<hashes::keccak_1600<256>>(S.begin(), S.end(), Acc);
+      };
+      addHash(Func->DemangledName);
+      addHash("(");
+      bool IsFirst = true;
+      for (auto Input : Func->Inputs) {
+        if (!IsFirst) {
+          addHash(",");
+        }
+        addHash(EVM::ValTypeToString(Input));
+        IsFirst = false;
+      }
+      addHash(")");
+      auto sha3 = accumulators::extract::hash<hashes::keccak_1600<256>>(Acc);
+      auto Hash = (sha3[0] << 24) | (sha3[1] << 16) | (sha3[2] << 8) | sha3[3];
+      Dispatcher.inst(opcodes::DUP1);
+      Dispatcher.inst(opcodes::PUSH4, Hash);
+      Dispatcher.inst(opcodes::EQ);
+      Dispatcher.push(Func->Name + "#trampoline");
+      Dispatcher.inst(opcodes::JUMPI);
+    }
+  }
+  Dispatcher.push("fail");
+  Dispatcher.inst(opcodes::JUMP);
+
+  // We use trampoline for each function invocation, where we copy function's
+  // arguments from the calldata memory to the stack. Then jump to the
+  // function code.
+  for (auto& File : Files) {
+    for (auto &Func : File->getFunctions()) {
+      if (!Func->Visible) {
+        continue;
+      }
+      Dispatcher.jump_dest(Func->Name + "#trampoline");
+      Dispatcher.inst(opcodes::POP);
+      Dispatcher.push(Func->Name + "#return");
+      // Push arguments in reverse order
+      for (int i = Func->Inputs.size() - 1; i >= 0; i--) {
+        Dispatcher.inst(opcodes::PUSH1, 4 + i * 32);
+        Dispatcher.inst(opcodes::CALLDATALOAD);
+      }
+      Dispatcher.push(Func->Name);
+      Dispatcher.inst(opcodes::JUMP);
+      Dispatcher.jump_dest(Func->Name + "#return");
+      // TODO: Should read function's abi to determine return size.
+      Dispatcher.inst(opcodes::PUSH1, 0);
+      Dispatcher.inst(opcodes::MSTORE);
+      Dispatcher.inst(opcodes::PUSH1, 0x20);
+      Dispatcher.inst(opcodes::PUSH1, 0);
+      Dispatcher.inst(opcodes::RETURN);
+    }
+  }
+
+  // Build failure block
+  Dispatcher.jump_dest("fail");
+  Dispatcher.inst(opcodes::PUSH1, 0);
+  Dispatcher.inst(opcodes::DUP1);
+  Dispatcher.inst(opcodes::REVERT);
+
+  Dispatcher.emit();
+
+}
+
+void EvmLinker::buildConstructor() {
+  Constructor.inst(opcodes::PUSH1, 0x80);
+  Constructor.inst(opcodes::PUSH1, 0x40);
+  Constructor.inst(opcodes::MSTORE);
+  Constructor.push4("codesize");
+  Constructor.inst(opcodes::DUP1);
+  Constructor.push1("codestart");
+  Constructor.inst(opcodes::PUSH1, 0x00);
+  Constructor.inst(opcodes::CODECOPY);
+  Constructor.inst(opcodes::PUSH1, 0x00);
+  Constructor.inst(opcodes::RETURN);
+  Constructor.label("codestart");
+
+  Constructor.emit();
+  Constructor.resolveFixup("codestart", Constructor.size());
+}
+
+
+void EvmLinker::resolve(bool CheckReachable) {
+  // Update functions offsets according to other files.
+  // Also resolve references to the functions in Dispatcher.
+  unsigned FileOffset = Dispatcher.size();
+  for (auto& File : Files) {
+    File->setOffset(FileOffset);
+    for (auto &Func : File->getFunctions()) {
+      if (!Func->Reachable) {
+        continue;
+      }
+      Func->Offset += FileOffset;
+      if (Func->Visible) {
+        Dispatcher.resolveFixup(Func->Name, Func->Offset);
+      }
+    }
+    FileOffset += File->getCode().size();
+  }
+
+  unsigned DataOffset = InitDataOffset;
+  for (auto &File : Files) {
+    DataOffset = File->resolveGlobalsWithInitData(DataOffset);
+  }
+
+  for (auto &File : Files) {
+    DataOffset = File->resolveGlobalsWithoutInitData(DataOffset);
+  }
+  GlobalsSectionSize = DataOffset;
+
+  for (auto& File : Files) {
+    File->resolve(SymbolMap);
+  }
+
+  for (auto &File : Files) {
+    File->appendInitData(InitData);
+  }
+
+  CodeSize = std::accumulate(Files.begin(), Files.end(), 0,
+                             [](auto Acc, const auto& F) {
+                               return Acc + F->getCode().size();
+                             });
+
+  Dispatcher.resolveFixup("init_data_size", InitData.size());
+  Dispatcher.resolveFixup("init_data_code_offset",
+                          CodeSize + Dispatcher.size());
+  Dispatcher.resolveFixup("init_data_mem_offset", InitDataOffset);
+  Dispatcher.resolveFixup("stack_start", GlobalsSectionSize);
+  if (!NoCtor) {
+    Constructor.resolveFixup("codesize", CodeSize + Dispatcher.size());
+  }
+}
+
+/// Remove all symbols, that are not reachable from root symbols. Root symbols
+/// are the symbols, that have `evm` attribute.
+void EvmLinker::removeUnreachable() {
+  if (KeepUnused) {
+    for (auto& File : Files) {
+      for (auto &Func : File->getFunctions()) {
+        Func->Reachable = true;
+      }
+    }
+    return;
+  }
+  DependencyGraph DepGraph(SymbolMap);
+  for (auto& File : Files) {
+    File->buildDepGraph(DepGraph);
+  }
+  for (auto& File : Files) {
+    for (auto &Func : File->getFunctions()) {
+      if (Func->Visible) {
+        DepGraph.markReachable(Func.get());
+      }
+    }
+  }
+  for (auto& File : Files) {
+    File->removeUnreachable();
+  }
+}
+
+void EvmLinker::emit() {
+
+  std::string BinOutputName;
+
+  if (OutputFilename.empty()) {
+    BinOutputName = InputFilenames[0] + ".bin";
+    WithColor::note() << "Output file is not specified, writing to "
+                      << BinOutputName << '\n';
+  } else {
+    BinOutputName = OutputFilename;
+  }
+
+  { // Emit code
+    auto Stream = OpenOutputFile(BinOutputName);
+    if (!Stream) {
+      report_fatal_error("Can't open output file");
+    }
+
+    if (!NoCtor) {
+      Constructor.verify();
+      WriteDataToStream(Stream->os(), Constructor.data(),
+                        Constructor.size());
+    }
+    Dispatcher.verify();
+    LOG() << "Dispatcher, ";
+    WriteDataToStream(Stream->os(), Dispatcher.data(), Dispatcher.size());
+    for (auto &File : Files) {
+      LOG() << "Code for " << File->getName() << ", ";
+      WriteDataToStream(Stream->os(), File->getCode().data(),
+                        File->getCode().size());
+    }
+    LOG() << "Init data, ";
+    WriteDataToStream(Stream->os(), InitData.data(), InitData.size());
+  }
+
+  { // Emit Abi file
+    std::string OutputName =
+        std::filesystem::path(BinOutputName).replace_extension("abi");
+    auto Stream = OpenOutputFile(OutputName);
+    json::OStream JsonAbi(Stream->os(), 2);
+    JsonAbi.arrayBegin();
+    for (auto& File : Files) {
+      File->emitAbi(JsonAbi);
+    }
+    JsonAbi.arrayEnd();
+  }
+
+  { // Emit auxiliary Info file
+    std::string OutputName =
+        std::filesystem::path(BinOutputName).replace_extension("info");
+    auto Stream = OpenOutputFile(OutputName);
+    json::OStream JsonInfo(Stream->os(), 2);
+    JsonInfo.objectBegin();
+
+    JsonInfo.attributeObject("info", [&]() {
+      JsonInfo.attribute("dispatcher.size", Dispatcher.size());
+      JsonInfo.attribute("code.size", CodeSize);
+      JsonInfo.attribute("globals.offset", CodeSize + Dispatcher.size());
+      JsonInfo.attribute("globals.size", InitData.size());
+      JsonInfo.attribute("code.file", BinOutputName);
+    });
+
+    JsonInfo.attributeObject("functions", [&]() {
+      for (auto &File : Files) {
+        for (auto &Func : File->getFunctions()) {
+          JsonInfo.attributeObject(Func->Name, [&]() {
+            JsonInfo.attribute("symbol", Func->Name);
+            JsonInfo.attribute("name", Func->DemangledName);
+            JsonInfo.attribute("offset", Func->Offset);
+            JsonInfo.attribute("size", Func->Size);
+          });
+        }
+      }
+      JsonInfo.attributeObject("__dispatcher__", [&]() {
+        JsonInfo.attribute("symbol", "__dispatcher__");
+        JsonInfo.attribute("name", "DISPATCHER");
+        JsonInfo.attribute("offset", 0);
+        JsonInfo.attribute("size", Dispatcher.size());
+      });
+    });
+
+    unsigned GlobalsSize = 0;
+    JsonInfo.attributeObject("globals", [&]() {
+      for (auto &File : Files) {
+        for (auto &G : File->getGlobals()) {
+          GlobalsSize += G->Size;
+          JsonInfo.attributeObject(G->Name, [&]() {
+            JsonInfo.attribute("name", G->Name);
+            JsonInfo.attribute("offset", G->Offset);
+            JsonInfo.attribute("size", G->Size);
+            if (!G->InitData.empty()) {
+              JsonInfo.attributeArray("data", [&]() {
+                for (auto V : G->InitData) {
+                  if (V.isSingleWord())
+                    JsonInfo.value(V.getZExtValue());
+                  else {
+                    SmallString<80> Str;
+                    V.toStringUnsigned(Str, 16);
+                    JsonInfo.value(Str);
+                  }
+                }
+              });
+            }
+          });
+        }
+      }
+    });
+
+    std::unordered_map<std::string, std::vector<Relocation>>
+        CollectedRelocations;
+
+    for (auto &File : Files) {
+      for (auto& [Symbol, Relocs]: File->getRelocations()) {
+        std::copy(Relocs.begin(), Relocs.end(), std::back_inserter(CollectedRelocations[Symbol]));
+      }
+    }
+    JsonInfo.attributeObject("relocations", [&] {
+      for (auto Relocation: CollectedRelocations) {
+        if (Relocation.first == "fix4" || !SymbolMap[Relocation.first]->Reachable) {
+          continue;
+        }
+        JsonInfo.attributeArray(Relocation.first, [&]() {
+          for (auto &Reloc : Relocation.second) {
+            if (!Reloc.TargetSymbol->Reachable) {
+              continue;
+            }
+            if (Reloc.Space == Relocation::SpaceKind::Code) {
+              std::string Value = Reloc.TargetSymbol->Name + "+" + std::to_string(Reloc.Offset);
+              JsonInfo.value(Value);
+            }
+          }
+        });
+      }
+    });
+
+
+    JsonInfo.objectEnd();
+  }
+}
+
+static std::unique_ptr<ToolOutputFile> OpenOutputFile(std::string_view Path) {
   std::error_code EC;
   auto Out =
       std::make_unique<ToolOutputFile>(Path, EC, sys::fs::OpenFlags::OF_None);
@@ -130,168 +466,23 @@ static std::unique_ptr<ToolOutputFile> GetOutputStream() {
     WithColor::error() << EC.message() << '\n';
     return nullptr;
   }
-
   Out->keep();
   return Out;
 }
 
+static void WriteDataToStream(raw_fd_ostream& OS, const void* Data, size_t Size) {
+  if (BinaryOutput) {
+    OS.write(reinterpret_cast<const char *>(Data), Size);
+  } else {
+    auto HexData =
+        toHex(ArrayRef(reinterpret_cast<const uint8_t*>(Data), Size), true);
+    LOG() << "Size=" << Size << '\n';
+    OS.write(reinterpret_cast<char*>(HexData.data()), HexData.size());
+  }
+}
+
 int main(int argc, char **argv) {
   cl::ParseCommandLineOptions(argc, argv, "Link EVM compiled files\n");
-
-  ErrorOr<std::unique_ptr<MemoryBuffer>> FileOrErr =
-      MemoryBuffer::getFileOrSTDIN(InputFilename, true);
-  auto JsonFile = json::parse(FileOrErr.get()->getBuffer());
-  if (!JsonFile) {
-    report_fatal_error("Can not open input file");
-  }
-
-  auto JsonData = JsonFile->getAsObject();
-
-  InstBuilder Builder;
-
-  Builder.inst(opcodes::PUSH1, 0x80);
-  Builder.inst(opcodes::PUSH1, 0x40);
-  Builder.inst(opcodes::MSTORE);
-  Builder.inst(opcodes::PUSH1, 0x60);
-  Builder.inst(opcodes::PUSH1, 0x00);
-  Builder.inst(opcodes::MSTORE);
-  // Check that there are at least 4 bytes for function's hash
-  Builder.inst(opcodes::PUSH1, 0x4);
-  Builder.inst(opcodes::CALLDATASIZE);
-  Builder.inst(opcodes::LT);
-  Builder.push_target("fail");
-  Builder.inst(opcodes::JUMPI);
-
-  // Load callee function's hash
-  Builder.inst(opcodes::PUSH1, 0);
-  Builder.inst(opcodes::CALLDATALOAD);
-  Builder.inst(opcodes::PUSH1, 0xe0);
-  Builder.inst(opcodes::SHR);
-
-  auto Functions = JsonData->getArray("functions");
-  if (!Functions) {
-    report_fatal_error("'functions' not found!");
-  }
-  // Switch table over all functions
-  for (auto F : *Functions) {
-    auto Func = F.getAsObject();
-    auto sha3 = getSignatureHash(Func->getString("name")->str());
-    Builder.inst(opcodes::DUP1);
-    Builder.inst(opcodes::PUSH4, sha3);
-    Builder.inst(opcodes::EQ);
-    Builder.push_target(Func->getString("name")->str() + "#trampoline");
-    Builder.inst(opcodes::JUMPI);
-  }
-  Builder.push_target("fail");
-  Builder.inst(opcodes::JUMP);
-
-  // We use trampoline for each function invocation, where we copy function's
-  // arguments from the calldata memory to the stack. Then jump to the
-  // function code.
-  for (auto F : *Functions) {
-    auto Func = F.getAsObject();
-    Builder.inst(opcodes::JUMPDEST, Func->getString("name")->str() + "#trampoline");
-    Builder.inst(opcodes::POP);
-    Builder.push_target(Func->getString("name")->str() + "#return");
-    auto InputArray = Func->getArray("inputs");
-    // Push arguments in reverse order
-    for (int i = InputArray->size() - 1; i >= 0; i--) {
-      auto InputObj = (*InputArray)[i].getAsObject();
-      auto Type = InputObj->getString("type")->str();
-      // TODO: support all types
-      assert(Type == "i256");
-      Builder.inst(opcodes::PUSH1, 4 + i * 32);
-      Builder.inst(opcodes::CALLDATALOAD);
-    }
-    Builder.push_func(Func->getString("name")->str(),
-                      Func->getInteger("offset").value());
-    Builder.inst(opcodes::JUMP);
-    Builder.inst(opcodes::JUMPDEST, Func->getString("name")->str() + "#return");
-    // TODO: Should read function's abi to determine return size.
-    Builder.inst(opcodes::PUSH1, 0);
-    Builder.inst(opcodes::MSTORE);
-    Builder.inst(opcodes::PUSH1, 0x20);
-    Builder.inst(opcodes::PUSH1, 0);
-    Builder.inst(opcodes::RETURN);
-  }
-
-  // Build failure block
-  Builder.inst(opcodes::JUMPDEST, "fail");
-  Builder.inst(opcodes::PUSH1, 0);
-  Builder.inst(opcodes::DUP1);
-  Builder.inst(opcodes::REVERT);
-
-  std::string EntryData;
-  raw_string_ostream OS(EntryData);
-  for (auto Inst : Builder.getInstructions()) {
-    OS.write(Inst.Opcode);
-    if (Inst.hasImmediate()) {
-      auto Imm = Inst.getImmediate();
-      unsigned push_size = opcodes::getPushSize(Inst.Opcode);
-      for (int i = push_size - 1; i >= 0; --i) {
-        char byte = (uint64_t)(0x00FF) & (Imm >> (i * 8));
-        OS.write(byte);
-      }
-    } else if (Inst.hasJumpTarget()) {
-      if (Inst.Opcode == opcodes::JUMPDEST) {
-        Inst.getJumpTarget()->Offset = EntryData.size() - 1;
-      } else {
-        assert(Inst.Opcode == opcodes::PUSH2 &&
-               "Only PUSH2 is supported at the moment");
-        Inst.getJumpTarget()->PatchOffsets.push_back(EntryData.size());
-        OS.write(0);
-        OS.write(0);
-      }
-    }
-  }
-
-  // We're done with the entry code, now functions' code will be encoded. So, it
-  // is time to patch all jump offsets, that were just encoded.
-  for (auto &It : Builder.getJumpMap()) {
-    auto &JT = It.second;
-    unsigned Offset = JT.Offset;
-    if (JT.FunctionTarget) {
-      Offset += EntryData.size();
-    }
-    assert(Offset != 0 && Offset <= 0xffff);
-    for (auto PatchOffset : JT.PatchOffsets) {
-      EntryData[PatchOffset] = (Offset >> 8) & 0xff;
-      EntryData[PatchOffset + 1] = Offset & 0xff;
-    }
-  }
-
-  // JSON file contains code in a string hex format. Here we're converting it
-  // to the raw binary format.
-  auto Code = JsonData->getString("code").value();
-  std::vector<uint8_t> CodeBuffer(Code.size() / 2);
-  for (unsigned i = 0; i < Code.size() / 2; i++) {
-    bool Res = to_integer(Code.substr(i * 2, 2), CodeBuffer[i], 16);
-    if (!Res) {
-      report_fatal_error("EntryData corrupted!");
-    }
-  }
-
-  // Patch all jump offsets resided in functions' code. We just increase all
-  // jump offset by size of function selector code.
-  auto JumpOffsets = JsonData->getArray("jump_offsets");
-  if (JumpOffsets) {
-    for (auto it : *JumpOffsets) {
-      auto Offset = it.getAsInteger().value();
-      uint16_t JumpTarget = CodeBuffer[Offset] << 8 | CodeBuffer[Offset + 1];
-      JumpTarget += EntryData.size();
-      CodeBuffer[Offset] = (JumpTarget >> 8) & 0xff;
-      CodeBuffer[Offset + 1] = JumpTarget & 0xff;
-    }
-  }
-
-  // Finally, write all data to the output stream.
-  auto OutputStream = GetOutputStream();
-  if (!OutputStream) {
-    return 1;
-  }
-  OutputStream->os().write(EntryData.data(), EntryData.size());
-  OutputStream->os().write(reinterpret_cast<char*>(CodeBuffer.data()),
-                           CodeBuffer.size());
-
-  return 0;
+  Logger::Enabled = OptVerbose;
+  return EvmLinker().run();
 }

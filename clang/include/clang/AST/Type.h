@@ -2627,15 +2627,15 @@ public:
   QualType desugar() const { return QualType(this, 0); }
 
   bool isInteger() const {
-    return getKind() >= Bool && getKind() <= Int128;
+    return getKind() >= Bool && getKind() <= Int256;
   }
 
   bool isSignedInteger() const {
-    return getKind() >= Char_S && getKind() <= Int128;
+    return getKind() >= Char_S && getKind() <= Int256;
   }
 
   bool isUnsignedInteger() const {
-    return getKind() >= Bool && getKind() <= UInt128;
+    return getKind() >= Bool && getKind() <= UInt256;
   }
 
   bool isFloatingPoint() const {
@@ -7153,7 +7153,7 @@ bool IsEnumDeclScoped(EnumDecl *);
 inline bool Type::isIntegerType() const {
   if (const auto *BT = dyn_cast<BuiltinType>(CanonicalType))
     return BT->getKind() >= BuiltinType::Bool &&
-           BT->getKind() <= BuiltinType::Int128;
+           BT->getKind() <= BuiltinType::Int256;
   if (const EnumType *ET = dyn_cast<EnumType>(CanonicalType)) {
     // Incomplete enum types are not treated as integer types.
     // FIXME: In C++, enum types are never integer types.
@@ -7224,7 +7224,7 @@ inline bool Type::isScalarType() const {
 inline bool Type::isIntegralOrEnumerationType() const {
   if (const auto *BT = dyn_cast<BuiltinType>(CanonicalType))
     return BT->getKind() >= BuiltinType::Bool &&
-           BT->getKind() <= BuiltinType::Int128;
+           BT->getKind() <= BuiltinType::Int256;
 
   // Check for a complete enum type; incomplete enum types are not properly an
   // enumeration type in the sense required here.

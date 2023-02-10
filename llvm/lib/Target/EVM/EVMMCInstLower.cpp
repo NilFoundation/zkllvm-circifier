@@ -19,6 +19,7 @@
 #include "llvm/MC/MCAsmInfo.h"
 #include "llvm/MC/MCExpr.h"
 #include "llvm/MC/MCInst.h"
+#include "llvm/MC/MCSectionEVM.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -93,6 +94,7 @@ void EVMMCInstLower::Lower(const MachineInstr *MI, MCInst &OutMI) const {
           MCOp = MCOperand::createExpr(
               MCSymbolRefExpr::create(
                 Printer.getSymbol(MO.getGlobal()),
+                MCSymbolRefExpr::VK_GOTOFF,
                 Ctx));
           break;
         }
@@ -101,6 +103,7 @@ void EVMMCInstLower::Lower(const MachineInstr *MI, MCInst &OutMI) const {
           MCOp = MCOperand::createExpr(
               MCSymbolRefExpr::create(
                 Printer.GetExternalSymbolSymbol(MO.getSymbolName()),
+                MCSymbolRefExpr::VK_GOT,
                 Ctx));
           break;
         }

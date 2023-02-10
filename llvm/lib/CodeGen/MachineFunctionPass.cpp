@@ -155,6 +155,12 @@ bool MachineFunctionPass::runOnFunction(Function &F) {
   return RV;
 }
 
+void MachineFunctionPass::dumpIR(raw_ostream &OS, Function &F) {
+  MachineModuleInfo &MMI = getAnalysis<MachineModuleInfoWrapperPass>().getMMI();
+  MachineFunction &MF = MMI.getOrCreateMachineFunction(F);
+  MF.print(OS);
+}
+
 void MachineFunctionPass::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<MachineModuleInfoWrapperPass>();
   AU.addPreserved<MachineModuleInfoWrapperPass>();

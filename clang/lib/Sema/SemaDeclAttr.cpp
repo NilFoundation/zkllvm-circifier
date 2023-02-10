@@ -388,6 +388,13 @@ static void handleSimpleAttribute(Sema &S, Decl *D,
   D->addAttr(::new (S.Context) AttrType(S.Context, CI));
 }
 
+// EVM_BEGIN
+static void handleEvmAttribute(Sema &S, Decl *D,
+                                  const AttributeCommonInfo &CI) {
+  D->addAttr(::new (S.Context) EVMFuncAttr(S.Context, CI));
+}
+// EVM_END
+
 template <typename... DiagnosticArgs>
 static const Sema::SemaDiagnosticBuilder&
 appendDiagnostics(const Sema::SemaDiagnosticBuilder &Bldr) {
@@ -9099,6 +9106,11 @@ ProcessDeclAttribute(Sema &S, Scope *scope, Decl *D, const ParsedAttr &AL,
   case ParsedAttr::AT_UsingIfExists:
     handleSimpleAttribute<UsingIfExistsAttr>(S, D, AL);
     break;
+  // EVM_BEGIN
+  case ParsedAttr::AT_EVMFunc:
+    handleEvmAttribute(S, D, AL);
+    break;
+  // EVM_ENd
   }
 }
 

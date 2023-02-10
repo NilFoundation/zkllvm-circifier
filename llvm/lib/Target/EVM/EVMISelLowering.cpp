@@ -51,6 +51,8 @@ EVMTargetLowering::EVMTargetLowering(const TargetMachine &TM,
   setSchedulingPreference(Sched::RegPressure);
   setStackPointerRegisterToSaveRestore(EVM::SP);
 
+  setOperationAction(ISD::CopyToReg, MVT::Other, Custom);
+
   for (auto VT : {MVT::i1, MVT::i8, MVT::i16, MVT::i32, MVT::i64, MVT::i128,
                   MVT::i160, MVT::i256}) {
     setOperationAction(ISD::SMIN, VT, Expand);
@@ -90,17 +92,17 @@ EVMTargetLowering::EVMTargetLowering(const TargetMachine &TM,
     setOperationAction(ISD::SHL_PARTS, VT, Expand);
     setOperationAction(ISD::SRL_PARTS, VT, Expand);
     setOperationAction(ISD::SRA_PARTS, VT, Expand);
-    setOperationAction(ISD::CTPOP, VT, Expand);
     setOperationAction(ISD::SELECT, VT, Expand);
 
     setOperationAction(ISD::SELECT_CC, VT, Custom);
+    setOperationAction(ISD::SETCC, VT, Custom);
 
     setOperationAction(ISD::BSWAP, VT, Expand);
     setOperationAction(ISD::BITREVERSE, VT, Expand);
-    setOperationAction(ISD::CTTZ, VT, Expand);
-    setOperationAction(ISD::CTLZ, VT, Expand);
-    setOperationAction(ISD::CTPOP, VT, Expand);
-    setOperationAction(ISD::CTTZ_ZERO_UNDEF, VT, Expand);
+    setOperationAction(ISD::CTTZ, VT, Legal);
+    setOperationAction(ISD::CTLZ, VT, Legal);
+    setOperationAction(ISD::CTPOP, VT, Legal);
+    setOperationAction(ISD::CTTZ_ZERO_UNDEF, VT, Legal);
     setOperationAction(ISD::SIGN_EXTEND_INREG, VT, Custom);
 
     setOperationAction(ISD::GlobalAddress, VT, Custom);
@@ -141,6 +143,8 @@ EVMTargetLowering::EVMTargetLowering(const TargetMachine &TM,
     setLoadExtAction(ISD::ZEXTLOAD, VT, MVT::i1,  Promote);
     setLoadExtAction(ISD::SEXTLOAD, VT, MVT::i1,  Promote);
   }
+
+  setTargetDAGCombine({ISD::SIGN_EXTEND, ISD::ZERO_EXTEND, ISD::ANY_EXTEND});
 }
 
 EVT EVMTargetLowering::getSetCCResultType(const DataLayout &DL, LLVMContext &,
@@ -272,9 +276,17 @@ SDValue EVMTargetLowering::LowerSELECT_CC(SDValue Op, SelectionDAG &DAG) const {
   ISD::CondCode CC = cast<CondCodeSDNode>(Op.getOperand(4))->get();
   SDLoc DL(Op);
 
-  // we are going to pattern match out the i64 type.
-  SDValue TargetCC = DAG.getConstant(CC, DL, LHS.getValueType());
+  // Extend operands in case they are smaller than 256-bits.
+  // If we don't do this extension, Type Legalizing would fail.
+  if (LHS.getValueType().getSizeInBits() < 256) {
+    LHS = DAG.getNode(ISD::ZERO_EXTEND, SDLoc(LHS), {MVT::i256}, LHS);
+  }
+  if (RHS.getValueType().getSizeInBits() < 256) {
+    RHS = DAG.getNode(ISD::ZERO_EXTEND, SDLoc(RHS), {MVT::i256}, RHS);
+  }
+
   SDVTList VTs = DAG.getVTList(Op.getValueType(), MVT::Glue);
+  SDValue TargetCC = DAG.getConstant(CC, DL, MVT::i256);
   SDValue Ops[] = {LHS, RHS, TargetCC, TrueV, FalseV};
 
   return DAG.getNode(EVMISD::SELECTCC, DL, VTs, Ops);
@@ -285,16 +297,28 @@ SDValue EVMTargetLowering::LowerSIGN_EXTEND(SDValue Op, SelectionDAG &DAG) const
   SDLoc dl(Op);
   assert(Op.getValueType() == MVT::i256 && "Unhandled target sign_extend.");
 
-  unsigned Width = cast<VTSDNode>(Op.getOperand(1))->getVT().getSizeInBits() / 8;
+  if (Op0.getValueType().getSizeInBits() < 256) {
+    Op0 = DAG.getNode(ISD::ZERO_EXTEND, SDLoc(Op0), {MVT::i256}, Op0);
+  }
 
-  return DAG.getNode(EVMISD::SIGNEXTEND, dl, MVT::i256, Op0,
-                     DAG.getConstant(32 - Width, dl, MVT::i256));
+  auto OpSizeInBits = cast<VTSDNode>(Op.getOperand(1))->getVT().getSizeInBits();
+  // FIXME(!): Comment this case
+//  if (OpSizeInBits == 1) {
+//    return DAG.getNode(ISD::AND, dl, MVT::i256, Op0, DAG.getConstant(1, dl, MVT::i256));
+//  }
+  unsigned Width = OpSizeInBits / 8;
+  assert(Width != 0);
+
+  // According to EVM spec, size of extended value is "byte width - 1"
+  return DAG.getNode(EVMISD::SIGNEXTEND, dl, MVT::i256,
+                     DAG.getConstant(Width - 1, dl, MVT::i256), Op0);
 }
 
 SDValue EVMTargetLowering::LowerOperation(SDValue Op,
                                           SelectionDAG &DAG) const {
   switch (Op.getOpcode()) {
   default:
+    errs() << "Unexpected node: "; Op.dump(&DAG);
     llvm_unreachable("unimplemented lowering operation,");
   case ISD::BR:
     return LowerBR(Op, DAG);
@@ -313,16 +337,79 @@ SDValue EVMTargetLowering::LowerOperation(SDValue Op,
     return LowerExternalSymbol(Op, DAG);
   case ISD::BlockAddress:
     return LowerBlockAddress(Op, DAG);
+  case ISD::CopyToReg:
+    return LowerCopyToReg(Op, DAG);
+  case ISD::SETCC: {
+    SDValue LHS = Op.getOperand(0);
+    SDValue RHS = Op.getOperand(1);
+
+    if (LHS.getValueType().getSizeInBits() < 256) {
+      auto Extend = (LHS.getValueType().getSizeInBits() == 1) ?
+                    ISD::ZERO_EXTEND : ISD::SIGN_EXTEND;
+      LHS = DAG.getNode(Extend, SDLoc(LHS), {MVT::i256}, LHS);
+    }
+    if (RHS.getValueType().getSizeInBits() < 256) {
+      auto Extend = (RHS.getValueType().getSizeInBits() == 1) ?
+                    ISD::ZERO_EXTEND : ISD::SIGN_EXTEND;
+      RHS = DAG.getNode(Extend, SDLoc(RHS), {MVT::i256}, RHS);
+    }
+    return DAG.getNode(Op.getOpcode(), SDLoc(Op), MVT::i256, LHS, RHS,
+                       Op.getOperand(2));
+  }
+  case ISD::CTTZ_ZERO_UNDEF: {
+    auto Node = Op.getNode();
+    TargetLowering::ArgListTy Args;
+    TargetLowering::ArgListEntry Entry;
+    for (const SDValue &Op : Node->op_values()) {
+      EVT ArgVT = Op.getValueType();
+      Type *ArgTy = ArgVT.getTypeForEVT(*DAG.getContext());
+      Entry.Node = Op;
+      Entry.Ty = ArgTy;
+      Args.push_back(Entry);
+    }
+    TargetLowering::CallLoweringInfo CLI(DAG);
+    CLI.setDebugLoc(SDLoc(Op.getNode()))
+        .setChain(Op.getNode()->getOperand(0))
+        .setLibCallee(CallingConv::C, Type::getVoidTy(*DAG.getContext()),
+                      DAG.getExternalSymbol(
+                          "abort", getPointerTy(DAG.getDataLayout())),
+                      std::move(Args));
+    std::pair<SDValue, SDValue> CallResult = LowerCallTo(CLI);
+
+    return CallResult.second;
+  }
   }
 }
 
+SDValue EVMTargetLowering::LowerCopyToReg(SDValue Op,
+                                          SelectionDAG &DAG) const {
+  SDValue Src = Op.getOperand(2);
+  if (isa<FrameIndexSDNode>(Src.getNode())) {
+    SDValue Chain = Op.getOperand(0);
+    SDLoc DL(Op);
+    Register Reg = cast<RegisterSDNode>(Op.getOperand(1))->getReg();
+    EVT VT = Src.getValueType();
+    SDValue Copy(DAG.getMachineNode(EVM::pMOVE_r, DL, VT, Src),
+                 0);
+    return Op.getNode()->getNumValues() == 1
+               ? DAG.getCopyToReg(Chain, DL, Reg, Copy)
+               : DAG.getCopyToReg(Chain, DL, Reg, Copy,
+                                  Op.getNumOperands() == 4 ? Op.getOperand(3)
+                                                           : SDValue());
+  }
+  return SDValue();
+}
 
 void EVMTargetLowering::ReplaceNodeResults(SDNode *N,
                                            SmallVectorImpl<SDValue> &Results,
                                            SelectionDAG &DAG) const {
   SDLoc DL(N);
 
-  llvm_unreachable("not implemented");
+  assert(N->getNumValues() == 1);
+
+  auto Result = LowerOperation(SDValue(N, 0), DAG);
+
+  Results.push_back(Result);
 }
 
 MachineBasicBlock *
@@ -368,10 +455,11 @@ EVMTargetLowering::insertSELECTCC(MachineInstr &MI,
                   std::next(MachineBasicBlock::iterator(MI)), MBB->end());
   trueMBB->transferSuccessorsAndUpdatePHIs(MBB);
 
-    unsigned SelectedValue = MI.getOperand(0).getReg();
-    unsigned LHS   = MI.getOperand(1).getReg();
-    unsigned RHS   = MI.getOperand(2).getReg();
-
+  unsigned SelectedValue = MI.getOperand(0).getReg();
+  unsigned LHS = MI.getOperand(1).getReg();
+  unsigned RHS = MI.getOperand(2).getReg();
+  unsigned TrueReg = MI.getOperand(4).getReg();
+  unsigned FalseReg = MI.getOperand(5).getReg();
   // construct conditional jump
   {
     MachineFunction *F = MBB->getParent();
@@ -379,7 +467,7 @@ EVMTargetLowering::insertSELECTCC(MachineInstr &MI,
     const TargetRegisterClass *RC = getRegClassFor(MVT::i256);
     unsigned rvreg = RegInfo.createVirtualRegister(RC);
 
-    int CC = MI.getOperand(3).getImm();
+    int CC = MI.getOperand(3).getCImm()->getZExtValue();
     switch (CC) {
       default:
         llvm_unreachable("unimplemented.");
@@ -452,8 +540,8 @@ EVMTargetLowering::insertSELECTCC(MachineInstr &MI,
 
   // Set up the Phi node to determine where we came from
   BuildMI(*trueMBB, trueMBB->begin(), dl, TII.get(EVM::PHI), SelectedValue)
-    .addReg(LHS).addMBB(MBB)
-    .addReg(RHS).addMBB(falseMBB);
+    .addReg(TrueReg).addMBB(MBB)
+    .addReg(FalseReg).addMBB(falseMBB);
 
   MI.eraseFromParent(); // The pseudo instruction is gone now.
   return trueMBB;
@@ -681,4 +769,15 @@ Instruction *EVMTargetLowering::emitTrailingFence(IRBuilderBase &Builder,
                                                   AtomicOrdering Ord) const {
   llvm_unreachable("unimplemented.");
   return nullptr;
+}
+
+SDValue EVMTargetLowering::PerformDAGCombine(SDNode *N,
+                  TargetLowering::DAGCombinerInfo &DCI) const {
+  if (N->getOpcode() == ISD::ZERO_EXTEND || N->getOpcode() == ISD::SIGN_EXTEND
+      || N->getOpcode() == ISD::ANY_EXTEND) {
+    if (N->getValueSizeInBits(0) == N->getOperand(0).getValueSizeInBits()) {
+      DCI.DAG.ReplaceAllUsesOfValueWith(SDValue(N, 0), N->getOperand(0));
+    }
+  }
+  return SDValue();
 }

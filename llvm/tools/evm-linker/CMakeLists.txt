@@ -1,13 +1,12 @@
 set(LLVM_LINK_COMPONENTS
-  MC
-  MCDisassembler
-  Target
-  EVMAsmParser
-  EVMInfo
-  EVMDesc
+  Support
 )
 
+add_definitions("-Wno-gnu-zero-variadic-macro-arguments")
+
 add_llvm_tool(evm-linker
+  evm_builder.cpp
+  evm_file.cpp
   evm_linker.cpp
   DEPENDS EVMCommonTableGen
 )

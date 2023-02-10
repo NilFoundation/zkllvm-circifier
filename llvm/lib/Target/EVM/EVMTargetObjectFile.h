@@ -25,9 +25,7 @@ class EVMELFTargetObjectFile : public TargetLoweringObjectFile {
 
   MCSection *SelectSectionForGlobal(const GlobalObject *GO,
                                     SectionKind Kind,
-                                    const TargetMachine &TM) const override {
-    return getTextSection();
-  }
+                                    const TargetMachine &TM) const override;
 };
 
 } // end namespace llvm

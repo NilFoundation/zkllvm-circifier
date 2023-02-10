@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "MCTargetDesc/EVMMCTargetDesc.h"
+#include "EVMUtils.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/MC/MCCodeEmitter.h"
@@ -154,11 +155,22 @@ void EVMMCCodeEmitter::encodeInstruction(const MCInst &MI, raw_ostream &OS,
     if (opnd.isImm() || opnd.isCImm()) {
       encodeImmediate(OS, opnd, push_size);
     } else {
-      assert(push_size == 2 && "Static Jump operands are 2 bytes");
+      assert(push_size == EVM::RelocPushSize && "Static Jump operands are 2 bytes");
       assert(opnd.isExpr() && "PUSH operand should be either Imm or Expr");
-      MCFixupKind Kind = MCFixupKind(FK_SecRel_2);
+      MCFixupKind Kind = MCFixupKind(FK_SecRel_4);
+      if (auto SymbolRef = dyn_cast<MCSymbolRefExpr>(opnd.getExpr())) {
+        switch (SymbolRef->getKind()) {
+        case MCSymbolRefExpr::VK_GOT:
+          Kind = MCFixupKind(FK_Data_4);
+          break;
+        case MCSymbolRefExpr::VK_GOTOFF:  // Global variable
+          Kind = MCFixupKind(FK_Data_1);
+          break;
+        }
+      }
+
       // allocate space for fix up.
-      support::endian::write<uint16_t>(OS, 0x0000, support::big);
+      support::endian::write<EVM::RelocUnsignedType>(OS, 0x0, support::big);
       Fixups.push_back(MCFixup::create(1, opnd.getExpr(), Kind, MI.getLoc()));
     }
   }

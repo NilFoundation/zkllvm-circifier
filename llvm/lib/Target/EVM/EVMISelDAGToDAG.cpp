@@ -49,10 +49,10 @@ public:
   void Select(SDNode *Node) override;
 
   bool SelectLOAD(SDNode *Node);
-  bool SelectTargetGlobalAddress(SDNode *Node);
 
   // custom selecting
   bool SelectSETCC(SDNode *Node);
+  bool SelectSELECT_CC(SDNode *Node);
   bool SelectBlockAddress(SDNode *Node);
   bool SelectSIGNEXTEND(SDNode *Node);
   bool SelectCall(SDNode *Node);
@@ -62,7 +62,6 @@ public:
 
 private:
   void MutateReturnChain();
-  DenseMap<SDNode *, uint64_t> GlobalSlots;
 };
 }
 
@@ -129,66 +128,54 @@ void EVMDAGToDAGISel::PreprocessISelDAG() {
 void EVMDAGToDAGISel::PostprocessISelDAG() {
 
 }
-bool EVMDAGToDAGISel::SelectTargetGlobalAddress(SDNode *Node) {
-  const auto *GA = cast<GlobalAddressSDNode>(Node);
-  if (GA->getGlobal()->getValueType()->isFunctionTy()) {
-    return false;
-  }
-
-  DenseMap<SDNode *, uint64_t>::iterator GSIter = GlobalSlots.find(Node);
-  uint64_t offset;
-  if (GSIter == GlobalSlots.end()) {
-    // the first time we have encountered: allocate a new slot
-    offset = GlobalSlots.size() * 32;
-    GlobalSlots[Node] = offset;
-    Subtarget->updateAllocatedGlobalSlots(GlobalSlots.size());
-  } else {
-    offset = GSIter->second; 
-  }
-  // change GlobalAddress to the memory location offset
-  SDValue mem_offset =
-      CurDAG->getConstant(offset, SDLoc(Node), MVT::i256);
-  SDNode *push =
-      CurDAG->getMachineNode(EVM::PUSH32_r, SDLoc(Node), MVT::i256, mem_offset);
-  ReplaceNode(Node, push);
-  return true;
-}
 
 bool EVMDAGToDAGISel::SelectLOAD(SDNode *Node) {
   const LoadSDNode *LD = cast<LoadSDNode>(Node);
 
   switch (LD->getExtensionType()) {
     case ISD::SEXTLOAD: {
-      // MLOAD -> SIGNEXTEND
+      auto Op0 = LD->getOperand(0);
       SDValue Src = LD->getBasePtr();
-      uint64_t bytesToShift = 32 - (LD->getMemoryVT().getSizeInBits() / 8);
-      SDValue sval = CurDAG->getConstant(bytesToShift, SDLoc(Node), MVT::i256);
+      auto ExtSizeInBytes = LD->getMemoryVT().getSizeInBits() / 8;
+      if (ExtSizeInBytes == 0) {
+        llvm_unreachable("Not supported!");
+      }
+      SDValue sval = CurDAG->getConstant(ExtSizeInBytes - 1, SDLoc(Node), MVT::i256);
+
+      SDNode* mload = CurDAG->getMachineNode(EVM::MLOAD_r,
+                       SDLoc(Node), MVT::i256, MVT::Other, Src, Op0);
+
       SDValue shift = SDValue(CurDAG->getMachineNode(EVM::PUSH32_r, SDLoc(Node), MVT::i256, sval), 0);
-      SDValue mload = SDValue(CurDAG->getMachineNode(EVM::MLOAD_r,
-                              SDLoc(Node), MVT::i256, Src), 0);
+
       MachineSDNode * signextend = CurDAG->getMachineNode(EVM::SIGNEXTEND_r,
-                  SDLoc(Node), MVT::i256, mload, shift);
-      ReplaceNode(Node, signextend);
+                  SDLoc(Node), MVT::i256, {shift, SDValue(mload, 0)});
+
+      ReplaceUses(SDValue(Node, 0), SDValue(signextend, 0));
+      ReplaceNode(Node, mload);
+
       return true;
     }
     case ISD::ZEXTLOAD: {
-      // Load and then zsignextend.
-      //  MLOAD > SLL > SRL
+      auto Op0 = LD->getOperand(0);
       SDValue Src = LD->getBasePtr();
-      uint64_t bytesToFill = 256 - LD->getMemoryVT().getSizeInBits();
-      SDValue multiplier =CurDAG->getConstant(1 << bytesToFill, SDLoc(Node), MVT::i256);
-      SDValue push_mul =
-          SDValue(CurDAG->getMachineNode(EVM::PUSH32_r, SDLoc(Node), MVT::i256,
-                                         multiplier),
-                  0);
-      SDValue mload = SDValue(CurDAG->getMachineNode(EVM::MLOAD_r,
-                              SDLoc(Node), MVT::i256, Src), 0);
-      SDValue mul = SDValue(CurDAG->getMachineNode(EVM::MUL_r, SDLoc(Node),
-                                                   MVT::i256, mload, push_mul), 0);
+      auto ExtSizeInBits = LD->getMemoryVT().getSizeInBits();
+      assert(ExtSizeInBits <= 128);
+      SDNode* Load = CurDAG->getMachineNode(EVM::MLOAD_r,
+                                             SDLoc(Node), MVT::i256, MVT::Other, Src, Op0);
+      if (ExtSizeInBits <= 64) {
+        auto Mask = maskTrailingOnes<uint64_t>(ExtSizeInBits);
+        SDValue MaskConst = CurDAG->getConstant(Mask, SDLoc(Node), MVT::i256);
 
-      MachineSDNode * div = CurDAG->getMachineNode(EVM::DIV_r, SDLoc(Node),
-                                                   MVT::i256, MVT::Other, mul, push_mul);
-      ReplaceNode(Node, div);
+        SDValue MaskNode =
+            SDValue(CurDAG->getMachineNode(EVM::PUSH32_r, SDLoc(Node),
+                                           MVT::i256, MaskConst), 0);
+        MachineSDNode *And = CurDAG->getMachineNode(
+            EVM::AND_r, SDLoc(Node), MVT::i256, {SDValue(Load, 0), MaskNode});
+
+        ReplaceUses(SDValue(Node, 0), SDValue(And, 0));
+      }
+      ReplaceNode(Node, Load);
+
       return true;
     }
     case ISD::NON_EXTLOAD:
@@ -215,16 +202,13 @@ bool EVMDAGToDAGISel::SelectSIGNEXTEND(SDNode *Node) {
   unsigned opcode = Node->getOpcode();
   assert(opcode == EVMISD::SIGNEXTEND);
 
-  const SDValue reg = Node->getOperand(0);
-  const SDValue shiftVal = Node->getOperand(1);
-  ConstantSDNode *shiftConstant = dyn_cast<ConstantSDNode>(shiftVal);
-  uint64_t shiftuint = shiftConstant->getZExtValue();
+  const SDValue reg = Node->getOperand(1);
+  const SDValue shiftVal = Node->getOperand(0);
 
-  SDValue sval = CurDAG->getConstant(shiftuint, SDLoc(Node), MVT::i256);
   const SDValue shift = SDValue(
-      CurDAG->getMachineNode(EVM::PUSH32_r, SDLoc(Node), MVT::i256, sval), 0);
+      CurDAG->getMachineNode(EVM::PUSH32_r, SDLoc(Node), MVT::i256, shiftVal), 0);
   MachineSDNode *signextend = CurDAG->getMachineNode(
-      EVM::SIGNEXTEND_r, SDLoc(Node), MVT::i256, reg, shift);
+      EVM::SIGNEXTEND_r, SDLoc(Node), MVT::i256, shift, reg);
 
   ReplaceNode(Node, signextend);
   return true;
@@ -236,37 +220,37 @@ bool EVMDAGToDAGISel::SelectCall(SDNode *Node) {
   bool isVoid = opcode == EVMISD::CALLVOID;
   unsigned mopcode = isVoid ? EVM::pJUMPSUBVOID_r : EVM::pJUMPSUB_r;
 
-  const SDValue &chain = Node->getOperand(0);
-  const SDValue &targetWrapper = Node->getOperand(1);
-  assert(targetWrapper.getOpcode() == EVMISD::WRAPPER);
-
-  // get the jump target.
-  const SDValue &target = targetWrapper.getOperand(0);
-  assert(target.getOpcode() == ISD::TargetGlobalAddress);
-  
-  // construct return 
-  std::vector<SDValue> opsVec;
-
+  const SDValue &Chain = Node->getOperand(0);
+  const SDValue &Callee = Node->getOperand(1);
+  // construct return
+  SmallVector<SDValue, 8> opsVec;
+  SDValue CalleeOperand;
 
   for (unsigned i = 2; i < Node->getNumOperands(); ++i) {
-    opsVec.push_back(Node->getOperand(i));
+      opsVec.push_back(Node->getOperand(i));
   }
 
-  // we put the target at the back of the operands, it becomes:
-  // pJUMPSUB arg1, arg2, arg3, ..., targetAddr
-  // stack status is:
-  // (top) arg1, arg2, arg3, ..., targetAddr
-  // we need to have return address, which is best to be fixed in position:
-  // 1. PUSH retAddr (PC + offset)
-  // 2. swap retAddr and targetAddr
-  
-  MachineSDNode *push =
-      CurDAG->getMachineNode(EVM::PUSH32_r, SDLoc(Node), MVT::i256, target);
-  SDValue pushVal = SDValue(push, 0);
-  opsVec.push_back(pushVal);
+  if (Callee.getOpcode() == EVMISD::WRAPPER) {
+      // get the jump target.
+      const SDValue &target = Callee.getOperand(0);
 
-  opsVec.push_back(chain);
+      // we put the target at the back of the operands, it becomes:
+      // pJUMPSUB arg1, arg2, arg3, ..., targetAddr
+      // stack status is:
+      // (top) arg1, arg2, arg3, ..., targetAddr
+      // we need to have return address, which is best to be fixed in position:
+      // 1. PUSH retAddr (PC + offset)
+      // 2. swap retAddr and targetAddr
 
+      MachineSDNode *push =
+          CurDAG->getMachineNode(EVM::PUSH32_r, SDLoc(Node), MVT::i256, target);
+      SDValue pushVal = SDValue(push, 0);
+      CalleeOperand = pushVal;
+  } else {
+      CalleeOperand = Callee;
+  }
+  opsVec.push_back(CalleeOperand);
+  opsVec.push_back(Chain);
 
   ArrayRef<SDValue> ops(opsVec);
 
@@ -325,6 +309,53 @@ bool EVMDAGToDAGISel::SelectSETCC(SDNode *Node) {
   return true;
 }
 
+bool EVMDAGToDAGISel::SelectSELECT_CC(SDNode *Node) {
+  ISD::CondCode cc = cast<CondCodeSDNode>(Node->getOperand(4))->get();
+
+  unsigned firstOpcode;
+
+  switch (cc) {
+  case ISD::SETNE:
+      // %temp = EQ_r lhs, rhs
+      // %rv = NOT %temp
+      firstOpcode = EVM::EQ_r;
+      break;
+  case ISD::SETUGE:
+      // %temp = LT_r lhs, rhs
+      // %rv = ISZERO %temp
+      firstOpcode = EVM::LT_r;
+      break;
+  case ISD::SETGE:
+      // %temp = SLT_r lhs, rhs
+      // %rv = ISZERO %temp
+      firstOpcode = EVM::SLT_r;
+      break;
+  case ISD::SETULE:
+      // %temp = GT_r lhs, rhs
+      // %rv = ISZERO %temp
+      firstOpcode = EVM::GT_r;
+      break;
+  case ISD::SETLE:
+      // %temp = SGT_r lhs, rhs
+      // %rv = ISZERO %temp
+      firstOpcode = EVM::SGT_r;
+      break;
+  default:
+      // those will be handled by tablegen
+      return false;
+  }
+
+  const SDValue &LHS = Node->getOperand(0);
+  const SDValue &RHS = Node->getOperand(1);
+
+  SDValue eq = SDValue(CurDAG->getMachineNode(firstOpcode, SDLoc(Node),
+                                              MVT::i256, LHS, RHS), 0);
+  MachineSDNode * ne = CurDAG->getMachineNode(EVM::ISZERO_r, SDLoc(Node),
+                                             MVT::i256, eq);
+  ReplaceNode(Node, ne);
+  return true;
+}
+
 void EVMDAGToDAGISel::Select(SDNode *Node) {
   unsigned Opcode = Node->getOpcode();
 
@@ -337,10 +368,6 @@ void EVMDAGToDAGISel::Select(SDNode *Node) {
   switch (Opcode) {
     case ISD::LOAD: {
       if (SelectLOAD(Node)) return;
-      break;
-    }
-    case ISD::TargetGlobalAddress: {
-      if (SelectTargetGlobalAddress(Node)) return;
       break;
     }
     case ISD::SETCC:
@@ -356,6 +383,29 @@ void EVMDAGToDAGISel::Select(SDNode *Node) {
     case EVMISD::SIGNEXTEND:
       if (SelectSIGNEXTEND(Node)) return;
       break;
+    case ISD::CTLZ:
+    case ISD::CTLZ_ZERO_UNDEF:
+    case ISD::CTTZ:
+    case ISD::CTTZ_ZERO_UNDEF: {
+      // We don't support these builtins for now.
+      // TODO: Support these builtins.
+      const SDValue &Callee = CurDAG->getExternalSymbol("abort",
+                              TLI->getPointerTy(CurDAG->getDataLayout()));
+      const SDValue PushCallee =
+          SDValue(CurDAG->getMachineNode(EVM::PUSH32_r, SDLoc(Node), MVT::i256, Callee), 0);
+
+      SmallVector<SDValue, 8> opsVec;
+      opsVec.push_back(Node->getOperand(0));
+      opsVec.push_back(PushCallee);
+
+      ArrayRef<SDValue> ops(opsVec);
+
+      MachineSDNode *call =
+          CurDAG->getMachineNode(EVM::pJUMPSUB_r, SDLoc(Node), Node->getVTList(), ops);
+
+      ReplaceNode(Node, call);
+      return;
+    }
   }
 
   SelectCode(Node);

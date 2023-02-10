@@ -322,6 +322,8 @@ public:
   ///  Return what kind of Pass Manager can manage this pass.
   PassManagerType getPotentialPassManagerType() const override;
 
+  virtual void dumpIR(raw_ostream &OS, Function &F);
+
 protected:
   /// Optional passes call this function to check whether the pass should be
   /// skipped. This is the case when Attribute::OptimizeNone is set or when

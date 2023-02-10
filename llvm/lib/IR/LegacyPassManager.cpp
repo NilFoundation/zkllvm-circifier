@@ -24,6 +24,8 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/FileSystem.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/TimeProfiler.h"
 #include "llvm/Support/Timer.h"
 #include "llvm/Support/raw_ostream.h"
@@ -1387,12 +1389,44 @@ void FPPassManager::dumpPassStructure(unsigned Offset) {
   }
 }
 
+static std::string CanonizeName(StringRef Name) {
+  auto Result = Name.str();
+  std::replace_if(Result.begin(), Result.end(), [](char c) {
+    return c == ' ' || c == '/' || c == '&' || c == '>' || c == '-';
+  }, '_');
+  return Result.substr(0, 255);
+}
+
+class MachineFunctionPass;
+
 /// Execute all of the passes scheduled for execution by invoking
 /// runOnFunction method.  Keep track of whether any of the passes modifies
 /// the function, and if so, return true.
 bool FPPassManager::runOnFunction(Function &F) {
   if (F.isDeclaration())
     return false;
+
+//#define SINGLE_FUNC "_ZN3nil7crypto314multiprecision8backends13eval_multiplyILj512ELj512ELNS1_16cpp_integer_typeE1ELNS1_18cpp_int_check_typeE0EvLj512ELj512ELS4_1ELS5_0EvEENSt3__19enable_ifIXaantsr18is_trivial_cpp_intINS2_15cpp_int_backendIXT_EXT0_EXT1_EXT2_ET3_EEEE5valuentsr18is_trivial_cpp_intINS8_IXT4_EXT5_EXT6_EXT7_ET8_EEEE5valueEvE4typeERSA_RKSC_RKo"
+
+#ifdef SINGLE_FUNC
+  if (F.getName() != SINGLE_FUNC) {
+    return false;
+  }
+#endif
+
+  std::array skip = {
+      // DUP depth
+      "_ZN3nil7crypto36hashes6detail16keccak_1600_implINS2_18keccak_1600_policyILm256EEEE7permuteERNSt3__15arrayImLm25EEE"
+  };
+
+  for (auto s : skip) {
+    if (F.getName() == s) {
+      return false;
+    }
+  }
+
+//  static int N = 0;
+//  errs() << '[' << N++ <<"] COMPILE: " << F.getName() << '\n';
 
   bool Changed = false;
   Module &M = *F.getParent();
@@ -1428,6 +1462,22 @@ bool FPPassManager::runOnFunction(Function &F) {
       uint64_t RefHash = FP->structuralHash(F);
 #endif
       LocalChanged |= FP->runOnFunction(F);
+
+#define DUMPE 1
+      if (DUMPE && LocalChanged) {
+        auto DirName = "ir_dump/" + CanonizeName(F.getName());
+        if (auto Error = sys::fs::create_directories(DirName, true)) {
+          errs() << "DIRECTORY NAME:" << DirName << '\n';
+          errs() << Error.message() << '\n';
+          report_fatal_error("Can't create dump directory!");
+        }
+        auto name = formatv("{0}/{1,0+4}_{2}", DirName, Index,
+                            CanonizeName(FP->getPassName()));
+        std::error_code EC;
+
+        raw_fd_ostream OS(name.str(), EC);
+        FP->dumpIR(OS, F);
+      }
 
 #if defined(EXPENSIVE_CHECKS) && !defined(NDEBUG)
       if (!LocalChanged && (RefHash != FP->structuralHash(F))) {

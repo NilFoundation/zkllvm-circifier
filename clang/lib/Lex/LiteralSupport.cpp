@@ -859,6 +859,7 @@ NumericLiteralParser::NumericLiteralParser(StringRef TokSpelling,
   isAccum = false;
   hadError = false;
   isBitInt = false;
+  isBigInt = false;
 
   // This routine assumes that the range begin/end matches the regex for integer
   // and FP constants (specifically, the 'pp-number' regex), and assumes that
@@ -909,6 +910,11 @@ NumericLiteralParser::NumericLiteralParser(StringRef TokSpelling,
   // we break out of the loop.
   for (; s != ThisTokEnd; ++s) {
     switch (*s) {
+    case 'X':
+    case 'x':
+      isBigInt = true;
+      isUnsigned = true;
+      continue;
     case 'R':
     case 'r':
       if (!LangOpts.FixedPoint)

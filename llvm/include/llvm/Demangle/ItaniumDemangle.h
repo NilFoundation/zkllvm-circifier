@@ -3843,6 +3843,14 @@ Node *AbstractManglingParser<Derived, Alloc>::parseType() {
   case 'o':
     ++First;
     return make<NameType>("unsigned __int128");
+  //                ::= q    # unsigned __int256
+  case 'q':
+    ++First;
+    return make<NameType>("__int256");
+  //                ::= Q    # __uint256
+  case 'Q':
+    ++First;
+    return make<NameType>("__uint256");
   //                ::= f    # float
   case 'f':
     ++First;
@@ -4280,6 +4288,12 @@ Node *AbstractManglingParser<Derived, Alloc>::parseExprPrimary() {
   case 'o':
     ++First;
     return getDerived().parseIntegerLiteral("unsigned __int128");
+  case 'q':
+    ++First;
+    return getDerived().parseIntegerLiteral("__int256");
+  case 'Q':
+    ++First;
+    return getDerived().parseIntegerLiteral("__uint256");
   case 'f':
     ++First;
     return getDerived().template parseFloatingLiteral<float>();

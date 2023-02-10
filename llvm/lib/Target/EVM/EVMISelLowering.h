@@ -50,6 +50,25 @@ public:
   bool isTruncateFree(EVT SrcVT, EVT DstVT) const override;
   bool isZExtFree(SDValue Val, EVT VT2) const override;
   bool isSExtCheaperThanZExt(EVT SrcVT, EVT DstVT) const override;
+  bool findOptimalMemOpLowering(std::vector<EVT> &MemOps, unsigned Limit,
+                           const MemOp &Op, unsigned DstAS, unsigned SrcAS,
+                           const AttributeList &FuncAttributes) const override {
+    return false;
+  }
+  bool isOffsetFoldingLegal(const GlobalAddressSDNode *GA) const override {
+    return false;
+  }
+
+  bool isLoadReducingLegal() const override {
+    return false;
+  }
+
+  bool allowsMisalignedMemoryAccesses(
+      EVT, unsigned AddrSpace = 0, Align Alignment = Align(1),
+      MachineMemOperand::Flags Flags = MachineMemOperand::MONone,
+      bool * /*Fast*/ = nullptr) const override {
+    return true;
+  }
 
   // Provide custom lowering hooks for some operations.
   SDValue LowerOperation(SDValue Op, SelectionDAG &DAG) const override;
@@ -66,6 +85,7 @@ public:
   SDValue LowerExternalSymbol(SDValue Op, SelectionDAG &DAG) const;
   SDValue LowerBlockAddress(SDValue Op, SelectionDAG &DAG) const;
   SDValue LowerBasicBlock(SDValue Op, SelectionDAG &DAG) const;
+  SDValue LowerCopyToReg(SDValue Op, SelectionDAG &DAG) const;
 
   // This method returns the name of a target specific DAG node.
   const char *getTargetNodeName(unsigned Opcode) const override;
@@ -90,6 +110,10 @@ public:
                                 AtomicOrdering Ord) const override;
   Instruction *emitTrailingFence(IRBuilderBase &Builder, Instruction * Inst,
                                  AtomicOrdering Ord) const override;
+
+  SDValue
+  PerformDAGCombine(SDNode *N,
+                    TargetLowering::DAGCombinerInfo &DCI) const override;
 
 private:
   // Lower incoming arguments, copy physregs into vregs

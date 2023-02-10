@@ -6456,7 +6456,7 @@ SDValue DAGCombiner::visitAND(SDNode *N) {
     if (SDValue Res = reduceLoadWidth(N))
       return Res;
 
-  if (LegalTypes) {
+  if (LegalTypes && TLI.isLoadReducingLegal()) {
     // Attempt to propagate the AND back up to the leaves which, if they're
     // loads, can be combined to narrow loads and the AND node can be removed.
     // Perform after legalization so that extend nodes will already be
@@ -12802,6 +12802,11 @@ SDValue DAGCombiner::visitAssertAlign(SDNode *N) {
 /// narrower type, try to transform the load to a narrower type and/or
 /// use an extending load.
 SDValue DAGCombiner::reduceLoadWidth(SDNode *N) {
+  // EVM_BEGIN
+  if (!TLI.isLoadReducingLegal())
+    return SDValue();
+  // EVM_END
+
   unsigned Opc = N->getOpcode();
 
   ISD::LoadExtType ExtType = ISD::NON_EXTLOAD;

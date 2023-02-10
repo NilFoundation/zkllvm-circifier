@@ -175,11 +175,20 @@ enum : uint8_t {
   STATICCALL = 0xfa,
   REVERT = 0xfd,
   INVALID = 0xfe,
-  SELFDESTRUCT = 0xff
+  SELFDESTRUCT = 0xff,
 };
 
-static inline unsigned getPushSize(unsigned Opcode) {
-  assert(Opcode >= PUSH1 && Opcode <= PUSH32);
+enum : uint16_t {
+  PSEUDO  = 0x100,
+  LABEL   = PSEUDO + 0,
+};
+
+static inline bool isPush(unsigned Opcode) {
+  return Opcode >= PUSH1 && Opcode <= PUSH32;
+}
+
+static inline uint8_t getPushSize(unsigned Opcode) {
+  assert(isPush(Opcode));
   return Opcode - PUSH1 + 1;
 }
 

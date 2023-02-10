@@ -45,6 +45,7 @@ FunctionPass  *createEVMExpandPseudos();
 FunctionPass  *createEVMExpandFramePointer();
 FunctionPass  *createEVMFinalization();
 FunctionPass  *createEVMStackAllocPass();
+FunctionPass  *createEVMStackAllocationPass();
 
 void initializeEVMPrepareStackificationPass(PassRegistry &);
 void initializeEVMVRegToMemPass(PassRegistry &);
@@ -57,6 +58,7 @@ void initializeEVMCallTransformationPass(PassRegistry &);
 void initializeEVMFinalizationPass(PassRegistry &);
 void initializeEVMExpandFramePointerPass(PassRegistry &);
 void initializeEVMStackAllocPass(PassRegistry &);
+void initializeEVMStackAllocationPass(PassRegistry &);
 
 }
 

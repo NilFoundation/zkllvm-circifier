@@ -294,6 +294,21 @@ void Sema::Initialize() {
       PushOnScopeChains(Context.getUInt128Decl(), TUScope);
   }
 
+  // EVM_BEGIN
+  // Initialize predefined 256-bit integer types, if needed.
+  if (Context.getTargetInfo().hasInt256Type()) {
+    // If either of the 256-bit integer types are unavailable to name lookup,
+    // define them now.
+    DeclarationName Int256 = &Context.Idents.get("__int256_t");
+    if (IdResolver.begin(Int256) == IdResolver.end())
+      PushOnScopeChains(Context.getInt256Decl(), TUScope);
+
+    DeclarationName UInt256 = &Context.Idents.get("__uint256_t");
+    if (IdResolver.begin(UInt256) == IdResolver.end())
+      PushOnScopeChains(Context.getUInt256Decl(), TUScope);
+  }
+  // EVM_END
+
 
   // Initialize predefined Objective-C types:
   if (getLangOpts().ObjC) {

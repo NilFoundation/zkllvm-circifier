@@ -41,6 +41,7 @@ autoconf/autom4te.cache
 # External projects that are tracked independently.
 projects/*
 !projects/*.*
+!projects/evm-sdk
 !projects/Makefile
 runtimes/*
 !runtimes/*.*

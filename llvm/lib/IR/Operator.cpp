@@ -147,9 +147,17 @@ bool GEPOperator::accumulateConstantOffset(
           return false;
         continue;
       }
-      if (!AccumulateOffset(ConstOffset->getValue(),
-                            DL.getTypeAllocSize(GTI.getIndexedType())))
+      // EVM_BEGIN
+      uint64_t AllocSize = DL.getTypeAllocSize(GTI.getIndexedType());
+      if (GTI.getIndexedType() == Type::getInt8Ty(V->getContext())) {
+        auto I8Alignment =
+            DL.getABITypeAlignment(Type::getInt8Ty(V->getContext()));
+        assert((AllocSize % I8Alignment) == 0);
+        AllocSize /= I8Alignment;
+      }
+      if (!AccumulateOffset(ConstOffset->getValue(), AllocSize))
         return false;
+      // EVM_END
       continue;
     }
 

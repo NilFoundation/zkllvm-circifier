@@ -221,81 +221,12 @@ enum : unsigned {
 enum : unsigned {
   EVM_TYPE_I32 = 0x7F,
   EVM_TYPE_I64 = 0x7E,
-  EVM_TYPE_F32 = 0x7D,
-  EVM_TYPE_F64 = 0x7C,
-  EVM_TYPE_V128 = 0x7B,
+  EVM_TYPE_I128 = 0x7B,
+  EVM_TYPE_I256 = 0x7A,
   EVM_TYPE_FUNCREF = 0x70,
   EVM_TYPE_EXCEPT_REF = 0x68,
   EVM_TYPE_FUNC = 0x60,
   EVM_TYPE_NORESULT = 0x40, // for blocks with no result values
-};
-
-// Kinds of externals (for imports and exports).
-enum : unsigned {
-  EVM_EXTERNAL_FUNCTION = 0x0,
-  EVM_EXTERNAL_TABLE = 0x1,
-  EVM_EXTERNAL_MEMORY = 0x2,
-  EVM_EXTERNAL_GLOBAL = 0x3,
-  EVM_EXTERNAL_EVENT = 0x4,
-};
-
-// Opcodes used in initializer expressions.
-enum : unsigned {
-  EVM_OPCODE_END = 0x0b,
-  EVM_OPCODE_CALL = 0x10,
-  EVM_OPCODE_GLOBAL_GET = 0x23,
-  EVM_OPCODE_I32_STORE = 0x36,
-  EVM_OPCODE_I32_CONST = 0x41,
-  EVM_OPCODE_I64_CONST = 0x42,
-  EVM_OPCODE_F32_CONST = 0x43,
-  EVM_OPCODE_F64_CONST = 0x44,
-  EVM_OPCODE_I32_ADD = 0x6a,
-};
-
-enum : unsigned {
-  EVM_LIMITS_FLAG_HAS_MAX = 0x1,
-  EVM_LIMITS_FLAG_IS_SHARED = 0x2,
-};
-
-enum : unsigned {
-  EVM_SEGMENT_IS_PASSIVE = 0x01,
-  EVM_SEGMENT_HAS_MEMINDEX = 0x02,
-};
-
-// Feature policy prefixes used in the custom "target_features" section
-enum : uint8_t {
-  EVM_FEATURE_PREFIX_USED = '+',
-  EVM_FEATURE_PREFIX_REQUIRED = '=',
-  EVM_FEATURE_PREFIX_DISALLOWED = '-',
-};
-
-// Kind codes used in the custom "name" section
-enum : unsigned {
-  EVM_NAMES_FUNCTION = 0x1,
-  EVM_NAMES_LOCAL = 0x2,
-};
-
-// Kind codes used in the custom "linking" section
-enum : unsigned {
-  EVM_SEGMENT_INFO = 0x5,
-  EVM_INIT_FUNCS = 0x6,
-  EVM_COMDAT_INFO = 0x7,
-  EVM_SYMBOL_TABLE = 0x8,
-};
-
-// Kind codes used in the custom "linking" section in the EVM_COMDAT_INFO
-enum : unsigned {
-  EVM_COMDAT_DATA = 0x0,
-  EVM_COMDAT_FUNCTION = 0x1,
-};
-
-// Kind codes used in the custom "linking" section in the EVM_SYMBOL_TABLE
-enum EVMSymbolType : unsigned {
-  EVM_SYMBOL_TYPE_FUNCTION = 0x0,
-  EVM_SYMBOL_TYPE_DATA = 0x1,
-  EVM_SYMBOL_TYPE_GLOBAL = 0x2,
-  EVM_SYMBOL_TYPE_SECTION = 0x3,
-  EVM_SYMBOL_TYPE_EVENT = 0x4,
 };
 
 // Kinds of event attributes.
@@ -303,47 +234,47 @@ enum EVMEventAttribute : unsigned {
   EVM_EVENT_ATTRIBUTE_EXCEPTION = 0x0,
 };
 
-const unsigned EVM_SYMBOL_BINDING_MASK = 0x3;
-const unsigned EVM_SYMBOL_VISIBILITY_MASK = 0xc;
-
-const unsigned EVM_SYMBOL_BINDING_GLOBAL = 0x0;
-const unsigned EVM_SYMBOL_BINDING_WEAK = 0x1;
-const unsigned EVM_SYMBOL_BINDING_LOCAL = 0x2;
-const unsigned EVM_SYMBOL_VISIBILITY_DEFAULT = 0x0;
-const unsigned EVM_SYMBOL_VISIBILITY_HIDDEN = 0x4;
-const unsigned EVM_SYMBOL_UNDEFINED = 0x10;
-const unsigned EVM_SYMBOL_EXPORTED = 0x20;
-const unsigned EVM_SYMBOL_EXPLICIT_NAME = 0x40;
-
-/* // removed to make it compile.
-#define EVM_RELOC(name, value) name = value,
-
-enum : unsigned {
-#include "EVMRelocs.def"
-};
-
-#undef EVM_RELOC
-*/
-
 // Subset of types that a value can have
 enum class ValType {
+  INVALID = 0,
   I32 = EVM_TYPE_I32,
   I64 = EVM_TYPE_I64,
-  F32 = EVM_TYPE_F32,
-  F64 = EVM_TYPE_F64,
-  V128 = EVM_TYPE_V128,
-  EXCEPT_REF = EVM_TYPE_EXCEPT_REF,
+  I128 = EVM_TYPE_I128,
+  I256 = EVM_TYPE_I256,
 };
 
+inline const char* ValTypeToString(ValType Type) {
+  switch (Type) {
+  case ValType::I32: return "int32";
+  case ValType::I64: return "int64";
+  case ValType::I128: return "int128";
+  case ValType::I256: return "int256";
+  default:
+    llvm_unreachable("Invalid type!");
+  }
+}
+
+inline ValType parseType(StringRef Str) {
+  if (Str == "int32")
+    return ValType::I32;
+  if (Str == "int64")
+    return ValType::I64;
+  if (Str == "int128")
+    return ValType::I128;
+  if (Str == "int256")
+    return ValType::I256;
+  return ValType::INVALID;
+}
+
 struct EVMSignature {
-  SmallVector<ValType, 1> Returns;
+  SmallVector<ValType, 2> Returns;
   SmallVector<ValType, 4> Params;
   // Support empty and tombstone instances, needed by DenseMap.
   enum { Plain, Empty, Tombstone } State = Plain;
 
-  EVMSignature(SmallVector<ValType, 1> &&InReturns,
-                SmallVector<ValType, 4> &&InParams)
-      : Returns(InReturns), Params(InParams) {}
+  EVMSignature(decltype(Returns) &&InReturns, decltype(Params) &&InParams)
+      : Returns(std::forward<decltype(Returns)>(InReturns)),
+        Params(std::forward<decltype(Params)>(InParams)) {}
   EVMSignature() = default;
 };
 
@@ -365,8 +296,6 @@ inline bool operator!=(const EVMGlobalType &LHS, const EVMGlobalType &RHS) {
   return !(LHS == RHS);
 }
 
-std::string toString(EVMSymbolType type);
-std::string relocTypetoString(uint32_t type);
 
 } // end namespace EVM
 } // end namespace llvm

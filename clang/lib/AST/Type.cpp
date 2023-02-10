@@ -1930,7 +1930,7 @@ bool Type::hasIntegerRepresentation() const {
 bool Type::isIntegralType(const ASTContext &Ctx) const {
   if (const auto *BT = dyn_cast<BuiltinType>(CanonicalType))
     return BT->getKind() >= BuiltinType::Bool &&
-           BT->getKind() <= BuiltinType::Int128;
+           BT->getKind() <= BuiltinType::Int256;
 
   // Complete enum types are integral in C.
   if (!Ctx.getLangOpts().CPlusPlus)
@@ -1943,7 +1943,7 @@ bool Type::isIntegralType(const ASTContext &Ctx) const {
 bool Type::isIntegralOrUnscopedEnumerationType() const {
   if (const auto *BT = dyn_cast<BuiltinType>(CanonicalType))
     return BT->getKind() >= BuiltinType::Bool &&
-           BT->getKind() <= BuiltinType::Int128;
+           BT->getKind() <= BuiltinType::Int256;
 
   if (isBitIntType())
     return true;
@@ -2018,7 +2018,7 @@ bool Type::isAnyCharacterType() const {
 bool Type::isSignedIntegerType() const {
   if (const auto *BT = dyn_cast<BuiltinType>(CanonicalType)) {
     return BT->getKind() >= BuiltinType::Char_S &&
-           BT->getKind() <= BuiltinType::Int128;
+           BT->getKind() <= BuiltinType::Int256;
   }
 
   if (const EnumType *ET = dyn_cast<EnumType>(CanonicalType)) {
@@ -2039,7 +2039,7 @@ bool Type::isSignedIntegerType() const {
 bool Type::isSignedIntegerOrEnumerationType() const {
   if (const auto *BT = dyn_cast<BuiltinType>(CanonicalType)) {
     return BT->getKind() >= BuiltinType::Char_S &&
-           BT->getKind() <= BuiltinType::Int128;
+           BT->getKind() <= BuiltinType::Int256;
   }
 
   if (const auto *ET = dyn_cast<EnumType>(CanonicalType)) {
@@ -2068,7 +2068,7 @@ bool Type::hasSignedIntegerRepresentation() const {
 bool Type::isUnsignedIntegerType() const {
   if (const auto *BT = dyn_cast<BuiltinType>(CanonicalType)) {
     return BT->getKind() >= BuiltinType::Bool &&
-           BT->getKind() <= BuiltinType::UInt128;
+           BT->getKind() <= BuiltinType::UInt256;
   }
 
   if (const auto *ET = dyn_cast<EnumType>(CanonicalType)) {
@@ -2089,7 +2089,7 @@ bool Type::isUnsignedIntegerType() const {
 bool Type::isUnsignedIntegerOrEnumerationType() const {
   if (const auto *BT = dyn_cast<BuiltinType>(CanonicalType)) {
     return BT->getKind() >= BuiltinType::Bool &&
-    BT->getKind() <= BuiltinType::UInt128;
+    BT->getKind() <= BuiltinType::UInt256;
   }
 
   if (const auto *ET = dyn_cast<EnumType>(CanonicalType)) {
@@ -2998,6 +2998,10 @@ StringRef BuiltinType::getName(const PrintingPolicy &Policy) const {
     return "long long";
   case Int128:
     return "__int128";
+  // EVM_BEGIN
+  case Int256:
+    return "__int256";
+  // EVM_END
   case UChar:
     return "unsigned char";
   case UShort:
@@ -3010,6 +3014,10 @@ StringRef BuiltinType::getName(const PrintingPolicy &Policy) const {
     return "unsigned long long";
   case UInt128:
     return "unsigned __int128";
+  // EVM_BEGIN
+  case UInt256:
+    return "unsigned __int256";
+  // EVM_END
   case Half:
     return Policy.Half ? "half" : "__fp16";
   case BFloat16:

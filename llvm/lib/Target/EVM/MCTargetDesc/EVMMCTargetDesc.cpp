@@ -80,7 +80,12 @@ static MCTargetStreamer *
 createAsmTargetStreamer(MCStreamer &S, formatted_raw_ostream &OS,
                         MCInstPrinter * /*InstPrint*/,
                         bool /*isVerboseAsm*/) {
-  return new EVMTargetStreamer(S);
+  return new EVMTargetAsmStreamer(S, OS);
+}
+
+static MCTargetStreamer *
+createObjectTargetStreamer(MCStreamer &S, const MCSubtargetInfo &STI) {
+  return new EVMTargetNullStreamer(S);
 }
 
 extern "C" void LLVMInitializeEVMTargetMC() {
@@ -110,6 +115,9 @@ extern "C" void LLVMInitializeEVMTargetMC() {
   // Register the ASM Backend
   TargetRegistry::RegisterMCAsmBackend(getTheEVMTarget(),
                                        createEVMAsmBackend);
+
+  // Register the object target streamer.
+  TargetRegistry::RegisterObjectTargetStreamer(*T, createObjectTargetStreamer);
 
   // Register the asm target streamer.
   TargetRegistry::RegisterAsmTargetStreamer(*T, createAsmTargetStreamer);

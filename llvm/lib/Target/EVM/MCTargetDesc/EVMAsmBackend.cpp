@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "MCTargetDesc/EVMMCTargetDesc.h"
+#include "EVMUtils.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/MC/MCAsmBackend.h"
 #include "llvm/MC/MCAssembler.h"
@@ -35,31 +36,6 @@ static cl::opt<unsigned> DebugOffset("evm-debug-offset", cl::init(0),
 
 static cl::opt<std::string>
 EVMMetadataFile("evm_md_file", cl::desc("EVM metadata filename."));
-
-class MCGenEVMInfo {
-public:
-
-  // When generating EVM Metadata for assembly source files this emits the EVM 
-  // sections.
-  static void Emit(const MCAssembler &Asm) {
-    if (EVMMetadataFile.empty()) {
-      // TODO: change it to an appropriate name
-      EVMMetadataFile = "EVMMeta.txt";
-    }
-
-    std::error_code EC;
-    sys::fs::OpenFlags OpenFlags = sys::fs::OF_None;
-    auto FDOut =
-        std::make_unique<ToolOutputFile>(EVMMetadataFile, EC, OpenFlags);
-
-    if (EC) {
-      WithColor::error() << EC.message() << '\n';
-      return;
-    }
-
-    FDOut->keep();
-  }
-};
 
 namespace {
 
@@ -98,7 +74,7 @@ public:
 
 private:
   void applyFixupValue(MutableArrayRef<char> &Contents, size_t Offset,
-                       uint16_t Value) const;
+                       unsigned Value) const;
 };
 
 } // end anonymous namespace
@@ -108,18 +84,16 @@ bool EVMAsmBackend::writeNopData(raw_ostream &OS, uint64_t Count, const MCSubtar
 }
 
 void EVMAsmBackend::applyFixupValue(MutableArrayRef<char> &Contents,
-                                    size_t Offset, uint16_t Value) const {
+                                    size_t Offset, unsigned Value) const {
   if (DebugOffset != 0) {
     LLVM_DEBUG(dbgs() << "Artifically adding " << DebugOffset
                       << " to all Fixup relocation.\n";);
   }
-  support::endian::write<uint16_t>(&Contents[Offset + DebugOffset],
-                                   static_cast<uint16_t>(Value), Endian);
+  support::endian::write<EVM::RelocUnsignedType>(&Contents[Offset + DebugOffset],
+                                            Value, Endian);
 }
 
 void EVMAsmBackend::finish(const MCAssembler &Asm, MCAsmLayout &Layout) const {
-  MCGenEVMInfo::Emit(Asm);
-
   // also fix up hidden variables such as deploy.size
   for (MCAssembler::const_symbol_iterator it = Asm.symbol_begin(),
                                           ie = Asm.symbol_end();
@@ -151,13 +125,27 @@ void EVMAsmBackend::applyFixup(const MCAssembler &Asm, const MCFixup &Fixup,
                                MutableArrayRef<char> Data, uint64_t Value,
                                bool IsResolved,
                                const MCSubtargetInfo *STI) const {
-  assert(Fixup.getKind() == FK_SecRel_2);
-  assert(Value <= 0xFFFF);
+  assert(Value <= (1ULL << (EVM::RelocPushSize * CHAR_BIT)) - 1);
 
-  auto MetaSection = Asm.getContext().getEVMSection();
-  MetaSection->addFixupOffset(Fixup.getOffset());
-
-  applyFixupValue(Data, Fixup.getOffset(), Value);
+  if (Fixup.getKind() == MCFixupKind::FK_SecRel_4) {
+    auto Section = Asm.getContext().getEVMSection(".text");
+    Section->addFixup(Fixup.getOffset(), 4);
+    applyFixupValue(Data, Fixup.getOffset(), Value);
+  } else if (Fixup.getKind() == MCFixupKind::FK_Data_4) {
+    auto Section = Asm.getContext().getEVMSection(".text");
+    assert(dyn_cast<MCSymbolRefExpr>(Fixup.getValue()));
+    auto symExpr = dyn_cast<MCSymbolRefExpr>(Fixup.getValue());
+    Section->addRelocation(symExpr->getSymbol().getName().str(),
+                           Fixup.getOffset());
+  } else if (Fixup.getKind() == MCFixupKind::FK_Data_1) {
+    auto Section = Asm.getContext().getEVMSection(".text");
+    assert(dyn_cast<MCSymbolRefExpr>(Fixup.getValue()));
+    auto symExpr = dyn_cast<MCSymbolRefExpr>(Fixup.getValue());
+    Section->addRelocation(symExpr->getSymbol().getName().str(),
+                           Fixup.getOffset());
+  } else {
+    report_fatal_error("Invalid fixup kind!");
+  }
 }
 
 std::unique_ptr<MCObjectTargetWriter>

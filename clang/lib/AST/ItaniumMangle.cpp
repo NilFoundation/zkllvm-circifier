@@ -2930,6 +2930,8 @@ void CXXNameMangler::mangleType(const BuiltinType *T) {
   //                 ::= e  # long double, __float80
   //                 ::= g  # __float128
   //                 ::= g  # __ibm128
+  //                 ::= Q  # __int256_t
+  //                 ::= q  # __uint256_t
   // UNSUPPORTED:    ::= Dd # IEEE 754r decimal floating point (64 bits)
   // UNSUPPORTED:    ::= De # IEEE 754r decimal floating point (128 bits)
   // UNSUPPORTED:    ::= Df # IEEE 754r decimal floating point (32 bits)
@@ -2969,6 +2971,9 @@ void CXXNameMangler::mangleType(const BuiltinType *T) {
   case BuiltinType::UInt128:
     Out << 'o';
     break;
+  case BuiltinType::UInt256:
+    Out << 'Q';
+    break;
   case BuiltinType::SChar:
     Out << 'a';
     break;
@@ -2999,6 +3004,9 @@ void CXXNameMangler::mangleType(const BuiltinType *T) {
     break;
   case BuiltinType::Int128:
     Out << 'n';
+    break;
+  case BuiltinType::Int256:
+    Out << 'q';
     break;
   case BuiltinType::Float16:
     Out << "DF16_";

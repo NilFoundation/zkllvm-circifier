@@ -8,6 +8,7 @@
 
 #include "MCTargetDesc/EVMMCTargetDesc.h"
 #include "EVM.h"
+#include "EVMUtils.h"
 #include "EVMMachineFunctionInfo.h"
 #include "EVMSubtarget.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
@@ -148,8 +149,9 @@ bool EVMShrinkpush::runOnMachineFunction(MachineFunction &MF) {
         }
 
         // EIP-170
-        if (MO.isMBB() || MO.isGlobal() || MO.isBlockAddress()) {
-          int new_opcode = EVMSubtarget::get_push_opcode(2);
+        if (MO.isMBB() || MO.isGlobal() || MO.isBlockAddress() ||
+            MO.isSymbol()) {
+          int new_opcode = EVMSubtarget::get_push_opcode(EVM::RelocPushSize);
           MI.setDesc(TII.get(new_opcode));
           Changed = true;
         }

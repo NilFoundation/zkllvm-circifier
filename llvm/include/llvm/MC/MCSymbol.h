@@ -286,6 +286,8 @@ public:
 
   bool isXCOFF() const { return Kind == SymbolKindXCOFF; }
 
+  bool isEVM() const { return Kind == SymbolKindEVM; }
+
   /// @}
   /// \name Variable Symbols
   /// @{

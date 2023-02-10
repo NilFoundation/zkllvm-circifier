@@ -61,6 +61,8 @@ public:
   void emitZerofill(MCSection *Section, MCSymbol *Symbol = nullptr,
                     uint64_t Size = 0, unsigned ByteAlignment = 0,
                     SMLoc Loc = SMLoc()) override;
+  void emitFill(const MCExpr &NumBytes, uint64_t FillValue,
+                 SMLoc Loc) override;
   void emitTBSSSymbol(MCSection *Section, MCSymbol *Symbol, uint64_t Size,
                       unsigned ByteAlignment = 0) override;
   void emitValueImpl(const MCExpr *Value, unsigned Size,
@@ -69,6 +71,12 @@ public:
   void emitIdent(StringRef IdentString) override;
 
   void emitValueToAlignment(unsigned, int64_t, unsigned, unsigned) override;
+
+  void emitLabel(MCSymbol *Symbol, SMLoc Loc) override;
+
+  void emitIntValue(uint64_t Value, unsigned Size) override;
+
+  void emitIntValue(APInt Value) override;
 
   void finishImpl() override;
 

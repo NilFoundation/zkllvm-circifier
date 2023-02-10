@@ -22,6 +22,7 @@
 #include "llvm/MC/MCInst.h"
 #include "llvm/MC/MCObjectStreamer.h"
 #include "llvm/MC/MCSection.h"
+#include "llvm/MC/MCSectionEVM.h"
 #include "llvm/MC/MCSymbol.h"
 #include "llvm/MC/MCValue.h"
 #include "llvm/MC/TargetRegistry.h"
@@ -55,6 +56,79 @@ void MCEVMStreamer::emitAssemblerFlag(MCAssemblerFlag Flag) {
   llvm_unreachable("invalid assembler flag!");
 }
 
+void MCEVMStreamer::emitLabel(MCSymbol *Symbol, SMLoc Loc) {
+  MCObjectStreamer::emitLabel(Symbol, Loc);
+  auto Section = static_cast<MCSectionEVM*>(getCurrentSectionOnly());
+  if (Section->getKind().isData()) {
+    assert(Symbol->isEVM());
+    Section->addGlobal(Symbol);
+  }
+}
+
+void MCEVMStreamer::emitIntValue(uint64_t Value, unsigned Size) {
+  auto Section = static_cast<MCSectionEVM*>(getCurrentSectionOnly());
+  if (Section->getKind().isData()) {
+    Section->addGlobalsData(Value);
+    auto& CurGlobal = Section->getGlobals().back();
+    CurGlobal.DataCount = Section->getGlobalsDataSize() - CurGlobal.DataIndex;
+  }
+}
+
+void MCEVMStreamer::emitIntValue(APInt Value) {
+  auto Section = static_cast<MCSectionEVM*>(getCurrentSectionOnly());
+  if (Section->getKind().isData()) {
+    Section->addGlobalsData(Value);
+    auto& CurGlobal = Section->getGlobals().back();
+    CurGlobal.DataCount = Section->getGlobalsDataSize() - CurGlobal.DataIndex;
+  }
+}
+
+void MCEVMStreamer::emitValueImpl(const MCExpr *Value, unsigned Size,
+                                  SMLoc Loc) {
+  auto Section = static_cast<MCSectionEVM*>(getCurrentSectionOnly());
+  if (Section->getKind().isData()) {
+    switch (Value->getKind()) {
+    case MCExpr::Constant:
+      emitIntValue(dyn_cast<MCConstantExpr>(Value)->getValue(), Size);
+      break;
+    case MCExpr::SymbolRef: {
+      Section->addGlobalsData(Value);
+      auto& CurGlobal = Section->getGlobals().back();
+      CurGlobal.DataCount = Section->getGlobalsDataSize() - CurGlobal.DataIndex;
+      break;
+    }
+    case MCExpr::Binary: {
+      Section->addGlobalsData(Value);
+      auto& CurGlobal = Section->getGlobals().back();
+      CurGlobal.DataCount = Section->getGlobalsDataSize() - CurGlobal.DataIndex;
+      break;
+    }
+    default:
+      llvm_unreachable("Unsupported MCExpr kind");
+    }
+  }
+}
+
+void MCEVMStreamer::emitFill(const MCExpr &NumBytes, uint64_t FillValue,
+                             SMLoc Loc) {
+  assert(NumBytes.getKind() == MCExpr::Constant);
+  int64_t NumBytesValue;
+  if (!NumBytes.evaluateAsAbsolute(NumBytesValue))
+    report_fatal_error("Invalid expression for emitFill");
+  if (NumBytesValue == 0)
+    return;
+  if (NumBytesValue < 32)
+    return;
+  if (NumBytesValue < 32) {
+    NumBytesValue = alignTo(NumBytesValue, 32);
+  }
+  assert((NumBytesValue % 32) == 0 && "Only 32 bytes chunk supported");
+
+  for (int i = 0; i < NumBytesValue; i += 32) {
+    emitIntValue(FillValue, 32);
+  }
+}
+
 void MCEVMStreamer::changeSection(MCSection *Section,
                                   const MCExpr *Subsection) {
   changeSectionImpl(Section, Subsection);
@@ -78,17 +152,19 @@ void MCEVMStreamer::emitCommonSymbol(MCSymbol *S, uint64_t Size,
 }
 
 void MCEVMStreamer::emitELFSize(MCSymbol *Symbol, const MCExpr *Value) {
-  llvm_unreachable("unimplemented");
+  auto Section = static_cast<MCSectionEVM*>(getCurrentSectionOnly());
+  if (Section->getKind().isData()) {
+    auto& CurGlobal = Section->getGlobals().back();
+    int64_t Size;
+    Value->evaluateAsAbsolute(Size);
+    CurGlobal.Size = Size;
+    cast<MCSymbolEVM>(Symbol)->setSize(Size);
+  }
 }
 
 void MCEVMStreamer::emitLocalCommonSymbol(MCSymbol *S, uint64_t Size,
                                           unsigned ByteAlignment) {
   llvm_unreachable("Local common symbols are not yet implemented for EVM");
-}
-
-void MCEVMStreamer::emitValueImpl(const MCExpr *Value, unsigned Size,
-                                  SMLoc Loc) {
-  MCObjectStreamer::emitValueImpl(Value, Size, Loc);
 }
 
 void MCEVMStreamer::emitValueToAlignment(unsigned ByteAlignment, int64_t Value,
@@ -114,11 +190,12 @@ void MCEVMStreamer::emitInstToData(const MCInst &Inst,
   SmallVector<MCFixup, 4> Fixups;
   SmallString<256> Code;
   raw_svector_ostream VecOS(Code);
-  Assembler.getEmitter().encodeInstruction(Inst, VecOS, Fixups, STI);
 
   // Append the encoded instruction to the current data fragment (or create a
   // new such fragment if the current fragment is not a data fragment).
   MCDataFragment *DF = getOrCreateDataFragment();
+
+  Assembler.getEmitter().encodeInstruction(Inst, VecOS, Fixups, STI);
 
   // Add the fixups and data.
   for (unsigned I = 0, E = Fixups.size(); I != E; ++I) {

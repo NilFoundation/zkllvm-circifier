@@ -99,10 +99,11 @@ EVMTargetLowering::EVMTargetLowering(const TargetMachine &TM,
 
     setOperationAction(ISD::BSWAP, VT, Expand);
     setOperationAction(ISD::BITREVERSE, VT, Expand);
-    setOperationAction(ISD::CTTZ, VT, Legal);
-    setOperationAction(ISD::CTLZ, VT, Legal);
+    setOperationAction(ISD::CTTZ, VT, Custom);
+    setOperationAction(ISD::CTLZ, VT, Custom);
     setOperationAction(ISD::CTPOP, VT, Legal);
-    setOperationAction(ISD::CTTZ_ZERO_UNDEF, VT, Legal);
+    setOperationAction(ISD::CTTZ_ZERO_UNDEF, VT, Custom);
+    setOperationAction(ISD::CTLZ_ZERO_UNDEF, VT, Custom);
     setOperationAction(ISD::SIGN_EXTEND_INREG, VT, Custom);
 
     setOperationAction(ISD::GlobalAddress, VT, Custom);
@@ -318,7 +319,9 @@ SDValue EVMTargetLowering::LowerOperation(SDValue Op,
                                           SelectionDAG &DAG) const {
   switch (Op.getOpcode()) {
   default:
+#ifndef NDEBUG
     errs() << "Unexpected node: "; Op.dump(&DAG);
+#endif
     llvm_unreachable("unimplemented lowering operation,");
   case ISD::BR:
     return LowerBR(Op, DAG);
@@ -356,6 +359,9 @@ SDValue EVMTargetLowering::LowerOperation(SDValue Op,
     return DAG.getNode(Op.getOpcode(), SDLoc(Op), MVT::i256, LHS, RHS,
                        Op.getOperand(2));
   }
+  case ISD::CTLZ:
+  case ISD::CTTZ:
+  case ISD::CTLZ_ZERO_UNDEF:
   case ISD::CTTZ_ZERO_UNDEF: {
     auto Node = Op.getNode();
     TargetLowering::ArgListTy Args;
@@ -365,18 +371,39 @@ SDValue EVMTargetLowering::LowerOperation(SDValue Op,
       Type *ArgTy = ArgVT.getTypeForEVT(*DAG.getContext());
       Entry.Node = Op;
       Entry.Ty = ArgTy;
+      if (Op.getValueSizeInBits() != 256) {
+        Entry.Node = DAG.getNode(ISD::SIGN_EXTEND, SDLoc(Op), {MVT::i256}, Op);
+      }
       Args.push_back(Entry);
+    }
+    const char* CalleeStr;
+    auto OperandSize = Op.getOperand(0).getValueSizeInBits();
+    if (Op.getOpcode() == ISD::CTLZ_ZERO_UNDEF || Op.getOpcode() == ISD::CTLZ) {
+      CalleeStr = (OperandSize == 64) ? "__evm_builtin_clzll"
+                                      : "__evm_builtin_clz";
+    } else {
+      CalleeStr = (OperandSize == 64) ? "__evm_builtin_ctzll"
+                                      : "__evm_builtin_ctz";
     }
     TargetLowering::CallLoweringInfo CLI(DAG);
     CLI.setDebugLoc(SDLoc(Op.getNode()))
-        .setChain(Op.getNode()->getOperand(0))
-        .setLibCallee(CallingConv::C, Type::getVoidTy(*DAG.getContext()),
+        .setChain(DAG.getEntryNode())
+        .setLibCallee(CallingConv::C, Node->getValueType(0).getTypeForEVT(*DAG.getContext()),
                       DAG.getExternalSymbol(
-                          "abort", getPointerTy(DAG.getDataLayout())),
+                          CalleeStr, getPointerTy(DAG.getDataLayout())),
                       std::move(Args));
     std::pair<SDValue, SDValue> CallResult = LowerCallTo(CLI);
 
-    return CallResult.second;
+    assert(CLI.InVals.size() == 1);
+    DAG.ReplaceAllUsesOfValueWith(SDValue(Node, 0), CLI.InVals[0]);
+
+    SDValue ResNode = CLI.InVals[0];
+    if (ResNode.getValueSizeInBits() != Op.getValueSizeInBits()) {
+      ResNode = DAG.getZExtOrTrunc(CLI.InVals[0], SDLoc(Op), Op.getValueType());
+    }
+    DAG.ReplaceAllUsesOfValueWith(SDValue(Node, 0), ResNode);
+
+    return ResNode;
   }
   }
 }

@@ -892,15 +892,6 @@ unsigned EVMStackAlloc::calculateUseRegs(MachineInstr &MI, std::vector<MOPUseTyp
   unsigned index = 0;
   for (const MachineOperand &MOP : MI.explicit_uses()) {
     if (!MOP.isReg()) {
-      LLVM_DEBUG({
-        if (MI.getOpcode() == EVM::PUSH32_r) {
-          assert(MOP.isImm() || MOP.isCImm() || MOP.isGlobal());
-          assert(MI.getNumExplicitOperands() - MI.getNumExplicitDefs() == 1);
-        } else if (MI.getOpcode() == EVM::JUMP_r ||
-                   MI.getOpcode() == EVM::JUMPI_r) {
-          assert(MOP.isSymbol() || MOP.isMBB());
-        }
-      });
       ++index;
       continue;
     }

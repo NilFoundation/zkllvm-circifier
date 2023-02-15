@@ -235,7 +235,9 @@ bool DAGTypeLegalizer::run() {
     assert(N->getNodeId() == ReadyToProcess &&
            "Node should be ready if on worklist!");
 
-    LLVM_DEBUG(dbgs() << "Legalizing node: "; N->dump(&DAG));
+    // EVM_START
+    LLVM_DEBUG(dbgs() << "\nLegalizing node: "; N->dump(&DAG));
+    // EVM_END
     if (IgnoreNodeResults(N)) {
       LLVM_DEBUG(dbgs() << "Ignoring node results\n");
       goto ScanOperands;
@@ -391,8 +393,9 @@ ScanOperands:
     }
 
     if (i == NumOperands) {
-      LLVM_DEBUG(dbgs() << "Legally typed node: "; N->dump(&DAG);
-                 dbgs() << "\n");
+      // EVM_START
+      LLVM_DEBUG(dbgs() << "Legally typed node: "; N->dump(&DAG););
+      // EVM_END
     }
     }
 NodeDone:

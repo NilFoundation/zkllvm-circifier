@@ -33,6 +33,12 @@
 
 using namespace llvm;
 
+#include <iostream>
+
+#define VERBOSE 0
+
+#define LOG() VERBOSE && std::cerr
+
 MCEVMStreamer::~MCEVMStreamer() = default; // anchor.
 
 void MCEVMStreamer::mergeFragment(MCDataFragment *DF, MCDataFragment *EF) {
@@ -57,6 +63,9 @@ void MCEVMStreamer::emitAssemblerFlag(MCAssemblerFlag Flag) {
 }
 
 void MCEVMStreamer::emitLabel(MCSymbol *Symbol, SMLoc Loc) {
+#if VERBOSE
+  LOG() << "emitLabel: "; Symbol->print(errs(), nullptr); LOG() << '\n';
+#endif
   MCObjectStreamer::emitLabel(Symbol, Loc);
   auto Section = static_cast<MCSectionEVM*>(getCurrentSectionOnly());
   if (Section->getKind().isData()) {
@@ -66,6 +75,7 @@ void MCEVMStreamer::emitLabel(MCSymbol *Symbol, SMLoc Loc) {
 }
 
 void MCEVMStreamer::emitIntValue(uint64_t Value, unsigned Size) {
+  LOG() << "emitIntValue: " << Value << ", size=" << Size << '\n';
   auto Section = static_cast<MCSectionEVM*>(getCurrentSectionOnly());
   if (Section->getKind().isData()) {
     Section->addGlobalsData(Value);
@@ -80,7 +90,20 @@ void MCEVMStreamer::emitIntValue(APInt Value) {
     Section->addGlobalsData(Value);
     auto& CurGlobal = Section->getGlobals().back();
     CurGlobal.DataCount = Section->getGlobalsDataSize() - CurGlobal.DataIndex;
+    LOG() << Section->getGlobalsDataSize() << " emitAPIntValue\n";
   }
+}
+
+void MCEVMStreamer::emitBytes(StringRef Data) {
+  auto Section = static_cast<MCSectionEVM*>(getCurrentSectionOnly());
+  assert (Section->getKind().isData());
+  LOG() << Section->getGlobalsDataSize() << " emitBytes: size=" << Data.size()
+        << '\n';
+  auto& CurGlobal = Section->getGlobals().back();
+  for (auto Ch : Data) {
+    Section->addGlobalsData(static_cast<unsigned>(Ch));
+  }
+  CurGlobal.DataCount = Section->getGlobalsDataSize() - CurGlobal.DataIndex;
 }
 
 void MCEVMStreamer::emitValueImpl(const MCExpr *Value, unsigned Size,
@@ -95,12 +118,17 @@ void MCEVMStreamer::emitValueImpl(const MCExpr *Value, unsigned Size,
       Section->addGlobalsData(Value);
       auto& CurGlobal = Section->getGlobals().back();
       CurGlobal.DataCount = Section->getGlobalsDataSize() - CurGlobal.DataIndex;
+      LOG() << Section->getGlobalsDataSize() << " emit Symbol: "
+            << dyn_cast<MCSymbolRefExpr>(Value)->getSymbol().getName().data()
+            << ", size=" << Size << '\n';
       break;
     }
     case MCExpr::Binary: {
       Section->addGlobalsData(Value);
       auto& CurGlobal = Section->getGlobals().back();
       CurGlobal.DataCount = Section->getGlobalsDataSize() - CurGlobal.DataIndex;
+      LOG() << Section->getGlobalsDataSize() << " emit Binary: size=" << Size
+            << '\n';
       break;
     }
     default:
@@ -119,6 +147,7 @@ void MCEVMStreamer::emitFill(const MCExpr &NumBytes, uint64_t FillValue,
     return;
   if (NumBytesValue < 32)
     return;
+  LOG() << "emitFill: " << FillValue << ", size=" << NumBytesValue << '\n';
   if (NumBytesValue < 32) {
     NumBytesValue = alignTo(NumBytesValue, 32);
   }

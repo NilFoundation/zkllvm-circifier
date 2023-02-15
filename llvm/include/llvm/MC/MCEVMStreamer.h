@@ -78,6 +78,8 @@ public:
 
   void emitIntValue(APInt Value) override;
 
+  void emitBytes(StringRef Data) override;
+
   void finishImpl() override;
 
 private:

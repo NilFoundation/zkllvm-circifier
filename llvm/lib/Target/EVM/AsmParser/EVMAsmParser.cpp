@@ -204,7 +204,9 @@ public:
       O << "Immediate: \"" << getImm() << "\"";
     } else if (isSymbol()) {
       O << "Symbol: \"";
+#ifndef NDEBUG
       getSymbol()->dump();
+#endif
     }
   }
 
@@ -356,7 +358,6 @@ bool EVMAsmParser::MatchAndEmitInstruction(SMLoc IDLoc, unsigned &Opcode,
     Out.emitInstruction(Inst, getSTI());
     break;
   default:
-    Inst.dump();
     llvm_unreachable("Unexpected MatchResult. Maybe wrong instruction");
   }
 

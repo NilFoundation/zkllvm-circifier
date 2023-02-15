@@ -18,6 +18,7 @@ OptionParser.new do |opts|
   opts.on('--bin-dir=PATH', 'Path to LLVM binary directory') { |x| $options.bin_dir = x }
   opts.on('--clang-args=ARGS', 'Command line arguments for clang') { |x| $options.clang_args = x }
   opts.on('--linker-args=ARGS', 'Command line arguments for linker') { |x| $options.linker_args = x }
+  opts.on('--stdlib=PATH', 'Path to EVM stdlib') { |x| $options.stdlib = x }
   opts.on('--debug', 'Produce debug information')
   opts.on('--no-compile', 'Don\'t compile anything, assume it is already compiled') { $options.no_compile = true }
   opts.on('--no-ctor', 'Do not generate EVM constructor') { $options.no_ctor = true }
@@ -77,15 +78,19 @@ def run_test(source)
   codefile = "#{basename}.evm_h"
 
   unless options.no_compile
-    clang_cmd = "#{bindir}/clang -target evm #{source} -o #{codefile} -v -Xclang -disable-llvm-passes"
+    clang_cmd = "#{bindir}/clang -target evm #{source} -o #{codefile} "
+    clang_cmd += ' -v ' if options.verbose
+    clang_cmd += ' -Xclang -disable-llvm-passes '
+    clang_cmd += ' -fno-exceptions '
     clang_cmd += ' -std=c++17 '
     clang_cmd += ' -O3 '
     clang_cmd += ' -fno-rtti '
+    clang_cmd += ' -DNDEBUG '
     clang_cmd += ' -Xlinker --no-ctor ' if options.no_ctor
     clang_cmd += " -Xlinker #{options.linker_args}" if options.linker_args
     clang_cmd += ' ' + options.clang_args if options.clang_args
     unless options.no_stdlib
-      clang_cmd += ' stdlib.o '
+      clang_cmd += " #{options.stdlib} "
       clang_cmd += "-I#{options.src_dir}/llvm/projects/evm-sdk/cpp-stdlib/libcpp " \
                    "-I#{options.src_dir}/llvm/projects/evm-sdk/cpp-stdlib/libc/include "
     end
@@ -113,7 +118,7 @@ def run_test(source)
     result = result.to_i(16) if result.start_with? '0x'
     if test_run.result && test_run.result != result
       if options.debug
-        result = command("evm -debug --gas 10000 --input #{input} --codefile #{codefile} run")
+        result = command("evm -debug --gas 1000000 --input #{input} --codefile #{codefile} run")
         File.write("#{basename}.run", result)
       end
       raise "Wrong output result: expected(#{test_run.result}) != real(#{result})"

@@ -86,7 +86,9 @@ public:
     auto [It, _] = Nodes.insert({Name, std::make_unique<EvmSymbolNode>()});
     auto Node = It->second.get();
     Node->Symbol = SM[Name];
+#ifndef NDEBUG
     Node->Name = Name;
+#endif
     return Node;
   }
 

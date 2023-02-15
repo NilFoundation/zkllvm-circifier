@@ -42,6 +42,10 @@ class OStream;
 class Value;
 }
 
+namespace llvm {
+class MemoryBuffer;
+}
+
 class EvmFile {
 
   EvmFile() = default;
@@ -98,8 +102,10 @@ public:
 
   void emitAbi(llvm::json::OStream& OS);
 
-  static std::unique_ptr<EvmFile> Create(
-      const std::string& FileName, SymbolManager& SymManager);
+  static std::unique_ptr<EvmFile> Create(llvm::StringRef FileName,
+                                         SymbolManager& SymManager);
+  static std::unique_ptr<EvmFile> Create(llvm::StringRef FileName,
+      std::unique_ptr<llvm::MemoryBuffer> Buffer, SymbolManager& SymManager);
 
 private:
   Function* getFunctionByOffset(unsigned Offset);

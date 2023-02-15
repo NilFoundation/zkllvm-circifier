@@ -383,29 +383,6 @@ void EVMDAGToDAGISel::Select(SDNode *Node) {
     case EVMISD::SIGNEXTEND:
       if (SelectSIGNEXTEND(Node)) return;
       break;
-    case ISD::CTLZ:
-    case ISD::CTLZ_ZERO_UNDEF:
-    case ISD::CTTZ:
-    case ISD::CTTZ_ZERO_UNDEF: {
-      // We don't support these builtins for now.
-      // TODO: Support these builtins.
-      const SDValue &Callee = CurDAG->getExternalSymbol("abort",
-                              TLI->getPointerTy(CurDAG->getDataLayout()));
-      const SDValue PushCallee =
-          SDValue(CurDAG->getMachineNode(EVM::PUSH32_r, SDLoc(Node), MVT::i256, Callee), 0);
-
-      SmallVector<SDValue, 8> opsVec;
-      opsVec.push_back(Node->getOperand(0));
-      opsVec.push_back(PushCallee);
-
-      ArrayRef<SDValue> ops(opsVec);
-
-      MachineSDNode *call =
-          CurDAG->getMachineNode(EVM::pJUMPSUB_r, SDLoc(Node), Node->getVTList(), ops);
-
-      ReplaceNode(Node, call);
-      return;
-    }
   }
 
   SelectCode(Node);

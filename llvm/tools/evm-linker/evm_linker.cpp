@@ -27,6 +27,8 @@
 #include "evm_file.h"
 #include "nil/crypto3/hash/algorithm/hash.hpp"
 #include "nil/crypto3/hash/keccak.hpp"
+#include "llvm/Object/Archive.h"
+#include "llvm/Object/ArchiveWriter.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/JSON.h"
@@ -55,6 +57,10 @@ static cl::opt<bool> KeepUnused("keep-unused",
 static cl::opt<bool> OptVerbose("verbose",
                                 cl::desc("Verbose output"),
                                 llvm::cl::init(false));
+static cl::opt<bool> MakeArchive("make-archive",
+                                 cl::desc("Compose input files into an archive,"
+                                          " without linking"),
+                                 llvm::cl::init(false));
 
 static std::unique_ptr<ToolOutputFile> OpenOutputFile(std::string_view Path);
 static void WriteDataToStream(raw_fd_ostream& OS, const void* Data, size_t Size);
@@ -73,8 +79,13 @@ public:
 
   void resolve(bool CheckReachable);
 
+  void readArchive(std::unique_ptr<object::Archive> Archive,
+                   std::string_view FileName,
+                   std::vector<std::unique_ptr<EvmFile>>& Files);
 
   void emit();
+
+  int emitArchive();
 
 private:
   evm::Builder Dispatcher;
@@ -88,8 +99,31 @@ private:
 };
 
 int EvmLinker::run() {
+  if (MakeArchive) {
+    return emitArchive();
+  }
   Files.reserve(InputFilenames.size());
   for (auto& InputFile : InputFilenames) {
+    {
+      // At first, check that the file is an archive file, if so, unpack it and process all its containing files.
+      if (auto Buf = MemoryBuffer::getFile(InputFile, false, false); Buf) {
+        if (Buf.get()->getBuffer().startswith(object::ArchiveMagic)) {
+          Expected<std::unique_ptr<object::Archive>> ArchiveOrError =
+              object::Archive::create(Buf.get()->getMemBufferRef());
+          if (!ArchiveOrError) {
+            std::string Message;
+            handleAllErrors(std::move(ArchiveOrError.takeError()),
+                            [&](ErrorInfoBase &EIB) {
+              Message = EIB.message();
+            });
+            report_fatal_error(Twine("Read archive failed: ") + Message);
+          }
+          readArchive(std::move(ArchiveOrError.get()), InputFile, Files);
+          continue;
+        }
+      }
+    }
+
     auto File = EvmFile::Create(InputFile, SymManager);
     if (!File) {
       LOG() << "Failed to load input file `" << InputFile << '\n';
@@ -126,6 +160,52 @@ int EvmLinker::run() {
   return 0;
 }
 
+int EvmLinker::emitArchive() {
+  static std::vector<NewArchiveMember> Members;
+
+  for (auto Input : InputFilenames) {
+    auto MemberOrErr = NewArchiveMember::getFile(Input, true);
+    if (!MemberOrErr) {
+      report_fatal_error("Cannot open input file");
+    }
+    Members.push_back(std::move(MemberOrErr.get()));
+  }
+  Error E = writeArchive(OutputFilename, Members, false,
+                         object::Archive::Kind::K_GNU, true, false, nullptr);
+  if (E) {
+    report_fatal_error("writeArchive failed");
+  }
+
+  return 0;
+}
+
+void EvmLinker::readArchive(std::unique_ptr<object::Archive> Archive,
+                            std::string_view FileName,
+                            std::vector<std::unique_ptr<EvmFile>>& Files) {
+  Error Err = Error::success();
+  for (auto &C : Archive->children(Err)) {
+    Expected<StringRef> NameOrErr = C.getName();
+    if (!NameOrErr) {
+      WithColor::error(errs(), "evm-linker") << NameOrErr.takeError();
+      report_fatal_error("getName failed");
+    }
+    Expected<StringRef> BufOrErr = C.getBuffer();
+    if (!BufOrErr) {
+      WithColor::error(errs(), "evm-linker") << BufOrErr.takeError();
+      report_fatal_error("getBuffer failed");
+    }
+    auto Buffer = MemoryBuffer::getMemBuffer(BufOrErr.get(), FileName, false);
+    auto File = EvmFile::Create(NameOrErr.get(), std::move(Buffer), SymManager);
+    if (!File) {
+      report_fatal_error(Twine("Failed to load archive item: ") +
+                         NameOrErr.get());
+    }
+    Files.push_back(std::move(File));
+  }
+  if (Err) {
+    report_fatal_error("Iterating over Archive's children failed");
+  }
+}
 
 void EvmLinker::buildDispatcher() {
   Dispatcher.push("stack_start");

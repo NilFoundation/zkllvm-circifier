@@ -19,5 +19,11 @@ using namespace nil::crypto3;
         return 1;
     }
 
+    T::value_type e1inv = e1.inversed();
+
+    if (e1inv != 0x3667dc6f224c235aae3a11459dca90697c112999c0a100bbf14cef709538d2d3_cppui256) {
+        return 2;
+    }
+
     return 0;
 }

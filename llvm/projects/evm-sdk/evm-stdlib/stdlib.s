@@ -77,13 +77,13 @@ head2:
     JUMPI
 
     # Exit if count is not mod of 32
-    PUSH1 31
+    PUSH1 32
     DUP4
     MOD
-    PUSH 0
+    PUSH1 0
     EQ
     ISZERO
-    PUSH4   abort
+    PUSH4   fail
     JUMPI
 
     # Decrease count variable
@@ -125,6 +125,10 @@ exit2:
     #POP
     SWAP1
     JUMP
+
+fail:
+    JUMPDEST
+    INVALID
 
 # TODO: Implement memmove
 STDLIB_FUNC_INVALID memmove

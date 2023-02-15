@@ -46,3 +46,7 @@ add_llvm_external_project(soll)
 if(LLVM_INCLUDE_TESTS)
   add_llvm_external_project(cross-project-tests)
 endif()
+
+# EVM_START
+add_subdirectory(evm-sdk/evm-stdlib)
+# EVM_END

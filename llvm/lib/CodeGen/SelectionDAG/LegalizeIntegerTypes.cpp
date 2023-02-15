@@ -38,8 +38,9 @@ using namespace llvm;
 /// may also have invalid operands or may have other results that need
 /// expansion, we just know that (at least) one result needs promotion.
 void DAGTypeLegalizer::PromoteIntegerResult(SDNode *N, unsigned ResNo) {
-  LLVM_DEBUG(dbgs() << "Promote integer result: "; N->dump(&DAG);
-             dbgs() << "\n");
+  // EVM_START
+  LLVM_DEBUG(dbgs() << "Promote integer result: "; N->dump(&DAG););
+  // EVM_END
   SDValue Res = SDValue();
 
   // See if the target wants to custom expand this node.

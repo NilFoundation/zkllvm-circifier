@@ -34,17 +34,21 @@ using namespace llvm;
 static std::string parseRelocSymbol(std::string_view Str, unsigned* Addend);
 
 std::unique_ptr<EvmFile> EvmFile::Create(
-    const std::string& FileName, SymbolManager& SymManager) {
+    StringRef FileName, SymbolManager& SymManager) {
   ErrorOr<std::unique_ptr<MemoryBuffer>> FileOrErr =
       MemoryBuffer::getFileOrSTDIN(FileName, true);
   if (FileOrErr.getError()) {
     report_fatal_error(Twine("Cannot open file ") + FileName);
   }
+  return Create(FileName, std::move(FileOrErr.get()), SymManager);
+}
 
+std::unique_ptr<EvmFile> EvmFile::Create(StringRef FileName,
+    std::unique_ptr<MemoryBuffer> Buffer, SymbolManager& SymManager) {
   auto File = std::unique_ptr<EvmFile>(new EvmFile);
   File->FileName = FileName;
 
-  auto JsonFile = json::parse(FileOrErr.get()->getBuffer());
+  auto JsonFile = json::parse(Buffer->getBuffer());
   if (!JsonFile) {
     report_fatal_error(Twine("JSON parse failed, file: ") + FileName);
   }
@@ -104,7 +108,7 @@ std::unique_ptr<EvmFile> EvmFile::Create(
       G->Name = GObj->getString("name").value();
       G->Size = GObj->getInteger("size").value();
       if (auto Data = GObj->getArray("data")) {
-        assert(Data->empty() || Data->size() * BytesInEvmWord == G->Size);
+        assert(Data->size() * BytesInEvmWord == G->Size);
         for (auto V : *Data) {
           switch (V.kind()) {
           case json::Value::Number:
@@ -164,9 +168,8 @@ std::unique_ptr<EvmFile> EvmFile::Create(
         assert(Value >= Func->Offset);
         Value -= Func->Offset;
 
-        // Fixup can be only in PUSH instructions
-        uint8_t Opcode = File->Code[Offset - 1];
-        assert(opcodes::isPush(Opcode));
+        // Fixup can be only in PUSH instructions. Opcode is in `Offset - 1`.
+        assert(opcodes::isPush(File->Code[Offset - 1]));
 
         support::endian::write32(&File->Code[Offset], Value,
                                  support::endianness::big);
@@ -241,8 +244,7 @@ void EvmFile::resolve(const SymbolMap& Map) {
                       (Reloc.TargetSymbol ? Reloc.TargetSymbol->Offset : 0) -
                       this->Offset.value();
         LOG() << "Resolve in offset=" << Offset << " by value=" << Symbol->Offset << '\n';
-        auto Opcode = Code[Offset - 1];
-        assert(opcodes::getPushSize(Opcode) == 4);
+        assert(opcodes::getPushSize(Code[Offset - 1]) == 4);
         support::endian::write32(&Code[Offset], Symbol->Offset,
                                  support::endianness::big);
         break;

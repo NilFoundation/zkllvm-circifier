@@ -1406,7 +1406,7 @@ bool FPPassManager::runOnFunction(Function &F) {
   if (F.isDeclaration())
     return false;
 
-//#define SINGLE_FUNC "_ZN3nil7crypto314multiprecision8backends13eval_multiplyILj512ELj512ELNS1_16cpp_integer_typeE1ELNS1_18cpp_int_check_typeE0EvLj512ELj512ELS4_1ELS5_0EvEENSt3__19enable_ifIXaantsr18is_trivial_cpp_intINS2_15cpp_int_backendIXT_EXT0_EXT1_EXT2_ET3_EEEE5valuentsr18is_trivial_cpp_intINS8_IXT4_EXT5_EXT6_EXT7_ET8_EEEE5valueEvE4typeERSA_RKSC_RKo"
+//#define SINGLE_FUNC "_Z4testm"
 
 #ifdef SINGLE_FUNC
   if (F.getName() != SINGLE_FUNC) {

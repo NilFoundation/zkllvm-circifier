@@ -29,6 +29,7 @@ PrintModulePass::PrintModulePass(raw_ostream &OS, const std::string &Banner,
       ShouldPreserveUseListOrder(ShouldPreserveUseListOrder) {}
 
 PreservedAnalyses PrintModulePass::run(Module &M, ModuleAnalysisManager &) {
+#if 1
   if (llvm::isFunctionInPrintList("*")) {
     if (!Banner.empty())
       OS << Banner << "\n";
@@ -46,6 +47,7 @@ PreservedAnalyses PrintModulePass::run(Module &M, ModuleAnalysisManager &) {
       }
     }
   }
+#endif
   return PreservedAnalyses::all();
 }
 

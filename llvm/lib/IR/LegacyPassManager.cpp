@@ -42,6 +42,9 @@ using namespace llvm;
 // pass name to be printed before it executes.
 //
 
+static cl::opt<std::string> FuncToCompile("func", cl::desc("Function name to compile"),
+                                           cl::value_desc(""));
+
 namespace {
 // Different debug levels that can be enabled...
 enum PassDebugLevel {
@@ -1406,7 +1409,13 @@ bool FPPassManager::runOnFunction(Function &F) {
   if (F.isDeclaration())
     return false;
 
-//#define SINGLE_FUNC "_Z4testm"
+//#define SINGLE_FUNC "_ZN3nil7crypto314multiprecision8backends13eval_multiplyILj320ELj320ELNS1_16cpp_integer_typeE0ELNS1_18cpp_int_check_typeE0EvLj320ELj320ELS4_0ELS5_0EvLj320ELj320ELS4_0ELS5_0EvEENSt3__19enable_ifIXaaaantsr18is_trivial_cpp_intINS2_15cpp_int_backendIXT_EXT0_EXT1_EXT2_ET3_EEEE5valuentsr18is_trivial_cpp_intINS8_IXT4_EXT5_EXT6_EXT7_ET8_EEEE5valuentsr18is_trivial_cpp_intINS8_IXT9_EXT10_EXT11_EXT12_ET13_EEEE5valueEvE4typeERSA_RKSC_RKSE_"
+
+  if (!FuncToCompile.empty()) {
+    if (F.getName() != FuncToCompile) {
+      return false;
+    }
+  }
 
 #ifdef SINGLE_FUNC
   if (F.getName() != SINGLE_FUNC) {
@@ -1464,7 +1473,7 @@ bool FPPassManager::runOnFunction(Function &F) {
       LocalChanged |= FP->runOnFunction(F);
 
 #define DUMPE 1
-      if (DUMPE && LocalChanged) {
+      if (DUMPE && (LocalChanged || Index == 0)) {
         auto DirName = "ir_dump/" + CanonizeName(F.getName());
         if (auto Error = sys::fs::create_directories(DirName, true)) {
           errs() << "DIRECTORY NAME:" << DirName << '\n';

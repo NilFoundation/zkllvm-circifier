@@ -162,8 +162,9 @@ bool EVMDAGToDAGISel::SelectLOAD(SDNode *Node) {
       assert(ExtSizeInBits <= 128);
       SDNode* Load = CurDAG->getMachineNode(EVM::MLOAD_r,
                                              SDLoc(Node), MVT::i256, MVT::Other, Src, Op0);
-      if (ExtSizeInBits <= 64) {
-        auto Mask = maskTrailingOnes<uint64_t>(ExtSizeInBits);
+      if (ExtSizeInBits <= 128) {
+        constexpr std::array<uint64_t, 2> MaskData = {uint64_t(-1), uint64_t(-1)};
+        APInt Mask(256, MaskData);
         SDValue MaskConst = CurDAG->getConstant(Mask, SDLoc(Node), MVT::i256);
 
         SDValue MaskNode =

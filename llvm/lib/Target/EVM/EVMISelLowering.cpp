@@ -362,50 +362,51 @@ SDValue EVMTargetLowering::LowerOperation(SDValue Op,
   case ISD::CTLZ:
   case ISD::CTTZ:
   case ISD::CTLZ_ZERO_UNDEF:
-  case ISD::CTTZ_ZERO_UNDEF: {
-    auto Node = Op.getNode();
-    TargetLowering::ArgListTy Args;
-    TargetLowering::ArgListEntry Entry;
-    for (const SDValue &Op : Node->op_values()) {
-      EVT ArgVT = Op.getValueType();
-      Type *ArgTy = ArgVT.getTypeForEVT(*DAG.getContext());
-      Entry.Node = Op;
-      Entry.Ty = ArgTy;
-      if (Op.getValueSizeInBits() != 256) {
-        Entry.Node = DAG.getNode(ISD::SIGN_EXTEND, SDLoc(Op), {MVT::i256}, Op);
-      }
-      Args.push_back(Entry);
-    }
-    const char* CalleeStr;
-    auto OperandSize = Op.getOperand(0).getValueSizeInBits();
-    if (Op.getOpcode() == ISD::CTLZ_ZERO_UNDEF || Op.getOpcode() == ISD::CTLZ) {
-      CalleeStr = (OperandSize == 64) ? "__evm_builtin_clzll"
-                                      : "__evm_builtin_clz";
-    } else {
-      CalleeStr = (OperandSize == 64) ? "__evm_builtin_ctzll"
-                                      : "__evm_builtin_ctz";
-    }
-    TargetLowering::CallLoweringInfo CLI(DAG);
-    CLI.setDebugLoc(SDLoc(Op.getNode()))
-        .setChain(DAG.getEntryNode())
-        .setLibCallee(CallingConv::C, Node->getValueType(0).getTypeForEVT(*DAG.getContext()),
-                      DAG.getExternalSymbol(
-                          CalleeStr, getPointerTy(DAG.getDataLayout())),
-                      std::move(Args));
-    std::pair<SDValue, SDValue> CallResult = LowerCallTo(CLI);
-
-    assert(CLI.InVals.size() == 1);
-    DAG.ReplaceAllUsesOfValueWith(SDValue(Node, 0), CLI.InVals[0]);
-
-    SDValue ResNode = CLI.InVals[0];
-    if (ResNode.getValueSizeInBits() != Op.getValueSizeInBits()) {
-      ResNode = DAG.getZExtOrTrunc(CLI.InVals[0], SDLoc(Op), Op.getValueType());
-    }
-    DAG.ReplaceAllUsesOfValueWith(SDValue(Node, 0), ResNode);
-
-    return ResNode;
+  case ISD::CTTZ_ZERO_UNDEF:
+    return LowerCtxz(Op, DAG);
   }
+}
+
+SDValue EVMTargetLowering::LowerCtxz(SDValue Op, SelectionDAG &DAG) const {
+  auto Node = Op.getNode();
+  TargetLowering::ArgListTy Args;
+  TargetLowering::ArgListEntry Entry;
+  for (const SDValue &Op : Node->op_values()) {
+    EVT ArgVT = Op.getValueType();
+    Type *ArgTy = ArgVT.getTypeForEVT(*DAG.getContext());
+    Entry.Node = Op;
+    Entry.Ty = ArgTy;
+    if (Op.getValueSizeInBits() != 256) {
+      Entry.Node = DAG.getNode(ISD::SIGN_EXTEND, SDLoc(Op), {MVT::i256}, Op);
+    }
+    Args.push_back(Entry);
   }
+  const char* CalleeStr;
+  auto OperandSize = Op.getOperand(0).getValueSizeInBits();
+  if (Op.getOpcode() == ISD::CTLZ_ZERO_UNDEF || Op.getOpcode() == ISD::CTLZ) {
+    CalleeStr = (OperandSize == 64) ? "__evm_builtin_clzll"
+                                    : "__evm_builtin_clz";
+  } else {
+    CalleeStr = (OperandSize == 64) ? "__evm_builtin_ctzll"
+                                    : "__evm_builtin_ctz";
+  }
+  TargetLowering::CallLoweringInfo CLI(DAG);
+  CLI.setDebugLoc(SDLoc(Op.getNode()))
+      .setChain(DAG.getEntryNode())
+      .setLibCallee(CallingConv::C, Node->getValueType(0).getTypeForEVT(*DAG.getContext()),
+                    DAG.getExternalSymbol(
+                        CalleeStr, getPointerTy(DAG.getDataLayout())),
+                    std::move(Args));
+
+  assert(CLI.InVals.size() == 1);
+
+  SDValue ResNode = CLI.InVals[0];
+  if (ResNode.getValueSizeInBits() != Op.getValueSizeInBits()) {
+    ResNode = DAG.getZExtOrTrunc(CLI.InVals[0], SDLoc(Op), Op.getValueType());
+  }
+  DAG.ReplaceAllUsesOfValueWith(SDValue(Node, 0), ResNode);
+
+  return ResNode;
 }
 
 SDValue EVMTargetLowering::LowerCopyToReg(SDValue Op,

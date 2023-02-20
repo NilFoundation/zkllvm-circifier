@@ -42,3 +42,29 @@ using namespace nil::crypto3::multiprecision;
         return 1;
     return 0;
 }
+
+// EVM_RUN: function: test_mulitply, input: [], result: 0
+[[evm]]
+int test_mulitply() {
+    auto a = 0x1101010123232323454545456767676789898989ababababcdcdcdcdefefefef_cppui256;
+    auto b = 0x3101010123232323454545456767676789898989ababababcdcdcdcdefefefef_cppui256;
+    auto res = a * b;
+    if (res != 0xb4e2d0be87ed52b7f4489cf117d28d47d0690199fbe9d7c57832eda823222121_cppui256) {
+        return 1;
+    }
+    return 0;
+}
+
+// EVM_RUN: function: test_mulitply_320, input: [], result: 0
+[[evm]]
+int test_mulitply_320() {
+    auto a = 0xf101010123232323454545456767676789898989ababababcdcdcdcdefefefefcdcdefefefefcdc_cppui320;
+    auto b = 0xf101010123232323454545456767676789898989ababababcdcdcdcdefefefefcdcdefefefefcdcf_cppui320;
+    auto res = a * b;
+
+    if (res != 0x32ad590496081a2c23b3a393688dd318427486988f459bf22e0235473ecebf405b9615e5d60ea1e4_cppui320) {
+        return 1;
+    }
+    return 0;
+
+}

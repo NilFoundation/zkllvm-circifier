@@ -28,3 +28,21 @@
   }
   return 0;
 }
+
+// EVM_RUN: function: test_struct_copy, input: [], result: 0
+
+struct Foo {
+  int n{1};
+  char c{2};
+};
+
+[[evm]] int test_struct_copy(int n) {
+  Foo f1{0x123, 45};
+  Foo f2;
+  if (f2.n != 1 || f2.c != 2)
+    return 1;
+  memcpy(&f2, &f1, sizeof(Foo));
+  if (f2.n != 0x123 || f2.c != 45)
+    return 2;
+  return 0;
+}

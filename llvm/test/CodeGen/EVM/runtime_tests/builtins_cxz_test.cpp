@@ -34,3 +34,11 @@
 [[evm]] int test_clz64(unsigned long long v) {
   return __builtin_clzll(v);
 }
+
+// [Regression test] Lowering of clz node didn't properly cast its result.
+// EVM_RUN: function: test_sub, input: [0x5000000000000000], result: 63
+// EVM_RUN: function: test_sub, input: [0x2], result: 2
+[[evm]] int test_sub(unsigned long long v) {
+  return 64ULL - __builtin_clzll(v);
+}
+

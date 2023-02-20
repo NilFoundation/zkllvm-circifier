@@ -1488,12 +1488,29 @@ void EVMStackAlloc::handleBinaryOpcode(EVMStackAlloc::MOPUseType op1, MOPUseType
         SwapRegToTop(reg1, MI);
       } else if (depth1 != 0 && depth2 == 1) {
         LLVM_DEBUG({ dbgs() << "(2 in place)\n"; });
+        /**
+         * 0: xxx
+         * 1: reg2 (Not last use)
+         * ...
+         * N: reg1 (Last use)
+         * ===>
+         * 0: reg1 (Last use)
+         * 1: reg2 (duplicate)
+         * 2: reg2
+         * ...
+         * N: xxx
+         *
+         */
+        DupRegToTop(reg2, MI);
+        insertSwapBefore(1, MI);
         SwapRegToTop(reg1, MI);
       } else if (depth1 != 0 && depth2 != 1) {
         LLVM_DEBUG({ dbgs() << "(no in place)\n"; });
         DupRegToTop(reg2, MI);
         insertSwapBefore(1, MI);
         SwapRegToTop(reg1, MI);
+      } else {
+        llvm_unreachable("Ooops");
       }
     }
 

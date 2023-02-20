@@ -1478,7 +1478,7 @@ double LLVMConstRealGetDouble(LLVMValueRef ConstantVal, LLVMBool *LosesInfo) {
 /*--.. Operations on field constants .......................................--*/
 
 LLVMValueRef LLVMConstField(LLVMTypeRef FieldTy, LLVMValueRef ConstantVal) {
-  ConstantInt *const_int = unwrap<ConstantInt>(ConstantVal) ;
+  ConstantInt *const_int = unwrap<ConstantInt>(ConstantVal);
   return wrap(ConstantField::get(unwrap<GaloisFieldType>(FieldTy), const_int->getValue()));
 }
 

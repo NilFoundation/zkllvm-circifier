@@ -690,7 +690,7 @@ inline TypeSize DataLayout::getTypeSizeInBits(Type *Ty) const {
     return TypeSize::Fixed(Ty->getIntegerBitWidth());
   case Type::GaloisFieldTyID:
   case Type::EllipticCurveTyID:
-    return TypeSize::Fixed(8);
+    return TypeSize::Fixed(32);
   case Type::HalfTyID:
   case Type::BFloatTyID:
     return TypeSize::Fixed(16);

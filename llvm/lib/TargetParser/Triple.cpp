@@ -322,6 +322,7 @@ Triple::ArchType Triple::getArchTypeForLLVMName(StringRef Name) {
     .Case("arm64_32", aarch64_32)
     .Case("arm", arm)
     .Case("armeb", armeb)
+    .Case("assigner", assigner)
     .Case("avr", avr)
     .StartsWith("bpf", BPFArch)
     .Case("m68k", m68k)

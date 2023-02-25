@@ -412,6 +412,7 @@ set(LLVM_ALL_TARGETS
   AArch64
   AMDGPU
   ARM
+  Assigner
   AVR
   BPF
   Hexagon

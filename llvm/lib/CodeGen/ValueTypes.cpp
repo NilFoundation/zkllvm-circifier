@@ -554,6 +554,7 @@ MVT MVT::getVT(Type *Ty, bool HandleUnknown){
   case Type::IntegerTyID:
     return getIntegerVT(cast<IntegerType>(Ty)->getBitWidth());
   case Type::GaloisFieldTyID:
+  case Type::EllipticCurveTyID:
     return (MVT::SimpleValueType)(MVT::INVALID_SIMPLE_VALUE_TYPE);
   case Type::HalfTyID:      return MVT(MVT::f16);
   case Type::BFloatTyID:    return MVT(MVT::bf16);

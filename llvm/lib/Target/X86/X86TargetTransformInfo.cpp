@@ -223,7 +223,7 @@ InstructionCost X86TTIImpl::getArithmeticInstrCost(
     const Instruction *CxtI) {
 
   // TODO(maksenov): remove this workaround
-  if (Ty->isFieldTy())
+  if (Ty->isFieldTy() || Ty->isCurveTy())
     return InstructionCost();
 
   // vXi8 multiplications are always promoted to vXi16.

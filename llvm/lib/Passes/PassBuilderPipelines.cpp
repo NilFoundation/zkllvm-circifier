@@ -777,9 +777,13 @@ PassBuilder::buildInlinerPipeline(OptimizationLevel Level,
 
   // Lastly, add the core function simplification pipeline nested inside the
   // CGSCC walk.
-  MainCGPipeline.addPass(createCGSCCToFunctionPassAdaptor(
-      buildFunctionSimplificationPipeline(Level, Phase),
-      PTO.EagerlyInvalidateAnalyses, EnableNoRerunSimplificationPipeline));
+  // EVM_BEGIN
+  if (!TM->isEVM()) {
+    MainCGPipeline.addPass(createCGSCCToFunctionPassAdaptor(
+        buildFunctionSimplificationPipeline(Level, Phase),
+        PTO.EagerlyInvalidateAnalyses, EnableNoRerunSimplificationPipeline));
+  }
+  // EVM_END
 
   MainCGPipeline.addPass(CoroSplitPass(Level != OptimizationLevel::O0));
 
@@ -878,7 +882,11 @@ PassBuilder::buildModuleSimplificationPipeline(OptimizationLevel Level,
   // Compare/branch metadata may alter the behavior of passes like SimplifyCFG.
   EarlyFPM.addPass(LowerExpectIntrinsicPass());
   EarlyFPM.addPass(SimplifyCFGPass());
-  EarlyFPM.addPass(SROAPass());
+  // EVM_BEGIN
+  if (!TM->isEVM()) {
+    EarlyFPM.addPass(SROAPass());
+  }
+  // EVM_END
   EarlyFPM.addPass(EarlyCSEPass());
   if (Level == OptimizationLevel::O3)
     EarlyFPM.addPass(CallSiteSplittingPass());
@@ -946,7 +954,10 @@ PassBuilder::buildModuleSimplificationPipeline(OptimizationLevel Level,
   MPM.addPass(CalledValuePropagationPass());
 
   // Optimize globals to try and fold them into constants.
-  MPM.addPass(GlobalOptPass());
+  if (!TM->isEVM()) { // EVM_BEGIN
+    MPM.addPass(GlobalOptPass());
+  }
+  // EVM_END
 
   // Promote any localized globals to SSA registers.
   // FIXME: Should this instead by a run of SROA?
@@ -1137,7 +1148,9 @@ PassBuilder::buildModuleOptimizationPipeline(OptimizationLevel Level,
   ModulePassManager MPM;
 
   // Optimize globals now that the module is fully simplified.
-  MPM.addPass(GlobalOptPass());
+  if (!TM->isEVM()) { // EVM_BEGIN
+    MPM.addPass(GlobalOptPass());
+  } // EVM_END
   MPM.addPass(GlobalDCEPass());
 
   // Run partial inlining pass to partially inline functions that have

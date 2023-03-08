@@ -58,6 +58,7 @@ FunctionPass *llvm::createEVMExpandFramePointer() {
 /// eliminate frame pointer.
 bool EVMExpandFramePointer::handleFramePointer(MachineInstr *MI) {
   bool Changed = false;
+  auto MF = MI->getParent()->getParent();
   for (unsigned i = 0; i < MI->getNumOperands(); ++i) {
     MachineOperand &MO = MI->getOperand(i);
     if (!MO.isReg()) continue;
@@ -72,9 +73,11 @@ bool EVMExpandFramePointer::handleFramePointer(MachineInstr *MI) {
       unsigned fpReg = this->getNewRegister(MI);
       unsigned reg = this->getNewRegister(MI);
       BuildMI(*MBB, MI, DL, TII->get(EVM::PUSH32_r), reg)
-          .addImm(ST->getFramePointer());
+          .addImm(ST->getFramePointer())
+          .addComment(*MF, Twine("FP"));
       BuildMI(*MBB, MI, DL, TII->get(EVM::MLOAD_r), fpReg)
-          .addReg(reg);
+          .addReg(reg)
+          .addComment(*MF, Twine("FP"));
       LLVM_DEBUG({
         dbgs() << "Expanding $fp to %"
                <<Register::virtReg2Index(fpReg) << " in instruction: ";
@@ -87,6 +90,7 @@ bool EVMExpandFramePointer::handleFramePointer(MachineInstr *MI) {
   return Changed;
 }
 bool EVMExpandFramePointer::handleStackPointer(MachineInstr *MI) {
+  auto MF = MI->getParent()->getParent();
   for (unsigned i = 0; i < MI->getNumOperands(); ++i) {
     MachineOperand &MO = MI->getOperand(i);
     if (!MO.isReg()) continue;
@@ -114,9 +118,11 @@ bool EVMExpandFramePointer::handleStackPointer(MachineInstr *MI) {
       });
 
       BuildMI(*MBB, MI, DL, TII->get(EVM::PUSH32_r), fmpReg)
-          .addImm(ST->getStackPointer());
+          .addImm(ST->getStackPointer())
+          .addComment(*MF, Twine("SP"));
       BuildMI(*MBB, MI, DL, TII->get(EVM::MSTORE_r))
-          .addReg(fmpReg).add(MI->getOperand(1));
+          .addReg(fmpReg).add(MI->getOperand(1))
+          .addComment(*MF, Twine("SP"));
       MI->eraseFromParent();
       return true;
     }
@@ -130,9 +136,11 @@ bool EVMExpandFramePointer::handleStackPointer(MachineInstr *MI) {
       // dst = MLOAD fmp
       // and remove the MOVE
       BuildMI(*MBB, MI, DL, TII->get(EVM::PUSH32_r), fmpReg)
-          .addImm(ST->getStackPointer());
+          .addImm(ST->getStackPointer())
+          .addComment(*MF, Twine("SP"));
       BuildMI(*MBB, MI, DL, TII->get(EVM::MLOAD_r), reg)
-          .addReg(fmpReg);
+          .addReg(fmpReg)
+          .addComment(*MF, Twine("SP"));
 
       LLVM_DEBUG({
         dbgs() << "Expanding $sp to %"

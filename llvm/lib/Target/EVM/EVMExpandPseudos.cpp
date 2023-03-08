@@ -132,23 +132,24 @@ void EVMExpandPseudos::expandLOCAL(MachineInstr* MI) const {
   BuildMI(*MBB, MI, DL, TII->get(EVM::ADD_r), addrReg)
     .addReg(fpReg).addReg(immReg);
 
+  MachineInstr* NewInst;
   unsigned localReg = MI->getOperand(0).getReg();
   if (opc == EVM::pGETLOCAL_r) {
-    auto mi = BuildMI(*MBB, MI, DL, TII->get(EVM::MLOAD_r), localReg).addReg(addrReg);
-
+    NewInst = BuildMI(*MBB, MI, DL, TII->get(EVM::MLOAD_r), localReg).addReg(addrReg);
     uint32_t flags = EVM::BuildCommentFlags(EVM::GETLOCAL, slot_index);
-    mi->setAsmPrinterFlag(flags);
+    NewInst->setAsmPrinterFlag(flags);
   } else if (opc == EVM::pPUTLOCAL_r) {
     // MSTORE_r addrReg value
-    auto mi = BuildMI(*MBB, MI, DL, TII->get(EVM::MSTORE_r))
+    NewInst = BuildMI(*MBB, MI, DL, TII->get(EVM::MSTORE_r))
                   .addReg(addrReg)
                   .addReg(localReg);
 
     uint32_t flags = EVM::BuildCommentFlags(EVM::PUTLOCAL, slot_index);
-    mi->setAsmPrinterFlag(flags);
+    NewInst->setAsmPrinterFlag(flags);
   } else {
     llvm_unreachable("invalid parameter");
   }
+  NewInst->setComment(MI->getComment());
   MI->eraseFromParent();
 }
 

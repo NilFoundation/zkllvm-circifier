@@ -80,7 +80,6 @@ def run_test(source)
   unless options.no_compile
     clang_cmd = "#{bindir}/clang -target evm #{source} -o #{codefile} "
     clang_cmd += ' -v ' if options.verbose
-    clang_cmd += ' -Xclang -disable-llvm-passes '
     clang_cmd += ' -fno-exceptions '
     clang_cmd += ' -std=c++17 '
     clang_cmd += ' -O3 '

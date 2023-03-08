@@ -38,6 +38,7 @@ add_llvm_target(EVMCodeGen
                 EVMFinalization.cpp
                 EVMStackAllocAnalysis.cpp
                 EVMStackAllocation.cpp
+                EVMOptimizePush.cpp
                 EVMUtils.cpp
 
                 LINK_COMPONENTS

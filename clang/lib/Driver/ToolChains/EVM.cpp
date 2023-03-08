@@ -145,6 +145,15 @@ void EVM::addClangTargetOptions(const ArgList &DriverArgs,
   // EVM doesn't support RTTI
   CC1Args.push_back("-fno-rtti");
 
+  // Disable Loop Strength Reduction optimization. Loop optimizations are
+  // redundant in EVM.
+  CC1Args.push_back("-mllvm");
+  CC1Args.push_back("-disable-lsr");
+  // Disable Codegen Prepare, because it performs some transformations,
+  // unsuitable with EVM target.
+  CC1Args.push_back("-mllvm");
+  CC1Args.push_back("-disable-cgp");
+
   if (!DriverArgs.hasFlag(options::OPT_mmutable_globals,
                           options::OPT_mno_mutable_globals, false)) {
     // -fPIC implies +mutable-globals because the PIC ABI used by the linker

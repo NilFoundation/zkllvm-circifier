@@ -406,6 +406,11 @@ public:
   virtual unsigned getAddressSpaceForPseudoSourceKind(unsigned Kind) const {
     return 0;
   }
+
+  /// This is workaround method for customizing PassBuilder, because some
+  /// optimizations are unsuitable for the EVM backend.
+  /// TODO: One of the solutions is to implement separate Pass Builder for EVM.
+  virtual bool isEVM() const { return false; }
 };
 
 /// This class describes a target machine that is implemented with the LLVM

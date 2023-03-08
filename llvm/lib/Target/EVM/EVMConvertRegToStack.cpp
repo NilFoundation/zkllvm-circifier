@@ -123,7 +123,7 @@ void EVMConvertRegToStack::convertSWAP(MachineInstr* MI) const {
 
   unsigned opc = getSWAPOpcode(swapIdx);
 
-  BuildMI(*MI->getParent(), MI, MI->getDebugLoc(), TII->get(opc));
+  BuildMI(*MI->getParent(), MI, MI->getDebugLoc(), TII->get(opc))->setComment(MI->getComment());
   MI->removeFromParent();
 }
 

@@ -11,6 +11,7 @@
 
 #include "EVM.h"
 #include "EVMStackAllocAnalysis.h"
+#include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -286,8 +287,9 @@ void EVMStackAlloc::allocateRegistersToStack(MachineFunction &F) {
   edgeSets.dump();
 
   // analyze each BB
-  for (MachineBasicBlock &MBB : F) {
-    analyzeBasicBlock(&MBB);
+  ReversePostOrderTraversal<MachineFunction*> RPOT(&F);
+  for (auto *MBB : RPOT) {
+    analyzeBasicBlock(MBB);
   }
 
   // exit check: stack should be empty

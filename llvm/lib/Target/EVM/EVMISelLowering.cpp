@@ -345,19 +345,25 @@ SDValue EVMTargetLowering::LowerOperation(SDValue Op,
   case ISD::SETCC: {
     SDValue LHS = Op.getOperand(0);
     SDValue RHS = Op.getOperand(1);
+    ConstantSDNode *LHSConst = dyn_cast<ConstantSDNode>(LHS);
+    ConstantSDNode *RHSConst = dyn_cast<ConstantSDNode>(LHS);
 
-    if (LHS.getValueType().getSizeInBits() < 256) {
+    if (!LHSConst && LHS.getValueType().getSizeInBits() < 256) {
       auto Extend = (LHS.getValueType().getSizeInBits() == 1) ?
                     ISD::ZERO_EXTEND : ISD::SIGN_EXTEND;
       LHS = DAG.getNode(Extend, SDLoc(LHS), {MVT::i256}, LHS);
     }
-    if (RHS.getValueType().getSizeInBits() < 256) {
+    if (!RHSConst && RHS.getValueType().getSizeInBits() < 256) {
       auto Extend = (RHS.getValueType().getSizeInBits() == 1) ?
                     ISD::ZERO_EXTEND : ISD::SIGN_EXTEND;
       RHS = DAG.getNode(Extend, SDLoc(RHS), {MVT::i256}, RHS);
     }
-    return DAG.getNode(Op.getOpcode(), SDLoc(Op), MVT::i256, LHS, RHS,
+    auto Res = DAG.getNode(Op.getOpcode(), SDLoc(Op), MVT::i256, LHS, RHS,
                        Op.getOperand(2));
+    // Use truncate at the end to make common legalizer happy. Otherwise, it
+    // can't find our new legalized node when it legalizes the operands of
+    // arithmetic instructions.
+    return DAG.getNode(ISD::TRUNCATE, SDLoc(Op), Op.getValueType(), Res);
   }
   case ISD::CTLZ:
   case ISD::CTTZ:
@@ -397,6 +403,7 @@ SDValue EVMTargetLowering::LowerCtxz(SDValue Op, SelectionDAG &DAG) const {
                     DAG.getExternalSymbol(
                         CalleeStr, getPointerTy(DAG.getDataLayout())),
                     std::move(Args));
+  LowerCallTo(CLI);
 
   assert(CLI.InVals.size() == 1);
 
@@ -466,6 +473,21 @@ EVMTargetLowering::insertSELECTCC(MachineInstr &MI,
     BuildMI(MBB, dl, TII.get(EVM::pJUMPTO_r)).addMBB(FallThrough);
   }
 
+  // Move pSTACKARG_r instructions before SELECTCC, thereby after we split
+  // basic block, they appear in the entry block.
+  {
+    SmallVector<MachineInstr *, 4> StackArgs;
+    for (auto It = MI.getIterator(); It != MBB->end(); ++It) {
+      if (It->getOpcode() == EVM::pSTACKARG_r) {
+        StackArgs.push_back(&*It);
+      }
+    }
+    for (auto SAI : StackArgs) {
+      MBB->remove(SAI);
+      MBB->insertAfter(MI.getPrevNode()->getIterator(), SAI);
+    }
+  }
+
   // create two MBBs to handle true and false
   MachineBasicBlock *trueMBB = MF->CreateMachineBasicBlock(LLVM_BB);
   MachineBasicBlock *falseMBB = MF->CreateMachineBasicBlock(LLVM_BB);
@@ -483,16 +505,30 @@ EVMTargetLowering::insertSELECTCC(MachineInstr &MI,
                   std::next(MachineBasicBlock::iterator(MI)), MBB->end());
   trueMBB->transferSuccessorsAndUpdatePHIs(MBB);
 
+  MachineRegisterInfo &RegInfo = MF->getRegInfo();
+  const TargetRegisterClass *RC = getRegClassFor(MVT::i256);
+
   unsigned SelectedValue = MI.getOperand(0).getReg();
   unsigned LHS = MI.getOperand(1).getReg();
   unsigned RHS = MI.getOperand(2).getReg();
-  unsigned TrueReg = MI.getOperand(4).getReg();
-  unsigned FalseReg = MI.getOperand(5).getReg();
+  unsigned TrueReg;
+  if (MI.getOperand(4).isReg()) {
+    TrueReg = MI.getOperand(4).getReg();
+  } else if (MI.getOperand(4).isFI()) {
+    TrueReg = RegInfo.createVirtualRegister(RC);
+    BuildMI(*MBB, MI, dl, TII.get(EVM::PUSH32_r), TrueReg)
+        .addFrameIndex(MI.getOperand(4).getIndex());
+  }
+  unsigned FalseReg;
+  if (MI.getOperand(5).isReg()) {
+    FalseReg = MI.getOperand(5).getReg();
+  } else if (MI.getOperand(5).isFI()) {
+    FalseReg = RegInfo.createVirtualRegister(RC);
+    BuildMI(*MBB, MI, dl, TII.get(EVM::PUSH32_r), FalseReg)
+        .addFrameIndex(MI.getOperand(5).getIndex());
+  }
   // construct conditional jump
   {
-    MachineFunction *F = MBB->getParent();
-    MachineRegisterInfo &RegInfo = F->getRegInfo();
-    const TargetRegisterClass *RC = getRegClassFor(MVT::i256);
     unsigned rvreg = RegInfo.createVirtualRegister(RC);
 
     int CC = MI.getOperand(3).getCImm()->getZExtValue();

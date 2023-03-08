@@ -1820,6 +1820,10 @@ void MachineInstr::print(raw_ostream &OS, ModuleSlotTracker &MST,
   }
   // TODO: DBG_LABEL
 
+  if (Comment != nullptr) {
+    OS << " ; " << Comment->getString();
+  }
+
   if (AddNewLine)
     OS << '\n';
 }

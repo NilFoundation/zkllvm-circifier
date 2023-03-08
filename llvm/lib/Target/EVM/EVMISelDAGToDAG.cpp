@@ -204,10 +204,8 @@ bool EVMDAGToDAGISel::SelectSIGNEXTEND(SDNode *Node) {
   assert(opcode == EVMISD::SIGNEXTEND);
 
   const SDValue reg = Node->getOperand(1);
-  const SDValue shiftVal = Node->getOperand(0);
+  const SDValue shift = Node->getOperand(0);
 
-  const SDValue shift = SDValue(
-      CurDAG->getMachineNode(EVM::PUSH32_r, SDLoc(Node), MVT::i256, shiftVal), 0);
   MachineSDNode *signextend = CurDAG->getMachineNode(
       EVM::SIGNEXTEND_r, SDLoc(Node), MVT::i256, shift, reg);
 

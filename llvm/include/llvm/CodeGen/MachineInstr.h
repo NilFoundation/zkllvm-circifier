@@ -114,6 +114,14 @@ public:
                                         // this instruction.
   };
 
+  void setComment(MDString* C) {
+    Comment = C;
+  }
+
+  MDString* getComment() const {
+    return Comment;
+  }
+
 private:
   const MCInstrDesc *MCID;              // Instruction descriptor.
   MachineBasicBlock *Parent = nullptr;  // Pointer to the owning basic block.
@@ -132,6 +140,8 @@ private:
                                         // information.  Do not use this for
                                         // anything other than to convey comment
                                         // information to AsmPrinter.
+
+  MDString* Comment = nullptr;
 
   // OperandCapacity has uint8_t size, so it should be next to AsmPrinterFlags
   // to properly pack.

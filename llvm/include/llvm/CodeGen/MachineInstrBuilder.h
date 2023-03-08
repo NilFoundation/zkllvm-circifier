@@ -310,6 +310,12 @@ public:
     }
   }
 
+  const MachineInstrBuilder &addComment(MachineFunction& MF, Twine Comment) const {
+    auto MDS = MDString::get(MF.getFunction().getContext(), Comment.str());
+    MI->setComment(MDS);
+    return *this;
+  }
+
   /// Copy all the implicit operands from OtherMI onto this one.
   const MachineInstrBuilder &
   copyImplicitOps(const MachineInstr &OtherMI) const {

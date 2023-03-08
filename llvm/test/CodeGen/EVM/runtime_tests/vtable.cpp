@@ -1,4 +1,5 @@
-// EVM_RUN: function: test, input: [1], result: 2
+// EVM_RUN: function: test, input: [10], result: 2
+// EVM_RUN: function: test, input: [1], result: 1
 
 struct Bar {
   virtual int func() {
@@ -16,7 +17,7 @@ struct Foo : public Bar {
   Foo foo;
   Bar bar;
   Bar* obj;
-  if (n > 0) {
+  if (n > 5) {
     obj = &foo;
   } else {
     obj = &bar;

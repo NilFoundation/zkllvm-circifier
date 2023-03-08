@@ -20,8 +20,28 @@
 #include "llvm/BinaryFormat/EVM.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Type.h"
+#include <sstream>
+
 
 namespace llvm {
+
+void addInstCommentStr(MachineInstr& MI, const std::string& Str);
+
+void addInstCommentStr(MachineInstr& MI, MachineFunction& MF, const std::string& Str);
+
+template<typename... TArgs>
+void addInstComment(MachineInstr& MI, TArgs&&... Args) {
+  std::stringstream ss;
+  ((ss << Args),...);
+  addInstCommentStr(MI, ss.str());
+}
+
+template<typename... TArgs>
+void addInstComment(MachineInstr& MI, MachineFunction& MF, TArgs&&... Args) {
+  std::stringstream ss;
+  ((ss << Args),...);
+  addInstCommentStr(MI, MF, ss.str());
+}
 
 namespace EVM {
 

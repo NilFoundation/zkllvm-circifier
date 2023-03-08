@@ -23,6 +23,9 @@
 #include "llvm/Target/TargetOptions.h"
 using namespace llvm;
 
+#define USE_REGALLOC 0
+#define USE_NEW_STACK_ALLOC 1
+
 extern "C" void LLVMInitializeEVMTarget() {
   RegisterTargetMachine<EVMTargetMachine> Y(getTheEVMTarget());
   auto PR = PassRegistry::getPassRegistry();
@@ -82,7 +85,13 @@ public:
   // No reg alloc
   bool addRegAssignAndRewriteFast() override { return false; }
   // EVM doesn't use reg alloc
-  bool addRegAssignAndRewriteOptimized() override { return false; }
+  bool addRegAssignAndRewriteOptimized() override {
+#if USE_REGALLOC
+    return TargetPassConfig::addRegAssignAndRewriteOptimized();
+#else
+    return false;
+#endif
+  }
 };
 } // namespace
 
@@ -113,12 +122,16 @@ void EVMPassConfig::addPreEmitPass() {
   // only deals with virtual registers.
   addPass(createEVMExpandFramePointer());
 
+  addPass(createEVMOptimizePushPass());
+
   if (getOptLevel() != CodeGenOpt::None) {
     // addPass(createEVMPrepareStackification());
     //  This is the major pass we will use to stackify registers
+#if USE_NEW_STACK_ALLOC
+     addPass(createEVMStackAllocationPass());
+#else
     addPass(createEVMStackAllocPass());
-    // TODO: Replace with reworked Stack Allocator
-    // addPass(createEVMStackAllocationPass());
+#endif
   } else {
     // In this pass we assign un-stackified registers
     // with an explicit memory location for storage.
@@ -167,7 +180,19 @@ void EVMPassConfig::addPostRegAlloc() {
   TargetPassConfig::addPostRegAlloc();
 }
 
+bool EVMTargetMachine::usesPhysRegsForValues() const {
+#if USE_REGALLOC
+  return LLVMTargetMachine::usesPhysRegsForValues();
+#else
+  return false;
+#endif
+}
+
 // Disable register allocation.
-FunctionPass *EVMPassConfig::createTargetRegisterAllocator(bool) {
+FunctionPass *EVMPassConfig::createTargetRegisterAllocator(bool v) {
+#if USE_REGALLOC
+  return TargetPassConfig::createTargetRegisterAllocator(v);
+#else
   return nullptr; // No reg alloc
+#endif
 }

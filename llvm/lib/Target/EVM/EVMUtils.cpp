@@ -52,3 +52,18 @@ ValType valTypeFromMVT(MVT T) {
 
 }  // namespace llvm::EVM
 
+namespace llvm {
+
+void addInstCommentStr(MachineInstr &MI, const std::string &Str) {
+  assert(MI.getParent() != nullptr);
+  auto MF = MI.getParent()->getParent();
+  assert(MF != nullptr);
+  addInstCommentStr(MI, *MF, Str);
+}
+
+void addInstCommentStr(MachineInstr &MI, MachineFunction& MF, const std::string &Str) {
+  auto MDS = MDString::get(MF.getFunction().getContext(), Str);
+  MI.setComment(MDS);
+}
+
+}

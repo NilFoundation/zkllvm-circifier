@@ -763,7 +763,9 @@ void EmitAssemblyHelper::RunOptimizationPipeline(
     TM->setPGOOption(PGOOpt);
 
   PipelineTuningOptions PTO;
-  PTO.LoopUnrolling = CodeGenOpts.UnrollLoops;
+  // EVM_BEGIN
+  PTO.LoopUnrolling = TM->isEVM() ? false : CodeGenOpts.UnrollLoops;
+  // EVM_END
   // For historical reasons, loop interleaving is set to mirror setting for loop
   // unrolling.
   PTO.LoopInterleaving = CodeGenOpts.UnrollLoops;

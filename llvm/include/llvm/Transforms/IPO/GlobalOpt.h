@@ -24,6 +24,9 @@ class Module;
 /// Optimize globals that never have their address taken.
 class GlobalOptPass : public PassInfoMixin<GlobalOptPass> {
 public:
+  GlobalOptPass() {
+    errs() << "ASDaSD" << '\n';
+  }
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM);
 };
 

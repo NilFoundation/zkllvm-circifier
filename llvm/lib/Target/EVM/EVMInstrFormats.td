@@ -47,11 +47,11 @@ multiclass RSInst<dag outs_r, dag ins_r,
     def "" : EVMInst<(outs), (ins), [], "true", asmstr_s, inst, cost>;
 }
 
-multiclass PUSHInst<bits<8> inst, int cost> {
-  let isCodeGenOnly = 1, BaseName = NAME in
+multiclass PUSHInst<bits<8> inst, int size, int cost> {
+  let isCodeGenOnly = 1, BaseName = NAME, TSFlags = size in
     def _r : EVMInst<(outs GPR:$dst), (ins I256Imm:$src), [],
                      "false", NAME#" \t$src", inst, cost>;
-  let BaseName = NAME in
+  let BaseName = NAME, TSFlags = size in
     def "" : EVMInst<(outs), (ins I256Imm:$src), [], "true",
                      NAME#" \t$src", inst, cost>;
 }

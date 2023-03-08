@@ -127,8 +127,10 @@ void MCEVMStreamer::emitValueImpl(const MCExpr *Value, unsigned Size,
       Section->addGlobalsData(Value);
       auto& CurGlobal = Section->getGlobals().back();
       CurGlobal.DataCount = Section->getGlobalsDataSize() - CurGlobal.DataIndex;
-      LOG() << Section->getGlobalsDataSize() << " emit Binary: size=" << Size
-            << '\n';
+      LOG() << Section->getGlobalsDataSize() << " emit Binary: ";
+#if VERBOSE
+      Value->dump();
+#endif
       break;
     }
     default:

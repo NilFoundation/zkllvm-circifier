@@ -16,7 +16,9 @@
 #include "llvm/CodeGen/MachineInstrBuilder.h"
 #include "llvm/CodeGen/Passes.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/GraphWriter.h"
 #include "llvm/Support/raw_ostream.h"
+
 using namespace llvm;
 
 #define DEBUG_TYPE "evm-expand-pseudos"
@@ -29,7 +31,7 @@ public:
 
 private:
   StringRef getPassName() const override {
-    return "EVM add Jumpdest";
+    return "EVM Finalization";
   }
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
@@ -156,7 +158,41 @@ bool EVMFinalization::runOnMachineFunction(MachineFunction &MF) {
           opcode == EVM::pADJFPDOWN) {
           expandADJFP(MI);
       }
+    }
+  }
 
+
+  // Emit final code to separate file. It is better than disassembling of the result binary, since it contains basic
+  // blocks and some additional information.
+  // TODO(EVM): this is kept in the repository solely for debug purposes. Once the EVM matures, we need to rework it.
+  if (1) {
+    unsigned Pc = 89;
+    std::error_code EC;
+    raw_fd_ostream OS("code.ir", EC);
+    OS << "Function: " << MF.getName() << '\n';
+    for (MachineBasicBlock &MBB : MF) {
+      OS << "\nbb." << MBB.getNumber()<< '.' << MBB.getName() << ":\n";
+      OS << "; predecessors: ";
+      if (!MBB.pred_empty()) {
+        ListSeparator LS;
+        for (auto *Pred : MBB.predecessors())
+          OS << LS << printMBBReference(*Pred);
+        OS << '\n';
+      }
+      if (!MBB.succ_empty()) {
+        OS.indent(2) << "successors: ";
+        ListSeparator LS;
+        for (auto I = MBB.succ_begin(), E = MBB.succ_end(); I != E; ++I) {
+          OS << LS << printMBBReference(**I);
+        }
+        OS << '\n';
+      }
+      for (auto &MI : MBB) {
+        OS << "  " << Pc << " " << MI;
+        Pc += 1;
+        // TSFlags contains immediate size
+        Pc += MI.getDesc().TSFlags;
+      }
     }
   }
 

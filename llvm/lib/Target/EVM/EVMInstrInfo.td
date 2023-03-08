@@ -367,41 +367,43 @@ def PUSH32_r :
   EVMInst<(outs GPR:$dst), (ins I256Imm:$src), [(set GPR:$dst, imm:$src)],
           "false", "PUSH32_r \t$dst, $src", 0x7f, 3>;
 }
+
+let TSFlags = 32 in
 def PUSH32 :
   EVMInst<(outs), (ins I256Imm:$src), [], "true", "PUSH32 \t$src", 0x7f, 3>;
 }
 
-defm PUSH1 : PUSHInst<0x60, 3>;
-defm PUSH2 : PUSHInst<0x61, 3>;
-defm PUSH3 : PUSHInst<0x62, 3>;
-defm PUSH4 : PUSHInst<0x63, 3>;
-defm PUSH5 : PUSHInst<0x64, 3>;
-defm PUSH6 : PUSHInst<0x65, 3>;
-defm PUSH7 : PUSHInst<0x66, 3>;
-defm PUSH8 : PUSHInst<0x67, 3>;
-defm PUSH9 : PUSHInst<0x68, 3>;
-defm PUSH10: PUSHInst<0x69, 3>;
-defm PUSH11: PUSHInst<0x6a, 3>;
-defm PUSH12: PUSHInst<0x6b, 3>;
-defm PUSH13: PUSHInst<0x6c, 3>;
-defm PUSH14: PUSHInst<0x6d, 3>;
-defm PUSH15: PUSHInst<0x6e, 3>;
-defm PUSH16: PUSHInst<0x6f, 3>;
-defm PUSH17: PUSHInst<0x70, 3>;
-defm PUSH18: PUSHInst<0x71, 3>;
-defm PUSH19: PUSHInst<0x72, 3>;
-defm PUSH20: PUSHInst<0x73, 3>;
-defm PUSH21: PUSHInst<0x74, 3>;
-defm PUSH22: PUSHInst<0x75, 3>;
-defm PUSH23: PUSHInst<0x76, 3>;
-defm PUSH24: PUSHInst<0x77, 3>;
-defm PUSH25: PUSHInst<0x78, 3>;
-defm PUSH26: PUSHInst<0x79, 3>;
-defm PUSH27: PUSHInst<0x7a, 3>;
-defm PUSH28: PUSHInst<0x7b, 3>;
-defm PUSH29: PUSHInst<0x7c, 3>;
-defm PUSH30: PUSHInst<0x7d, 3>;
-defm PUSH31: PUSHInst<0x7e, 3>;
+defm PUSH1 : PUSHInst<0x60, 1, 3>;
+defm PUSH2 : PUSHInst<0x61, 2, 3>;
+defm PUSH3 : PUSHInst<0x62, 3, 3>;
+defm PUSH4 : PUSHInst<0x63, 4, 3>;
+defm PUSH5 : PUSHInst<0x64, 5, 3>;
+defm PUSH6 : PUSHInst<0x65, 6, 3>;
+defm PUSH7 : PUSHInst<0x66, 7, 3>;
+defm PUSH8 : PUSHInst<0x67, 8, 3>;
+defm PUSH9 : PUSHInst<0x68, 9, 3>;
+defm PUSH10: PUSHInst<0x69, 10, 3>;
+defm PUSH11: PUSHInst<0x6a, 11, 3>;
+defm PUSH12: PUSHInst<0x6b, 12, 3>;
+defm PUSH13: PUSHInst<0x6c, 13, 3>;
+defm PUSH14: PUSHInst<0x6d, 14, 3>;
+defm PUSH15: PUSHInst<0x6e, 15, 3>;
+defm PUSH16: PUSHInst<0x6f, 16, 3>;
+defm PUSH17: PUSHInst<0x70, 17, 3>;
+defm PUSH18: PUSHInst<0x71, 18, 3>;
+defm PUSH19: PUSHInst<0x72, 19, 3>;
+defm PUSH20: PUSHInst<0x73, 20, 3>;
+defm PUSH21: PUSHInst<0x74, 21, 3>;
+defm PUSH22: PUSHInst<0x75, 22, 3>;
+defm PUSH23: PUSHInst<0x76, 23, 3>;
+defm PUSH24: PUSHInst<0x77, 24, 3>;
+defm PUSH25: PUSHInst<0x78, 25, 3>;
+defm PUSH26: PUSHInst<0x79, 26, 3>;
+defm PUSH27: PUSHInst<0x7a, 27, 3>;
+defm PUSH28: PUSHInst<0x7b, 28, 3>;
+defm PUSH29: PUSHInst<0x7c, 29, 3>;
+defm PUSH30: PUSHInst<0x7d, 30, 3>;
+defm PUSH31: PUSHInst<0x7e, 31, 3>;
 
 // swap instructions
 def SWAP_r: EVMPseudo<(outs), (ins I256Imm:$num), []>;

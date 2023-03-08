@@ -233,18 +233,6 @@ void EVMArgumentMove::sortStackArgs(MachineFunction &MF) const {
     EntryMBB.insert(InsertPt, index2mi[index]->removeFromParent());
   }
 
-  // TODO: this is buggy
-  // insert pops afterwards
-  for (std::vector<unsigned>::iterator rit = unusedArgs.begin();
-       rit != unusedArgs.end(); ++rit) {
-    LLVM_DEBUG({
-      dbgs() << "Inserting POP instruction to remove reg "
-             << Register::virtReg2Index(*rit) << "\n";
-    });
-    BuildMI(EntryMBB, InsertPt, InsertPt->getDebugLoc(),
-            TII->get(EVM::POP_r)).addReg(*rit);
-  }
-
   // Now move any argument instructions later in the block
   // to before our first NonArg instruction.
   for (MachineInstr &MI : llvm::make_range(InsertPt, EntryMBB.end())) {

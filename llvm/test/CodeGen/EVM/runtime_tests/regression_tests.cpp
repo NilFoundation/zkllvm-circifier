@@ -78,3 +78,19 @@ int* gp = &gf.b;
 [[evm]] int test_struct_field_resolve() {
   return *gp;
 }
+
+// Stack allocator issue: one vreg is used twice within a single instruction with
+// arbitrary operands count.
+//
+// EVM_RUN: function: same_uses_in_func_call, input: [1], result: 3
+// EVM_RUN: function: same_uses_in_func_call, input: [7], result: 21
+
+int __attribute__ ((noinline)) __add__(int a, int b)
+{
+  return a + b;
+}
+
+[[evm]] int same_uses_in_func_call(int n) {
+  int a = __add__(n, n);
+  return n + a;
+}

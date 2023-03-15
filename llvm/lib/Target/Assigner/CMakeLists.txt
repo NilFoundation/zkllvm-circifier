@@ -1,6 +1,8 @@
 add_llvm_component_group(Assigner)
 
 add_llvm_target(AssignerCodeGen
+  AssignerISelLowering.cpp
+  AssignerSubtarget.cpp
   AssignerTargetMachine.cpp
 
   LINK_COMPONENTS

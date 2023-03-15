@@ -1,6 +1,8 @@
 add_llvm_component_group(Assigner)
 
 add_llvm_target(AssignerCodeGen
+  AssignerISelLowering.cpp
+  AssignerSubtarget.cpp
   AssignerTargetMachine.cpp
 
   LINK_COMPONENTS
@@ -15,6 +17,7 @@ add_llvm_target(AssignerCodeGen
   SelectionDAG
   Support
   Target
+  TargetParser
   TransformUtils
   GlobalISel
   CFGuard

@@ -1,11 +1,24 @@
+//===-- AssignerTargetMachine.cpp - Define TargetMachine for Assigner -----===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+// Implements the info about Assigner target spec.
+//
+//===----------------------------------------------------------------------===//
+
 #include "AssignerTargetMachine.h"
+#include "AssignerTargetTransformInfo.h"
 #include "TargetInfo/AssignerTargetInfo.h"
 #include "llvm/MC/TargetRegistry.h"
 
 using namespace llvm;
 
 extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeAssignerTarget() {
-    RegisterTargetMachine<AssignerTargetMachine> X(getTheAssignerTarget());
+  RegisterTargetMachine<AssignerTargetMachine> X(getTheAssignerTarget());
 }
 
 static std::string computeDataLayout(const Triple &TT) {
@@ -26,4 +39,10 @@ AssignerTargetMachine::AssignerTargetMachine(const Target &T, const Triple &TT,
                                    CodeGenOpt::Level OL, bool JIT)
     : LLVMTargetMachine(T, computeDataLayout(TT), TT, CPU, FS, Options,
                         getEffectiveRelocModel(RM),
-                        getEffectiveCodeModel(CM, CodeModel::Small), OL) {}
+                        getEffectiveCodeModel(CM, CodeModel::Small), OL),
+      Subtarget(TT, *this) {}
+
+TargetTransformInfo
+AssignerTargetMachine::getTargetTransformInfo(const Function &F) const {
+  return TargetTransformInfo(AssignerTTIImpl(this, F));
+}

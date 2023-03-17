@@ -19809,6 +19809,8 @@ Value *CodeGenFunction::EmitAssignerBuiltinExpr(unsigned int BuiltinID,
                                                 const CallExpr *E) {
   SmallVector<Value *, 2> Ops;
 
+  llvm::Type *RetType = nullptr;
+
   for (unsigned i = 0, e = E->getNumArgs(); i != e; i++)
     Ops.push_back(EmitScalarExpr(E->getArg(i)));
 
@@ -19818,11 +19820,16 @@ Value *CodeGenFunction::EmitAssignerBuiltinExpr(unsigned int BuiltinID,
     llvm_unreachable("unexpected builtin ID.");
   case assigner::BI__builtin_assigner_malloc:
     ID = Intrinsic::assigner_malloc;
+    RetType = ConvertType(E->getType());
+    break;
+  case assigner::BI__builtin_assigner_free:
+    ID = Intrinsic::assigner_free;
+    RetType = llvm::Type::getInt8PtrTy(getLLVMContext());
     break;
   }
 
-  assert(ID != Intrinsic::not_intrinsic);
+  assert(ID != Intrinsic::not_intrinsic && RetType != nullptr);
 
-  llvm::Function *F = CGM.getIntrinsic(ID, ConvertType(E->getType()));
+  llvm::Function *F = CGM.getIntrinsic(ID, RetType);
   return Builder.CreateCall(F, Ops);
 }

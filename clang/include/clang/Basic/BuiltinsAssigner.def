@@ -19,6 +19,7 @@
 #endif
 
 BUILTIN(__builtin_assigner_malloc, "v*z", "n")
+BUILTIN(__builtin_assigner_free, "vv*", "n")
 
 #undef BUILTIN
 #undef TARGET_BUILTIN

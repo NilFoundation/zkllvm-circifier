@@ -40,6 +40,6 @@ void AssignerTargetInfo::getTargetDefines(const LangOptions &Opts,
 }
 
 ArrayRef<Builtin::Info> AssignerTargetInfo::getTargetBuiltins() const {
-    return llvm::makeArrayRef(BuiltinInfo, clang::assigner::LastTSBuiltin -
+    return llvm::ArrayRef(BuiltinInfo, clang::assigner::LastTSBuiltin -
                                              Builtin::FirstTSBuiltin);
 }

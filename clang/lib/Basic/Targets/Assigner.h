@@ -29,7 +29,8 @@ public:
       : TargetInfo(Triple) {
     LongWidth = LongAlign = PointerWidth = PointerAlign = 64;
     RegParmMax = 255;
-    resetDataLayout("e-m:e-p:64:64-i64:64-i128:128-n32:64-S128");  // TODO(maksenov): ??
+    // copied from x64_86:
+    resetDataLayout("e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128");
     MaxAtomicPromoteWidth = 64;
     MaxAtomicInlineWidth = 64;
   }

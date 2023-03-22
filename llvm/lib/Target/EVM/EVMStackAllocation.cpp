@@ -155,39 +155,7 @@ void EVMStackAllocation::handleOperands(MachineInstr &MI) {
   }
 
   if (NumOperands > 2) {
-    LLVM_DEBUG(errs() << "Multiple arguments pattern");
-    SeenRegisters.clear();
-    SmallVector<unsigned, 8> Indexes;
-    Indexes.resize(NumOperands);
-    int i = 0;
-    for (const MachineOperand &MOP : MI.explicit_uses()) {
-      if (MOP.isReg()) {
-        Indexes[i] = TheStack.find(MOP.getReg());
-        i++;
-      }
-    }
-    unsigned Depth = 0;
-    i = NumOperands - 1;
-    for (const MachineOperand &MOP : reverse(MI.explicit_uses())) {
-      if (!MOP.isReg()) {
-        continue;
-      }
-      auto Reg = MOP.getReg();
-      auto Index = Indexes[i];
-      bool IsSeenReg = SeenRegisters.find(Register::virtReg2Index(Reg)) !=
-                       SeenRegisters.end();
-      SeenRegisters[Register::virtReg2Index(Reg)] = true;
-      if (Stack::isValidIndex(Index)) {
-        // Don't consume stack element if IsSeenReg is true. Register was
-        // already consumed in other operand.
-        insertDup<BEFORE>(MI, Index + Depth, !IsSeenReg);
-      } else {
-        insertFill(MI, Reg);
-        TheStack.push(Reg, 1);
-      }
-      Depth++;
-      i--;
-    }
+    handleArbitraryOperands(MI, NumOperands);
     return;
   }
 
@@ -225,6 +193,43 @@ void EVMStackAllocation::handleOperands(MachineInstr &MI) {
   (this->*OperandsPatternMap[Pattern])(MI, Reg0, Reg1);
 }
 
+void EVMStackAllocation::handleArbitraryOperands(MachineInstr &MI,
+                                                 unsigned NumOperands) {
+  LLVM_DEBUG(errs() << "Multiple arguments pattern");
+  SeenRegisters.clear();
+  SmallVector<unsigned, 8> Indexes;
+  Indexes.resize(NumOperands);
+  int i = 0;
+  for (const MachineOperand &MOP : MI.explicit_uses()) {
+    if (MOP.isReg()) {
+      Indexes[i] = TheStack.find(MOP.getReg());
+      i++;
+    }
+  }
+  unsigned Depth = 0;
+  i = NumOperands - 1;
+  for (const MachineOperand &MOP : reverse(MI.explicit_uses())) {
+    if (!MOP.isReg()) {
+      continue;
+    }
+    auto Reg = MOP.getReg();
+    auto Index = Indexes[i];
+    bool IsSeenReg = SeenRegisters.find(Register::virtReg2Index(Reg)) !=
+                     SeenRegisters.end();
+    SeenRegisters[Register::virtReg2Index(Reg)] = true;
+    if (Stack::isValidIndex(Index)) {
+      // Don't consume stack element if IsSeenReg is true. Register was
+      // already consumed in other operand.
+      insertDup<BEFORE>(MI, Index + Depth, !IsSeenReg);
+    } else {
+      insertFill(MI, Reg);
+      TheStack.push(Reg, 1);
+    }
+    Depth++;
+    i--;
+  }
+}
+
 void EVMStackAllocation::executeInstruction(MachineInstr &MI) {
   LLVM_DEBUG(TheStack.dump());
   for (const MachineOperand &MOP : MI.explicit_uses()) {
@@ -241,11 +246,13 @@ void EVMStackAllocation::executeInstruction(MachineInstr &MI) {
   if (MI.getNumExplicitDefs() != 0) {
     auto Reg = getDefRegister(MI);
     auto NumUsers = getUsersCountInSameBB(Reg, MI);
+    if (NumUsers != 0) {
+      ensureSpaceInStack(MI);
+    }
     TheStack.push(Reg, NumUsers);
     if (hasUsersInOtherBB(MI)) {
       insertSpill(MI);
     }
-
   }
 }
 
@@ -281,6 +288,55 @@ bool EVMStackAllocation::hasUsersInOtherBB(const MachineInstr &MI) const {
     }
   }
   return false;
+}
+
+void EVMStackAllocation::ensureSpaceInStack(MachineInstr &MI) {
+  if (TheStack.size() >= (MAX_STACK_DEPTH - 1)) {
+    unsigned MinUsers = 1000;
+    unsigned MinUsersIndex = -1;
+    for (int i = 0; i < TheStack.size(); i++) {
+      auto& Item = TheStack[i];
+      auto& Slot = MemorySlotsMap[Item.getReg()];
+      if (Slot != INVALID_SLOT) {
+        if (Item.getNumUsers() < MinUsers) {
+          MinUsers = Item.getNumUsers();
+          MinUsersIndex = i;
+        }
+      }
+    }
+    assert(MinUsersIndex != -1);
+    LLVM_DEBUG(errs() << "Free up stack: " << TheStack[MinUsersIndex].getValue()
+                      << '\n');
+    insertSwap<BEFORE>(MI, MinUsersIndex);
+    insertPop<BEFORE>(MI);
+
+    // TODO: the following code does spill of a stack item, in case there are
+    // no items in stack, that have slot in memory. Turn it off for a while,
+    // since we have no tests for that case yet.
+#if 0
+    auto Reg = Register::index2VirtReg(TheStack[MinUsersIndex].getValue());
+    auto& Slot = MemorySlotsMap[Reg];
+    if (Slot == INVALID_SLOT) {
+      Slot = AllocatedSlotNumber++;
+    }
+
+    insertSwap<BEFORE>(MI, MinUsersIndex);
+
+    LLVM_DEBUG(errs() << "ensureSpaceInStack: " << TheStack[MinUsersIndex].getValue() << '\n');
+
+    auto PutLocal = BuildMI(*MF, MI.getDebugLoc(), TII->get(EVM::pPUTLOCAL_r))
+                        .addReg(Reg)
+                        .addImm(Slot);
+    addInstComment(*PutLocal.getInstr(), *MF,
+                   "PUTLOCAL(full stack): reg=",
+                   Register::virtReg2Index(Reg),
+                   ", slot=", Slot);
+    MI.getParent()->insert(MachineBasicBlock::iterator(MI), PutLocal);
+    LIS->InsertMachineInstrInMaps(*PutLocal);
+    MemorySlotsMap[Reg] = Slot;
+    TheStack.pop();
+#endif
+  }
 }
 
 /**
@@ -586,15 +642,24 @@ void EVMStackAllocation::handleInst<EVMStackAllocation::B_MU_IM_1U_IM>(
 template<>
 void EVMStackAllocation::handleInst<EVMStackAllocation::B_MU_IM_MU_IM>(
     MachineInstr& MI, Register Reg0, Register Reg1) {
+  if (Reg0 == Reg1) {
+    auto NumUsers = getUsersCountInSameBB(Reg0, MI);
+    insertFill(MI, Reg0);
+    TheStack.push(Reg0, NumUsers + 2);
+    insertDup<BEFORE>(MI, 0);
+    insertDup<BEFORE>(MI, 1);
+    return;
+  }
   auto NumUsers = getUsersCountInSameBB(Reg1, MI);
-  auto TmpReg = insertFill(MI, Reg1);
-  TheStack.push(TmpReg, NumUsers + 1);
-  insertDup<BEFORE>(MI, 0);
+  insertFill(MI, Reg1);
+  TheStack.push(Reg1, NumUsers + 1);
 
   NumUsers = getUsersCountInSameBB(Reg0, MI);
-  TmpReg = insertFill(MI, Reg0);
-  TheStack.push(TmpReg, NumUsers + 1);
-  insertDup<BEFORE>(MI, 0);
+  insertFill(MI, Reg0);
+  TheStack.push(Reg0, NumUsers + 1);
+
+  insertDup<BEFORE>(MI, 1);
+  insertDup<BEFORE>(MI, 1);
 }
 
 

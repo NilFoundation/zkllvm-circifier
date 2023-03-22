@@ -52,6 +52,10 @@ public:
     return Value;
   }
 
+  Register getReg() const {
+    return Register::index2VirtReg(Value);
+  }
+
   bool isValid() const {
     return getValue() != INVALID_VALUE;
   }
@@ -98,6 +102,14 @@ public:
 
   Stack() {
     Vector.reserve(1024);
+  }
+
+  decltype(auto) begin() {
+    return Vector.begin();
+  }
+
+  decltype(auto) end() {
+    return Vector.end();
   }
 
   unsigned size() const {

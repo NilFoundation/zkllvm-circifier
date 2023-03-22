@@ -112,8 +112,13 @@ bool EVMOptimizePush::runOnMachineFunction(MachineFunction &MF) {
       auto Reg = getDefRegister(MI);
       auto MBB = MI.getParent();
 
+      bool is_first = true;
       for (auto& Use : MRI->use_nodbg_instructions(Reg)) {
-        if (MBB != Use.getParent()) {
+        if (is_first) {
+          is_first = false;
+          continue;
+        }
+        if (Use.getPrevNode() != &MI) {
           auto NewReg = MRI->createVirtualRegister(&EVM::GPRRegClass);
           auto Inst = BuildMI(*Use.getParent(), Use, Use.getDebugLoc(),
                               TII->get(EVM::PUSH32_r), NewReg);

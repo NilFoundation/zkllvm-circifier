@@ -39,6 +39,7 @@ class EVMStackAllocation : public MachineFunctionPass {
 
 public:
   static inline char ID = 0;
+  static constexpr unsigned MAX_STACK_DEPTH = 16;
 
   EVMStackAllocation();
 
@@ -52,9 +53,12 @@ private:
   unsigned getUsersCountInSameBB(unsigned reg, const MachineInstr &MI) const;
   bool hasUsersInOtherBB(const MachineInstr &MI) const;
   void handleOperands(MachineInstr &MI);
+  void handleArbitraryOperands(MachineInstr &MI, unsigned NumOperands);
   void handleArguments();
   void executeInstruction(MachineInstr &MI);
   void cleanupStack(MachineInstr &MI, bool DeepClean);
+
+  void ensureSpaceInStack(MachineInstr &MI);
 
   void insertAfterCurrent(MachineInstr &MI) {
     CurrentPosition->getParent()->insertAfter(CurrentPosition, &MI);
@@ -74,6 +78,7 @@ private:
   MachineInstr* insertDup(MachineInstr &MI, int Index, bool Consume = true) {
     auto Inst =
         BuildMI(*MF, MI.getDebugLoc(), TII->get(EVM::DUP_r)).addImm(Index + 1);
+    Inst.addComment(*MF, Twine("Reg: %") + Twine(TheStack[Index].getValue()));
     insertInstruction<Position>(MI, *Inst);
     if (Consume) {
       TheStack[Index].consume();
@@ -94,6 +99,8 @@ private:
     }
     auto Inst =
         BuildMI(*MF, MI.getDebugLoc(), TII->get(EVM::SWAP_r)).addImm(Index);
+    Inst.addComment(*MF, Twine("%") + Twine(TheStack[Index].getValue()) +
+                    Twine(" <=> %" + Twine(TheStack[0].getValue())));
     insertInstruction<Position>(MI, *Inst);
     TheStack.swap(Index);
     return Inst;
@@ -107,6 +114,7 @@ private:
   template<Insert Position>
   void insertPop(MachineInstr &MI) {
     auto Inst = BuildMI(*MF, MI.getDebugLoc(), TII->get(EVM::POP_r));
+    Inst.addComment(*MF, Twine("Reg: %") + Twine(TheStack[0].getValue()));
     insertInstruction<Position>(MI, *Inst);
     TheStack.pop();
   }

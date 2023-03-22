@@ -80,6 +80,7 @@ def run_test(source)
   unless options.no_compile
     clang_cmd = "#{bindir}/clang -target evm #{source} -o #{codefile} "
     clang_cmd += ' -v ' if options.verbose
+    # clang_cmd += ' -Xclang -disable-llvm-passes '
     clang_cmd += ' -fno-exceptions '
     clang_cmd += ' -std=c++17 '
     clang_cmd += ' -O3 '
@@ -111,7 +112,9 @@ def run_test(source)
     raise "`function` must be specified in test case" unless test_run.function
     function_sha3 = get_func_keccak(test_run.function, abifile)
     input = function_sha3[0..7]
-    input += test_run.input.map{|x| "%064x" % x }.join if test_run.input
+    # Use 'x & 0xfffff...' for proper extraction hex strings from negative numbers
+    mask = (1 << 256) - 1
+    input += test_run.input.map{|x| "%064x" % (x & mask) }.join if test_run.input
 
     result = command("evm --input #{input} --codefile #{codefile} run").strip
     result = result.to_i(16) if result.start_with? '0x'

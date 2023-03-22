@@ -296,6 +296,7 @@ SDValue EVMTargetLowering::LowerSELECT_CC(SDValue Op, SelectionDAG &DAG) const {
 SDValue EVMTargetLowering::LowerSIGN_EXTEND(SDValue Op, SelectionDAG &DAG) const {
   SDValue Op0 = Op.getOperand(0);
   SDLoc dl(Op);
+  // TODO: probably we need to remove this assert
   assert(Op.getValueType() == MVT::i256 && "Unhandled target sign_extend.");
 
   if (Op0.getValueType().getSizeInBits() < 256) {
@@ -311,8 +312,12 @@ SDValue EVMTargetLowering::LowerSIGN_EXTEND(SDValue Op, SelectionDAG &DAG) const
   assert(Width != 0);
 
   // According to EVM spec, size of extended value is "byte width - 1"
-  return DAG.getNode(EVMISD::SIGNEXTEND, dl, MVT::i256,
+  auto Res = DAG.getNode(EVMISD::SIGNEXTEND, dl, MVT::i256,
                      DAG.getConstant(Width - 1, dl, MVT::i256), Op0);
+  if (Op.getValueType() == MVT::i256) {
+    return Res;
+  }
+  return DAG.getNode(ISD::TRUNCATE, SDLoc(Op), Op.getValueType(), Res);
 }
 
 SDValue EVMTargetLowering::LowerOperation(SDValue Op,

@@ -7,7 +7,7 @@ int add(int a, int b) {
 }
 
 // EVM_RUN: function: call_test, input: [], result: 10
-int callee(int a, int b) {
+int __attribute__ ((noinline)) callee(int a, int b) {
   return a - b;
 }
 

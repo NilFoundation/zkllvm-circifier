@@ -82,9 +82,20 @@ head2:
     MOD
     PUSH1 0
     EQ
-    ISZERO
-    PUSH4   fail
+    PUSH4   skip_align
     JUMPI
+
+    # Align size to 32
+    DUP3
+    PUSH1 32
+    ADD
+    PUSH8 0xffffffffffffffe0
+    AND
+    SWAP3
+    POP
+
+skip_align:
+    JUMPDEST
 
     # Decrease count variable
     PUSH1 32
@@ -129,6 +140,17 @@ exit2:
 fail:
     JUMPDEST
     INVALID
+
+################################ EXIT ################################
+# INPUT STACK: 1: exit code
+#
+STDLIB_FUNC exit
+    JUMPDEST
+    PUSH1 0
+    MSTORE
+    PUSH1 0x20
+    PUSH1 0
+    RETURN
 
 # TODO: Implement memmove
 STDLIB_FUNC_INVALID memmove

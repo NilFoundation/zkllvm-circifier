@@ -50,6 +50,8 @@ public:
 
   bool SelectLOAD(SDNode *Node);
 
+  bool SelectSTORE(SDNode *Node);
+
   // custom selecting
   bool SelectSETCC(SDNode *Node);
   bool SelectSELECT_CC(SDNode *Node);
@@ -185,6 +187,56 @@ bool EVMDAGToDAGISel::SelectLOAD(SDNode *Node) {
       return false;
     }
   }
+  return false;
+}
+
+bool EVMDAGToDAGISel::SelectSTORE(SDNode *Node) {
+  StoreSDNode *ST = dyn_cast<StoreSDNode>(Node);
+  assert(ST != nullptr && "Must be a store node");
+
+  auto StoreVT = ST->getMemoryVT();
+  if (StoreVT != MVT::i256) {
+    auto Op = ST->getOperand(1);
+
+    constexpr std::array<uint64_t, 2> MaskData = {uint64_t(-1), uint64_t(-1)};
+    APInt Mask(256, MaskData);
+
+    switch (StoreVT.getFixedSizeInBits()) {
+    case 128:
+        // 128 mask is already set by default
+        break;
+    case 64:
+        Mask = 0xffffffffffffffff;
+        break;
+    case 32:
+        Mask = 0xffffffff;
+        break;
+    case 16:
+        Mask = 0xffff;
+        break;
+    case 8:
+        Mask = 0xff;
+        break;
+    default:
+        llvm_unreachable("Unsupported type!");
+    }
+
+    SDValue MaskConst = CurDAG->getConstant(Mask, SDLoc(Node), MVT::i256);
+
+    SDValue MaskNode =
+        SDValue(CurDAG->getMachineNode(EVM::PUSH32_r, SDLoc(Node),
+                                       MVT::i256, MaskConst), 0);
+    MachineSDNode *And = CurDAG->getMachineNode(
+        EVM::AND_r, SDLoc(Node), MVT::i256, {Op, MaskNode});
+
+    MachineSDNode *Store =
+        CurDAG->getMachineNode(EVM::MSTORE_r, SDLoc(Node), MVT::Other,
+                               Node->getOperand(2), SDValue(And, 0), Node->getOperand(0));
+
+    ReplaceNode(Node, Store);
+    return true;
+  }
+
   return false;
 }
 
@@ -367,6 +419,10 @@ void EVMDAGToDAGISel::Select(SDNode *Node) {
   switch (Opcode) {
     case ISD::LOAD: {
       if (SelectLOAD(Node)) return;
+      break;
+    }
+    case ISD::STORE: {
+      if (SelectSTORE(Node)) return;
       break;
     }
     case ISD::SETCC:

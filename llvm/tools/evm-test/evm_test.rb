@@ -40,15 +40,12 @@ def command(cmd)
   output
 end
 
-def load_run_info(line)
-  data = YAML.load("{ #{line.split('EVM_RUN:')[1]} }")
-  JSON.parse(data.to_json, object_class: OpenStruct).freeze
-end
-
 def collect_runs(filename)
   runs = []
   File.readlines(filename).each do |line|
-    runs << load_run_info(line) if line.start_with? '// EVM_RUN:'
+    data = YAML.load("{ #{line.split('EVM_RUN:')[1]} }")
+    data = JSON.parse(data.to_json, object_class: OpenStruct).freeze
+    runs << data if line.start_with? '// EVM_RUN:'
   end
   runs
 end
@@ -80,7 +77,8 @@ def run_test(source)
   unless options.no_compile
     clang_cmd = "#{bindir}/clang -target evm #{source} -o #{codefile} "
     clang_cmd += ' -v ' if options.verbose
-    # clang_cmd += ' -Xclang -disable-llvm-passes '
+    # Uncomment to disable llvm optimizations
+    #clang_cmd += ' -Xclang -disable-llvm-passes '
     clang_cmd += ' -fno-exceptions '
     clang_cmd += ' -std=c++17 '
     clang_cmd += ' -O3 '

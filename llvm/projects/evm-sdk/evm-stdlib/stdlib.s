@@ -62,6 +62,7 @@ exit1:
 
 ################################ MEMCPY ################################
 # INPUT STACK: 1:dst, 2:src, 3:count
+# TODO: implement via `identity` precompiled contract
 #
 STDLIB_FUNC memcpy
     JUMPDEST
@@ -151,6 +152,121 @@ STDLIB_FUNC exit
     PUSH1 0x20
     PUSH1 0
     RETURN
+
+######################## __evm_builtin_modmul ########################
+# INPUT STACK: 1: first, 2: second, 3: mod
+#
+STDLIB_FUNC __evm_builtin_modmul
+    JUMPDEST
+    MULMOD
+    SWAP1
+    JUMP
+
+######################## __evm_builtin_modmul ########################
+# INPUT STACK: 1: first, 2: second, 3: mod
+#
+STDLIB_FUNC __evm_builtin_modadd
+    JUMPDEST
+    ADDMOD
+    SWAP1
+    JUMP
+
+######################## __evm_builtin_modpow ########################
+# INPUT STACK: 1: base, 2: exp, 3: mod
+#
+STDLIB_FUNC __evm_builtin_modpow
+    JUMPDEST
+
+    PUSH1   0  // FP ADDRESS
+    MLOAD
+
+    # Stack: [mod, exp, base, freemem]
+    PUSH1 32
+    DUP2
+    MSTORE
+
+    PUSH1 32
+    DUP2
+    PUSH1 32
+    ADD
+    MSTORE
+
+    PUSH1 32
+    DUP2
+    PUSH1 64
+    ADD
+    MSTORE
+
+    # Stack: [mod, exp, base, freemem]
+    DUP1
+    PUSH1 96
+    ADD
+    # Stack: [mod, exp, base, freemem, addr]
+    DUP3
+    # Stack: [mod, exp, base, freemem, addr, base]
+    SWAP1
+    # Stack: [mod, exp, base, freemem, base, addr]
+    MSTORE
+
+    # Stack: [mod, exp, base, freemem]
+    DUP1
+    PUSH1 128
+    ADD
+    # Stack: [mod, exp, base, freemem, addr]
+    DUP4
+    # Stack: [mod, exp, base, freemem, addr, exp]
+    SWAP1
+    # Stack: [mod, exp, base, freemem, exp, addr]
+    MSTORE
+
+    # Stack: [mod, exp, base, freemem]
+    DUP1
+    PUSH1 160
+    ADD
+    # Stack: [mod, exp, base, freemem, addr]
+    DUP5
+    # Stack: [mod, exp, base, freemem, addr, mod]
+    SWAP1
+    # Stack: [mod, exp, base, freemem, mod, addr]
+    MSTORE
+
+    # Stack: [mod, exp, base, freemem]
+    PUSH1 32
+    # Stack: [mod, exp, base, freemem, retSize]
+    DUP2
+    # Stack: [mod, exp, base, freemem, retSize, retOffset(freemem)]
+    PUSH1 192
+    # Stack: [mod, exp, base, freemem, retSize, retOffset(freemem), argsSize]
+    DUP4
+    # Stack: [mod, exp, base, freemem, retSize, retOffset(freemem), argsSize, argsOffset(freemem)]
+    PUSH1 5
+    # Stack: [mod, exp, base, freemem, retSize, retOffset(freemem), argsSize, argsOffset(freemem), contract]
+    GAS
+    # Stack: [mod, exp, base, freemem, retSize, retOffset(freemem), argsSize, argsOffset(freemem), contract, gas]
+    STATICCALL
+
+    # Stack: [mod, exp, base, freemem, result]
+    PUSH4 modpow_cont
+    JUMPI
+    PUSH4 abort
+    JUMP
+
+modpow_cont:
+    JUMPDEST
+
+    # Stack: [mod, exp, base, freemem]
+    SWAP3
+    POP
+    POP
+    POP
+    # Stack: [freemem]
+    MLOAD
+    # Stack: [result]
+
+    SWAP1
+    # Stack: [result, return_address]
+    JUMP
+
 
 # TODO: Implement memmove
 STDLIB_FUNC_INVALID memmove

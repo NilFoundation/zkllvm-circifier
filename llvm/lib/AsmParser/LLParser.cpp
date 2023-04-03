@@ -3493,10 +3493,11 @@ bool LLParser::parseValID(ValID &ID, PerFunctionState *PFS, Type *ExpectedTy) {
 
     if (!Elts[0]->getType()->isIntegerTy() &&
         !Elts[0]->getType()->isFloatingPointTy() &&
-        !Elts[0]->getType()->isPointerTy())
+        !Elts[0]->getType()->isPointerTy() &&
+        !Elts[0]->getType()->isFieldTy())
       return error(
           FirstEltLoc,
-          "vector elements must have integer, pointer or floating point type");
+          "vector elements must have integer, field, pointer or floating point type");
 
     // Verify that all the vector elements have the same type.
     for (unsigned i = 1, e = Elts.size(); i != e; ++i)

@@ -1824,6 +1824,7 @@ static bool EvaluateTemporary(const Expr *E, LValue &Result, EvalInfo &Info);
 static bool EvaluateInteger(const Expr *E, APSInt &Result, EvalInfo &Info);
 static bool EvaluateIntegerOrLValue(const Expr *E, APValue &Result,
                                     EvalInfo &Info);
+static bool EvaluateField(const Expr *E, FieldElem &Result, EvalInfo &Info);
 static bool EvaluateFloat(const Expr *E, APFloat &Result, EvalInfo &Info);
 static bool EvaluateComplex(const Expr *E, ComplexValue &Res, EvalInfo &Info);
 static bool EvaluateAtomic(const Expr *E, const LValue *This, APValue &Result,
@@ -10516,6 +10517,15 @@ VectorExprEvaluator::VisitInitListExpr(const InitListExpr *E) {
         sInt = Info.Ctx.MakeIntValue(0, EltTy);
       Elements.push_back(APValue(sInt));
       CountElts++;
+    } else if (EltTy->isFieldType()) {
+      llvm::FieldElem f;
+      if (CountInits < NumInits) {
+        if (!EvaluateField(E->getInit(CountInits), f, Info))
+          return false;
+      } else
+        return false;
+      Elements.push_back(APValue(f));
+      CountElts++;
     } else {
       llvm::APFloat f(0.0);
       if (CountInits < NumInits) {
@@ -13931,6 +13941,16 @@ bool IntExprEvaluator::VisitConceptSpecializationExpr(
 
 bool IntExprEvaluator::VisitRequiresExpr(const RequiresExpr *E) {
   return Success(E->isSatisfied(), E);
+}
+
+static bool EvaluateField(const Expr *E, FieldElem &Result, EvalInfo &Info) {
+  assert(!E->isValueDependent());
+  assert(E->isPRValue() && E->getType()->isFieldType());
+  APValue Val;
+  if (!FieldExprEvaluator(Info, Val).Visit(E))
+    return false;
+  Result = Val.getField();
+  return true;
 }
 
 bool FieldExprEvaluator::VisitBinaryOperator(const BinaryOperator *E) {

@@ -20,6 +20,8 @@
 
 BUILTIN(__builtin_assigner_malloc, "v*z", "n")
 BUILTIN(__builtin_assigner_free, "vv*", "n")
+BUILTIN(__builtin_assigner_poseidon_pallas_base, "E3g1E3g1", "n")
+BUILTIN(__builtin_assigner_sha2_256_pallas_base, "E2g1E2g1E2g1", "n")
 
 #undef BUILTIN
 #undef TARGET_BUILTIN

@@ -19809,7 +19809,7 @@ Value *CodeGenFunction::EmitAssignerBuiltinExpr(unsigned int BuiltinID,
                                                 const CallExpr *E) {
   SmallVector<Value *, 2> Ops;
 
-  llvm::Type *RetType = nullptr;
+  llvm::Type *OverloadTy = nullptr;
 
   for (unsigned i = 0, e = E->getNumArgs(); i != e; i++)
     Ops.push_back(EmitScalarExpr(E->getArg(i)));
@@ -19820,16 +19820,30 @@ Value *CodeGenFunction::EmitAssignerBuiltinExpr(unsigned int BuiltinID,
     llvm_unreachable("unexpected builtin ID.");
   case assigner::BI__builtin_assigner_malloc:
     ID = Intrinsic::assigner_malloc;
-    RetType = ConvertType(E->getType());
+    OverloadTy = ConvertType(E->getType());
     break;
   case assigner::BI__builtin_assigner_free:
     ID = Intrinsic::assigner_free;
-    RetType = llvm::Type::getInt8PtrTy(getLLVMContext());
+    OverloadTy = llvm::Type::getInt8PtrTy(getLLVMContext());
+    break;
+  case assigner::BI__builtin_assigner_poseidon_pallas_base: {
+    ID = Intrinsic::assigner_poseidon;
+    auto ElemTy = llvm::GaloisFieldType::get(getLLVMContext(),
+                                             llvm::GALOIS_FIELD_PALLAS_BASE);
+    OverloadTy = llvm::FixedVectorType::get(ElemTy, 3);
     break;
   }
+  case assigner::BI__builtin_assigner_sha2_256_pallas_base: {
+    ID = Intrinsic::assigner_sha2_256;
+    auto ElemTy = llvm::GaloisFieldType::get(getLLVMContext(),
+                                             llvm::GALOIS_FIELD_PALLAS_BASE);
+    OverloadTy = llvm::FixedVectorType::get(ElemTy, 2);
+    break;
+  }
+  }
 
-  assert(ID != Intrinsic::not_intrinsic && RetType != nullptr);
+  assert(ID != Intrinsic::not_intrinsic && OverloadTy != nullptr);
 
-  llvm::Function *F = CGM.getIntrinsic(ID, RetType);
+  llvm::Function *F = CGM.getIntrinsic(ID, OverloadTy);
   return Builder.CreateCall(F, Ops);
 }

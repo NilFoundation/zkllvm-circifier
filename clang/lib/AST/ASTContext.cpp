@@ -11083,6 +11083,17 @@ ASTMutationListener::~ASTMutationListener() = default;
 void ASTMutationListener::DeducedReturnType(const FunctionDecl *FD,
                                             QualType ReturnType) {}
 
+static QualType FieldIdToType(const ASTContext &Context, unsigned Id) {
+  switch (Id) {
+  default:
+    llvm_unreachable("Unexpected field id");
+  case 1:
+    return Context.FPallasbaseTy;
+  case 2:
+    return Context.FPallasscalarTy;
+  }
+}
+
 //===----------------------------------------------------------------------===//
 //                          Builtin Type Computation
 //===----------------------------------------------------------------------===//
@@ -11342,6 +11353,16 @@ static QualType DecodeTypeFromStr(const char *&Str, const ASTContext &Context,
     QualType ElementType = DecodeTypeFromStr(Str, Context, Error, RequiresICE,
                                              false);
     Type = Context.getExtVectorType(ElementType, NumElements);
+    break;
+  }
+  case 'g': {
+    char *End;
+    unsigned FieldId = strtoul(Str, &End, 10);
+    assert(End != Str && "Missing field id");
+
+    Str = End;
+
+    Type = FieldIdToType(Context, FieldId);
     break;
   }
   case 'X': {

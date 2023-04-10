@@ -109,11 +109,12 @@ bool FieldElemFromStr(GaloisFieldKind Kind, StringRef StrRef,
       radix = 8;
     }
   }
-  unsigned NumBits = GetNumberBits(Kind);
-  APInt ParsedInt(NumBits, 0);
+  // TODO(maksenov): deal with negative constants
+  unsigned StorageBits = GetNumberBits(Kind) + 1;  // +1 for sign
+  APInt ParsedInt(StorageBits, 0);
   if (Str.str().getAsInteger(radix, ParsedInt))
     return false;
-  if (ParsedInt.getBitWidth() != NumBits) {
+  if (ParsedInt.getSignificantBits() > StorageBits) {
     // Value was extended during parsing, so field bit width is insufficient
     return false;
   }

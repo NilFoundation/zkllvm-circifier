@@ -234,8 +234,7 @@ public:
 
   /// Return true if this is an integer type or a vector of integer types.
   bool isIntOrIntVectorTy() const {
-    return getScalarType()->isIntegerTy() || getScalarType()->isFieldTy() ||
-           getScalarType()->isCurveTy();
+    return getScalarType()->isIntegerTy();
   }
 
 

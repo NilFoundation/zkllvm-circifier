@@ -7097,7 +7097,9 @@ bool LLParser::parseArithmetic(Instruction *&Inst, PerFunctionState &PFS,
     return true;
 
   bool Valid = IsFP ? LHS->getType()->isFPOrFPVectorTy()
-                    : LHS->getType()->isIntOrIntVectorTy();
+                    : LHS->getType()->isIntOrIntVectorTy() ||
+                          LHS->getType()->isFieldTy() ||
+                          LHS->getType()->isCurveTy();
 
   if (!Valid)
     return error(Loc, "invalid operand type for instruction");
@@ -7145,6 +7147,8 @@ bool LLParser::parseCompare(Instruction *&Inst, PerFunctionState &PFS,
   } else {
     assert(Opc == Instruction::ICmp && "Unknown opcode for CmpInst!");
     if (!LHS->getType()->isIntOrIntVectorTy() &&
+        !LHS->getType()->isFieldTy() &&
+        !LHS->getType()->isCurveTy() &&
         !LHS->getType()->isPtrOrPtrVectorTy())
       return error(Loc, "icmp requires integer operands");
     Inst = new ICmpInst(CmpInst::Predicate(Pred), LHS, RHS);

@@ -28,7 +28,7 @@ class [[nodiscard]] FieldElem : public APInt {
 public:
   FieldElem() : APInt(), Kind(static_cast<GaloisFieldKind>(0)) {}
   FieldElem(GaloisFieldKind k, APInt v)
-      : APInt(v.zext(GetNumberBits(k))), Kind(k) {}
+      : APInt(v.zext(GetNumberBits(k) + 1)), Kind(k) {}  // +1 for sign
 
   GaloisFieldKind getKind() const { return Kind; }
 

@@ -2890,8 +2890,8 @@ void BinaryOperator::AssertOK() {
   case Mul:
     assert(getType() == LHS->getType() &&
            "Arithmetic operation should return same type as operands!");
-    assert(getType()->isIntOrIntVectorTy() &&
-           "Tried to create an integer operation on a non-integer type!");
+    assert((getType()->isIntOrIntVectorTy() || getType()->isFieldTy() || getType()->isCurveTy()) &&
+           "Tried to create an arithmetic operation on a non-arithmetic type!");
     break;
   case FAdd: case FSub:
   case FMul:
@@ -2905,8 +2905,8 @@ void BinaryOperator::AssertOK() {
   case SDiv:
     assert(getType() == LHS->getType() &&
            "Arithmetic operation should return same type as operands!");
-    assert(getType()->isIntOrIntVectorTy() &&
-           "Incorrect operand type (not integer) for S/UDIV");
+    assert((getType()->isIntOrIntVectorTy() || getType()->isFieldTy()) &&
+           "Incorrect operand type (not integer or field) for S/UDIV");
     break;
   case FDiv:
     assert(getType() == LHS->getType() &&

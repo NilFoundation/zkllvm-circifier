@@ -3699,7 +3699,9 @@ void Verifier::visitBinaryOperator(BinaryOperator &B) {
   case Instruction::UDiv:
   case Instruction::SRem:
   case Instruction::URem:
-    Check(B.getType()->isIntOrIntVectorTy(),
+    Check(B.getType()->isIntOrIntVectorTy() ||
+          B.getType()->isFieldTy() ||
+          B.getType()->isCurveTy(),
           "Integer arithmetic operators only work with integral types!", &B);
     Check(B.getType() == B.getOperand(0)->getType(),
           "Integer arithmetic operators must have same type "
@@ -3753,7 +3755,10 @@ void Verifier::visitICmpInst(ICmpInst &IC) {
   Check(Op0Ty == Op1Ty,
         "Both operands to ICmp instruction are not of the same type!", &IC);
   // Check that the operands are the right type
-  Check(Op0Ty->isIntOrIntVectorTy() || Op0Ty->isPtrOrPtrVectorTy(),
+  Check(Op0Ty->isIntOrIntVectorTy() ||
+        Op0Ty->isFieldTy() ||
+        Op0Ty->isCurveTy() ||
+        Op0Ty->isPtrOrPtrVectorTy(),
         "Invalid operand types for ICmp instruction", &IC);
   // Check that the predicate is valid.
   Check(IC.isIntPredicate(), "Invalid predicate in ICmp instruction!", &IC);

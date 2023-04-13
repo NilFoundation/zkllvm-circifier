@@ -62,6 +62,8 @@ STATISTIC(NumDeadAlloca,    "Number of dead alloca's removed");
 STATISTIC(NumPHIInsert,     "Number of PHI nodes inserted");
 
 bool llvm::isAllocaPromotable(const AllocaInst *AI) {
+  unsigned AS = AI->getType()->getAddressSpace();
+
   // Only allow direct and non-volatile loads and stores...
   for (const User *U : AI->users()) {
     if (const LoadInst *LI = dyn_cast<LoadInst>(U)) {
@@ -81,10 +83,18 @@ bool llvm::isAllocaPromotable(const AllocaInst *AI) {
       if (!II->isLifetimeStartOrEnd() && !II->isDroppable())
         return false;
     } else if (const BitCastInst *BCI = dyn_cast<BitCastInst>(U)) {
-      if (!onlyUsedByLifetimeMarkersOrDroppableInsts(BCI))
+      //if (!onlyUsedByLifetimeMarkersOrDroppableInsts(BCI))
+      // TVM local begin
+      if (BCI->getType() != Type::getIntBytePtrTy(U->getContext(), AS))
+        return false;
+      // TVM local end
+      if (!onlyUsedByLifetimeMarkers(BCI))
         return false;
     } else if (const GetElementPtrInst *GEPI = dyn_cast<GetElementPtrInst>(U)) {
-      if (!GEPI->hasAllZeroIndices())
+      //if (!GEPI->hasAllZeroIndices())
+      // TVM local begin
+      if (GEPI->getType() != Type::getIntBytePtrTy(U->getContext(), AS))
+      // TVM local end
         return false;
       if (!onlyUsedByLifetimeMarkersOrDroppableInsts(GEPI))
         return false;
@@ -545,7 +555,6 @@ static bool promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
 
 void PromoteMem2Reg::run() {
   Function &F = *DT.getRoot()->getParent();
-
   AllocaDbgUsers.resize(Allocas.size());
 
   AllocaInfo Info;

@@ -714,6 +714,10 @@ public:
   /// other block.
   bool isLayoutSuccessor(const MachineBasicBlock *MBB) const;
 
+  // TVM local begin
+  bool isFallthroughSuccessor(const MachineBasicBlock *MBB) const;
+  // TVM local end
+
   /// Return the fallthrough block if the block can implicitly
   /// transfer control to the block after it by falling off the end of
   /// it.  This should return null if it can reach the block after

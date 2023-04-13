@@ -464,8 +464,12 @@ public:
     if (TypeDescriptorType)
       return TypeDescriptorType;
     llvm::Type *FieldTypes[] = {
-        CGM.Int8PtrPtrTy,
-        CGM.Int8PtrTy,
+        // CGM.Int8PtrPtrTy,
+        // CGM.Int8PtrTy,
+        // TVM local begin
+        CGM.BytePtrPtrTy,
+        CGM.BytePtrTy,
+        // TVM local end
         llvm::ArrayType::get(CGM.Int8Ty, TypeInfoString.size() + 1)};
     TypeDescriptorType =
         llvm::StructType::create(CGM.getLLVMContext(), FieldTypes, TDTypeName);
@@ -482,7 +486,10 @@ public:
     if (BaseClassDescriptorType)
       return BaseClassDescriptorType;
     llvm::Type *FieldTypes[] = {
-        getImageRelativeType(CGM.Int8PtrTy),
+        // getImageRelativeType(CGM.Int8PtrTy),
+        // TVM local begin
+        getImageRelativeType(CGM.BytePtrTy),
+        // TVM local end
         CGM.IntTy,
         CGM.IntTy,
         CGM.IntTy,
@@ -521,7 +528,10 @@ public:
         CGM.IntTy,
         CGM.IntTy,
         CGM.IntTy,
-        getImageRelativeType(CGM.Int8PtrTy),
+        // getImageRelativeType(CGM.Int8PtrTy),
+        // TVM local begin
+        getImageRelativeType(CGM.BytePtrTy),
+        // TVM local end
         getImageRelativeType(getClassHierarchyDescriptorType()->getPointerTo()),
         getImageRelativeType(CompleteObjectLocatorType),
     };
@@ -697,15 +707,27 @@ public:
   llvm::StructType *getCatchableTypeType() {
     if (CatchableTypeType)
       return CatchableTypeType;
+    //llvm::Type *FieldTypes[] = {
+    //    CGM.IntTy,                           // Flags
+    //    getImageRelativeType(CGM.Int8PtrTy), // TypeDescriptor
+    //    CGM.IntTy,                           // NonVirtualAdjustment
+    //    CGM.IntTy,                           // OffsetToVBPtr
+    //    CGM.IntTy,                           // VBTableIndex
+    //    CGM.IntTy,                           // Size
+    //    getImageRelativeType(CGM.Int8PtrTy)  // CopyCtor
+    //};
+    // TVM local begin
     llvm::Type *FieldTypes[] = {
         CGM.IntTy,                           // Flags
-        getImageRelativeType(CGM.Int8PtrTy), // TypeDescriptor
+        getImageRelativeType(CGM.BytePtrTy), // TypeDescriptor
         CGM.IntTy,                           // NonVirtualAdjustment
         CGM.IntTy,                           // OffsetToVBPtr
         CGM.IntTy,                           // VBTableIndex
         CGM.IntTy,                           // Size
-        getImageRelativeType(CGM.Int8PtrTy)  // CopyCtor
+        getImageRelativeType(CGM.BytePtrTy)  // CopyCtor
     };
+    // TVM local end
+
     CatchableTypeType = llvm::StructType::create(
         CGM.getLLVMContext(), FieldTypes, "eh.CatchableType");
     return CatchableTypeType;
@@ -735,9 +757,14 @@ public:
       return ThrowInfoType;
     llvm::Type *FieldTypes[] = {
         CGM.IntTy,                           // Flags
-        getImageRelativeType(CGM.Int8PtrTy), // CleanupFn
-        getImageRelativeType(CGM.Int8PtrTy), // ForwardCompat
-        getImageRelativeType(CGM.Int8PtrTy)  // CatchableTypeArray
+        //getImageRelativeType(CGM.Int8PtrTy), // CleanupFn
+        //getImageRelativeType(CGM.Int8PtrTy), // ForwardCompat
+        //getImageRelativeType(CGM.Int8PtrTy)  // CatchableTypeArray
+       // TVM local begin
+        getImageRelativeType(CGM.BytePtrTy), // CleanupFn
+        getImageRelativeType(CGM.BytePtrTy), // ForwardCompat
+        getImageRelativeType(CGM.BytePtrTy)  // CatchableTypeArray
+        // TVM local end
     };
     ThrowInfoType = llvm::StructType::create(CGM.getLLVMContext(), FieldTypes,
                                              "eh.ThrowInfo");
@@ -747,7 +774,11 @@ public:
   llvm::FunctionCallee getThrowFn() {
     // _CxxThrowException is passed an exception object and a ThrowInfo object
     // which describes the exception.
-    llvm::Type *Args[] = {CGM.Int8PtrTy, getThrowInfoType()->getPointerTo()};
+    // llvm::Type *Args[] = {CGM.Int8PtrTy, getThrowInfoType()->getPointerTo()};
+    // TVM local begin
+    llvm::Type *Args[] = {CGM.BytePtrTy, getThrowInfoType()->getPointerTo()};
+    // TVM local end
+
     llvm::FunctionType *FTy =
         llvm::FunctionType::get(CGM.VoidTy, Args, /*isVarArg=*/false);
     llvm::FunctionCallee Throw =
@@ -879,7 +910,10 @@ void MicrosoftCXXABI::emitVirtualObjectDelete(CodeGenFunction &CGF,
 
 void MicrosoftCXXABI::emitRethrow(CodeGenFunction &CGF, bool isNoReturn) {
   llvm::Value *Args[] = {
-      llvm::ConstantPointerNull::get(CGM.Int8PtrTy),
+      // llvm::ConstantPointerNull::get(CGM.Int8PtrTy),
+      // TVM local begin
+      llvm::ConstantPointerNull::get(CGM.BytePtrTy),
+      // TVM local end
       llvm::ConstantPointerNull::get(getThrowInfoType()->getPointerTo())};
   llvm::FunctionCallee Fn = getThrowFn();
   if (isNoReturn)
@@ -917,7 +951,11 @@ void MicrosoftCXXABI::emitBeginCatch(CodeGenFunction &CGF,
 std::tuple<Address, llvm::Value *, const CXXRecordDecl *>
 MicrosoftCXXABI::performBaseAdjustment(CodeGenFunction &CGF, Address Value,
                                        QualType SrcRecordTy) {
-  Value = CGF.Builder.CreateBitCast(Value, CGF.Int8PtrTy);
+  //Value = CGF.Builder.CreateBitCast(Value, CGF.Int8PtrTy);
+  // TVM local begin
+  Value = CGF.Builder.CreateBitCast(Value, CGF.BytePtrTy);
+  // TVM local end
+
   const CXXRecordDecl *SrcDecl = SrcRecordTy->getAsCXXRecordDecl();
   const ASTContext &Context = getContext();
 
@@ -958,9 +996,15 @@ bool MicrosoftCXXABI::shouldTypeidBeNullChecked(bool IsDeref,
 
 static llvm::CallBase *emitRTtypeidCall(CodeGenFunction &CGF,
                                         llvm::Value *Argument) {
-  llvm::Type *ArgTypes[] = {CGF.Int8PtrTy};
+  //llvm::Type *ArgTypes[] = {CGF.Int8PtrTy};
+  //llvm::FunctionType *FTy =
+  //    llvm::FunctionType::get(CGF.Int8PtrTy, ArgTypes, false);
+  // TVM local begin
+  llvm::Type *ArgTypes[] = {CGF.BytePtrTy};
   llvm::FunctionType *FTy =
-      llvm::FunctionType::get(CGF.Int8PtrTy, ArgTypes, false);
+      llvm::FunctionType::get(CGF.BytePtrTy, ArgTypes, false);
+  // TVM local end
+
   llvm::Value *Args[] = {Argument};
   llvm::FunctionCallee Fn = CGF.CGM.CreateRuntimeFunction(FTy, "__RTtypeid");
   return CGF.EmitRuntimeCallOrInvoke(Fn, Args);
@@ -1012,11 +1056,19 @@ llvm::Value *MicrosoftCXXABI::EmitDynamicCastCall(
   //   PVOID SrcType,
   //   PVOID TargetType,
   //   BOOL isReference)
-  llvm::Type *ArgTypes[] = {CGF.Int8PtrTy, CGF.Int32Ty, CGF.Int8PtrTy,
-                            CGF.Int8PtrTy, CGF.Int32Ty};
+  //llvm::Type *ArgTypes[] = {CGF.Int8PtrTy, CGF.Int32Ty, CGF.Int8PtrTy,
+  //                          CGF.Int8PtrTy, CGF.Int32Ty};
+  //llvm::FunctionCallee Function = CGF.CGM.CreateRuntimeFunction(
+  //    llvm::FunctionType::get(CGF.Int8PtrTy, ArgTypes, false),
+  //    "__RTDynamicCast");
+  // TVM local begin
+  llvm::Type *ArgTypes[] = {CGF.BytePtrTy, CGF.Int32Ty, CGF.BytePtrTy,
+                            CGF.BytePtrTy, CGF.Int32Ty};
   llvm::FunctionCallee Function = CGF.CGM.CreateRuntimeFunction(
-      llvm::FunctionType::get(CGF.Int8PtrTy, ArgTypes, false),
+      llvm::FunctionType::get(CGF.BytePtrTy, ArgTypes, false),
       "__RTDynamicCast");
+  // TVM local end
+
   llvm::Value *Args[] = {
       ThisPtr, Offset, SrcRTTI, DestRTTI,
       llvm::ConstantInt::get(CGF.Int32Ty, DestTy->isReferenceType())};
@@ -1033,10 +1085,16 @@ MicrosoftCXXABI::EmitDynamicCastToVoid(CodeGenFunction &CGF, Address Value,
 
   // PVOID __RTCastToVoid(
   //   PVOID inptr)
-  llvm::Type *ArgTypes[] = {CGF.Int8PtrTy};
+  //llvm::Type *ArgTypes[] = {CGF.Int8PtrTy};
+  //llvm::FunctionCallee Function = CGF.CGM.CreateRuntimeFunction(
+  //    llvm::FunctionType::get(CGF.Int8PtrTy, ArgTypes, false),
+  //    "__RTCastToVoid");
+  // TVM local begin
+  llvm::Type *ArgTypes[] = {CGF.BytePtrTy};
   llvm::FunctionCallee Function = CGF.CGM.CreateRuntimeFunction(
-      llvm::FunctionType::get(CGF.Int8PtrTy, ArgTypes, false),
+      llvm::FunctionType::get(CGF.BytePtrTy, ArgTypes, false),
       "__RTCastToVoid");
+  // TVM local end
   llvm::Value *Args[] = {Value.getPointer()};
   return CGF.EmitRuntimeCall(Function, Args);
 }
@@ -1889,7 +1947,10 @@ llvm::GlobalVariable *MicrosoftCXXABI::getAddrOfVTable(const CXXRecordDecl *RD,
       if (C)
         C->setSelectionKind(llvm::Comdat::Largest);
     }
-    VFTable = llvm::GlobalAlias::create(CGM.Int8PtrTy,
+    // VFTable = llvm::GlobalAlias::create(CGM.Int8PtrTy,
+    // TVM local begin
+    VFTable = llvm::GlobalAlias::create(CGM.BytePtrTy,
+    // TVM local end
                                         /*AddressSpace=*/0, VFTableLinkage,
                                         VFTableName.str(), VTableGEP,
                                         &CGM.getModule());
@@ -3097,7 +3158,10 @@ llvm::Value *MicrosoftCXXABI::AdjustVirtualBase(
   if (VBaseAdjustBB) {
     Builder.CreateBr(SkipAdjustBB);
     CGF.EmitBlock(SkipAdjustBB);
-    llvm::PHINode *Phi = Builder.CreatePHI(CGM.Int8PtrTy, 2, "memptr.base");
+    // llvm::PHINode *Phi = Builder.CreatePHI(CGM.Int8PtrTy, 2, "memptr.base");
+    // TVM local begin
+    llvm::PHINode *Phi = Builder.CreatePHI(CGM.BytePtrTy, 2, "memptr.base");
+    // TVM local end
     Phi->addIncoming(Base.getPointer(), OriginalBB);
     Phi->addIncoming(AdjustedBase, VBaseAdjustBB);
     return Phi;
@@ -3438,7 +3502,10 @@ CGCallee MicrosoftCXXABI::EmitLoadOfMemberFunctionPointer(
 
   if (NonVirtualBaseAdjustment) {
     // Apply the adjustment and cast back to the original struct type.
-    llvm::Value *Ptr = Builder.CreateBitCast(ThisPtrForCall, CGF.Int8PtrTy);
+    // llvm::Value *Ptr = Builder.CreateBitCast(ThisPtrForCall, CGF.Int8PtrTy);
+    // TVM local begin
+    llvm::Value *Ptr = Builder.CreateBitCast(ThisPtrForCall, CGF.BytePtrTy);
+    // TVM local end
     Ptr = Builder.CreateInBoundsGEP(CGF.Int8Ty, Ptr, NonVirtualBaseAdjustment);
     ThisPtrForCall = Builder.CreateBitCast(Ptr, ThisPtrForCall->getType(),
                                            "this.adjusted");
@@ -3488,7 +3555,10 @@ static llvm::GlobalVariable *getTypeInfoVTable(CodeGenModule &CGM) {
   StringRef MangledName("??_7type_info@@6B@");
   if (auto VTable = CGM.getModule().getNamedGlobal(MangledName))
     return VTable;
-  return new llvm::GlobalVariable(CGM.getModule(), CGM.Int8PtrTy,
+  // return new llvm::GlobalVariable(CGM.getModule(), CGM.Int8PtrTy,
+  // TVM local begin
+  return new llvm::GlobalVariable(CGM.getModule(), CGM.BytePtrTy,
+  // TVM local end
                                   /*isConstant=*/true,
                                   llvm::GlobalVariable::ExternalLinkage,
                                   /*Initializer=*/nullptr, MangledName);
@@ -3891,7 +3961,10 @@ llvm::Constant *MicrosoftCXXABI::getAddrOfRTTIDescriptor(QualType Type) {
 
   // Check to see if we've already declared this TypeDescriptor.
   if (llvm::GlobalVariable *GV = CGM.getModule().getNamedGlobal(MangledName))
-    return llvm::ConstantExpr::getBitCast(GV, CGM.Int8PtrTy);
+    // return llvm::ConstantExpr::getBitCast(GV, CGM.Int8PtrTy);
+    // TVM local begin
+    return llvm::ConstantExpr::getBitCast(GV, CGM.BytePtrTy);
+    // TVM local end
 
   // Note for the future: If we would ever like to do deferred emission of
   // RTTI, check if emitting vtables opportunistically need any adjustment.
@@ -3906,7 +3979,10 @@ llvm::Constant *MicrosoftCXXABI::getAddrOfRTTIDescriptor(QualType Type) {
   // Declare and initialize the TypeDescriptor.
   llvm::Constant *Fields[] = {
     getTypeInfoVTable(CGM),                        // VFPtr
-    llvm::ConstantPointerNull::get(CGM.Int8PtrTy), // Runtime data
+    // llvm::ConstantPointerNull::get(CGM.Int8PtrTy), // Runtime data
+    // TVM local begin
+    llvm::ConstantPointerNull::get(CGM.BytePtrTy), // Runtime data
+    // TVM local end
     llvm::ConstantDataArray::getString(CGM.getLLVMContext(), TypeInfoString)};
   llvm::StructType *TypeDescriptorType =
       getTypeDescriptorType(TypeInfoString);
@@ -3917,7 +3993,10 @@ llvm::Constant *MicrosoftCXXABI::getAddrOfRTTIDescriptor(QualType Type) {
       MangledName);
   if (Var->isWeakForLinker())
     Var->setComdat(CGM.getModule().getOrInsertComdat(Var->getName()));
-  return llvm::ConstantExpr::getBitCast(Var, CGM.Int8PtrTy);
+  // return llvm::ConstantExpr::getBitCast(Var, CGM.Int8PtrTy);
+  // TVM local begin
+  return llvm::ConstantExpr::getBitCast(Var, CGM.BytePtrTy);
+  // TVM local end
 }
 
 /// Gets or a creates a Microsoft CompleteObjectLocator.
@@ -4111,9 +4190,15 @@ llvm::Constant *MicrosoftCXXABI::getCatchableType(QualType T,
     else
       CopyCtor = CGM.getAddrOfCXXStructor(GlobalDecl(CD, Ctor_Complete));
 
-    CopyCtor = llvm::ConstantExpr::getBitCast(CopyCtor, CGM.Int8PtrTy);
+    // CopyCtor = llvm::ConstantExpr::getBitCast(CopyCtor, CGM.Int8PtrTy);
+    // TVM local begin
+    CopyCtor = llvm::ConstantExpr::getBitCast(CopyCtor, CGM.BytePtrTy);
+    // TVM local end
   } else {
-    CopyCtor = llvm::Constant::getNullValue(CGM.Int8PtrTy);
+    // CopyCtor = llvm::Constant::getNullValue(CGM.Int8PtrTy);
+    // TVM local begin
+    CopyCtor = llvm::ConstantExpr::getBitCast(CopyCtor, CGM.BytePtrTy);
+    // TVM local end
   }
   CopyCtor = getImageRelativeConstant(CopyCtor);
 
@@ -4317,18 +4402,32 @@ llvm::GlobalVariable *MicrosoftCXXABI::getThrowInfo(QualType T) {
 
   // The cleanup-function (a destructor) must be called when the exception
   // object's lifetime ends.
-  llvm::Constant *CleanupFn = llvm::Constant::getNullValue(CGM.Int8PtrTy);
+  // llvm::Constant *CleanupFn = llvm::Constant::getNullValue(CGM.Int8PtrTy);
+  // TVM local begin
+  llvm::Constant *CleanupFn = llvm::Constant::getNullValue(CGM.BytePtrTy);
+  // TVM local en
+
   if (const CXXRecordDecl *RD = T->getAsCXXRecordDecl())
     if (CXXDestructorDecl *DtorD = RD->getDestructor())
       if (!DtorD->isTrivial())
         CleanupFn = llvm::ConstantExpr::getBitCast(
             CGM.getAddrOfCXXStructor(GlobalDecl(DtorD, Dtor_Complete)),
-            CGM.Int8PtrTy);
+            // CGM.Int8PtrTy);
+            // TVM local begin
+            CGM.BytePtrTy);
+            // TVM local end
   // This is unused as far as we can tell, initialize it to null.
+  //llvm::Constant *ForwardCompat =
+  //    getImageRelativeConstant(llvm::Constant::getNullValue(CGM.Int8PtrTy));
+  //llvm::Constant *PointerToCatchableTypes = getImageRelativeConstant(
+  //    llvm::ConstantExpr::getBitCast(CTA, CGM.Int8PtrTy));
+  // TVM local begin
   llvm::Constant *ForwardCompat =
-      getImageRelativeConstant(llvm::Constant::getNullValue(CGM.Int8PtrTy));
+      getImageRelativeConstant(llvm::Constant::getNullValue(CGM.BytePtrTy));
   llvm::Constant *PointerToCatchableTypes = getImageRelativeConstant(
-      llvm::ConstantExpr::getBitCast(CTA, CGM.Int8PtrTy));
+      llvm::ConstantExpr::getBitCast(CTA, CGM.BytePtrTy));
+  // TVM local end
+
   llvm::StructType *TIType = getThrowInfoType();
   llvm::Constant *Fields[] = {
       llvm::ConstantInt::get(CGM.IntTy, Flags), // Flags
@@ -4362,7 +4461,10 @@ void MicrosoftCXXABI::emitThrow(CodeGenFunction &CGF, const CXXThrowExpr *E) {
 
   // Call into the runtime to throw the exception.
   llvm::Value *Args[] = {
-    CGF.Builder.CreateBitCast(AI.getPointer(), CGM.Int8PtrTy),
+    // CGF.Builder.CreateBitCast(AI.getPointer(), CGM.Int8PtrTy),
+    // TVM local begin
+    CGF.Builder.CreateBitCast(AI.getPointer(), CGM.BytePtrTy),
+    // TVM local end
     TI
   };
   CGF.EmitNoreturnRuntimeCallOrInvoke(getThrowFn(), Args);
@@ -4373,7 +4475,10 @@ MicrosoftCXXABI::LoadVTablePtr(CodeGenFunction &CGF, Address This,
                                const CXXRecordDecl *RD) {
   std::tie(This, std::ignore, RD) =
       performBaseAdjustment(CGF, This, QualType(RD->getTypeForDecl(), 0));
-  return {CGF.GetVTablePtr(This, CGM.Int8PtrTy, RD), RD};
+  // return {CGF.GetVTablePtr(This, CGM.Int8PtrTy, RD), RD};
+  // TVM local begin
+  return {CGF.GetVTablePtr(This, CGM.BytePtrTy, RD), RD};
+  // TVM local end
 }
 
 bool MicrosoftCXXABI::isPermittedToBeHomogeneousAggregate(

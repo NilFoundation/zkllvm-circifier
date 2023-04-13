@@ -14,6 +14,16 @@
 
 using namespace llvm;
 
+static unsigned getLoopOperandSizeInBytes(Type *Type) {
+  // TVM local begin
+  // TODO
+  //if (VectorType *VTy = dyn_cast<VectorType>(Type)) {
+  //  return VTy->getBitWidth() / ByteSizeInBits;
+
+  return Type->getPrimitiveSizeInBits() / ByteSizeInBits;
+  // TVM local end
+}
+
 void llvm::createMemCpyLoopKnownSize(Instruction *InsertBefore, Value *SrcAddr,
                                      Value *DstAddr, ConstantInt *CopyLen,
                                      Align SrcAlign, Align DstAlign,
@@ -166,8 +176,13 @@ void llvm::createMemCpyLoopUnknownSize(Instruction *InsertBefore,
   IntegerType *ILengthType = dyn_cast<IntegerType>(CopyLenType);
   assert(ILengthType &&
          "expected size argument to memcpy to be an integer type!");
-  Type *Int8Type = Type::getInt8Ty(Ctx);
-  bool LoopOpIsInt8 = LoopOpType == Int8Type;
+  //Type *Int8Type = Type::getInt8Ty(Ctx);
+  //bool LoopOpIsInt8 = LoopOpType == Int8Type;
+  // TVM local begin
+  Type *ByteType = Type::getByteTy(Ctx);
+  bool LoopOpIsInt8 = LoopOpType == ByteType;
+  // TVM local end
+
   ConstantInt *CILoopOpSize = ConstantInt::get(ILengthType, LoopOpSize);
   Value *RuntimeLoopCount = LoopOpIsInt8 ?
                             CopyLen :
@@ -230,17 +245,31 @@ void llvm::createMemCpyLoopUnknownSize(Instruction *InsertBefore,
         ResBuilder.CreatePHI(CopyLenType, 2, "residual-loop-index");
     ResidualIndex->addIncoming(Zero, ResHeaderBB);
 
+//    Value *SrcAsInt8 =
+//        ResBuilder.CreateBitCast(SrcAddr, PointerType::get(Int8Type, SrcAS));
+//    Value *DstAsInt8 =
+//        ResBuilder.CreateBitCast(DstAddr, PointerType::get(Int8Type, DstAS));
+//    Value *FullOffset = ResBuilder.CreateAdd(RuntimeBytesCopied, ResidualIndex);
+//    Value *SrcGEP =
+//        ResBuilder.CreateInBoundsGEP(Int8Type, SrcAsInt8, FullOffset);
+//    Value *Load = ResBuilder.CreateAlignedLoad(Int8Type, SrcGEP, PartSrcAlign,
+//                                               SrcIsVolatile);
+//    Value *DstGEP =
+//        ResBuilder.CreateInBoundsGEP(Int8Type, DstAsInt8, FullOffset);
+
+ // TVM local begin
     Value *SrcAsInt8 =
-        ResBuilder.CreateBitCast(SrcAddr, PointerType::get(Int8Type, SrcAS));
+        ResBuilder.CreateBitCast(SrcAddr, PointerType::get(ByteType, SrcAS));
     Value *DstAsInt8 =
-        ResBuilder.CreateBitCast(DstAddr, PointerType::get(Int8Type, DstAS));
+        ResBuilder.CreateBitCast(DstAddr, PointerType::get(ByteType, DstAS));
     Value *FullOffset = ResBuilder.CreateAdd(RuntimeBytesCopied, ResidualIndex);
     Value *SrcGEP =
-        ResBuilder.CreateInBoundsGEP(Int8Type, SrcAsInt8, FullOffset);
-    Value *Load = ResBuilder.CreateAlignedLoad(Int8Type, SrcGEP, PartSrcAlign,
-                                               SrcIsVolatile);
+        ResBuilder.CreateInBoundsGEP(ByteType, SrcAsInt8, FullOffset);
+    Value *Load = ResBuilder.CreateLoad(SrcGEP, SrcIsVolatile);
     Value *DstGEP =
-        ResBuilder.CreateInBoundsGEP(Int8Type, DstAsInt8, FullOffset);
+        ResBuilder.CreateInBoundsGEP(ByteType, DstAsInt8, FullOffset);
+    // TVM local end
+
     ResBuilder.CreateAlignedStore(Load, DstGEP, PartDstAlign, DstIsVolatile);
 
     Value *ResNewIndex =
@@ -465,3 +494,59 @@ void llvm::expandMemSetAsLoop(MemSetInst *Memset) {
                    /* Alignment */ Memset->getDestAlign().valueOrOne(),
                    Memset->isVolatile());
 }
+
+// TVM local begin void
+ void llvm::expandMemCpyAsLoopTVM(MemCpyInst *Memcpy,
+                                const TargetTransformInfo &TTI) {
+  IRBuilder<> B(Memcpy);
+  Value *FixLength =
+      B.CreateZExtOrBitCast(Memcpy->getLength(), B.getInt257Ty());
+  if (ConstantInt *CI = dyn_cast<ConstantInt>(FixLength)) {
+    createMemCpyLoopKnownSize(/* InsertBefore */ Memcpy,
+                              /* SrcAddr */ Memcpy->getRawSource(),
+                              /* DstAddr */ Memcpy->getRawDest(),
+                              /* CopyLen */ CI,
+                              /* SrcAlign */ Align(Memcpy->getSourceAlignment()),
+                              /* DestAlign */ Align(Memcpy->getDestAlignment()),
+                              /* SrcIsVolatile */ Memcpy->isVolatile(),
+                              /* DstIsVolatile */ Memcpy->isVolatile(),
+                              /* TargetTransformInfo */ TTI);
+  } else {
+    createMemCpyLoopUnknownSize(/* InsertBefore */ Memcpy,
+                                /* SrcAddr */ Memcpy->getRawSource(),
+                                /* DstAddr */ Memcpy->getRawDest(),
+                                /* CopyLen */ FixLength,
+                                /* SrcAlign */ Align(Memcpy->getSourceAlignment()),
+                                /* DestAlign */ Align(Memcpy->getDestAlignment()),
+                                /* SrcIsVolatile */ Memcpy->isVolatile(),
+                                /* DstIsVolatile */ Memcpy->isVolatile(),
+                                /* TargetTransfomrInfo */ TTI);
+  }
+}
+
+void llvm::expandMemMoveAsLoopTVM(MemMoveInst *Memmove) {
+  IRBuilder<> B(Memmove);
+  Value *FixLength =
+      B.CreateZExtOrBitCast(Memmove->getLength(), B.getInt257Ty());
+  createMemMoveLoop(/* InsertBefore */ Memmove,
+                    /* SrcAddr */ Memmove->getRawSource(),
+                    /* DstAddr */ Memmove->getRawDest(),
+                    /* CopyLen */ FixLength,
+                    /* SrcAlign */ Align(Memmove->getSourceAlignment()),
+                    /* DestAlign */ Align(Memmove->getDestAlignment()),
+                    /* SrcIsVolatile */ Memmove->isVolatile(),
+                    /* DstIsVolatile */ Memmove->isVolatile());
+}
+
+void llvm::expandMemSetAsLoopTVM(MemSetInst *Memset) {
+  IRBuilder<> B(Memset);
+  Value *FixLength =
+      B.CreateZExtOrBitCast(Memset->getLength(), B.getInt257Ty());
+  createMemSetLoop(/* InsertBefore */ Memset,
+                   /* DstAddr */ Memset->getRawDest(),
+                   /* CopyLen */ FixLength,
+                   /* SetValue */ Memset->getValue(),
+                   /* Alignment */ Align(Memset->getDestAlignment()),
+                   Memset->isVolatile());
+}
+// TVM local end

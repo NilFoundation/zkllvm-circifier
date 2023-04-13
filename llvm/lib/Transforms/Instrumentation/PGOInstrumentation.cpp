@@ -914,7 +914,11 @@ static void instrumentOneFunc(
       InstrumentBBs.size() + FuncInfo.SIVisitor.getNumOfSelectInsts();
 
   uint32_t I = 0;
-  Type *I8PtrTy = Type::getInt8PtrTy(M->getContext());
+  // Type *I8PtrTy = Type::getInt8PtrTy(M->getContext());
+  // TVM local begin
+  Type *I8PtrTy = Type::getIntBytePtrTy(M->getContext());
+  // TVM local end
+
   for (auto *InstrBB : InstrumentBBs) {
     IRBuilder<> Builder(InstrBB, InstrBB->getFirstInsertionPt());
     assert(Builder.GetInsertPoint() != InstrBB->end() &&
@@ -1499,7 +1503,11 @@ void SelectInstVisitor::instrumentOneSelectInst(SelectInst &SI) {
   Module *M = F.getParent();
   IRBuilder<> Builder(&SI);
   Type *Int64Ty = Builder.getInt64Ty();
-  Type *I8PtrTy = Builder.getInt8PtrTy();
+  // Type *I8PtrTy = Builder.getInt8PtrTy();
+  // TVM local begin
+  Type *I8PtrTy = Builder.getIntBytePtrTy();
+  // TVM local end
+
   auto *Step = Builder.CreateZExt(SI.getCondition(), Int64Ty);
   Builder.CreateCall(
       Intrinsic::getDeclaration(M, Intrinsic::instrprof_increment_step),

@@ -101,13 +101,20 @@ void CallGraph::populateCallGraphNode(CallGraphNode *Node) {
     for (Instruction &I : BB) {
       if (auto *Call = dyn_cast<CallBase>(&I)) {
         const Function *Callee = Call->getCalledFunction();
-        if (!Callee || !Intrinsic::isLeaf(Callee->getIntrinsicID()))
+        // TVM local begin
+        if (Callee &&
+            Callee->getIntrinsicID() == Intrinsic::coro_tvm_deserialize) {
+          const auto *FuncOp =
+              dyn_cast<Function>(I.getOperand(1)->stripPointerCasts());
+          Node->addCalledFunction(Call, getOrInsertFunction(FuncOp));
+        } else if (!Callee || !Intrinsic::isLeaf(Callee->getIntrinsicID()))
           // Indirect calls of intrinsics are not allowed so no need to check.
           // We can be more precise here by using TargetArg returned by
           // Intrinsic::isLeaf.
           Node->addCalledFunction(Call, CallsExternalNode.get());
         else if (!Callee->isIntrinsic())
           Node->addCalledFunction(Call, getOrInsertFunction(Callee));
+        // TVM local end
 
         // Add reference to callback functions.
         forEachCallbackFunction(*Call, [=](Function *CB) {

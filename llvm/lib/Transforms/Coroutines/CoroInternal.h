@@ -23,6 +23,11 @@ class PassRegistry;
 
 void initializeCoroEarlyLegacyPass(PassRegistry &);
 void initializeCoroSplitLegacyPass(PassRegistry &);
+
+// TVM local begin
+void initializeCoroTVMExpandPass(PassRegistry &);
+// TVM local end
+
 void initializeCoroElideLegacyPass(PassRegistry &);
 void initializeCoroCleanupLegacyPass(PassRegistry &);
 

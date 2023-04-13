@@ -162,8 +162,10 @@ getAllocationDataForFunction(const Function *Callee, AllocType AllocTy,
   int SndParam = FnData->SndParam;
   FunctionType *FTy = Callee->getFunctionType();
 
-  if (FTy->getReturnType() == Type::getInt8PtrTy(FTy->getContext()) &&
-      FTy->getNumParams() == FnData->NumParams &&
+  // TVM local begin
+  if (FTy->getReturnType() == Type::getIntBytePtrTy(FTy->getContext()) &&
+  // TVM local end
+     FTy->getNumParams() == FnData->NumParams &&
       (FstParam < 0 ||
        (FTy->getParamType(FstParam)->isIntegerTy(32) ||
         FTy->getParamType(FstParam)->isIntegerTy(64))) &&
@@ -493,6 +495,12 @@ const CallInst *llvm::isFreeCall(const Value *I, const TargetLibraryInfo *TLI) {
   LibFunc TLIFn;
   if (!TLI || !TLI->getLibFunc(*Callee, TLIFn) || !TLI->has(TLIFn))
     return nullptr;
+
+  // TVM local begin
+  FunctionType *FTy = Callee->getFunctionType();
+  if (FTy->getParamType(0) != Type::getIntBytePtrTy(Callee->getContext()))
+    return nullptr;
+  // TVM local end
 
   return isLibFreeFunction(Callee, TLIFn) ? dyn_cast<CallInst>(I) : nullptr;
 }

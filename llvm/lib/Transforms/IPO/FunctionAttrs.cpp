@@ -1381,6 +1381,10 @@ static bool addNoRecurseAttrs(const SCCNodeSet &SCCNodes) {
     for (auto &I : BB.instructionsWithoutDebug())
       if (auto *CB = dyn_cast<CallBase>(&I)) {
         Function *Callee = CB->getCalledFunction();
+        // TVM local begin
+        if (Callee && Callee->isIntrinsic())
+          continue;
+        // TVM local end
         if (!Callee || Callee == F || !Callee->doesNotRecurse())
           // Function calls a potentially recursive function.
           return false;

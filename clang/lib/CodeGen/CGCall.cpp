@@ -38,6 +38,9 @@
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Intrinsics.h"
+// TVM local begin
+#include "llvm/IR/IntrinsicsTVM.h"
+// TVM local end
 #include "llvm/Transforms/Utils/Local.h"
 using namespace clang;
 using namespace CodeGen;
@@ -852,6 +855,11 @@ struct TypeExpansion {
     // Record fields are expanded recursively (but if record is a union, only
     // the field with the largest size is expanded).
     TEK_Record,
+    // TVM local begin
+    // TVM union expansion into { i257, i257, ..., i257 } to avoid i1 cast
+    // problem
+    TEK_TVMUnion,
+    // TVM local end
     // For complex types, real and imaginary parts are expanded recursively.
     TEK_Complex,
     // All other types are not expandable.
@@ -889,6 +897,15 @@ struct RecordExpansion : TypeExpansion {
   }
 };
 
+// TVM local begin
+struct TVMUnionExpansion : TypeExpansion {
+  TVMUnionExpansion() : TypeExpansion(TEK_TVMUnion) {}
+  static bool classof(const TypeExpansion *TE) {
+    return TE->Kind == TEK_TVMUnion;
+  }
+};
+// TVM local end
+
 struct ComplexExpansion : TypeExpansion {
   QualType EltTy;
 
@@ -919,6 +936,10 @@ getTypeExpansion(QualType Ty, const ASTContext &Context) {
     assert(!RD->hasFlexibleArrayMember() &&
            "Cannot expand structure with flexible array.");
     if (RD->isUnion()) {
+      // TVM local begin
+      return std::make_unique<TVMUnionExpansion>();
+      // TVM local end
+
       // Unions can be here only in degenerative cases - all the fields are same
       // after flattening. Thus we have to use the "largest" field.
       const FieldDecl *LargestFD = nullptr;
@@ -975,6 +996,11 @@ static int getExpansionSize(QualType Ty, const ASTContext &Context) {
       Res += getExpansionSize(FD->getType(), Context);
     return Res;
   }
+  // TVM local begin
+  if (isa<TVMUnionExpansion>(Exp.get())) {
+    return static_cast<int>(Context.getTypeSizeInChars(Ty).getQuantity());
+  }
+  // TVM local end
   if (isa<ComplexExpansion>(Exp.get()))
     return 2;
   assert(isa<NoExpansion>(Exp.get()));
@@ -994,6 +1020,13 @@ CodeGenTypes::getExpandedTypes(QualType Ty,
       getExpandedTypes(BS->getType(), TI);
     for (auto FD : RExp->Fields)
       getExpandedTypes(FD->getType(), TI);
+
+  // TVM local begin
+  } else if (isa<TVMUnionExpansion>(Exp.get())) {
+    int64_t Size = Context.getTypeSizeInChars(Ty).getQuantity();
+    for (int64_t i = 0; i < Size; ++i)
+      *TI++ = llvm::Type::getInt257Ty(getLLVMContext());
+    // TVM local end
   } else if (auto CExp = dyn_cast<ComplexExpansion>(Exp.get())) {
     llvm::Type *EltTy = ConvertType(CExp->EltTy);
     *TI++ = EltTy;
@@ -1048,6 +1081,20 @@ void CodeGenFunction::ExpandTypeFromArgs(QualType Ty, LValue LV,
       LValue SubLV = EmitLValueForFieldInitialization(LV, FD);
       ExpandTypeFromArgs(FD->getType(), SubLV, AI);
     }
+    // TVM local begin
+  } else if (isa<TVMUnionExpansion>(Exp.get())) {
+    Address This = LV.getAddress(*this);
+    int64_t Size = getContext().getTypeSizeInChars(Ty).getQuantity();
+    auto TupTy = getContext().getTVMTuple(static_cast<unsigned>(Size));
+    auto *llvmTupTy = CGM.getTypes().ConvertType(TupTy);
+
+    This = Address(
+        Builder.CreateBitCast(This.getPointer(), llvmTupTy->getPointerTo()),
+        This.getAlignment());
+
+    LValue SubLV = MakeAddrLValue(This, TupTy);
+    ExpandTypeFromArgs(TupTy, SubLV, AI);
+    // TVM local end
   } else if (isa<ComplexExpansion>(Exp.get())) {
     auto realValue = &*AI++;
     auto imagValue = &*AI++;
@@ -1100,6 +1147,20 @@ void CodeGenFunction::ExpandTypeToArgs(
       ExpandTypeToArgs(FD->getType(), FldArg, IRFuncTy, IRCallArgs,
                        IRCallArgPos);
     }
+    // TVM local begin
+  } else if (isa<TVMUnionExpansion>(Exp.get())) {
+    Address This = Arg.hasLValue() ? Arg.getKnownLValue().getAddress(*this)
+                                   : Arg.getKnownRValue().getAggregateAddress();
+    int64_t Size = getContext().getTypeSizeInChars(Ty).getQuantity();
+    auto TupTy = getContext().getTVMTuple(static_cast<unsigned>(Size));
+    auto *llvmTupTy = CGM.getTypes().ConvertType(TupTy)->getPointerTo();
+
+    This = Address(Builder.CreateBitCast(This.getPointer(), llvmTupTy),
+                   This.getAlignment());
+
+    CallArg TupleThis = CallArg(RValue::getAggregate(This), TupTy);
+    ExpandTypeToArgs(TupTy, TupleThis, IRFuncTy, IRCallArgs, IRCallArgPos);
+    // TVM local end
   } else if (isa<ComplexExpansion>(Exp.get())) {
     ComplexPairTy CV = Arg.getKnownRValue().getComplexVal();
     IRCallArgs[IRCallArgPos++] = CV.first;
@@ -1234,7 +1295,7 @@ static llvm::Value *CreateCoercedLoad(Address Src, llvm::Type *Ty,
   if (SrcTy == Ty)
     return CGF.Builder.CreateLoad(Src);
 
-  llvm::TypeSize DstSize = CGF.CGM.getDataLayout().getTypeAllocSize(Ty);
+   llvm::TypeSize DstSize = CGF.CGM.getDataLayout().getTypeAllocSize(Ty);
 
   if (llvm::StructType *SrcSTy = dyn_cast<llvm::StructType>(SrcTy)) {
     Src = EnterStructPointerForCoercedAccess(Src, SrcSTy,
@@ -1249,7 +1310,8 @@ static llvm::Value *CreateCoercedLoad(Address Src, llvm::Type *Ty,
   if ((isa<llvm::IntegerType>(Ty) || isa<llvm::PointerType>(Ty)) &&
       (isa<llvm::IntegerType>(SrcTy) || isa<llvm::PointerType>(SrcTy))) {
     llvm::Value *Load = CGF.Builder.CreateLoad(Src);
-    return CoerceIntOrPtrToIntOrPtr(Load, Ty, CGF);
+    llvm::Value *CLoad = CoerceIntOrPtrToIntOrPtr(Load, Ty, CGF);
+    return CLoad;
   }
 
   // If load is legal, just bitcast the src pointer.
@@ -1298,12 +1360,56 @@ static llvm::Value *CreateCoercedLoad(Address Src, llvm::Type *Ty,
   // Otherwise do coercion through memory. This is stupid, but simple.
   Address Tmp =
       CreateTempAllocaForCoercion(CGF, Ty, Src.getAlignment(), Src.getName());
+  //CGF.Builder.CreateMemCpy(
+  //    Tmp.getPointer(), Tmp.getAlignment().getAsAlign(), Src.getPointer(),
+  //    Src.getAlignment().getAsAlign(),
+  //    llvm::ConstantInt::get(CGF.IntPtrTy, SrcSize.getKnownMinSize()));
+  //return CGF.Builder.CreateLoad(Tmp);
+  // TVM local begin
+  Address Casted = CGF.Builder.CreateBitCast(Tmp, CGF.AllocaBytePtrTy);
+  Address SrcCasted = CGF.Builder.CreateBitCast(Src, CGF.AllocaBytePtrTy);
   CGF.Builder.CreateMemCpy(
-      Tmp.getPointer(), Tmp.getAlignment().getAsAlign(), Src.getPointer(),
-      Src.getAlignment().getAsAlign(),
-      llvm::ConstantInt::get(CGF.IntPtrTy, SrcSize.getKnownMinSize()));
-  return CGF.Builder.CreateLoad(Tmp);
+      Casted, SrcCasted, llvm::ConstantInt::get(CGF.IntPtrTy, SrcSize), false);
+  // TVM local end
 }
+
+// TVM local begin
+static llvm::Value *TVMImplicitCast(CodeGenFunction &CGF, llvm::Value *Src,
+                                    llvm::Type *DstTy) {
+  auto doCast = [&](unsigned IntID, llvm::Value *Op) {
+    return CGF.Builder.CreateCall(CGF.CGM.getIntrinsic(IntID), Op);
+  };
+  auto SrcTy = Src->getType();
+  if (SrcTy != DstTy) {
+    auto *STyDst = dyn_cast<llvm::StructType>(DstTy);
+    if (STyDst && STyDst->getNumElements() == 1) {
+      auto RV = llvm::UndefValue::get(DstTy);
+      Src = TVMImplicitCast(CGF, Src, STyDst->getElementType(0));
+      return CGF.Builder.CreateInsertValue(RV, Src, 0);
+    }
+    if (DstTy->isIntegerTy()) {
+      if (SrcTy->isTVMTupleTy())
+        return doCast(llvm::Intrinsic::tvm_cast_from_tuple, Src);
+      if (SrcTy->isTVMSliceTy())
+        return doCast(llvm::Intrinsic::tvm_cast_from_slice, Src);
+      if (SrcTy->isTVMBuilderTy())
+        return doCast(llvm::Intrinsic::tvm_cast_from_builder, Src);
+      if (SrcTy->isTVMCellTy())
+        return doCast(llvm::Intrinsic::tvm_cast_from_cell, Src);
+    } else if (SrcTy->isIntegerTy()) {
+      if (DstTy->isTVMTupleTy())
+        return doCast(llvm::Intrinsic::tvm_cast_to_tuple, Src);
+      if (DstTy->isTVMSliceTy())
+        return doCast(llvm::Intrinsic::tvm_cast_to_slice, Src);
+      if (DstTy->isTVMBuilderTy())
+        return doCast(llvm::Intrinsic::tvm_cast_to_builder, Src);
+      if (DstTy->isTVMCellTy())
+        return doCast(llvm::Intrinsic::tvm_cast_to_cell, Src);
+    }
+  }
+  return Src;
+}
+// TVM local end
 
 // Function to store a first-class aggregate into memory.  We prefer to
 // store the elements rather than the aggregate to be more friendly to
@@ -1313,11 +1419,32 @@ void CodeGenFunction::EmitAggregateStore(llvm::Value *Val, Address Dest,
                                          bool DestIsVolatile) {
   // Prefer scalar stores to first-class aggregate stores.
   if (llvm::StructType *STy = dyn_cast<llvm::StructType>(Val->getType())) {
+    //for (unsigned i = 0, e = STy->getNumElements(); i != e; ++i) {
+    //  Address EltPtr = Builder.CreateStructGEP(Dest, i);
+    //  llvm::Value *Elt = Builder.CreateExtractValue(Val, i);
+    //  Builder.CreateStore(Elt, EltPtr, DestIsVolatile);
+    // }
+
+    // TVM local begin
+    const llvm::StructLayout *Layout =
+        CGM.getDataLayout().getStructLayout(STy);
+
+    auto *STyDst = dyn_cast<llvm::StructType>(Dest.getElementType());
+    if (getTarget().getTriple().getArch() == llvm::Triple::tvm)
+      if (STyDst && STy->isLiteral() && STyDst->isLiteral()) {
+        Address Ptr =
+            Builder.CreateBitCast(Dest, Val->getType()->getPointerTo());
+        Builder.CreateStore(Val, Ptr, DestIsVolatile);
+        return;
+      }
+
     for (unsigned i = 0, e = STy->getNumElements(); i != e; ++i) {
+      auto EltOffset = CharUnits::fromQuantity(Layout->getElementOffset(i));
       Address EltPtr = Builder.CreateStructGEP(Dest, i);
       llvm::Value *Elt = Builder.CreateExtractValue(Val, i);
       Builder.CreateStore(Elt, EltPtr, DestIsVolatile);
     }
+    // TVM local end
   } else {
     Builder.CreateStore(Val, Dest, DestIsVolatile);
   }
@@ -1372,8 +1499,17 @@ static void CreateCoercedStore(llvm::Value *Src,
   if (isa<llvm::ScalableVectorType>(SrcTy) ||
       isa<llvm::ScalableVectorType>(DstTy) ||
       SrcSize.getFixedSize() <= DstSize.getFixedSize()) {
-    Dst = CGF.Builder.CreateElementBitCast(Dst, SrcTy);
+    //Dst = CGF.Builder.CreateElementBitCast(Dst, SrcTy);
+    //CGF.EmitAggregateStore(Src, Dst, DstIsVolatile);
+
+   // TVM local begin
+    Src = TVMImplicitCast(CGF, Src, DstTy);
+    SrcTy = Src->getType();
+    if (SrcTy != DstTy)
+      Dst = CGF.Builder.CreateElementBitCast(Dst, SrcTy);
     CGF.EmitAggregateStore(Src, Dst, DstIsVolatile);
+    // TVM local end
+
   } else {
     // Otherwise do coercion through memory. This is stupid, but
     // simple.
@@ -1385,11 +1521,18 @@ static void CreateCoercedStore(llvm::Value *Src,
     // FIXME: Assert that we aren't truncating non-padding bits when have access
     // to that information.
     Address Tmp = CreateTempAllocaForCoercion(CGF, SrcTy, Dst.getAlignment());
-    CGF.Builder.CreateStore(Src, Tmp);
-    CGF.Builder.CreateMemCpy(
-        Dst.getPointer(), Dst.getAlignment().getAsAlign(), Tmp.getPointer(),
-        Tmp.getAlignment().getAsAlign(),
-        llvm::ConstantInt::get(CGF.IntPtrTy, DstSize.getFixedSize()));
+    //CGF.Builder.CreateStore(Src, Tmp);
+    //CGF.Builder.CreateMemCpy(
+    //    Dst.getPointer(), Dst.getAlignment().getAsAlign(), Tmp.getPointer(),
+    //    Tmp.getAlignment().getAsAlign(),
+    //    llvm::ConstantInt::get(CGF.IntPtrTy, DstSize.getFixedSize()));
+    // TVM local begin
+    Address Casted = CGF.Builder.CreateBitCast(Tmp, CGF.AllocaBytePtrTy);
+    Address DstCasted = CGF.Builder.CreateBitCast(Dst, CGF.AllocaBytePtrTy);
+    // TVM local end
+    CGF.Builder.CreateMemCpy(DstCasted, Casted,
+                             llvm::ConstantInt::get(CGF.IntPtrTy, DstSize),
+                             false);
   }
 }
 
@@ -1397,6 +1540,10 @@ static Address emitAddressAtOffset(CodeGenFunction &CGF, Address addr,
                                    const ABIArgInfo &info) {
   if (unsigned offset = info.getDirectOffset()) {
     addr = CGF.Builder.CreateElementBitCast(addr, CGF.Int8Ty);
+    // TVM local begin
+    addr = CGF.Builder.CreateElementBitCast(addr, CGF.ByteTy);
+    // TVM local end
+
     addr = CGF.Builder.CreateConstInBoundsByteGEP(addr,
                                              CharUnits::fromQuantity(offset));
     addr = CGF.Builder.CreateElementBitCast(addr, info.getCoerceToType());
@@ -2695,10 +2842,16 @@ void CodeGenFunction::EmitFunctionProlog(const CGFunctionInfo &FI,
           // FIXME: We should have a common utility for generating an aggregate
           // copy.
           CharUnits Size = getContext().getTypeSizeInChars(Ty);
-          Builder.CreateMemCpy(
-              AlignedTemp.getPointer(), AlignedTemp.getAlignment().getAsAlign(),
-              ParamAddr.getPointer(), ParamAddr.getAlignment().getAsAlign(),
-              llvm::ConstantInt::get(IntPtrTy, Size.getQuantity()));
+          //Builder.CreateMemCpy(
+          //    AlignedTemp.getPointer(), AlignedTemp.getAlignment().getAsAlign(),
+          //    ParamAddr.getPointer(), ParamAddr.getAlignment().getAsAlign(),
+          //    llvm::ConstantInt::get(IntPtrTy, Size.getQuantity()));
+          // TVM local begin
+          auto SizeVal = llvm::ConstantInt::get(IntPtrTy, Size.getQuantity());
+          Address Dst = Builder.CreateBitCast(AlignedTemp, BytePtrTy);
+          Address Src = Builder.CreateBitCast(ParamAddr, BytePtrTy);
+          // TVM local end
+          Builder.CreateMemCpy(Dst, Src, SizeVal, false);
           V = AlignedTemp;
         }
         ArgVals.push_back(ParamValue::forIndirect(V));

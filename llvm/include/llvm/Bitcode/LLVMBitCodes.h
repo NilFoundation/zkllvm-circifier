@@ -172,6 +172,13 @@ enum TypeCodes {
   TYPE_CODE_X86_AMX = 24, // X86 AMX
 
   TYPE_CODE_OPAQUE_POINTER = 25, // OPAQUE_POINTER: [addrspace]
+
+ // TVM local begin
+  TYPE_CODE_TVMSLICE = 26,   // TVM Slice
+  TYPE_CODE_TVMBUILDER = 27, // TVM Builder
+  TYPE_CODE_TVMCELL = 28,    // TVM Cell
+  TYPE_CODE_TVMTUPLE = 29    // TVM Tuple
+  // TVM local end
 };
 
 enum OperandBundleTagCode {

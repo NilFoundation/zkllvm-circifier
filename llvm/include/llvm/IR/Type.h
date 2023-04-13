@@ -74,7 +74,14 @@ public:
     StructTyID,        ///< Structures
     ArrayTyID,         ///< Arrays
     FixedVectorTyID,   ///< Fixed width SIMD vector type
-    ScalableVectorTyID ///< Scalable SIMD vector type
+    ScalableVectorTyID, ///< Scalable SIMD vector type
+
+    // TVM local begin
+    TVMSliceID, ///< 17: TVM Slice
+    TVMBuilderID,   ///< 18: TVM Builder
+    TVMCellID,      ///< 19: TVM Cell
+    TVMTupleID,     ///< 20: TVM Tuple
+    // TVM local end
   };
 
 private:
@@ -197,6 +204,23 @@ public:
   /// Return true if this is 'token'.
   bool isTokenTy() const { return getTypeID() == TokenTyID; }
 
+  // TVM local begin
+  /// Return true if this is 'TVM Slice'.
+  bool isTVMSliceTy() const { return getTypeID() == TVMSliceID; }
+  /// Return true if this is 'TVM Builder'.
+  bool isTVMBuilderTy() const { return getTypeID() == TVMBuilderID; }
+  /// Return true if this is 'TVM Cell'.
+  bool isTVMCellTy() const { return getTypeID() == TVMCellID; }
+  /// Return true if this is 'TVM Tuple'.
+  bool isTVMTupleTy() const { return getTypeID() == TVMTupleID; }
+
+  /// Return true if this is TVM Slice/Builder/Cell.
+  bool isTVMBuiltinTy() const {
+    return isTVMSliceTy() || isTVMBuilderTy() || isTVMCellTy() ||
+           isTVMTupleTy();
+  }
+  // TVM local end
+
   /// True if this is an instance of IntegerType.
   bool isIntegerTy() const { return getTypeID() == IntegerTyID; }
 
@@ -258,7 +282,7 @@ public:
   /// includes all first-class types except struct and array types.
   bool isSingleValueType() const {
     return isFloatingPointTy() || isX86_MMXTy() || isIntegerTy() ||
-           isPointerTy() || isVectorTy() || isX86_AMXTy();
+           isPointerTy() || isVectorTy() || isX86_AMXTy() || isTVMBuiltinTy();
   }
 
   /// Return true if the type is an aggregate type. This means it is valid as
@@ -277,6 +301,11 @@ public:
         getTypeID() == PointerTyID || getTypeID() == X86_MMXTyID ||
         getTypeID() == X86_AMXTyID)
       return true;
+    // TVM local begin
+    if (getTypeID() == TVMSliceID || getTypeID() == TVMBuilderID ||
+        getTypeID() == TVMCellID || getTypeID() == TVMTupleID)
+      return true;
+    // TVM local end
     // If it is not something that can have a size (e.g. a function or label),
     // it doesn't have a size.
     if (getTypeID() != StructTyID && getTypeID() != ArrayTyID && !isVectorTy())
@@ -422,6 +451,12 @@ public:
   static Type *getX86_MMXTy(LLVMContext &C);
   static Type *getX86_AMXTy(LLVMContext &C);
   static Type *getTokenTy(LLVMContext &C);
+  // TVM local begin
+  static Type *getTVMSliceTy(LLVMContext &C);
+  static Type *getTVMBuilderTy(LLVMContext &C);
+  static Type *getTVMCellTy(LLVMContext &C);
+  static Type *getTVMTupleTy(LLVMContext &C);
+  // TVM local end
   static IntegerType *getIntNTy(LLVMContext &C, unsigned N);
   static IntegerType *getInt1Ty(LLVMContext &C);
   static IntegerType *getInt8Ty(LLVMContext &C);
@@ -429,6 +464,10 @@ public:
   static IntegerType *getInt32Ty(LLVMContext &C);
   static IntegerType *getInt64Ty(LLVMContext &C);
   static IntegerType *getInt128Ty(LLVMContext &C);
+  // TVM local begin
+  static IntegerType *getInt257Ty(LLVMContext &C);
+  static IntegerType *getByteTy(LLVMContext &C);
+  // TVM local end
   template <typename ScalarTy> static Type *getScalarTy(LLVMContext &C) {
     int noOfBits = sizeof(ScalarTy) * CHAR_BIT;
     if (std::is_integral<ScalarTy>::value) {
@@ -479,6 +518,9 @@ public:
   static PointerType *getX86_AMXPtrTy(LLVMContext &C, unsigned AS = 0);
   static PointerType *getIntNPtrTy(LLVMContext &C, unsigned N, unsigned AS = 0);
   static PointerType *getInt1PtrTy(LLVMContext &C, unsigned AS = 0);
+  // TVM local begin
+  static PointerType *getIntBytePtrTy(LLVMContext &C, unsigned AS = 0);
+  // TVM local end
   static PointerType *getInt8PtrTy(LLVMContext &C, unsigned AS = 0);
   static PointerType *getInt16PtrTy(LLVMContext &C, unsigned AS = 0);
   static PointerType *getInt32PtrTy(LLVMContext &C, unsigned AS = 0);

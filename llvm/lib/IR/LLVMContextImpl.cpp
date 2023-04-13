@@ -34,9 +34,39 @@ LLVMContextImpl::LLVMContextImpl(LLVMContext &C)
       MetadataTy(C, Type::MetadataTyID), TokenTy(C, Type::TokenTyID),
       X86_FP80Ty(C, Type::X86_FP80TyID), FP128Ty(C, Type::FP128TyID),
       PPC_FP128Ty(C, Type::PPC_FP128TyID), X86_MMXTy(C, Type::X86_MMXTyID),
+
+      // TVM local begin
+      TVMSliceTy(C, Type::TVMSliceID), TVMBuilderTy(C, Type::TVMBuilderID),
+      TVMCellTy(C, Type::TVMCellID), TVMTupleTy(C, Type::TVMTupleID),
+      // TVM local end
+
       X86_AMXTy(C, Type::X86_AMXTyID), Int1Ty(C, 1), Int8Ty(C, 8),
       Int16Ty(C, 16), Int32Ty(C, 32), Int64Ty(C, 64), Int128Ty(C, 128),
-      OpaquePointers(OpaquePointersCL) {}
+      OpaquePointers(OpaquePointersCL),
+      // TVM local begin
+      Int257Ty(C, 257), VeryNonStandartByteTy(C, ByteSizeInBits) {
+  switch (ByteSizeInBits) {
+  case 8:
+    ByteTy = &Int8Ty;
+    break;
+  case 16:
+    ByteTy = &Int16Ty;
+    break;
+  case 32:
+    ByteTy = &Int32Ty;
+    break;
+  case 64:
+    ByteTy = &Int64Ty;
+    break;
+  case 257:
+    ByteTy = &Int257Ty;
+    break;
+  default:
+    ByteTy = &VeryNonStandartByteTy;
+    break;
+  }
+  // TVM local end
+}
 
 LLVMContextImpl::~LLVMContextImpl() {
   // NOTE: We need to delete the contents of OwnedModules, but Module's dtor

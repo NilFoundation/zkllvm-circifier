@@ -1705,6 +1705,9 @@ public:
   struct Binding {
     IdentifierInfo *Name;
     SourceLocation NameLoc;
+    // TVM local begin
+    bool BindExisting;
+    // TVM local end
   };
 
 private:

@@ -37,7 +37,9 @@ class LLVM_LIBRARY_VISIBILITY CoroSubFnInst : public IntrinsicInst {
 
 public:
   enum ResumeKind {
+    // TVM local begin
     RestartTrigger = -1,
+    // TVM local end
     ResumeIndex,
     DestroyIndex,
     CleanupIndex,
@@ -47,6 +49,10 @@ public:
 
   Value *getFrame() const { return getArgOperand(FrameArg); }
   ResumeKind getIndex() const {
+    // TVM local begin
+    if (getRawIndex()->getValue().getMinSignedBits() > 64)
+      return RestartTrigger;
+    // TVM local end
     int64_t Index = getRawIndex()->getValue().getSExtValue();
     assert(Index >= IndexFirst && Index < IndexLast &&
            "unexpected CoroSubFnInst index argument");
@@ -124,7 +130,10 @@ public:
   void clearPromise() {
     Value *Arg = getArgOperand(PromiseArg);
     setArgOperand(PromiseArg,
-                  ConstantPointerNull::get(Type::getInt8PtrTy(getContext())));
+//                  ConstantPointerNull::get(Type::getInt8PtrTy(getContext())));
+        // TVM local begin
+        ConstantPointerNull::get(Type::getIntBytePtrTy(getContext())));
+    // TVM local end
     if (isa<AllocaInst>(Arg))
       return;
     assert((isa<BitCastInst>(Arg) || isa<GetElementPtrInst>(Arg)) &&
@@ -185,7 +194,11 @@ public:
   void setCoroutineSelf() {
     assert(isa<ConstantPointerNull>(getArgOperand(CoroutineArg)) &&
            "Coroutine argument is already assigned");
-    auto *const Int8PtrTy = Type::getInt8PtrTy(getContext());
+//    auto *const Int8PtrTy = Type::getInt8PtrTy(getContext());
+    // TVM local begin
+    auto *const Int8PtrTy = Type::getIntBytePtrTy(getContext());
+    // TVM local end
+
     setArgOperand(CoroutineArg,
                   ConstantExpr::getBitCast(getFunction(), Int8PtrTy));
   }

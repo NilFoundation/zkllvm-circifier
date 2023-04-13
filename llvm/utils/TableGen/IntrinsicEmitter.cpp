@@ -249,7 +249,16 @@ enum IIT_Info {
   IIT_BF16 = 48,
   IIT_STRUCT9 = 49,
   IIT_V256 = 50,
-  IIT_AMX  = 51
+  IIT_AMX  = 51,
+
+  // TVM local begin
+  IIT_STRUCT8_AND_MORE = 52,
+  IIT_I257 = 53,
+  IIT_TVMSLICE = 54,
+  IIT_TVMBUILDER = 55,
+  IIT_TVMCELL = 56,
+  IIT_TVMTUPLE = 57,
+  // TVM local end
 };
 
 static void EncodeFixedValueType(MVT::SimpleValueType VT,
@@ -264,6 +273,10 @@ static void EncodeFixedValueType(MVT::SimpleValueType VT,
     case 32: return Sig.push_back(IIT_I32);
     case 64: return Sig.push_back(IIT_I64);
     case 128: return Sig.push_back(IIT_I128);
+    // TVM local begin
+    case 256:  return Sig.push_back(IIT_I257);
+    case 257:  return Sig.push_back(IIT_I257);
+      // TVM local end
     }
   }
 
@@ -282,6 +295,16 @@ static void EncodeFixedValueType(MVT::SimpleValueType VT,
   case MVT::Other: return Sig.push_back(IIT_EMPTYSTRUCT);
   // MVT::isVoid is used to represent varargs here.
   case MVT::isVoid: return Sig.push_back(IIT_VARARG);
+    // TVM local begin
+  case MVT::TVMSlice:
+    return Sig.push_back(IIT_TVMSLICE);
+  case MVT::TVMBuilder:
+    return Sig.push_back(IIT_TVMBUILDER);
+  case MVT::TVMCell:
+    return Sig.push_back(IIT_TVMCELL);
+  case MVT::TVMTuple:
+    return Sig.push_back(IIT_TVMTUPLE);
+    // TVM local end
   }
 }
 
@@ -465,17 +488,54 @@ static void ComputeFixedEncoding(const CodeGenIntrinsic &Int,
            Int.IS.RetVTs[0] == MVT::isVoid)
     TypeSig.push_back(IIT_Done);
   else {
-    switch (Int.IS.RetVTs.size()) {
-      case 1: break;
-      case 2: TypeSig.push_back(IIT_STRUCT2); break;
-      case 3: TypeSig.push_back(IIT_STRUCT3); break;
-      case 4: TypeSig.push_back(IIT_STRUCT4); break;
-      case 5: TypeSig.push_back(IIT_STRUCT5); break;
-      case 6: TypeSig.push_back(IIT_STRUCT6); break;
-      case 7: TypeSig.push_back(IIT_STRUCT7); break;
-      case 8: TypeSig.push_back(IIT_STRUCT8); break;
-      case 9: TypeSig.push_back(IIT_STRUCT9); break;
-      default: llvm_unreachable("Unhandled case in struct");
+    unsigned RetSize = Int.IS.RetVTs.size();
+    while (RetSize) {
+      switch (RetSize) {
+      case 1:
+        // TVM local begin
+        RetSize = 0;
+        // TVM local end
+        break;
+      case 2:
+        RetSize = 0;
+        TypeSig.push_back(IIT_STRUCT2);
+        break;
+      case 3:
+        RetSize = 0;
+        TypeSig.push_back(IIT_STRUCT3);
+        break;
+      case 4:
+        RetSize = 0;
+        TypeSig.push_back(IIT_STRUCT4);
+        break;
+      case 5:
+        RetSize = 0;
+        TypeSig.push_back(IIT_STRUCT5);
+        break;
+      case 6:
+        RetSize = 0;
+        TypeSig.push_back(IIT_STRUCT6);
+        break;
+      case 7:
+        RetSize = 0;
+        TypeSig.push_back(IIT_STRUCT7);
+        break;
+      case 8:
+        RetSize = 0;
+        TypeSig.push_back(IIT_STRUCT8);
+        break;
+      case 9:
+        RetSize = 0;
+        TypeSig.push_back(IIT_STRUCT9);
+        break;
+      default:
+        // llvm_unreachable("Unhandled case in struct");
+        // TVM local begin
+        TypeSig.push_back(IIT_STRUCT8_AND_MORE);
+        RetSize -= 8;
+        // TVM local end
+        break;
+      }
     }
 
     for (unsigned i = 0, e = Int.IS.RetVTs.size(); i != e; ++i)

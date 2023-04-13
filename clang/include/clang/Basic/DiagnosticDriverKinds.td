@@ -592,4 +592,11 @@ def err_cc1_round_trip_ok_then_fail : Error<
   "generated arguments parse failed in round-trip">;
 def err_cc1_round_trip_mismatch : Error<
   "generated arguments do not match in round-trip">;
+
+// TVM local begin
+def warn_tvm_unsupported_assembler : Warning<
+"TVM doesn't support assembler; -c flag ignored">,
+InGroup<OptionIgnored>;
+// TVM local end
+
 }

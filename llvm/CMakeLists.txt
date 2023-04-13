@@ -1,5 +1,9 @@
 # See docs/CMake.html for instructions about how to build LLVM with CMake.
 
+if(MSVC)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /std:c++17")
+endif(MSVC)
+
 cmake_minimum_required(VERSION 3.13.4)
 
 # CMP0116: Ninja generators transform `DEPFILE`s from `add_custom_command()`
@@ -45,7 +49,7 @@ project(LLVM
   VERSION ${LLVM_VERSION_MAJOR}.${LLVM_VERSION_MINOR}.${LLVM_VERSION_PATCH}
   LANGUAGES C CXX ASM)
 
-set(CMAKE_CXX_STANDARD 14 CACHE STRING "C++ standard to conform to")
+set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ standard to conform to")
 set(CMAKE_CXX_STANDARD_REQUIRED YES)
 if (CYGWIN)
   # Cygwin is a bit stricter and lack things like 'strdup', 'stricmp', etc in

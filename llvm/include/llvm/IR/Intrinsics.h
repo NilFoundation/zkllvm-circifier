@@ -140,7 +140,14 @@ namespace Intrinsic {
       Subdivide2Argument,
       Subdivide4Argument,
       VecOfBitcastsToInt,
-      AMX
+      AMX,
+
+      // TVM local begin
+      TVMSlice,
+      TVMBuilder,
+      TVMCell,
+      TVMTuple
+      // TVM local end
     } Kind;
 
     union {

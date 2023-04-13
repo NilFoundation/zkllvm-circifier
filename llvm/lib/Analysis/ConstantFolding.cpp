@@ -46,6 +46,7 @@
 #include "llvm/IR/IntrinsicsARM.h"
 #include "llvm/IR/IntrinsicsWebAssembly.h"
 #include "llvm/IR/IntrinsicsX86.h"
+#include "llvm/IR/IntrinsicsTVM.h"
 #include "llvm/IR/Operator.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Value.h"
@@ -111,8 +112,10 @@ Constant *FoldBitCast(Constant *C, Type *DestTy, const DataLayout &DL) {
          "Invalid constantexpr bitcast!");
 
   // Catch the obvious splat cases.
-  if (C->isNullValue() && !DestTy->isX86_MMXTy() && !DestTy->isX86_AMXTy())
+  // TVM local begin
+  if (C->isNullValue() && !DestTy->isX86_MMXTy() && !DestTy->isTVMBuiltinTy())
     return Constant::getNullValue(DestTy);
+  // TVM local end
   if (C->isAllOnesValue() && !DestTy->isX86_MMXTy() && !DestTy->isX86_AMXTy() &&
       !DestTy->isPtrOrPtrVectorTy()) // Don't get ones for ptr types!
     return Constant::getAllOnesValue(DestTy);

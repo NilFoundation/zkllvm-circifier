@@ -794,6 +794,14 @@ private:
 
   void visitStoreInst(StoreInst &SI) {
     Value *ValOp = SI.getValueOperand();
+
+    // TVM local begin
+    //if (ValOp->getType()->isTVMCellTy() ||
+    //    ValOp->getType()->isTVMBuilderTy() ||
+    //    ValOp->getType()->isTVMSliceTy() || ValOp->getType()->isTVMTupleTy())
+    //  return PI.setEscapedAndAborted(&SI);
+    // TVM local end
+
     if (ValOp == *U)
       return PI.setEscapedAndAborted(&SI);
     if (!IsOffsetKnown)
@@ -1157,9 +1165,15 @@ findCommonType(AllocaSlices::const_iterator B, AllocaSlices::const_iterator E,
       // this for split integer operations where we want to use the type of the
       // entity causing the split. Also skip if the type is not a byte width
       // multiple.
-      if (UserITy->getBitWidth() % 8 != 0 ||
-          UserITy->getBitWidth() / 8 > (EndOffset - B->beginOffset()))
+      //if (UserITy->getBitWidth() % 8 != 0 ||
+      //    UserITy->getBitWidth() / 8 > (EndOffset - B->beginOffset()))
+      //  continue;
+      // TVM local begin
+      if (UserITy->getBitWidth() % ByteSizeInBits != 0 ||
+          UserITy->getBitWidth() / ByteSizeInBits >
+              (EndOffset - B->beginOffset()))
         continue;
+      // TVM local end
 
       // Track the largest bitwidth integer type used in this way in case there
       // is no common type.
@@ -1317,6 +1331,38 @@ static void speculatePHINodeLoads(PHINode &PN) {
   PN.eraseFromParent();
 }
 
+// TVM local begin
+static bool processSelectUsers(Value *Val, Value *TValue, Value *FValue,
+                               const DataLayout &DL) {
+  for (User *U : Val->users()) {
+    Value *V = U;
+    if (auto *GEP = dyn_cast<GetElementPtrInst>(V))
+      if (GEP->hasAllZeroIndices()) {
+        if (!processSelectUsers(GEP, TValue, FValue, DL))
+          return false;
+        continue;
+      }
+    LoadInst *LI = dyn_cast<LoadInst>(V);
+    if (!LI || !LI->isSimple()) {
+      LLVM_DEBUG(dbgs() << "isSafeSelectToSpeculate FALSE:" << Val << " \n");
+      LLVM_DEBUG(dbgs() << "because of :" << *U << " \n");
+      return false;
+    }
+
+    // Both operands to the select need to be dereferenceable, either
+    // absolutely (e.g. allocas) or at this point because we can see other
+    // accesses to it.
+    if (!isSafeToLoadUnconditionally(TValue, LI->getType(), LI->getAlign(), DL,
+                                     LI))
+      return false;
+    if (!isSafeToLoadUnconditionally(FValue, LI->getType(), LI->getAlign(), DL,
+                                     LI))
+      return false;
+  }
+  return true;
+}
+// TVM local end
+
 /// Select instructions that use an alloca and are subsequently loaded can be
 /// rewritten to load both input pointers and then select between the result,
 /// allowing the load of the alloca to be promoted.
@@ -1336,30 +1382,83 @@ static bool isSafeSelectToSpeculate(SelectInst &SI) {
   Value *FValue = SI.getFalseValue();
   const DataLayout &DL = SI.getModule()->getDataLayout();
 
-  for (User *U : SI.users()) {
-    LoadInst *LI;
-    BitCastInst *BC = dyn_cast<BitCastInst>(U);
-    if (BC && BC->hasOneUse())
-      LI = dyn_cast<LoadInst>(*BC->user_begin());
-    else
-      LI = dyn_cast<LoadInst>(U);
+//  for (User *U : SI.users()) {
+//    LoadInst *LI;
+//    BitCastInst *BC = dyn_cast<BitCastInst>(U);
+//    if (BC && BC->hasOneUse())
+//      LI = dyn_cast<LoadInst>(*BC->user_begin());
+//    else
+//      LI = dyn_cast<LoadInst>(U);
+//
+//    if (!LI || !LI->isSimple())
+//      return false;
+//
+//    // Both operands to the select need to be dereferenceable, either
+//    // absolutely (e.g. allocas) or at this point because we can see other
+//    // accesses to it.
+//    if (!isSafeToLoadUnconditionally(TValue, LI->getType(),
+//                                     LI->getAlign(), DL, LI))
+//      return false;
+//    if (!isSafeToLoadUnconditionally(FValue, LI->getType(),
+//                                     LI->getAlign(), DL, LI))
+//      return false;
+//  }
+//
+//  return true;
 
-    if (!LI || !LI->isSimple())
-      return false;
-
-    // Both operands to the select need to be dereferenceable, either
-    // absolutely (e.g. allocas) or at this point because we can see other
-    // accesses to it.
-    if (!isSafeToLoadUnconditionally(TValue, LI->getType(),
-                                     LI->getAlign(), DL, LI))
-      return false;
-    if (!isSafeToLoadUnconditionally(FValue, LI->getType(),
-                                     LI->getAlign(), DL, LI))
-      return false;
-  }
-
-  return true;
+  // TVM local begin
+  return processSelectUsers(&SI, TValue, FValue, DL);
+  // TVM local end
 }
+
+// TVM local begin
+static void processSelectUsersForSpeculate(Instruction *Val, Value *TV,
+                                           Value *FV, IRBuilderTy &IRB,
+                                           Value *Cond, Type *FixTy) {
+  while (!Val->use_empty()) {
+    Value *LV = Val->user_back();
+    if (auto *GEP = dyn_cast<GetElementPtrInst>(LV))
+      if (GEP->hasAllZeroIndices()) {
+        processSelectUsersForSpeculate(GEP, TV, FV, IRB, Cond, GEP->getType());
+        continue;
+      }
+    LoadInst *LI = cast<LoadInst>(LV);
+    assert(LI->isSimple() && "We only speculate simple loads");
+
+    IRB.SetInsertPoint(LI);
+    // TVM local begin
+    if (FixTy) {
+      TV = IRB.CreateBitOrPointerCast(TV, FixTy);
+      FV = IRB.CreateBitOrPointerCast(FV, FixTy);
+    }
+    // TVM local end
+    LoadInst *TL =
+        IRB.CreateLoad(TV, LI->getName() + ".sroa.speculate.load.true");
+    LoadInst *FL =
+        IRB.CreateLoad(FV, LI->getName() + ".sroa.speculate.load.false");
+    NumLoadsSpeculated += 2;
+
+    // Transfer alignment and AA info if present.
+    TL->setAlignment(LI->getAlign());
+    FL->setAlignment(LI->getAlign());
+
+    AAMDNodes Tags;
+    LI->getAAMetadata(Tags);
+    if (Tags) {
+      TL->setAAMetadata(Tags);
+      FL->setAAMetadata(Tags);
+    }
+
+    Value *V =
+        IRB.CreateSelect(Cond, TL, FL, LI->getName() + ".sroa.speculated");
+
+    LLVM_DEBUG(dbgs() << "          speculated to: " << *V << "\n");
+    LI->replaceAllUsesWith(V);
+    LI->eraseFromParent();
+  }
+  Val->eraseFromParent();
+}
+// TVM local end
 
 static void speculateSelectInstLoads(SelectInst &SI) {
   LLVM_DEBUG(dbgs() << "    original: " << SI << "\n");
@@ -1368,51 +1467,56 @@ static void speculateSelectInstLoads(SelectInst &SI) {
   Value *TV = SI.getTrueValue();
   Value *FV = SI.getFalseValue();
   // Replace the loads of the select with a select of two loads.
-  while (!SI.use_empty()) {
-    LoadInst *LI;
-    BitCastInst *BC = dyn_cast<BitCastInst>(SI.user_back());
-    if (BC) {
-      assert(BC->hasOneUse() && "Bitcast should have a single use.");
-      LI = cast<LoadInst>(BC->user_back());
-    } else {
-      LI = cast<LoadInst>(SI.user_back());
-    }
 
-    assert(LI->isSimple() && "We only speculate simple loads");
+//  while (!SI.use_empty()) {
+//    LoadInst *LI;
+//    BitCastInst *BC = dyn_cast<BitCastInst>(SI.user_back());
+//    if (BC) {
+//      assert(BC->hasOneUse() && "Bitcast should have a single use.");
+//      LI = cast<LoadInst>(BC->user_back());
+//    } else {
+//      LI = cast<LoadInst>(SI.user_back());
+//    }
+//
+//    assert(LI->isSimple() && "We only speculate simple loads");
+//
+//    IRB.SetInsertPoint(LI);
+//    Value *NewTV =
+//        BC ? IRB.CreateBitCast(TV, BC->getType(), TV->getName() + ".sroa.cast")
+//           : TV;
+//    Value *NewFV =
+//        BC ? IRB.CreateBitCast(FV, BC->getType(), FV->getName() + ".sroa.cast")
+//           : FV;
+//    LoadInst *TL = IRB.CreateLoad(LI->getType(), NewTV,
+//                                  LI->getName() + ".sroa.speculate.load.true");
+//    LoadInst *FL = IRB.CreateLoad(LI->getType(), NewFV,
+//                                  LI->getName() + ".sroa.speculate.load.false");
+//    NumLoadsSpeculated += 2;
+//
+//    // Transfer alignment and AA info if present.
+//    TL->setAlignment(LI->getAlign());
+//    FL->setAlignment(LI->getAlign());
+//
+//    AAMDNodes Tags = LI->getAAMetadata();
+//    if (Tags) {
+//      TL->setAAMetadata(Tags);
+//      FL->setAAMetadata(Tags);
+//    }
+//
+//    Value *V = IRB.CreateSelect(SI.getCondition(), TL, FL,
+//                                LI->getName() + ".sroa.speculated");
+//
+//    LLVM_DEBUG(dbgs() << "          speculated to: " << *V << "\n");
+//    LI->replaceAllUsesWith(V);
+//    LI->eraseFromParent();
+//    if (BC)
+//      BC->eraseFromParent();
+//  }
+//  SI.eraseFromParent();
 
-    IRB.SetInsertPoint(LI);
-    Value *NewTV =
-        BC ? IRB.CreateBitCast(TV, BC->getType(), TV->getName() + ".sroa.cast")
-           : TV;
-    Value *NewFV =
-        BC ? IRB.CreateBitCast(FV, BC->getType(), FV->getName() + ".sroa.cast")
-           : FV;
-    LoadInst *TL = IRB.CreateLoad(LI->getType(), NewTV,
-                                  LI->getName() + ".sroa.speculate.load.true");
-    LoadInst *FL = IRB.CreateLoad(LI->getType(), NewFV,
-                                  LI->getName() + ".sroa.speculate.load.false");
-    NumLoadsSpeculated += 2;
-
-    // Transfer alignment and AA info if present.
-    TL->setAlignment(LI->getAlign());
-    FL->setAlignment(LI->getAlign());
-
-    AAMDNodes Tags = LI->getAAMetadata();
-    if (Tags) {
-      TL->setAAMetadata(Tags);
-      FL->setAAMetadata(Tags);
-    }
-
-    Value *V = IRB.CreateSelect(SI.getCondition(), TL, FL,
-                                LI->getName() + ".sroa.speculated");
-
-    LLVM_DEBUG(dbgs() << "          speculated to: " << *V << "\n");
-    LI->replaceAllUsesWith(V);
-    LI->eraseFromParent();
-    if (BC)
-      BC->eraseFromParent();
-  }
-  SI.eraseFromParent();
+  // TVM local begin
+  processSelectUsersForSpeculate(&SI, TV, FV, IRB, SI.getCondition(), nullptr);
+  // TVM local end
 }
 
 /// Build a GEP out of a base pointer and indices.
@@ -1501,7 +1605,12 @@ static Value *getNaturalGEPWithOffset(IRBuilderTy &IRB, const DataLayout &DL,
 
   // Don't consider any GEPs through an i8* as natural unless the TargetTy is
   // an i8.
-  if (Ty == IRB.getInt8PtrTy(Ty->getAddressSpace()) && TargetTy->isIntegerTy(8))
+  //if (Ty == IRB.getInt8PtrTy(Ty->getAddressSpace()) && TargetTy->isIntegerTy(8))
+  //  return nullptr;
+  // TVM local begin
+  if (Ty == IRB.getIntBytePtrTy(Ty->getAddressSpace()) &&
+      TargetTy->isIntegerTy(ByteSizeInBits))
+    // TVM local end
     return nullptr;
 
   Type *ElementTy = Ty->getElementType();
@@ -1603,7 +1712,10 @@ static Value *getAdjustedPtr(IRBuilderTy &IRB, const DataLayout &DL, Value *Ptr,
     }
 
     // Stash this pointer if we've found an i8*.
-    if (Ptr->getType()->isIntegerTy(8)) {
+    // if (Ptr->getType()->isIntegerTy(8)) {
+    // TVM local begin
+    if (Ptr->getType()->isIntegerTy(ByteSizeInBits)) {
+      // TVM local end
       Int8Ptr = Ptr;
       Int8PtrOffset = Offset;
     }
@@ -1624,16 +1736,26 @@ static Value *getAdjustedPtr(IRBuilderTy &IRB, const DataLayout &DL, Value *Ptr,
   if (!OffsetPtr) {
     if (!Int8Ptr) {
       Int8Ptr = IRB.CreateBitCast(
-          Ptr, IRB.getInt8PtrTy(PointerTy->getPointerAddressSpace()),
+          //Ptr, IRB.getInt8PtrTy(PointerTy->getPointerAddressSpace()),
+          // TVM local begin
+          Ptr, IRB.getIntBytePtrTy(PointerTy->getPointerAddressSpace()),
+          // TVM local end
           NamePrefix + "sroa_raw_cast");
       Int8PtrOffset = Offset;
     }
 
+    //OffsetPtr = Int8PtrOffset == 0
+    //                ? Int8Ptr
+    //                : IRB.CreateInBoundsGEP(IRB.getInt8Ty(), Int8Ptr,
+    //                                        IRB.getInt(Int8PtrOffset),
+    //                                        NamePrefix + "sroa_raw_idx");
+    // TVM local begin
     OffsetPtr = Int8PtrOffset == 0
                     ? Int8Ptr
-                    : IRB.CreateInBoundsGEP(IRB.getInt8Ty(), Int8Ptr,
+                    : IRB.CreateInBoundsGEP(IRB.getByteTy(), Int8Ptr,
                                             IRB.getInt(Int8PtrOffset),
                                             NamePrefix + "sroa_raw_idx");
+    // TVM local end
   }
   Ptr = OffsetPtr;
 
@@ -1795,8 +1917,12 @@ static bool isVectorPromotionViableForSlice(Partition &P, const Slice &S,
                       ? Ty->getElementType()
                       : FixedVectorType::get(Ty->getElementType(), NumElements);
 
-  Type *SplitIntTy =
-      Type::getIntNTy(Ty->getContext(), NumElements * ElementSize * 8);
+  //Type *SplitIntTy =
+  //    Type::getIntNTy(Ty->getContext(), NumElements * ElementSize * 8);
+  // TVM local begin
+  Type *SplitIntTy = Type::getIntNTy(
+      Ty->getContext(), NumElements * ElementSize * ByteSizeInBits);
+  // TVM local end
 
   Use *U = S.getUse();
 
@@ -1940,11 +2066,19 @@ static VectorType *isVectorPromotionViable(Partition &P, const DataLayout &DL) {
 
     // While the definition of LLVM vectors is bitpacked, we don't support sizes
     // that aren't byte sized.
-    if (ElementSize % 8)
+    //if (ElementSize % 8)
+    //  return false;
+    //assert((DL.getTypeSizeInBits(VTy).getFixedSize() % 8) == 0 &&
+    //       "vector size not a multiple of element size?");
+    //ElementSize /= 8;
+
+    // TVM local begin
+    if (ElementSize % ByteSizeInBits)
       return false;
-    assert((DL.getTypeSizeInBits(VTy).getFixedSize() % 8) == 0 &&
+    assert((DL.getTypeSizeInBits(VTy) % ByteSizeInBits) == 0 &&
            "vector size not a multiple of element size?");
-    ElementSize /= 8;
+    ElementSize /= ByteSizeInBits;
+    // TVM local end
 
     for (const Slice &S : P)
       if (!isVectorPromotionViableForSlice(P, S, VTy, ElementSize, DL))
@@ -2103,10 +2237,17 @@ static Value *extractInteger(const DataLayout &DL, IRBuilderTy &IRB, Value *V,
   assert(DL.getTypeStoreSize(Ty).getFixedSize() + Offset <=
              DL.getTypeStoreSize(IntTy).getFixedSize() &&
          "Element extends past full value");
-  uint64_t ShAmt = 8 * Offset;
+  //uint64_t ShAmt = 8 * Offset;
+  //if (DL.isBigEndian())
+  //  ShAmt = 8 * (DL.getTypeStoreSize(IntTy).getFixedSize() -
+  //               DL.getTypeStoreSize(Ty).getFixedSize() - Offset);
+  // TVM local begin
+  uint64_t ShAmt = ByteSizeInBits * Offset;
   if (DL.isBigEndian())
-    ShAmt = 8 * (DL.getTypeStoreSize(IntTy).getFixedSize() -
-                 DL.getTypeStoreSize(Ty).getFixedSize() - Offset);
+    ShAmt = ByteSizeInBits *
+            (DL.getTypeStoreSize(IntTy) - DL.getTypeStoreSize(Ty) - Offset);
+  // TVM local end
+
   if (ShAmt) {
     V = IRB.CreateLShr(V, ShAmt, Name + ".shift");
     LLVM_DEBUG(dbgs() << "     shifted: " << *V << "\n");
@@ -2134,10 +2275,17 @@ static Value *insertInteger(const DataLayout &DL, IRBuilderTy &IRB, Value *Old,
   assert(DL.getTypeStoreSize(Ty).getFixedSize() + Offset <=
              DL.getTypeStoreSize(IntTy).getFixedSize() &&
          "Element store outside of alloca store");
-  uint64_t ShAmt = 8 * Offset;
+  //uint64_t ShAmt = 8 * Offset;
+  //if (DL.isBigEndian())
+  //  ShAmt = 8 * (DL.getTypeStoreSize(IntTy).getFixedSize() -
+  //               DL.getTypeStoreSize(Ty).getFixedSize() - Offset);
+  // TVM local begin
+  uint64_t ShAmt = ByteSizeInBits * Offset;
   if (DL.isBigEndian())
-    ShAmt = 8 * (DL.getTypeStoreSize(IntTy).getFixedSize() -
-                 DL.getTypeStoreSize(Ty).getFixedSize() - Offset);
+    ShAmt = ByteSizeInBits *
+            (DL.getTypeStoreSize(IntTy) - DL.getTypeStoreSize(Ty) - Offset);
+  // TVM local end
+
   if (ShAmt) {
     V = IRB.CreateShl(V, ShAmt, Name + ".shift");
     LLVM_DEBUG(dbgs() << "     shifted: " << *V << "\n");
@@ -2309,13 +2457,22 @@ public:
                 : nullptr),
         VecTy(PromotableVecTy),
         ElementTy(VecTy ? VecTy->getElementType() : nullptr),
-        ElementSize(VecTy ? DL.getTypeSizeInBits(ElementTy).getFixedSize() / 8
+        //ElementSize(VecTy ? DL.getTypeSizeInBits(ElementTy).getFixedSize() / 8
+        //                  : 0),
+        // TVM local begin
+        ElementSize(VecTy ? DL.getTypeSizeInBits(ElementTy) / ByteSizeInBits
                           : 0),
+        // TVM local end
         PHIUsers(PHIUsers), SelectUsers(SelectUsers),
         IRB(NewAI.getContext(), ConstantFolder()) {
     if (VecTy) {
-      assert((DL.getTypeSizeInBits(ElementTy).getFixedSize() % 8) == 0 &&
+      //assert((DL.getTypeSizeInBits(ElementTy).getFixedSize() % 8) == 0 &&
+      //       "Only multiple-of-8 sized vector elements are viable");
+      // TVM local begin
+      assert((DL.getTypeSizeInBits(ElementTy) % ByteSizeInBits) == 0 &&
              "Only multiple-of-8 sized vector elements are viable");
+      // TVM local end
+
       ++NumVectorized;
     }
     assert((!IntTy && !VecTy) || (IntTy && !VecTy) || (!IntTy && VecTy));
@@ -2450,7 +2607,12 @@ private:
     assert(NewBeginOffset >= NewAllocaBeginOffset && "Out of bounds offset");
     uint64_t Offset = NewBeginOffset - NewAllocaBeginOffset;
     if (Offset > 0 || NewEndOffset < NewAllocaEndOffset) {
-      IntegerType *ExtractTy = Type::getIntNTy(LI.getContext(), SliceSize * 8);
+      //IntegerType *ExtractTy = Type::getIntNTy(LI.getContext(), SliceSize * 8);
+      // TVM local begin
+      IntegerType *ExtractTy = Type::getIntNTy(
+          LI.getContext(), static_cast<unsigned>(SliceSize) * ByteSizeInBits);
+      // TVM local end
+
       V = extractInteger(DL, IRB, V, ExtractTy, Offset, "extract");
     }
     // It is possible that the extracted type is not the load type. This
@@ -2458,10 +2620,19 @@ private:
     // a consequence the slice is narrower but still a candidate for integer
     // lowering. To handle this case, we just zero extend the extracted
     // integer.
-    assert(cast<IntegerType>(LI.getType())->getBitWidth() >= SliceSize * 8 &&
+    //assert(cast<IntegerType>(LI.getType())->getBitWidth() >= SliceSize * 8 &&
+    //       "Can only handle an extract for an overly wide load");
+    //if (cast<IntegerType>(LI.getType())->getBitWidth() > SliceSize * 8)
+    //  V = IRB.CreateZExt(V, LI.getType());
+    // TVM local begin
+    assert((cast<IntegerType>(LI.getType())->getBitWidth() >=
+            SliceSize * ByteSizeInBits) &&
            "Can only handle an extract for an overly wide load");
-    if (cast<IntegerType>(LI.getType())->getBitWidth() > SliceSize * 8)
+    if (cast<IntegerType>(LI.getType())->getBitWidth() >
+        SliceSize * ByteSizeInBits)
       V = IRB.CreateZExt(V, LI.getType());
+    // TVM local end
+
     return V;
   }
 
@@ -2474,8 +2645,16 @@ private:
 
     unsigned AS = LI.getPointerAddressSpace();
 
-    Type *TargetTy = IsSplit ? Type::getIntNTy(LI.getContext(), SliceSize * 8)
-                             : LI.getType();
+    //Type *TargetTy = IsSplit ? Type::getIntNTy(LI.getContext(), SliceSize * 8)
+    //                         : LI.getType();
+    // TVM local begin
+    Type *TargetTy =
+        IsSplit
+            ? Type::getIntNTy(LI.getContext(),
+                              static_cast<unsigned>(SliceSize) * ByteSizeInBits)
+            : LI.getType();
+    // TVM local end
+
     const bool IsLoadPastEnd =
         DL.getTypeStoreSize(TargetTy).getFixedSize() > SliceSize;
     bool IsPtrAdjusted = false;
@@ -2649,7 +2828,12 @@ private:
              "Only integer type loads and stores are split");
       assert(DL.typeSizeEqualsStoreSize(V->getType()) &&
              "Non-byte-multiple bit width");
-      IntegerType *NarrowTy = Type::getIntNTy(SI.getContext(), SliceSize * 8);
+      //IntegerType *NarrowTy = Type::getIntNTy(SI.getContext(), SliceSize * 8);
+      // TVM local begin
+      IntegerType *NarrowTy = Type::getIntNTy(
+          SI.getContext(), static_cast<unsigned>(SliceSize) * ByteSizeInBits);
+      // TVM local end
+
       V = extractInteger(DL, IRB, V, NarrowTy, NewBeginOffset - BeginOffset,
                          "extract");
     }
@@ -2717,11 +2901,20 @@ private:
   Value *getIntegerSplat(Value *V, unsigned Size) {
     assert(Size > 0 && "Expected a positive number of bytes.");
     IntegerType *VTy = cast<IntegerType>(V->getType());
-    assert(VTy->getBitWidth() == 8 && "Expected an i8 value for the byte");
+    //assert(VTy->getBitWidth() == 8 && "Expected an i8 value for the byte");
+    // TVM local begin
+    assert(VTy->getBitWidth() == ByteSizeInBits &&
+           "Expected an i8 value for the byte");
+    // TVM local end
     if (Size == 1)
       return V;
 
-    Type *SplatIntTy = Type::getIntNTy(VTy->getContext(), Size * 8);
+    //Type *SplatIntTy = Type::getIntNTy(VTy->getContext(), Size * 8);
+    // TVM local begin
+    Type *SplatIntTy =
+        Type::getIntNTy(VTy->getContext(), Size * ByteSizeInBits);
+    // TVM local end
+
     V = IRB.CreateMul(
         IRB.CreateZExt(V, SplatIntTy, "zext"),
         ConstantExpr::getUDiv(
@@ -2774,7 +2967,10 @@ private:
       const uint64_t Len = C->getLimitedValue();
       if (Len > std::numeric_limits<unsigned>::max())
         return false;
-      auto *Int8Ty = IntegerType::getInt8Ty(NewAI.getContext());
+      //auto *Int8Ty = IntegerType::getInt8Ty(NewAI.getContext());
+      // TVM local begin
+      auto *Int8Ty = IntegerType::getIntBytePtrTy(NewAI.getContext());
+      // TVM local end
       auto *SrcTy = FixedVectorType::get(Int8Ty, Len);
       return canConvertValue(DL, SrcTy, AllocaTy) &&
              DL.isLegalInteger(DL.getTypeSizeInBits(ScalarTy).getFixedSize());
@@ -2812,8 +3008,13 @@ private:
       assert(NumElements <= cast<FixedVectorType>(VecTy)->getNumElements() &&
              "Too many elements!");
 
+      //Value *Splat = getIntegerSplat(
+      //    II.getValue(), DL.getTypeSizeInBits(ElementTy).getFixedSize() / 8);
+      // TVM local begin
       Value *Splat = getIntegerSplat(
-          II.getValue(), DL.getTypeSizeInBits(ElementTy).getFixedSize() / 8);
+          II.getValue(), DL.getTypeSizeInBits(ElementTy) / ByteSizeInBits);
+      // TVM local end
+
       Splat = convertValue(DL, IRB, Splat, ElementTy);
       if (NumElements > 1)
         Splat = getVectorSplat(Splat, NumElements);
@@ -2846,8 +3047,13 @@ private:
       assert(NewBeginOffset == NewAllocaBeginOffset);
       assert(NewEndOffset == NewAllocaEndOffset);
 
-      V = getIntegerSplat(II.getValue(),
-                          DL.getTypeSizeInBits(ScalarTy).getFixedSize() / 8);
+      //V = getIntegerSplat(II.getValue(),
+      //                    DL.getTypeSizeInBits(ScalarTy).getFixedSize() / 8);
+      // TVM local begin
+      V = getIntegerSplat(
+          II.getValue(), DL.getTypeSizeInBits(ElementTy) / ByteSizeInBits);
+      // TVM local end
+
       if (VectorType *AllocaVecTy = dyn_cast<VectorType>(AllocaTy))
         V = getVectorSplat(
             V, cast<FixedVectorType>(AllocaVecTy)->getNumElements());
@@ -2991,8 +3197,13 @@ private:
     unsigned BeginIndex = VecTy ? getIndex(NewBeginOffset) : 0;
     unsigned EndIndex = VecTy ? getIndex(NewEndOffset) : 0;
     unsigned NumElements = EndIndex - BeginIndex;
+    //IntegerType *SubIntTy =
+    //    IntTy ? Type::getIntNTy(IntTy->getContext(), Size * 8) : nullptr;
+    // TVM local begin
     IntegerType *SubIntTy =
-        IntTy ? Type::getIntNTy(IntTy->getContext(), Size * 8) : nullptr;
+        IntTy ? Type::getIntNTy(IntTy->getContext(), Size * ByteSizeInBits)
+              : nullptr;
+    // TVM local end
 
     // Reset the other pointer type to match the register type we're going to
     // use, but using the address space of the original other pointer.
@@ -3095,7 +3306,11 @@ private:
                          NewEndOffset - NewBeginOffset);
     // Lifetime intrinsics always expect an i8* so directly get such a pointer
     // for the new alloca slice.
-    Type *PointerTy = IRB.getInt8PtrTy(OldPtr->getType()->getPointerAddressSpace());
+    //Type *PointerTy = IRB.getInt8PtrTy(OldPtr->getType()->getPointerAddressSpace());
+    // TVM local begin
+    Type *PointerTy = IRB.getIntBytePtrTy(OldPtr->getType()->getPointerAddressSpace());
+    // TVM local end
+
     Value *Ptr = getNewAllocaSlicePtr(IRB, PointerTy);
     Value *New;
     if (II.getIntrinsicID() == Intrinsic::lifetime_start)
@@ -3958,7 +4173,11 @@ bool SROA::presplitLoadsAndStores(AllocaInst &AI, AllocaSlices &AS) {
 
     IntegerType *Ty = cast<IntegerType>(LI->getType());
     assert(Ty->getBitWidth() % 8 == 0);
-    uint64_t LoadSize = Ty->getBitWidth() / 8;
+    //uint64_t LoadSize = Ty->getBitWidth() / 8;
+    // TVM local begin
+    uint64_t LoadSize = Ty->getBitWidth() / ByteSizeInBits;
+    // TVM local end
+
     assert(LoadSize > 0 && "Cannot have a zero-sized integer load!");
 
     auto &Offsets = SplitOffsetsMap[LI];
@@ -3976,7 +4195,12 @@ bool SROA::presplitLoadsAndStores(AllocaInst &AI, AllocaSlices &AS) {
     uint64_t PartOffset = 0, PartSize = Offsets.Splits.front();
     int Idx = 0, Size = Offsets.Splits.size();
     for (;;) {
-      auto *PartTy = Type::getIntNTy(Ty->getContext(), PartSize * 8);
+      //auto *PartTy = Type::getIntNTy(Ty->getContext(), PartSize * 8);
+      // TVM local begin
+      auto *PartTy =
+          Type::getIntNTy(Ty->getContext(), PartSize * ByteSizeInBits);
+      // TVM local end
+
       auto AS = LI->getPointerAddressSpace();
       auto *PartPtrTy = PartTy->getPointerTo(AS);
       LoadInst *PLoad = IRB.CreateAlignedLoad(
@@ -4083,7 +4307,11 @@ bool SROA::presplitLoadsAndStores(AllocaInst &AI, AllocaSlices &AS) {
     auto *LI = cast<LoadInst>(SI->getValueOperand());
     IntegerType *Ty = cast<IntegerType>(LI->getType());
     assert(Ty->getBitWidth() % 8 == 0);
-    uint64_t StoreSize = Ty->getBitWidth() / 8;
+    //uint64_t StoreSize = Ty->getBitWidth() / 8;
+    // TVM local begin
+    uint64_t StoreSize = Ty->getBitWidth() / ByteSizeInBits;
+    // TVM local end
+
     assert(StoreSize > 0 && "Cannot have a zero-sized integer store!");
 
     auto &Offsets = SplitOffsetsMap[SI];
@@ -4112,7 +4340,12 @@ bool SROA::presplitLoadsAndStores(AllocaInst &AI, AllocaSlices &AS) {
     uint64_t PartOffset = 0, PartSize = Offsets.Splits.front();
     int Idx = 0, Size = Offsets.Splits.size();
     for (;;) {
-      auto *PartTy = Type::getIntNTy(Ty->getContext(), PartSize * 8);
+      //auto *PartTy = Type::getIntNTy(Ty->getContext(), PartSize * 8);
+      // TVM local begin
+      auto *PartTy =
+          Type::getIntNTy(Ty->getContext(), PartSize * ByteSizeInBits);
+      // TVM local end
+
       auto *LoadPartPtrTy = PartTy->getPointerTo(LI->getPointerAddressSpace());
       auto *StorePartPtrTy = PartTy->getPointerTo(SI->getPointerAddressSpace());
 
@@ -4254,15 +4487,25 @@ AllocaInst *SROA::rewritePartition(AllocaInst &AI, AllocaSlices &AS,
                                                  P.beginOffset(), P.size()))
       SliceTy = TypePartitionTy;
   // If still not, can we use the largest bitwidth integer type used?
-  if (!SliceTy && CommonUseTy.second)
-    if (DL.getTypeAllocSize(CommonUseTy.second).getFixedSize() >= P.size())
-      SliceTy = CommonUseTy.second;
+  //if (!SliceTy && CommonUseTy.second)
+  //  if (DL.getTypeAllocSize(CommonUseTy.second).getFixedSize() >= P.size())
+  //    SliceTy = CommonUseTy.second;
+  //if ((!SliceTy || (SliceTy->isArrayTy() &&
+  //                  SliceTy->getArrayElementType()->isIntegerTy())) &&
+  //    DL.isLegalInteger(P.size() * 8))
+  //  SliceTy = Type::getIntNTy(*C, P.size() * 8);
+  //if (!SliceTy)
+  //  SliceTy = ArrayType::get(Type::getInt8Ty(*C), P.size());
+
+  // TVM local begin
   if ((!SliceTy || (SliceTy->isArrayTy() &&
                     SliceTy->getArrayElementType()->isIntegerTy())) &&
-      DL.isLegalInteger(P.size() * 8))
-    SliceTy = Type::getIntNTy(*C, P.size() * 8);
+      DL.isLegalInteger(P.size() * ByteSizeInBits))
+    SliceTy = Type::getIntNTy(*C, P.size() * ByteSizeInBits);
   if (!SliceTy)
-    SliceTy = ArrayType::get(Type::getInt8Ty(*C), P.size());
+    SliceTy = ArrayType::get(Type::getIntNTy(*C, ByteSizeInBits), P.size());
+  // TVM local end
+
   assert(DL.getTypeAllocSize(SliceTy).getFixedSize() >= P.size());
 
   bool IsIntegerPromotable = isIntegerWideningViable(P, SliceTy, DL);
@@ -4470,7 +4713,10 @@ bool SROA::splitAlloca(AllocaInst &AI, AllocaSlices &AS) {
     if (AllocaInst *NewAI = rewritePartition(AI, AS, P)) {
       Changed = true;
       if (NewAI != &AI) {
-        uint64_t SizeOfByte = 8;
+        //uint64_t SizeOfByte = 8;
+        // TVM local begin
+        uint64_t SizeOfByte = ByteSizeInBits;
+        // TVM local end
         uint64_t AllocaSize =
             DL.getTypeSizeInBits(NewAI->getAllocatedType()).getFixedSize();
         // Don't include any padding.

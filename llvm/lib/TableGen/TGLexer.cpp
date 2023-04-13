@@ -579,7 +579,10 @@ tgtok::TokKind TGLexer::LexExclaim() {
     .Case("foreach", tgtok::XForEach)
     .Case("filter", tgtok::XFilter)
     .Case("listconcat", tgtok::XListConcat)
+    //.Case("listsplat", tgtok::XListSplat)
+    // TVM local begin
     .Case("listsplat", tgtok::XListSplat)
+    // TVM local end
     .Case("strconcat", tgtok::XStrConcat)
     .Case("interleave", tgtok::XInterleave)
     .Case("substr", tgtok::XSubstr)

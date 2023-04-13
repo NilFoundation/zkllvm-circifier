@@ -941,6 +941,12 @@ Init *BinOpInit::getStrConcat(Init *I0, Init *I1) {
   return BinOpInit::get(BinOpInit::STRCONCAT, I0, I1, StringRecTy::get());
 }
 
+// TVM local begin
+Init *BinOpInit::getListSplat(TypedInit *LHS, Init *RHS) {
+  return BinOpInit::get(BinOpInit::LISTSPLAT, LHS, RHS, LHS->getType());
+}
+// TVM local end
+
 static ListInit *ConcatListInits(const ListInit *LHS,
                                  const ListInit *RHS) {
   SmallVector<Init *, 8> Args;
@@ -1004,6 +1010,17 @@ Init *BinOpInit::Fold(Record *CurRec) const {
     }
     break;
   }
+  //case LISTSPLAT: {
+  //  TypedInit *Value = dyn_cast<TypedInit>(LHS);
+  //  IntInit *Size = dyn_cast<IntInit>(RHS);
+  //  if (Value && Size) {
+  //    SmallVector<Init *, 8> Args(Size->getValue(), Value);
+  //    return ListInit::get(Args, Value->getType());
+  //  }
+  //  break;
+  //}
+
+  // TVM local begin
   case LISTSPLAT: {
     TypedInit *Value = dyn_cast<TypedInit>(LHS);
     IntInit *Size = dyn_cast<IntInit>(RHS);
@@ -1013,6 +1030,8 @@ Init *BinOpInit::Fold(Record *CurRec) const {
     }
     break;
   }
+    // TVM local end
+
   case STRCONCAT: {
     StringInit *LHSs = dyn_cast<StringInit>(LHS);
     StringInit *RHSs = dyn_cast<StringInit>(RHS);
@@ -1020,6 +1039,7 @@ Init *BinOpInit::Fold(Record *CurRec) const {
       return ConcatStringInits(LHSs, RHSs);
     break;
   }
+
   case INTERLEAVE: {
     ListInit *List = dyn_cast<ListInit>(LHS);
     StringInit *Delim = dyn_cast<StringInit>(RHS);
@@ -1169,7 +1189,12 @@ std::string BinOpInit::getAsString() const {
   case GE: Result = "!ge"; break;
   case GT: Result = "!gt"; break;
   case LISTCONCAT: Result = "!listconcat"; break;
-  case LISTSPLAT: Result = "!listsplat"; break;
+  //case LISTSPLAT: Result = "!listsplat"; break;
+  // TVM local begin
+  case LISTSPLAT:
+    Result = "!listsplat";
+    break;
+  // TVM local end
   case STRCONCAT: Result = "!strconcat"; break;
   case INTERLEAVE: Result = "!interleave"; break;
   case SETDAGOP: Result = "!setdagop"; break;

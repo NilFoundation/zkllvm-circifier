@@ -946,17 +946,24 @@ Value *TargetTransformInfo::getOrCreateResultFromMemIntrinsic(
 Type *TargetTransformInfo::getMemcpyLoopLoweringType(
     LLVMContext &Context, Value *Length, unsigned SrcAddrSpace,
     unsigned DestAddrSpace, unsigned SrcAlign, unsigned DestAlign) const {
-  return TTIImpl->getMemcpyLoopLoweringType(Context, Length, SrcAddrSpace,
-                                            DestAddrSpace, SrcAlign, DestAlign);
+//  return TTIImpl->getMemcpyLoopLoweringType(Context, Length, SrcAddrSpace,
+//                                            DestAddrSpace, SrcAlign, DestAlign);
+  // TVM local begin
+  return Type::getByteTy(Context);
+  // TVM local end
 }
 
 void TargetTransformInfo::getMemcpyLoopResidualLoweringType(
     SmallVectorImpl<Type *> &OpsOut, LLVMContext &Context,
     unsigned RemainingBytes, unsigned SrcAddrSpace, unsigned DestAddrSpace,
     unsigned SrcAlign, unsigned DestAlign) const {
-  TTIImpl->getMemcpyLoopResidualLoweringType(OpsOut, Context, RemainingBytes,
-                                             SrcAddrSpace, DestAddrSpace,
-                                             SrcAlign, DestAlign);
+//  TTIImpl->getMemcpyLoopResidualLoweringType(OpsOut, Context, RemainingBytes,
+//                                             SrcAddrSpace, DestAddrSpace,
+//                                             SrcAlign, DestAlign);
+  // TVM local begin
+  for (unsigned i = 0; i != RemainingBytes; ++i)
+    OpsOut.push_back(Type::getByteTy(Context));
+  // TVM local end
 }
 
 bool TargetTransformInfo::areInlineCompatible(const Function *Caller,

@@ -44,6 +44,9 @@ using namespace llvm;
 void llvm::initializeCoroutines(PassRegistry &Registry) {
   initializeCoroEarlyLegacyPass(Registry);
   initializeCoroSplitLegacyPass(Registry);
+  // TVM local begin
+  initializeCoroTVMExpandPass(Registry);
+  // TVM local end
   initializeCoroElideLegacyPass(Registry);
   initializeCoroCleanupLegacyPass(Registry);
 }
@@ -51,6 +54,9 @@ void llvm::initializeCoroutines(PassRegistry &Registry) {
 static void addCoroutineOpt0Passes(const PassManagerBuilder &Builder,
                                    legacy::PassManagerBase &PM) {
   PM.add(createCoroSplitLegacyPass());
+  // TVM local begin
+  PM.add(createCoroTVMExpandPass());
+  // TVM local end
   PM.add(createCoroElideLegacyPass());
 
   PM.add(createBarrierNoopPass());
@@ -70,6 +76,9 @@ static void addCoroutineScalarOptimizerPasses(const PassManagerBuilder &Builder,
 static void addCoroutineSCCPasses(const PassManagerBuilder &Builder,
                                   legacy::PassManagerBase &PM) {
   PM.add(createCoroSplitLegacyPass(Builder.OptLevel != 0));
+  // TVM local begin
+  PM.add(createCoroTVMExpandPass());
+  // TVM local end
 }
 
 static void addCoroutineOptimizerLastPasses(const PassManagerBuilder &Builder,
@@ -93,7 +102,10 @@ void llvm::addCoroutinePassesToExtensionPoints(PassManagerBuilder &Builder) {
 // Construct the lowerer base class and initialize its members.
 coro::LowererBase::LowererBase(Module &M)
     : TheModule(M), Context(M.getContext()),
-      Int8Ptr(Type::getInt8PtrTy(Context)),
+//      Int8Ptr(Type::getInt8PtrTy(Context)),
+      // TVM local begin
+      Int8Ptr(Type::getIntBytePtrTy(Context)),
+      // TVM local end
       ResumeFnType(FunctionType::get(Type::getVoidTy(Context), Int8Ptr,
                                      /*isVarArg=*/false)),
       NullPtr(ConstantPointerNull::get(Int8Ptr)) {}
@@ -106,7 +118,11 @@ coro::LowererBase::LowererBase(Module &M)
 
 Value *coro::LowererBase::makeSubFnCall(Value *Arg, int Index,
                                         Instruction *InsertPt) {
-  auto *IndexVal = ConstantInt::get(Type::getInt8Ty(Context), Index);
+//  auto *IndexVal = ConstantInt::get(Type::getInt8Ty(Context), Index);
+  // TVM local begin
+  auto *IndexVal = ConstantInt::get(Type::getByteTy(Context), Index, true);
+  // TVM local end
+
   auto *Fn = Intrinsic::getDeclaration(&TheModule, Intrinsic::coro_subfn_addr);
 
   assert(Index >= CoroSubFnInst::IndexFirst &&
@@ -122,6 +138,7 @@ Value *coro::LowererBase::makeSubFnCall(Value *Arg, int Index,
 #ifndef NDEBUG
 static bool isCoroutineIntrinsicName(StringRef Name) {
   // NOTE: Must be sorted!
+  /*
   static const char *const CoroIntrinsics[] = {
       "llvm.coro.alloc",
       "llvm.coro.async.context.alloc",
@@ -152,6 +169,42 @@ static bool isCoroutineIntrinsicName(StringRef Name) {
       "llvm.coro.suspend.async",
       "llvm.coro.suspend.retcon",
   };
+  */
+
+  // TVM local begin
+  static const char *const CoroIntrinsics[] = {
+      "llvm.coro.alloc",
+      "llvm.coro.async.context.alloc",
+      "llvm.coro.async.context.dealloc",
+      "llvm.coro.async.size.replace",
+      "llvm.coro.async.store_resume",
+      "llvm.coro.begin",
+      "llvm.coro.destroy",
+      "llvm.coro.done",
+      "llvm.coro.end",
+      "llvm.coro.end.async",
+      "llvm.coro.frame",
+      "llvm.coro.free",
+      "llvm.coro.id",
+      "llvm.coro.id.async",
+      "llvm.coro.id.retcon",
+      "llvm.coro.id.retcon.once",
+      "llvm.coro.noop",
+      "llvm.coro.param",
+      "llvm.coro.prepare.async",
+      "llvm.coro.prepare.retcon",
+      "llvm.coro.promise",
+      "llvm.coro.resume",
+      "llvm.coro.save",
+      "llvm.coro.size",
+      "llvm.coro.subfn.addr",
+      "llvm.coro.suspend",
+      "llvm.coro.suspend.async",
+      "llvm.coro.suspend.retcon",
+      "llvm.coro.tvm.deserialize",
+      "llvm.coro.tvm.serialize"
+  };
+  // TVM local end
   return Intrinsic::lookupLLVMIntrinsicByName(CoroIntrinsics, Name) != -1;
 }
 #endif
@@ -181,7 +234,11 @@ void coro::replaceCoroFree(CoroIdInst *CoroId, bool Elide) {
     return;
 
   Value *Replacement =
-      Elide ? ConstantPointerNull::get(Type::getInt8PtrTy(CoroId->getContext()))
+      // Elide ? ConstantPointerNull::get(Type::getInt8PtrTy(CoroId->getContext()))
+      // TVM local begin
+      Elide ? ConstantPointerNull::get(
+        Type::getIntBytePtrTy(CoroId->getContext()))
+      // TVM local end
             : CoroFrees.front()->getFrame();
 
   for (CoroFreeInst *CF : CoroFrees) {
@@ -343,7 +400,11 @@ void coro::Shape::buildFrom(Function &F) {
   if (!CoroBegin) {
     // Replace coro.frame which are supposed to be lowered to the result of
     // coro.begin with undef.
-    auto *Undef = UndefValue::get(Type::getInt8PtrTy(F.getContext()));
+    // auto *Undef = UndefValue::get(Type::getInt8PtrTy(F.getContext()));
+    // TVM local begin
+    auto *Undef = UndefValue::get(Type::getIntBytePtrTy(F.getContext()));
+    // TVM local end
+
     for (CoroFrameInst *CF : CoroFrames) {
       CF->replaceAllUsesWith(Undef);
       CF->eraseFromParent();

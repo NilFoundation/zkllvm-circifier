@@ -13,6 +13,7 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/IntrinsicsARM.h"
+#include "llvm/IR/IntrinsicsTVM.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
@@ -103,7 +104,11 @@ MemoryLocation MemoryLocation::getForSource(const AtomicMemTransferInst *MTI) {
 MemoryLocation MemoryLocation::getForSource(const AnyMemTransferInst *MTI) {
   auto Size = LocationSize::afterPointer();
   if (ConstantInt *C = dyn_cast<ConstantInt>(MTI->getLength()))
-    Size = LocationSize::precise(C->getValue().getZExtValue());
+    // TVM local begin: 64-bit check
+    if (C->getValue().isIntN(64))
+      Size = C->getValue().getZExtValue();
+  // TVM local end
+  //  Size = LocationSize::precise(C->getValue().getZExtValue());
 
   // memcpy/memmove can have AA tags. For memcpy, they apply
   // to both the source and the destination.
@@ -121,7 +126,11 @@ MemoryLocation MemoryLocation::getForDest(const AtomicMemIntrinsic *MI) {
 MemoryLocation MemoryLocation::getForDest(const AnyMemIntrinsic *MI) {
   auto Size = LocationSize::afterPointer();
   if (ConstantInt *C = dyn_cast<ConstantInt>(MI->getLength()))
-    Size = LocationSize::precise(C->getValue().getZExtValue());
+    // TVM local begin: 64-bit check
+    if (C->getValue().isIntN(64))
+      Size = C->getValue().getZExtValue();
+    // TVM local end
+    //Size = LocationSize::precise(C->getValue().getZExtValue());
 
   // memcpy/memmove can have AA tags. For memcpy, they apply
   // to both the source and the destination.
@@ -148,8 +157,11 @@ MemoryLocation MemoryLocation::getForArgument(const CallBase *Call,
       assert((ArgIdx == 0 || ArgIdx == 1) &&
              "Invalid argument index for memory intrinsic");
       if (ConstantInt *LenCI = dyn_cast<ConstantInt>(II->getArgOperand(2)))
-        return MemoryLocation(Arg, LocationSize::precise(LenCI->getZExtValue()),
-                              AATags);
+        //  return MemoryLocation(Arg, LocationSize::precise(LenCI->getZExtValue()), AATags);
+        // TVM local begin: 64-bit check
+        if (LenCI->getValue().isIntN(64))
+          return MemoryLocation(Arg, LenCI->getZExtValue(), AATags);
+        // TVM local end
       return MemoryLocation::getAfter(Arg, AATags);
 
     case Intrinsic::lifetime_start:

@@ -3195,6 +3195,7 @@ bool LLParser::parseValID(ValID &ID, PerFunctionState *PFS, Type *ExpectedTy) {
               .first->second.insert(std::make_pair(std::move(Label), nullptr))
               .first->second;
       if (!FwdRef) {
+        /*
         unsigned FwdDeclAS;
         if (ExpectedTy) {
           // If we know the type that the blockaddress is being assigned to,
@@ -3213,6 +3214,11 @@ bool LLParser::parseValID(ValID &ID, PerFunctionState *PFS, Type *ExpectedTy) {
         FwdRef = new GlobalVariable(
             *M, Type::getInt8Ty(Context), false, GlobalValue::InternalLinkage,
             nullptr, "", nullptr, GlobalValue::NotThreadLocal, FwdDeclAS);
+            */
+      // TVM local begin
+      FwdRef = new GlobalVariable(*M, Type::getByteTy(Context), false,
+                                  GlobalValue::InternalLinkage, nullptr, "");
+      // TVM local end
       }
 
       ID.ConstantVal = FwdRef;

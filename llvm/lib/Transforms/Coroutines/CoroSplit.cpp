@@ -48,6 +48,9 @@
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
+// TVM local begin
+#include "llvm/IR/IntrinsicsTVM.h"
+// TVM local end
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
@@ -410,10 +413,17 @@ static void createResumeEntryBlock(Function &F, coro::Shape &Shape) {
     Switch->addCase(IndexVal, ResumeBB);
 
     cast<BranchInst>(SuspendBB->getTerminator())->setSuccessor(0, LandingBB);
-    auto *PN = PHINode::Create(Builder.getInt8Ty(), 2, "", &LandingBB->front());
+    //    auto *PN = PHINode::Create(Builder.getInt8Ty(), 2, "", &LandingBB->front());
+    //    S->replaceAllUsesWith(PN);
+    //    PN->addIncoming(Builder.getInt8(-1), SuspendBB);
+    //    PN->addIncoming(S, ResumeBB);
+
+    // TVM local begin
+    auto *PN = PHINode::Create(Builder.getByteTy(), 2, "", &LandingBB->front());
     S->replaceAllUsesWith(PN);
-    PN->addIncoming(Builder.getInt8(-1), SuspendBB);
+    PN->addIncoming(Builder.getByte(-1), SuspendBB);
     PN->addIncoming(S, ResumeBB);
+    // TVM local end
 
     ++SuspendIndex;
   }
@@ -551,7 +561,10 @@ void CoroCloner::replaceCoroSuspends() {
   // result in control flow proceeding to a cleanup label associated with this
   // suspend point.
   case coro::ABI::Switch:
-    SuspendResult = Builder.getInt8(isSwitchDestroyFunction() ? 1 : 0);
+    // SuspendResult = Builder.getInt8(isSwitchDestroyFunction() ? 1 : 0);
+    // TVM local begin
+    SuspendResult = Builder.getByte(isSwitchDestroyFunction() ? 1 : 0);
+    // TVM local end
     break;
 
   // In async lowering there are no uses of the result.
@@ -983,7 +996,10 @@ void CoroCloner::create() {
 
   // Remap vFrame pointer.
   auto *NewVFrame = Builder.CreateBitCast(
-      NewFramePtr, Type::getInt8PtrTy(Builder.getContext()), "vFrame");
+//      NewFramePtr, Type::getInt8PtrTy(Builder.getContext()), "vFrame");
+      // TVM local begin
+      NewFramePtr, Type::getIntBytePtrTy(Builder.getContext()), "vFrame");
+      // TVM local end
   Value *OldVFrame = cast<Value>(VMap[Shape.CoroBegin]);
   OldVFrame->replaceAllUsesWith(NewVFrame);
 
@@ -1107,7 +1123,10 @@ static void setCoroInfo(Function &F, coro::Shape &Shape,
 
   // Update coro.begin instruction to refer to this constant.
   LLVMContext &C = F.getContext();
-  auto *BC = ConstantExpr::getPointerCast(GV, Type::getInt8PtrTy(C));
+  // auto *BC = ConstantExpr::getPointerCast(GV, Type::getInt8PtrTy(C));
+  // TVM local begin
+  auto *BC = ConstantExpr::getPointerCast(GV, Type::getIntBytePtrTy(C));
+  // TVM local end
   Shape.getSwitchCoroId()->setInfo(BC);
 }
 
@@ -1306,7 +1325,10 @@ static void handleNoSuspendCoroutine(coro::Shape &Shape) {
       IRBuilder<> Builder(AllocInst);
       auto *Frame = Builder.CreateAlloca(Shape.FrameTy);
       Frame->setAlignment(Shape.FrameAlign);
-      auto *VFrame = Builder.CreateBitCast(Frame, Builder.getInt8PtrTy());
+      // auto *VFrame = Builder.CreateBitCast(Frame, Builder.getInt8PtrTy());
+      // TVM local begin
+      auto *VFrame = Builder.CreateBitCast(Frame, Builder.getIntBytePtrTy());
+      // TVM local end
       AllocInst->replaceAllUsesWith(Builder.getFalse());
       AllocInst->eraseFromParent();
       CoroBegin->replaceAllUsesWith(VFrame);
@@ -1516,7 +1538,10 @@ static void replaceAsyncResumeFunction(CoroSuspendAsyncInst *Suspend,
                                        Value *Continuation) {
   auto *ResumeIntrinsic = Suspend->getResumeFunction();
   auto &Context = Suspend->getParent()->getParent()->getContext();
-  auto *Int8PtrTy = Type::getInt8PtrTy(Context);
+  //auto *Int8PtrTy = Type::getInt8PtrTy(Context);
+  // TVM local begin
+  auto *Int8PtrTy = Type::getIntBytePtrTy(Context);
+  // TVM local end
 
   IRBuilder<> Builder(ResumeIntrinsic);
   auto *Val = Builder.CreateBitOrPointerCast(Continuation, Int8PtrTy);
@@ -1569,7 +1594,10 @@ static void splitAsyncCoroutine(Function &F, coro::Shape &Shape,
   F.removeRetAttr(Attribute::NonNull);
 
   auto &Context = F.getContext();
-  auto *Int8PtrTy = Type::getInt8PtrTy(Context);
+  //auto *Int8PtrTy = Type::getInt8PtrTy(Context);
+  // TVM local begin
+  auto *Int8PtrTy = Type::getIntBytePtrTy(Context);
+  // TVM local end
 
   auto *Id = cast<CoroIdAsyncInst>(Shape.CoroBegin->getId());
   IRBuilder<> Builder(Id);
@@ -1799,6 +1827,36 @@ namespace {
   };
 }
 
+// TVM local begin
+static bool isTVMCastToType(Instruction *I) {
+    if (auto *II = dyn_cast<IntrinsicInst>(I)) {
+      switch (II->getIntrinsicID()) {
+      default:
+      return false;
+      case Intrinsic::tvm_cast_to_slice:
+      case Intrinsic::tvm_cast_to_builder:
+      case Intrinsic::tvm_cast_to_cell:
+      case Intrinsic::tvm_cast_to_tuple:
+      return true;
+      }
+    }
+    return false;
+}
+
+static void relocateCasts(Function &F) {
+    SmallVector<Instruction *, 1> Insts;
+    for (auto II = inst_begin(F), E = inst_end(F); II != E;) {
+      Instruction *I = &*II++;
+      if (isTVMCastToType(I))
+      Insts.push_back(I);
+    }
+    for (Instruction *I : Insts) {
+      auto *def = dyn_cast<Instruction>(I->getOperand(0));
+      I->moveAfter(def);
+    }
+}
+// TVM local end
+
 static coro::Shape splitCoroutine(Function &F,
                                   SmallVectorImpl<Function *> &Clones,
                                   bool ReuseFrameSlot) {
@@ -1925,7 +1983,10 @@ static void prepareForSplit(Function &F, CallGraph &CG,
   Instruction *InsertPt =
       MarkForAsyncRestart ? F.getEntryBlock().getFirstNonPHIOrDbgOrLifetime()
                           : F.getEntryBlock().getTerminator();
-  auto *Null = ConstantPointerNull::get(Type::getInt8PtrTy(Context));
+//  auto *Null = ConstantPointerNull::get(Type::getInt8PtrTy(Context));
+  // TVM local begin
+  auto *Null = ConstantPointerNull::get(Type::getIntBytePtrTy(F.getContext()));
+  // TVM local end
   auto *DevirtFnAddr =
       Lowerer.makeSubFnCall(Null, CoroSubFnInst::RestartTrigger, InsertPt);
   FunctionType *FnTy = FunctionType::get(Type::getVoidTy(Context),
@@ -1946,8 +2007,12 @@ static void createDevirtTriggerFunc(CallGraph &CG, CallGraphSCC &SCC) {
     return;
 
   LLVMContext &C = M.getContext();
-  auto *FnTy = FunctionType::get(Type::getVoidTy(C), Type::getInt8PtrTy(C),
-                                 /*isVarArg=*/false);
+  //  auto *FnTy = FunctionType::get(Type::getVoidTy(C), Type::getInt8PtrTy(C),
+  //                                 /*isVarArg=*/false);
+  // TVM local begin
+  auto *FnTy = FunctionType::get(Type::getVoidTy(C), Type::getIntBytePtrTy(C),
+                                 /*IsVarArgs=*/false);
+  // TVM local end
   Function *DevirtFn =
       Function::Create(FnTy, GlobalValue::LinkageTypes::PrivateLinkage,
                        CORO_DEVIRT_TRIGGER_FN, &M);

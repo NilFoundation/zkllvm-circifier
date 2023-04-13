@@ -31,7 +31,12 @@ static void appendToGlobalArray(const char *Array, Module &M, Function *F,
   // to the list.
   SmallVector<Constant *, 16> CurrentCtors;
   StructType *EltTy = StructType::get(
-      IRB.getInt32Ty(), PointerType::getUnqual(FnTy), IRB.getInt8PtrTy());
+      IRB.getInt32Ty(), PointerType::getUnqual(FnTy),
+      //IRB.getInt8PtrTy());
+      // TVM local begin
+      IRB.getIntBytePtrTy());
+      // TVM local end
+
   if (GlobalVariable *GVCtor = M.getNamedGlobal(Array)) {
     if (Constant *Init = GVCtor->getInitializer()) {
       unsigned n = Init->getNumOperands();
@@ -46,8 +51,16 @@ static void appendToGlobalArray(const char *Array, Module &M, Function *F,
   Constant *CSVals[3];
   CSVals[0] = IRB.getInt32(Priority);
   CSVals[1] = F;
-  CSVals[2] = Data ? ConstantExpr::getPointerCast(Data, IRB.getInt8PtrTy())
-                   : Constant::getNullValue(IRB.getInt8PtrTy());
+  CSVals[2] = Data ? ConstantExpr::getPointerCast(Data,
+                     //IRB.getInt8PtrTy())
+                     // TVM local begin
+                     IRB.getIntBytePtrTy())
+                     // TVM local end
+                   : Constant::getNullValue(
+                     //IRB.getInt8PtrTy());
+                     // TVM local end
+                     IRB.getIntBytePtrTy());
+                     // TVM local end
   Constant *RuntimeCtorInit =
       ConstantStruct::get(EltTy, makeArrayRef(CSVals, EltTy->getNumElements()));
 
@@ -87,7 +100,11 @@ static void appendToUsedList(Module &M, StringRef Name, ArrayRef<GlobalValue *> 
     GV->eraseFromParent();
   }
 
-  Type *Int8PtrTy = llvm::Type::getInt8PtrTy(M.getContext());
+  //Type *Int8PtrTy = llvm::Type::getInt8PtrTy(M.getContext());
+  // TVM local begin
+  Type *Int8PtrTy = llvm::Type::getIntBytePtrTy(M.getContext());
+  // TVM local end
+
   for (auto *V : Values) {
     Constant *C = ConstantExpr::getPointerBitCastOrAddrSpaceCast(V, Int8PtrTy);
     if (InitAsSet.insert(C).second)
@@ -110,6 +127,19 @@ void llvm::appendToUsed(Module &M, ArrayRef<GlobalValue *> Values) {
 void llvm::appendToCompilerUsed(Module &M, ArrayRef<GlobalValue *> Values) {
   appendToUsedList(M, "llvm.compiler.used", Values);
 }
+
+// TVM local begin
+Function *llvm::checkSanitizerInterfaceFunction(Constant *FuncOrBitcast) {
+  if (isa<Function>(FuncOrBitcast))
+    return cast<Function>(FuncOrBitcast);
+  FuncOrBitcast->print(errs());
+  errs() << '\n';
+  std::string Err;
+  raw_string_ostream Stream(Err);
+  Stream << "Sanitizer interface function redefined: " << *FuncOrBitcast;
+  report_fatal_error(Err);
+}
+// TVM local end
 
 FunctionCallee
 llvm::declareSanitizerInitFunction(Module &M, StringRef InitName,

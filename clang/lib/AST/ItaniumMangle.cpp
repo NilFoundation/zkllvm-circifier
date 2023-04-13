@@ -682,6 +682,11 @@ bool ItaniumMangleContextImpl::shouldMangleCXXName(const NamedDecl *D) {
     if (FD->isMSVCRTEntryPoint())
       return false;
 
+   // TVM local begin
+    if (FD->hasAttr<TVMRawFuncAttr>())
+      return false;
+    // TVM local end
+
     // C++ functions and those whose names are not a simple identifier need
     // mangling.
     if (!FD->getDeclName().isIdentifier() || L == CXXLanguageLinkage)
@@ -3072,6 +3077,21 @@ void CXXNameMangler::mangleType(const BuiltinType *T) {
     Out << 'u' << type_name.size() << type_name;                               \
     break;
 #include "clang/Basic/RISCVVTypes.def"
+
+    // TVM local begin
+  case BuiltinType::TVMSlice:
+    Out << "TVMs";
+    break;
+  case BuiltinType::TVMBuilder:
+    Out << "TVMb";
+    break;
+  case BuiltinType::TVMCell:
+    Out << "TVMc";
+    break;
+  case BuiltinType::TVMTuple:
+    Out << "TVMt";
+    break;
+    // TVM local end
   }
 }
 

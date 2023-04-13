@@ -440,6 +440,11 @@ public:
   /// Print a general LLVM constant to the .s file.
   void emitGlobalConstant(const DataLayout &DL, const Constant *CV);
 
+  // TVM local begin
+  /// Print a big LLVM constant int (>64 bit) to the .s file.
+  virtual void EmitBigInt(const ConstantInt *CI);
+  // TVM local end
+
   /// Unnamed constant global variables solely contaning a pointer to
   /// another globals variable act like a global variable "proxy", or GOT
   /// equivalents, i.e., it's only used to hold the address of the latter. One
@@ -499,6 +504,12 @@ public:
   virtual void emitInstruction(const MachineInstr *) {
     llvm_unreachable("EmitInstruction not implemented");
   }
+
+ // TVM local begin
+  virtual bool ShouldPrintNextBlock(const MachineBasicBlock &CurMBB) const {
+    return true;
+  }
+  // TVM local end
 
   /// Return the symbol for the specified constant pool entry.
   virtual MCSymbol *GetCPISymbol(unsigned CPID) const;
@@ -753,15 +764,19 @@ public:
   static Align getGVAlignment(const GlobalObject *GV, const DataLayout &DL,
                               Align InAlign = Align(1));
 
+  /// This method emits the header for the current function.
+  // TVM local begin
+protected:
+  /// This method emits the header for the current function.
+  virtual void emitFunctionHeader();
+  // TVM local end
+
 private:
   /// Private state for PrintSpecial()
   // Assign a unique ID to this machine instruction.
   mutable const MachineInstr *LastMI = nullptr;
   mutable unsigned LastFn = 0;
   mutable unsigned Counter = ~0U;
-
-  /// This method emits the header for the current function.
-  virtual void emitFunctionHeader();
 
   /// This method emits a comment next to header for the current function.
   virtual void emitFunctionHeaderComment();

@@ -1,11 +1,15 @@
 cmake_minimum_required(VERSION 3.13.4)
 
+if(MSVC)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /std:c++17")
+endif(MSVC)
+
 # If we are not building as a part of LLVM, build Clang as an
 # standalone project, using LLVM as an external library:
 if( CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR )
   project(Clang)
 
-  set(CMAKE_CXX_STANDARD 14 CACHE STRING "C++ standard to conform to")
+  set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ standard to conform to")
   set(CMAKE_CXX_STANDARD_REQUIRED YES)
   set(CMAKE_CXX_EXTENSIONS NO)
 

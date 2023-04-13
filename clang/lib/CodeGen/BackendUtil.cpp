@@ -965,7 +965,10 @@ void EmitAssemblyHelper::EmitAssembly(BackendAction Action,
 
   bool UsesCodeGen = (Action != Backend_EmitNothing &&
                       Action != Backend_EmitBC &&
-                      Action != Backend_EmitLL);
+                      Action != Backend_EmitLL  &&
+                      // TVM local begin
+                      Action != Backend_EmitTextConst);
+                      // TVM local end
   CreateTargetMachine(UsesCodeGen);
 
   if (UsesCodeGen && !TM)
@@ -1037,6 +1040,13 @@ void EmitAssemblyHelper::EmitAssembly(BackendAction Action,
     PerModulePasses.add(
         createPrintModulePass(*OS, "", CodeGenOpts.EmitLLVMUseLists));
     break;
+
+  // TVM local begin
+  case Backend_EmitTextConst:
+    PerModulePasses.add(
+        createPrintTextConstantPass(*OS, CodeGenOpts.EmitTextConstant));
+    break;
+    // TVM local end
 
   default:
     if (!CodeGenOpts.SplitDwarfOutput.empty()) {
@@ -1213,7 +1223,11 @@ void EmitAssemblyHelper::EmitAssemblyWithNewPassManager(
 
   bool RequiresCodeGen = (Action != Backend_EmitNothing &&
                           Action != Backend_EmitBC &&
-                          Action != Backend_EmitLL);
+                          Action != Backend_EmitLL &&
+                          // TVM local begin
+                          Action != Backend_EmitTextConst);
+                          // TVM local end
+
   CreateTargetMachine(RequiresCodeGen);
 
   if (RequiresCodeGen && !TM)
@@ -1446,6 +1460,9 @@ void EmitAssemblyHelper::EmitAssemblyWithNewPassManager(
   // Append any output we need to the pass manager.
   switch (Action) {
   case Backend_EmitNothing:
+    // TVM local begin
+  case Backend_EmitTextConst:
+    // TVM local end
     break;
 
   case Backend_EmitBC:

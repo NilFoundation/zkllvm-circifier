@@ -40,6 +40,10 @@ TargetInfo::TargetInfo(const llvm::Triple &T) : TargetOpts(), Triple(T) {
   HasStrictFP = false;
   PointerWidth = PointerAlign = 32;
   BoolWidth = BoolAlign = 8;
+  // TVM local begin
+  CharWidth = CharAlign = 8;
+  ShortWidth = ShortAlign = 16;
+  // TVM local end
   IntWidth = IntAlign = 32;
   LongWidth = LongAlign = 32;
   LongLongWidth = LongLongAlign = 64;

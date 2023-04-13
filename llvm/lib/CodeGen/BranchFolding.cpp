@@ -1355,7 +1355,10 @@ ReoptimizeBlock:
       // instead.
       while (!MBB->pred_empty()) {
         MachineBasicBlock *Pred = *(MBB->pred_end()-1);
-        Pred->ReplaceUsesOfBlockWith(MBB, &*FallThrough);
+        //Pred->ReplaceUsesOfBlockWith(MBB, &*FallThrough);
+        // TVM local begin
+        TII->ReplaceUsesOfBlockWith(Pred, MBB, &*FallThrough);
+        // TVM local end
       }
       // If MBB was the target of a jump table, update jump tables to go to the
       // fallthrough instead.
@@ -1382,7 +1385,10 @@ ReoptimizeBlock:
       DebugLoc dl = getBranchDebugLoc(PrevBB);
       TII->removeBranch(PrevBB);
       PriorCond.clear();
-      if (PriorTBB != MBB)
+      //if (PriorTBB != MBB)
+      // TVM local begin
+      if (PriorTBB != MBB || !PriorTBB->canFallThrough())
+      // TVM local end
         TII->insertBranch(PrevBB, PriorTBB, nullptr, PriorCond, dl);
       MadeChange = true;
       ++NumBranchOpts;
@@ -1427,7 +1433,10 @@ ReoptimizeBlock:
 
     // If the previous branch *only* branches to *this* block (conditional or
     // not) remove the branch.
-    if (PriorTBB == MBB && !PriorFBB) {
+    //if (PriorTBB == MBB && !PriorFBB) {
+    // TVM local begin
+    if (PriorTBB == MBB && !PriorFBB && PrevBB.canFallThrough()) {
+    // TVM local end
       TII->removeBranch(PrevBB);
       MadeChange = true;
       ++NumBranchOpts;
@@ -1436,7 +1445,10 @@ ReoptimizeBlock:
 
     // If the prior block branches somewhere else on the condition and here if
     // the condition is false, remove the uncond second branch.
-    if (PriorFBB == MBB) {
+    //if (PriorFBB == MBB) {
+    // TVM local begin
+    if (PriorFBB == MBB && PrevBB.canFallThrough()) {
+    // TVM local end
       DebugLoc dl = getBranchDebugLoc(PrevBB);
       TII->removeBranch(PrevBB);
       TII->insertBranch(PrevBB, PriorTBB, nullptr, PriorCond, dl);
@@ -1448,7 +1460,10 @@ ReoptimizeBlock:
     // If the prior block branches here on true and somewhere else on false, and
     // if the branch condition is reversible, reverse the branch to create a
     // fall-through.
-    if (PriorTBB == MBB) {
+    //if (PriorTBB == MBB) {
+    // TVM local begin
+    if (PriorTBB == MBB && PrevBB.canFallThrough()) {
+    // TVM local end
       SmallVector<MachineOperand, 4> NewPriorCond(PriorCond);
       if (!TII->reverseBranchCondition(NewPriorCond)) {
         DebugLoc dl = getBranchDebugLoc(PrevBB);
@@ -1616,7 +1631,11 @@ ReoptimizeBlock:
               HasBranchToSelf = true;
             } else {
               DidChange = true;
-              PMBB->ReplaceUsesOfBlockWith(MBB, CurTBB);
+              // PMBB->ReplaceUsesOfBlockWith(MBB, CurTBB);
+              // TVM local begin
+              TII->ReplaceUsesOfBlockWith(PMBB, MBB, CurTBB);
+              // TVM local end
+
               // If this change resulted in PMBB ending in a conditional
               // branch where both conditions go to the same destination,
               // change this to an unconditional branch.
@@ -1668,6 +1687,10 @@ ReoptimizeBlock:
         MachineBasicBlock *PredTBB = nullptr, *PredFBB = nullptr;
         SmallVector<MachineOperand, 4> PredCond;
         if (PredBB != MBB && !PredBB->canFallThrough() &&
+            // TVM local begin
+            !PredBB->isLayoutSuccessor(MBB) &&
+            TII->canFallthrough(*PredBB, *MBB) &&
+            // TVM local end
             !TII->analyzeBranch(*PredBB, PredTBB, PredFBB, PredCond, true) &&
             (PredTBB == MBB || PredFBB == MBB) &&
             (!CurFallsThru || !CurTBB || !CurFBB) &&
@@ -1684,8 +1707,18 @@ ReoptimizeBlock:
           // next:
           if (CurFallsThru) {
             MachineBasicBlock *NextBB = &*std::next(MBB->getIterator());
-            CurCond.clear();
-            TII->insertBranch(*MBB, NextBB, nullptr, CurCond, DebugLoc());
+
+            //CurCond.clear();
+            //TII->insertBranch(*MBB, NextBB, nullptr, CurCond, DebugLoc());
+
+            // TVM local begin
+            // CurFallsThru may mean that existing uncond branch jumps
+            //  into next block
+            if (CurTBB != NextBB) {
+              CurCond.clear();
+              TII->insertBranch(*MBB, NextBB, nullptr, CurCond, DebugLoc());
+            }
+            // TVM local end
           }
           MBB->moveAfter(PredBB);
           MadeChange = true;
@@ -1708,6 +1741,9 @@ ReoptimizeBlock:
           // if the succ doesn't already have a block that can fall through into
           // it, we can arrange for the fallthrough to happen.
           if (SuccBB != MBB && &*SuccPrev != MBB &&
+              // TVM local begin
+              TII->canFallthrough(*MBB, *SuccBB) &&
+              // TVM local end
               !SuccPrev->canFallThrough()) {
             MBB->moveBefore(SuccBB);
             MadeChange = true;
@@ -1735,6 +1771,9 @@ ReoptimizeBlock:
       if (FallThrough != MF.end() &&
           !FallThrough->isEHPad() &&
           !TII->analyzeBranch(PrevBB, PrevTBB, PrevFBB, PrevCond, true) &&
+          // TVM local begin
+          TII->canFallthrough(PrevBB, *FallThrough) &&
+          // TVM local end
           PrevBB.isSuccessor(&*FallThrough)) {
         MBB->moveAfter(&MF.back());
         MadeChange = true;

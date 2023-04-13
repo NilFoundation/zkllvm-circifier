@@ -849,7 +849,10 @@ void SeparateConstOffsetFromGEP::lowerToSingleIndexGEPs(
   Type *IntPtrTy = DL->getIntPtrType(Variadic->getType());
 
   Type *I8PtrTy =
-      Builder.getInt8PtrTy(Variadic->getType()->getPointerAddressSpace());
+  //      Builder.getInt8PtrTy(Variadic->getType()->getPointerAddressSpace());
+  // TVM local begin
+      Builder.getIntBytePtrTy(Variadic->getType()->getPointerAddressSpace());
+  // TVM local end
   Value *ResultPtr = Variadic->getOperand(0);
   Loop *L = LI->getLoopFor(Variadic->getParent());
   // Check if the base is not loop invariant or used more than once.
@@ -1123,11 +1126,20 @@ bool SeparateConstOffsetFromGEP::splitGEP(GetElementPtrInst *GEP) {
     // sizeof(int64).
     //
     // Emit an uglygep in this case.
-    Type *I8PtrTy = Type::getInt8PtrTy(GEP->getContext(),
-                                       GEP->getPointerAddressSpace());
+
+//    Type *I8PtrTy = Type::getInt8PtrTy(GEP->getContext(),
+//                                       GEP->getPointerAddressSpace());
+    // TVM local begin
+    Type *I8PtrTy = Type::getIntBytePtrTy(GEP->getContext(), GEP->getPointerAddressSpace());
+    // TVM local end
+
     NewGEP = new BitCastInst(NewGEP, I8PtrTy, "", GEP);
     NewGEP = GetElementPtrInst::Create(
-        Type::getInt8Ty(GEP->getContext()), NewGEP,
+        // Type::getInt8Ty(GEP->getContext()), NewGEP,
+        // TVM local begin
+        Type::getByteTy(GEP->getContext()), NewGEP,
+        // TVM local end
+
         ConstantInt::get(IntPtrTy, AccumulativeByteOffset, true), "uglygep",
         GEP);
     NewGEP->copyMetadata(*GEP);

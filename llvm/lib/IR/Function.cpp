@@ -48,6 +48,7 @@
 #include "llvm/IR/IntrinsicsWebAssembly.h"
 #include "llvm/IR/IntrinsicsX86.h"
 #include "llvm/IR/IntrinsicsXCore.h"
+#include "llvm/IR/IntrinsicsTVM.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/MDBuilder.h"
 #include "llvm/IR/Metadata.h"
@@ -979,7 +980,16 @@ enum IIT_Info {
   IIT_BF16 = 48,
   IIT_STRUCT9 = 49,
   IIT_V256 = 50,
-  IIT_AMX  = 51
+  IIT_AMX  = 51,
+
+  // TVM local begin
+  IIT_STRUCT8_AND_MORE = 52,
+  IIT_I257 = 53,
+  IIT_TVMSLICE = 54,
+  IIT_TVMBUILDER = 55,
+  IIT_TVMCELL = 56,
+  IIT_TVMTUPLE = 57
+  // TVM local end
 };
 
 static void DecodeIITType(unsigned &NextElt, ArrayRef<unsigned char> Infos,
@@ -991,6 +1001,15 @@ static void DecodeIITType(unsigned &NextElt, ArrayRef<unsigned char> Infos,
 
   IIT_Info Info = IIT_Info(Infos[NextElt++]);
   unsigned StructElts = 2;
+
+ // TVM local begin
+  auto decodeStruct = [&](unsigned StructElts) {
+    OutputTable.push_back(
+        IITDescriptor::get(IITDescriptor::Struct, StructElts));
+    for (unsigned i = 0; i != StructElts; ++i)
+      DecodeIITType(NextElt, Infos, LastInfo, OutputTable);
+  };
+  // TVM local end
 
   switch (Info) {
   case IIT_Done:
@@ -1030,7 +1049,12 @@ static void DecodeIITType(unsigned &NextElt, ArrayRef<unsigned char> Infos,
     OutputTable.push_back(IITDescriptor::get(IITDescriptor::Integer, 1));
     return;
   case IIT_I8:
-    OutputTable.push_back(IITDescriptor::get(IITDescriptor::Integer, 8));
+//    OutputTable.push_back(IITDescriptor::get(IITDescriptor::Integer, 8));
+    // TVM local begin
+    // TODO: Maybe implement separate intrinsic type descriptor for Byte
+    OutputTable.push_back(
+        IITDescriptor::get(IITDescriptor::Integer, ByteSizeInBits));
+    // TVM local end
     return;
   case IIT_I16:
     OutputTable.push_back(IITDescriptor::get(IITDescriptor::Integer,16));
@@ -1044,6 +1068,23 @@ static void DecodeIITType(unsigned &NextElt, ArrayRef<unsigned char> Infos,
   case IIT_I128:
     OutputTable.push_back(IITDescriptor::get(IITDescriptor::Integer, 128));
     return;
+  // TVM local begin
+  case IIT_I257:
+    OutputTable.push_back(IITDescriptor::get(IITDescriptor::Integer, 257));
+    return;
+  case IIT_TVMSLICE:
+    OutputTable.push_back(IITDescriptor::get(IITDescriptor::TVMSlice, 0));
+    return;
+  case IIT_TVMBUILDER:
+    OutputTable.push_back(IITDescriptor::get(IITDescriptor::TVMBuilder, 0));
+    return;
+  case IIT_TVMCELL:
+    OutputTable.push_back(IITDescriptor::get(IITDescriptor::TVMCell, 0));
+    return;
+  case IIT_TVMTUPLE:
+    OutputTable.push_back(IITDescriptor::get(IITDescriptor::TVMTuple, 0));
+    return;
+  // TVM local end
   case IIT_V1:
     OutputTable.push_back(IITDescriptor::getVector(1, IsScalableVector));
     DecodeIITType(NextElt, Infos, Info, OutputTable);
@@ -1148,6 +1189,48 @@ static void DecodeIITType(unsigned &NextElt, ArrayRef<unsigned char> Infos,
   case IIT_EMPTYSTRUCT:
     OutputTable.push_back(IITDescriptor::get(IITDescriptor::Struct, 0));
     return;
+  // TVM local begin
+  case IIT_STRUCT8_AND_MORE: {
+    unsigned StructElts = 8;
+    while (Infos[NextElt] == IIT_STRUCT8_AND_MORE) {
+      StructElts += 8;
+      ++NextElt;
+    }
+    switch (Infos[NextElt]) {
+    case IIT_STRUCT8:
+      ++NextElt;
+      decodeStruct(StructElts + 8);
+      return;
+    case IIT_STRUCT7:
+      ++NextElt;
+      decodeStruct(StructElts + 7);
+      return;
+    case IIT_STRUCT6:
+      ++NextElt;
+      decodeStruct(StructElts + 6);
+      return;
+    case IIT_STRUCT5:
+      ++NextElt;
+      decodeStruct(StructElts + 5);
+      return;
+    case IIT_STRUCT4:
+      ++NextElt;
+      decodeStruct(StructElts + 4);
+      return;
+    case IIT_STRUCT3:
+      ++NextElt;
+      decodeStruct(StructElts + 3);
+      return;
+    case IIT_STRUCT2:
+      ++NextElt;
+      decodeStruct(StructElts + 2);
+      return;
+    default:
+      decodeStruct(StructElts + 1);
+      return;
+    }
+  }
+  // TVM local end
   case IIT_STRUCT9: ++StructElts; LLVM_FALLTHROUGH;
   case IIT_STRUCT8: ++StructElts; LLVM_FALLTHROUGH;
   case IIT_STRUCT7: ++StructElts; LLVM_FALLTHROUGH;
@@ -1250,6 +1333,17 @@ static Type *DecodeFixedType(ArrayRef<Intrinsic::IITDescriptor> &Infos,
   case IITDescriptor::Float: return Type::getFloatTy(Context);
   case IITDescriptor::Double: return Type::getDoubleTy(Context);
   case IITDescriptor::Quad: return Type::getFP128Ty(Context);
+
+  // TVM local begin
+  case IITDescriptor::TVMSlice:
+    return Type::getTVMSliceTy(Context);
+  case IITDescriptor::TVMBuilder:
+    return Type::getTVMBuilderTy(Context);
+  case IITDescriptor::TVMCell:
+    return Type::getTVMCellTy(Context);
+  case IITDescriptor::TVMTuple:
+    return Type::getTVMTupleTy(Context);
+    // TVM local end
 
   case IITDescriptor::Integer:
     return IntegerType::get(Context, D.Integer_Width);
@@ -1382,8 +1476,8 @@ Function *Intrinsic::getDeclaration(Module *M, ID id, ArrayRef<Type*> Tys) {
   auto *FT = getType(M->getContext(), id, Tys);
   return cast<Function>(
       M->getOrInsertFunction(Tys.empty() ? getName(id)
-                                         : getName(id, Tys, M, FT),
-                             getType(M->getContext(), id, Tys))
+               : getName(id, Tys, M, FT),
+                             FT)
           .getCallee());
 }
 
@@ -1433,6 +1527,18 @@ static bool matchIntrinsicType(
     case IITDescriptor::Double: return !Ty->isDoubleTy();
     case IITDescriptor::Quad: return !Ty->isFP128Ty();
     case IITDescriptor::Integer: return !Ty->isIntegerTy(D.Integer_Width);
+
+    // TVM local begin
+    case IITDescriptor::TVMSlice:
+      return !Ty->isTVMSliceTy();
+    case IITDescriptor::TVMBuilder:
+      return !Ty->isTVMBuilderTy();
+    case IITDescriptor::TVMCell:
+      return !Ty->isTVMCellTy();
+    case IITDescriptor::TVMTuple:
+      return !Ty->isTVMTupleTy();
+      // TVM local end
+
     case IITDescriptor::Vector: {
       VectorType *VT = dyn_cast<VectorType>(Ty);
       return !VT || VT->getElementCount() != D.Vector_Width ||

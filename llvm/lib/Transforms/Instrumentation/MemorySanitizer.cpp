@@ -798,62 +798,117 @@ void MemorySanitizer::createUserspaceApi(Module &M) {
       M.getOrInsertFunction(WarningFnName, IRB.getVoidTy(), IRB.getInt32Ty());
 
   // Create the global TLS variables.
-  RetvalTLS =
-      getOrInsertGlobal(M, "__msan_retval_tls",
-                        ArrayType::get(IRB.getInt64Ty(), kRetvalTLSSize / 8));
+//  RetvalTLS =
+//      getOrInsertGlobal(M, "__msan_retval_tls",
+//                        ArrayType::get(IRB.getInt64Ty(), kRetvalTLSSize / 8));
+//
+//  RetvalOriginTLS = getOrInsertGlobal(M, "__msan_retval_origin_tls", OriginTy);
+//
+//  ParamTLS =
+//      getOrInsertGlobal(M, "__msan_param_tls",
+//                        ArrayType::get(IRB.getInt64Ty(), kParamTLSSize / 8));
+//
+//  ParamOriginTLS =
+//      getOrInsertGlobal(M, "__msan_param_origin_tls",
+//                        ArrayType::get(OriginTy, kParamTLSSize / 4));
+//
+//  VAArgTLS =
+//      getOrInsertGlobal(M, "__msan_va_arg_tls",
+//                        ArrayType::get(IRB.getInt64Ty(), kParamTLSSize / 8));
+//
+//  VAArgOriginTLS =
+//      getOrInsertGlobal(M, "__msan_va_arg_origin_tls",
+//                        ArrayType::get(OriginTy, kParamTLSSize / 4));
+//
+//  VAArgOverflowSizeTLS =
+//      getOrInsertGlobal(M, "__msan_va_arg_overflow_size_tls", IRB.getInt64Ty());
+//
+//  for (size_t AccessSizeIndex = 0; AccessSizeIndex < kNumberOfAccessSizes;
+//       AccessSizeIndex++) {
+//    unsigned AccessSize = 1 << AccessSizeIndex;
+//    std::string FunctionName = "__msan_maybe_warning_" + itostr(AccessSize);
+//    SmallVector<std::pair<unsigned, Attribute>, 2> MaybeWarningFnAttrs;
+//    MaybeWarningFnAttrs.push_back(std::make_pair(
+//        AttributeList::FirstArgIndex, Attribute::get(*C, Attribute::ZExt)));
+//    MaybeWarningFnAttrs.push_back(std::make_pair(
+//        AttributeList::FirstArgIndex + 1, Attribute::get(*C, Attribute::ZExt)));
+//    MaybeWarningFn[AccessSizeIndex] = M.getOrInsertFunction(
+//        FunctionName, AttributeList::get(*C, MaybeWarningFnAttrs),
+//        IRB.getVoidTy(), IRB.getIntNTy(AccessSize * 8), IRB.getInt32Ty());
+//
+//    FunctionName = "__msan_maybe_store_origin_" + itostr(AccessSize);
+//    SmallVector<std::pair<unsigned, Attribute>, 2> MaybeStoreOriginFnAttrs;
+//    MaybeStoreOriginFnAttrs.push_back(std::make_pair(
+//        AttributeList::FirstArgIndex, Attribute::get(*C, Attribute::ZExt)));
+//    MaybeStoreOriginFnAttrs.push_back(std::make_pair(
+//        AttributeList::FirstArgIndex + 2, Attribute::get(*C, Attribute::ZExt)));
+//    MaybeStoreOriginFn[AccessSizeIndex] = M.getOrInsertFunction(
+//        FunctionName, AttributeList::get(*C, MaybeStoreOriginFnAttrs),
+//        IRB.getVoidTy(), IRB.getIntNTy(AccessSize * 8), IRB.getInt8PtrTy(),
+//        IRB.getInt32Ty());
+//  }
+//
+//  MsanSetAllocaOrigin4Fn = M.getOrInsertFunction(
+//    "__msan_set_alloca_origin4", IRB.getVoidTy(), IRB.getInt8PtrTy(), IntptrTy,
+//    IRB.getInt8PtrTy(), IntptrTy);
+//  MsanPoisonStackFn =
+//      M.getOrInsertFunction("__msan_poison_stack", IRB.getVoidTy(),
+//                            IRB.getInt8PtrTy(), IntptrTy);
 
-  RetvalOriginTLS = getOrInsertGlobal(M, "__msan_retval_origin_tls", OriginTy);
+  // TVM local begin
+  // Create the global TLS variables.
+  RetvalTLS = new GlobalVariable(
+      M, ArrayType::get(IRB.getInt64Ty(), kRetvalTLSSize / ByteSizeInBits),
+      false, GlobalVariable::ExternalLinkage, nullptr, "__msan_retval_tls",
+      nullptr, GlobalVariable::InitialExecTLSModel);
 
-  ParamTLS =
-      getOrInsertGlobal(M, "__msan_param_tls",
-                        ArrayType::get(IRB.getInt64Ty(), kParamTLSSize / 8));
+  RetvalOriginTLS = new GlobalVariable(
+      M, OriginTy, false, GlobalVariable::ExternalLinkage, nullptr,
+      "__msan_retval_origin_tls", nullptr, GlobalVariable::InitialExecTLSModel);
 
-  ParamOriginTLS =
-      getOrInsertGlobal(M, "__msan_param_origin_tls",
-                        ArrayType::get(OriginTy, kParamTLSSize / 4));
+  ParamTLS = new GlobalVariable(
+      M, ArrayType::get(IRB.getInt64Ty(), kParamTLSSize / ByteSizeInBits),
+      false, GlobalVariable::ExternalLinkage, nullptr, "__msan_param_tls",
+      nullptr, GlobalVariable::InitialExecTLSModel);
 
-  VAArgTLS =
-      getOrInsertGlobal(M, "__msan_va_arg_tls",
-                        ArrayType::get(IRB.getInt64Ty(), kParamTLSSize / 8));
+  ParamOriginTLS = new GlobalVariable(
+      M, ArrayType::get(OriginTy, kParamTLSSize / 4), false,
+      GlobalVariable::ExternalLinkage, nullptr, "__msan_param_origin_tls",
+      nullptr, GlobalVariable::InitialExecTLSModel);
 
-  VAArgOriginTLS =
-      getOrInsertGlobal(M, "__msan_va_arg_origin_tls",
-                        ArrayType::get(OriginTy, kParamTLSSize / 4));
-
-  VAArgOverflowSizeTLS =
-      getOrInsertGlobal(M, "__msan_va_arg_overflow_size_tls", IRB.getInt64Ty());
+  VAArgTLS = new GlobalVariable(
+      M, ArrayType::get(IRB.getInt64Ty(), kParamTLSSize / ByteSizeInBits),
+      false, GlobalVariable::ExternalLinkage, nullptr, "__msan_va_arg_tls",
+      nullptr, GlobalVariable::InitialExecTLSModel);
+  VAArgOverflowSizeTLS = new GlobalVariable(
+      M, IRB.getInt64Ty(), false, GlobalVariable::ExternalLinkage, nullptr,
+      "__msan_va_arg_overflow_size_tls", nullptr,
+      GlobalVariable::InitialExecTLSModel);
+//  OriginTLS = new GlobalVariable(
+//      M, IRB.getInt32Ty(), false, GlobalVariable::ExternalLinkage, nullptr,
+//      "__msan_origin_tls", nullptr, GlobalVariable::InitialExecTLSModel);
 
   for (size_t AccessSizeIndex = 0; AccessSizeIndex < kNumberOfAccessSizes;
        AccessSizeIndex++) {
     unsigned AccessSize = 1 << AccessSizeIndex;
     std::string FunctionName = "__msan_maybe_warning_" + itostr(AccessSize);
-    SmallVector<std::pair<unsigned, Attribute>, 2> MaybeWarningFnAttrs;
-    MaybeWarningFnAttrs.push_back(std::make_pair(
-        AttributeList::FirstArgIndex, Attribute::get(*C, Attribute::ZExt)));
-    MaybeWarningFnAttrs.push_back(std::make_pair(
-        AttributeList::FirstArgIndex + 1, Attribute::get(*C, Attribute::ZExt)));
     MaybeWarningFn[AccessSizeIndex] = M.getOrInsertFunction(
-        FunctionName, AttributeList::get(*C, MaybeWarningFnAttrs),
-        IRB.getVoidTy(), IRB.getIntNTy(AccessSize * 8), IRB.getInt32Ty());
+        FunctionName, IRB.getVoidTy(),
+        IRB.getIntNTy(AccessSize * ByteSizeInBits), IRB.getInt32Ty());
 
     FunctionName = "__msan_maybe_store_origin_" + itostr(AccessSize);
-    SmallVector<std::pair<unsigned, Attribute>, 2> MaybeStoreOriginFnAttrs;
-    MaybeStoreOriginFnAttrs.push_back(std::make_pair(
-        AttributeList::FirstArgIndex, Attribute::get(*C, Attribute::ZExt)));
-    MaybeStoreOriginFnAttrs.push_back(std::make_pair(
-        AttributeList::FirstArgIndex + 2, Attribute::get(*C, Attribute::ZExt)));
-    MaybeStoreOriginFn[AccessSizeIndex] = M.getOrInsertFunction(
-        FunctionName, AttributeList::get(*C, MaybeStoreOriginFnAttrs),
-        IRB.getVoidTy(), IRB.getIntNTy(AccessSize * 8), IRB.getInt8PtrTy(),
-        IRB.getInt32Ty());
+    MaybeStoreOriginFn[AccessSizeIndex] =
+        M.getOrInsertFunction(FunctionName, IRB.getVoidTy(),
+                              IRB.getIntNTy(AccessSize * ByteSizeInBits),
+                              IRB.getIntBytePtrTy(), IRB.getInt32Ty());
   }
 
   MsanSetAllocaOrigin4Fn = M.getOrInsertFunction(
-    "__msan_set_alloca_origin4", IRB.getVoidTy(), IRB.getInt8PtrTy(), IntptrTy,
-    IRB.getInt8PtrTy(), IntptrTy);
-  MsanPoisonStackFn =
-      M.getOrInsertFunction("__msan_poison_stack", IRB.getVoidTy(),
-                            IRB.getInt8PtrTy(), IntptrTy);
+      "__msan_set_alloca_origin4", IRB.getVoidTy(), IRB.getIntBytePtrTy(),
+      IntptrTy, IRB.getIntBytePtrTy(), IntptrTy);
+  MsanPoisonStackFn = M.getOrInsertFunction(
+      "__msan_poison_stack", IRB.getVoidTy(), IRB.getIntBytePtrTy(), IntptrTy);
+  // TVM local end
 }
 
 /// Insert extern declaration of runtime-provided functions and globals.
@@ -865,24 +920,38 @@ void MemorySanitizer::initializeCallbacks(Module &M) {
   IRBuilder<> IRB(*C);
   // Initialize callbacks that are common for kernel and userspace
   // instrumentation.
-  MsanChainOriginFn = M.getOrInsertFunction(
-    "__msan_chain_origin", IRB.getInt32Ty(), IRB.getInt32Ty());
-  MsanSetOriginFn =
-      M.getOrInsertFunction("__msan_set_origin", IRB.getVoidTy(),
-                            IRB.getInt8PtrTy(), IntptrTy, IRB.getInt32Ty());
-  MemmoveFn = M.getOrInsertFunction(
-    "__msan_memmove", IRB.getInt8PtrTy(), IRB.getInt8PtrTy(),
-    IRB.getInt8PtrTy(), IntptrTy);
-  MemcpyFn = M.getOrInsertFunction(
-    "__msan_memcpy", IRB.getInt8PtrTy(), IRB.getInt8PtrTy(), IRB.getInt8PtrTy(),
-    IntptrTy);
-  MemsetFn = M.getOrInsertFunction(
-    "__msan_memset", IRB.getInt8PtrTy(), IRB.getInt8PtrTy(), IRB.getInt32Ty(),
-    IntptrTy);
+//  MsanChainOriginFn = M.getOrInsertFunction(
+//    "__msan_chain_origin", IRB.getInt32Ty(), IRB.getInt32Ty());
+//  MsanSetOriginFn =
+//      M.getOrInsertFunction("__msan_set_origin", IRB.getVoidTy(),
+//                            IRB.getInt8PtrTy(), IntptrTy, IRB.getInt32Ty());
+//  MemmoveFn = M.getOrInsertFunction(
+//    "__msan_memmove", IRB.getInt8PtrTy(), IRB.getInt8PtrTy(),
+//    IRB.getInt8PtrTy(), IntptrTy);
+//  MemcpyFn = M.getOrInsertFunction(
+//    "__msan_memcpy", IRB.getInt8PtrTy(), IRB.getInt8PtrTy(), IRB.getInt8PtrTy(),
+//    IntptrTy);
+//  MemsetFn = M.getOrInsertFunction(
+//    "__msan_memset", IRB.getInt8PtrTy(), IRB.getInt8PtrTy(), IRB.getInt32Ty(),
+//    IntptrTy);
+//
+//  MsanInstrumentAsmStoreFn =
+//      M.getOrInsertFunction("__msan_instrument_asm_store", IRB.getVoidTy(),
+//                            PointerType::get(IRB.getInt8Ty(), 0), IntptrTy);
 
-  MsanInstrumentAsmStoreFn =
-      M.getOrInsertFunction("__msan_instrument_asm_store", IRB.getVoidTy(),
-                            PointerType::get(IRB.getInt8Ty(), 0), IntptrTy);
+ // TVM local begin
+  MsanChainOriginFn = M.getOrInsertFunction("__msan_chain_origin",
+                                            IRB.getInt32Ty(), IRB.getInt32Ty());
+  MemmoveFn = M.getOrInsertFunction("__msan_memmove", IRB.getIntBytePtrTy(),
+                                    IRB.getIntBytePtrTy(),
+                                    IRB.getIntBytePtrTy(), IntptrTy);
+  MemcpyFn = M.getOrInsertFunction("__msan_memcpy", IRB.getIntBytePtrTy(),
+                                   IRB.getIntBytePtrTy(), IRB.getIntBytePtrTy(),
+                                   IntptrTy);
+  MemsetFn =
+      M.getOrInsertFunction("__msan_memset", IRB.getIntBytePtrTy(),
+                            IRB.getIntBytePtrTy(), IRB.getInt32Ty(), IntptrTy);
+  // TVM local end
 
   if (CompileKernel) {
     createKernelApi(M);
@@ -1193,7 +1262,11 @@ struct MemorySanitizerVisitor : public InstVisitor<MemorySanitizerVisitor> {
           IRB.CreateZExt(ConvertedShadow, IRB.getIntNTy(8 * (1 << SizeIndex)));
       CallBase *CB = IRB.CreateCall(
           Fn, {ConvertedShadow2,
-               IRB.CreatePointerCast(Addr, IRB.getInt8PtrTy()), Origin});
+               // IRB.CreatePointerCast(Addr, IRB.getInt8PtrTy()),
+               // TVM local begin
+               IRB.CreatePointerCast(Addr, IRB.getIntBytePtrTy()),
+               // TVM local end
+               Origin});
       CB->addParamAttr(0, Attribute::ZExt);
       CB->addParamAttr(2, Attribute::ZExt);
     } else {
@@ -2564,8 +2637,13 @@ struct MemorySanitizerVisitor : public InstVisitor<MemorySanitizerVisitor> {
     IRBuilder<> IRB(&I);
     IRB.CreateCall(
         MS.MemmoveFn,
-        {IRB.CreatePointerCast(I.getArgOperand(0), IRB.getInt8PtrTy()),
-         IRB.CreatePointerCast(I.getArgOperand(1), IRB.getInt8PtrTy()),
+        // {IRB.CreatePointerCast(I.getArgOperand(0), IRB.getInt8PtrTy()),
+        // IRB.CreatePointerCast(I.getArgOperand(1), IRB.getInt8PtrTy()),
+        // TVM local begin
+        {IRB.CreatePointerCast(I.getArgOperand(0), IRB.getIntBytePtrTy()),
+         IRB.CreatePointerCast(I.getArgOperand(1), IRB.getIntBytePtrTy()),
+        // TVM local end
+
          IRB.CreateIntCast(I.getArgOperand(2), MS.IntptrTy, false)});
     I.eraseFromParent();
   }
@@ -2578,8 +2656,12 @@ struct MemorySanitizerVisitor : public InstVisitor<MemorySanitizerVisitor> {
     IRBuilder<> IRB(&I);
     IRB.CreateCall(
         MS.MemcpyFn,
-        {IRB.CreatePointerCast(I.getArgOperand(0), IRB.getInt8PtrTy()),
-         IRB.CreatePointerCast(I.getArgOperand(1), IRB.getInt8PtrTy()),
+//      {IRB.CreatePointerCast(I.getArgOperand(0), IRB.getInt8PtrTy()),
+//      IRB.CreatePointerCast(I.getArgOperand(1), IRB.getInt8PtrTy()),
+        // TVM local begin
+        {IRB.CreatePointerCast(I.getArgOperand(0), IRB.getIntBytePtrTy()),
+        IRB.CreatePointerCast(I.getArgOperand(1), IRB.getIntBytePtrTy()),
+        // TVM local end
          IRB.CreateIntCast(I.getArgOperand(2), MS.IntptrTy, false)});
     I.eraseFromParent();
   }
@@ -2589,7 +2671,10 @@ struct MemorySanitizerVisitor : public InstVisitor<MemorySanitizerVisitor> {
     IRBuilder<> IRB(&I);
     IRB.CreateCall(
         MS.MemsetFn,
-        {IRB.CreatePointerCast(I.getArgOperand(0), IRB.getInt8PtrTy()),
+         // {IRB.CreatePointerCast(I.getArgOperand(0), IRB.getInt8PtrTy()),
+         // TVM local begin
+         {IRB.CreatePointerCast(I.getArgOperand(0), IRB.getIntBytePtrTy()),
+         // TVM local end
          IRB.CreateIntCast(I.getArgOperand(1), IRB.getInt32Ty(), false),
          IRB.CreateIntCast(I.getArgOperand(2), MS.IntptrTy, false)});
     I.eraseFromParent();
@@ -4378,7 +4463,11 @@ struct VarArgAMD64Helper : public VarArgHelper {
       Value *CopySize =
         IRB.CreateAdd(ConstantInt::get(MS.IntptrTy, AMD64FpEndOffset),
                       VAArgOverflowSize);
-      VAArgTLSCopy = IRB.CreateAlloca(Type::getInt8Ty(*MS.C), CopySize);
+      // VAArgTLSCopy = IRB.CreateAlloca(Type::getInt8Ty(*MS.C), CopySize);
+      // TVM local begin
+      VAArgTLSCopy = IRB.CreateAlloca(Type::getByteTy(*MS.C), CopySize);
+      // TVM local end
+
       IRB.CreateMemCpy(VAArgTLSCopy, Align(8), MS.VAArgTLS, Align(8), CopySize);
       if (MS.TrackOrigins) {
         VAArgTLSOriginCopy = IRB.CreateAlloca(Type::getInt8Ty(*MS.C), CopySize);
@@ -4526,7 +4615,11 @@ struct VarArgMIPS64Helper : public VarArgHelper {
     if (!VAStartInstrumentationList.empty()) {
       // If there is a va_start in this function, make a backup copy of
       // va_arg_tls somewhere in the function entry block.
-      VAArgTLSCopy = IRB.CreateAlloca(Type::getInt8Ty(*MS.C), CopySize);
+      // VAArgTLSCopy = IRB.CreateAlloca(Type::getInt8Ty(*MS.C), CopySize);
+      // TVM local begin
+      VAArgTLSCopy = IRB.CreateAlloca(Type::getByteTy(*MS.C), CopySize);
+      // TVM local end
+
       IRB.CreateMemCpy(VAArgTLSCopy, Align(8), MS.VAArgTLS, Align(8), CopySize);
     }
 
@@ -4717,7 +4810,11 @@ struct VarArgAArch64Helper : public VarArgHelper {
       Value *CopySize =
         IRB.CreateAdd(ConstantInt::get(MS.IntptrTy, AArch64VAEndOffset),
                       VAArgOverflowSize);
-      VAArgTLSCopy = IRB.CreateAlloca(Type::getInt8Ty(*MS.C), CopySize);
+      // VAArgTLSCopy = IRB.CreateAlloca(Type::getInt8Ty(*MS.C), CopySize);
+      // TVM local begin
+      VAArgTLSCopy = IRB.CreateAlloca(Type::getByteTy(*MS.C), CopySize);
+      // TVM local end
+
       IRB.CreateMemCpy(VAArgTLSCopy, Align(8), MS.VAArgTLS, Align(8), CopySize);
     }
 
@@ -4964,7 +5061,11 @@ struct VarArgPowerPC64Helper : public VarArgHelper {
     if (!VAStartInstrumentationList.empty()) {
       // If there is a va_start in this function, make a backup copy of
       // va_arg_tls somewhere in the function entry block.
-      VAArgTLSCopy = IRB.CreateAlloca(Type::getInt8Ty(*MS.C), CopySize);
+      // VAArgTLSCopy = IRB.CreateAlloca(Type::getInt8Ty(*MS.C), CopySize);
+      // TVM local begin
+      VAArgTLSCopy = IRB.CreateAlloca(Type::getByteTy(*MS.C), CopySize);
+      // TVM local end
+
       IRB.CreateMemCpy(VAArgTLSCopy, Align(8), MS.VAArgTLS, Align(8), CopySize);
     }
 

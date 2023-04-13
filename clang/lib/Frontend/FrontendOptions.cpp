@@ -33,5 +33,8 @@ InputKind FrontendOptions::getInputKindForExtension(StringRef Extension) {
       .Cases("cu", "cuh", Language::CUDA)
       .Case("hip", Language::HIP)
       .Cases("ll", "bc", Language::LLVM_IR)
+      // TVM local begin
+      .Case("abi", Language::JsonAbi)
+      // TVM local end
       .Default(Language::Unknown);
 }

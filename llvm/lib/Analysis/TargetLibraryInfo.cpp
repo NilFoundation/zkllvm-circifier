@@ -727,6 +727,9 @@ bool TargetLibraryInfoImpl::isValidProtoForLibFunc(const FunctionType &FTy,
                                                    LibFunc F,
                                                    const DataLayout *DL) const {
   LLVMContext &Ctx = FTy.getContext();
+  // TVM local begin
+  Type *PCharTy = Type::getIntBytePtrTy(Ctx);
+  // TVM local end
   Type *SizeTTy = DL ? DL->getIntPtrType(Ctx, /*AddressSpace=*/0) : nullptr;
   auto IsSizeTTy = [SizeTTy](Type *Ty) {
     return SizeTTy ? Ty == SizeTTy : Ty->isIntegerTy();
@@ -808,7 +811,7 @@ bool TargetLibraryInfoImpl::isValidProtoForLibFunc(const FunctionType &FTy,
   case LibFunc_stpcpy:
     return (NumParams == 2 && FTy.getReturnType() == FTy.getParamType(0) &&
             FTy.getParamType(0) == FTy.getParamType(1) &&
-            FTy.getParamType(0)->isPointerTy());
+            /* FTy.getParamType(0)->isPointerTy() */ FTy.getParamType(0) == PCharTy);
 
   case LibFunc_strlcat_chk:
   case LibFunc_strlcpy_chk:
@@ -819,7 +822,8 @@ bool TargetLibraryInfoImpl::isValidProtoForLibFunc(const FunctionType &FTy,
   case LibFunc_strlcat:
   case LibFunc_strlcpy:
     return NumParams == 3 && IsSizeTTy(FTy.getReturnType()) &&
-           FTy.getParamType(0)->isPointerTy() &&
+           //FTy.getParamType(0)->isPointerTy() &&
+           FTy.getParamType(0) == PCharTy &&
            FTy.getParamType(1)->isPointerTy() &&
            IsSizeTTy(FTy.getParamType(2));
 
@@ -978,7 +982,9 @@ bool TargetLibraryInfoImpl::isValidProtoForLibFunc(const FunctionType &FTy,
   case LibFunc_realloc:
   case LibFunc_reallocf:
   case LibFunc_vec_realloc:
-    return (NumParams == 2 && FTy.getReturnType()->isPointerTy() &&
+    return (NumParams == 2 &&
+            //FTy.getReturnType()->isPointerTy() &&
+            FTy.getReturnType() == PCharTy &&
             FTy.getParamType(0) == FTy.getReturnType() &&
             IsSizeTTy(FTy.getParamType(1)));
   case LibFunc_read:

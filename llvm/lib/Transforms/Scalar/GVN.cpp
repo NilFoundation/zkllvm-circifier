@@ -1763,12 +1763,21 @@ bool GVN::processAssumeIntrinsic(AssumeInst *IntrinsicI) {
 
   if (ConstantInt *Cond = dyn_cast<ConstantInt>(V)) {
     if (Cond->isZero()) {
-      Type *Int8Ty = Type::getInt8Ty(V->getContext());
+      //Type *Int8Ty = Type::getInt8Ty(V->getContext());
+      // TVM local begin
+      Type *ByteTy = Type::getByteTy(V->getContext());
+      // TVM local end
+
       // Insert a new store to null instruction before the load to indicate that
       // this code is not reachable.  FIXME: We could insert unreachable
       // instruction directly because we can modify the CFG.
-      auto *NewS = new StoreInst(UndefValue::get(Int8Ty),
-                                 Constant::getNullValue(Int8Ty->getPointerTo()),
+      auto *NewS =
+          //new StoreInst(UndefValue::get(Int8Ty),
+          //   Constant::getNullValue(Int8Ty->getPointerTo()),
+          // TVM local begin
+          new StoreInst(UndefValue::get(ByteTy),
+                    Constant::getNullValue(ByteTy->getPointerTo()),
+          // TVM local end
                                  IntrinsicI);
       if (MSSAU) {
         const MemoryUseOrDef *FirstNonDom = nullptr;
@@ -2540,6 +2549,7 @@ bool GVN::processBlock(BasicBlock *BB) {
 
   for (BasicBlock::iterator BI = BB->begin(), BE = BB->end();
        BI != BE;) {
+
     if (!ReplaceOperandsWithMap.empty())
       ChangedFunction |= replaceOperandsForInBlockEquality(&*BI);
     ChangedFunction |= processInstruction(&*BI);
@@ -2560,6 +2570,7 @@ bool GVN::processBlock(BasicBlock *BB) {
     for (auto *I : InstrsToErase) {
       assert(I->getParent() == BB && "Removing instruction from wrong block?");
       LLVM_DEBUG(dbgs() << "GVN removed: " << *I << '\n');
+
       salvageKnowledge(I, AC);
       salvageDebugInfo(*I);
       if (MD) MD->removeInstruction(I);

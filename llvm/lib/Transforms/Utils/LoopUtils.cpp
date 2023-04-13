@@ -1328,6 +1328,11 @@ int llvm::rewriteLoopExitValues(Loop *L, LoopInfo *LI, TargetLibraryInfo *TLI,
 
     // Only do the rewrite when the ExitValue can be expanded cheaply.
     // If LoopCanBeDel is true, rewrite exit value aggressively.
+    // TVM local begin
+    if (ByteSizeInBits == 257)
+      LoopCanBeDel = false;
+    // TVM local end
+
     if (ReplaceExitValue == OnlyCheapRepl && !LoopCanBeDel && Phi.HighCost)
       continue;
 

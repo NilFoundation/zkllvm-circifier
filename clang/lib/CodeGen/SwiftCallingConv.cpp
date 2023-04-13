@@ -142,7 +142,10 @@ void SwiftAggLowering::addTypedData(const RecordDecl *record, CharUnits begin,
   if (cxxRecord) {
     //   - a v-table pointer, if the class adds its own
     if (layout.hasOwnVFPtr()) {
-      addTypedData(CGM.Int8PtrTy, begin);
+      // addTypedData(CGM.Int8PtrTy, begin);
+      // TVM local begin
+      addTypedData(CGM.BytePtrTy, begin);
+      // TVM local end
     }
 
     //   - non-virtual bases
@@ -155,7 +158,10 @@ void SwiftAggLowering::addTypedData(const RecordDecl *record, CharUnits begin,
 
     //   - a vbptr if the class adds its own
     if (layout.hasOwnVBPtr()) {
-      addTypedData(CGM.Int8PtrTy, begin + layout.getVBPtrOffset());
+      // addTypedData(CGM.Int8PtrTy, begin + layout.getVBPtrOffset());
+      // TVM local begin
+      addTypedData(CGM.BytePtrTy, begin + layout.getVBPtrOffset());
+      // TVM local end
     }
   }
 

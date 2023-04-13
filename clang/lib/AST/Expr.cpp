@@ -1059,10 +1059,18 @@ unsigned StringLiteral::mapCharByteWidth(TargetInfo const &Target,
     CharByteWidth = Target.getChar32Width();
     break;
   }
-  assert((CharByteWidth & 7) == 0 && "Assumes character size is byte multiple");
-  CharByteWidth /= 8;
+
+  //assert((CharByteWidth & 7) == 0 && "Assumes character size is byte multiple");
+  //CharByteWidth /= 8;
+  // TVM local begin
+  assert((CharByteWidth % ByteSizeInBits) == 0 &&
+         "Assumes character size is byte multiple");
+  CharByteWidth /= ByteSizeInBits;
+  // TVM local end
+
   assert((CharByteWidth == 1 || CharByteWidth == 2 || CharByteWidth == 4) &&
          "The only supported character byte widths are 1,2 and 4!");
+
   return CharByteWidth;
 }
 
@@ -1487,10 +1495,15 @@ Decl *Expr::getReferencedDeclOfCallee() {
         continue;
       }
     } else if (UnaryOperator *UO = dyn_cast<UnaryOperator>(CEE)) {
-      if (UO->getOpcode() == UO_Deref || UO->getOpcode() == UO_AddrOf ||
-          UO->getOpcode() == UO_Plus) {
-        CEE = UO->getSubExpr()->IgnoreParenImpCasts();
-        continue;
+        // if (UO->getOpcode() == UO_Deref || UO->getOpcode() == UO_AddrOf ||
+        //    UO->getOpcode() == UO_Plus) {
+        // CEE = UO->getSubExpr()->IgnoreParenImpCasts();
+        // continue;
+        // TVM local begin
+      if (UO->getOpcode() == UO_Deref || UO->getOpcode() == UO_AddrOf) {
+        CEE = UO->getSubExpr()->IgnoreParenCasts();
+        // TVM local end
+          continue;
       }
     }
     break;
@@ -1666,10 +1679,13 @@ MemberExpr *MemberExpr::Create(
                        TemplateArgumentLoc>(
           HasQualOrFound ? 1 : 0, HasTemplateKWAndArgsInfo ? 1 : 0,
           TemplateArgs ? TemplateArgs->size() : 0);
-
   void *Mem = C.Allocate(Size, alignof(MemberExpr));
   MemberExpr *E = new (Mem) MemberExpr(Base, IsArrow, OperatorLoc, MemberDecl,
                                        NameInfo, T, VK, OK, NOUR);
+
+  // TVM local begin
+  E->setDependence(Base->getDependence());
+  // TVM local end
 
   // FIXME: remove remaining dependence computation to computeDependence().
   auto Deps = E->getDependence();
@@ -1804,7 +1820,11 @@ bool CastExpr::CastConsistency() const {
 
   case CK_FunctionToPointerDecay:
     assert(getType()->isPointerType());
-    assert(getSubExpr()->getType()->isFunctionType());
+    //assert(getSubExpr()->getType()->isFunctionType());
+    // TVM local begin
+    assert(getSubExpr()->getType()->isFunctionType() ||
+           getSubExpr()->getType()->isMemberFunctionPointerType());
+    // TVM local end
     goto CheckNoBasePath;
 
   case CK_AddressSpaceConversion: {

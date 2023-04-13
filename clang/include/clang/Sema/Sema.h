@@ -2711,6 +2711,11 @@ public:
                                      Expr *Init);
   void CheckCompleteVariableDeclaration(VarDecl *VD);
   void CheckCompleteDecompositionDeclaration(DecompositionDecl *DD);
+  // TVM local begin
+  const CXXRecordDecl *FindDecomposableBaseClass(SourceLocation Loc,
+                                                 const CXXRecordDecl *RD,
+                                                 CXXCastPath &BasePath);
+  // TVM local end
   void MaybeSuggestAddingStaticToDecl(const FunctionDecl *D);
 
   NamedDecl* ActOnFunctionDeclarator(Scope* S, Declarator& D, DeclContext* DC,

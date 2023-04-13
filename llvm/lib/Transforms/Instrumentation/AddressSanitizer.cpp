@@ -1423,13 +1423,20 @@ void AddressSanitizer::instrumentMemIntrinsic(MemIntrinsic *MI) {
   if (isa<MemTransferInst>(MI)) {
     IRB.CreateCall(
         isa<MemMoveInst>(MI) ? AsanMemmove : AsanMemcpy,
-        {IRB.CreatePointerCast(MI->getOperand(0), IRB.getInt8PtrTy()),
-         IRB.CreatePointerCast(MI->getOperand(1), IRB.getInt8PtrTy()),
+        //{IRB.CreatePointerCast(MI->getOperand(0), IRB.getInt8PtrTy()),
+        // IRB.CreatePointerCast(MI->getOperand(1), IRB.getInt8PtrTy()),
+        // TVM local begin
+        {IRB.CreatePointerCast(MI->getOperand(0), IRB.getIntBytePtrTy()),
+         IRB.CreatePointerCast(MI->getOperand(1), IRB.getIntBytePtrTy()),
+        // TVM local end
          IRB.CreateIntCast(MI->getOperand(2), IntptrTy, false)});
   } else if (isa<MemSetInst>(MI)) {
     IRB.CreateCall(
         AsanMemset,
-        {IRB.CreatePointerCast(MI->getOperand(0), IRB.getInt8PtrTy()),
+         //{IRB.CreatePointerCast(MI->getOperand(0), IRB.getInt8PtrTy()),
+         // TVM local begin
+         {IRB.CreatePointerCast(MI->getOperand(0), IRB.getIntBytePtrTy()),
+         // TVM local end
          IRB.CreateIntCast(MI->getOperand(1), IRB.getInt32Ty(), false),
          IRB.CreateIntCast(MI->getOperand(2), IntptrTy, false)});
   }
@@ -2522,7 +2529,10 @@ bool ModuleAddressSanitizer::InstrumentGlobals(IRBuilder<> &IRB, Module &M,
       SourceLoc = ConstantInt::get(IntptrTy, 0);
     }
 
-    Constant *ODRIndicator = ConstantExpr::getNullValue(IRB.getInt8PtrTy());
+    //Constant *ODRIndicator = ConstantExpr::getNullValue(IRB.getInt8PtrTy());
+    // TVM local begin
+    Constant *ODRIndicator = ConstantExpr::getNullValue(IRB.getIntBytePtrTy());
+    // TVM local end
     GlobalValue *InstrumentedGlobal = NewGlobal;
 
     bool CanUsePrivateAliases =
@@ -2729,15 +2739,27 @@ void AddressSanitizer::initializeCallbacks(Module &M) {
 
   const std::string MemIntrinCallbackPrefix =
       CompileKernel ? std::string("") : ClMemoryAccessCallbackPrefix;
-  AsanMemmove = M.getOrInsertFunction(MemIntrinCallbackPrefix + "memmove",
-                                      IRB.getInt8PtrTy(), IRB.getInt8PtrTy(),
-                                      IRB.getInt8PtrTy(), IntptrTy);
-  AsanMemcpy = M.getOrInsertFunction(MemIntrinCallbackPrefix + "memcpy",
-                                     IRB.getInt8PtrTy(), IRB.getInt8PtrTy(),
-                                     IRB.getInt8PtrTy(), IntptrTy);
-  AsanMemset = M.getOrInsertFunction(MemIntrinCallbackPrefix + "memset",
-                                     IRB.getInt8PtrTy(), IRB.getInt8PtrTy(),
-                                     IRB.getInt32Ty(), IntptrTy);
+  //AsanMemmove = M.getOrInsertFunction(MemIntrinCallbackPrefix + "memmove",
+  //                                    IRB.getInt8PtrTy(), IRB.getInt8PtrTy(),
+  //                                    IRB.getInt8PtrTy(), IntptrTy);
+  //AsanMemcpy = M.getOrInsertFunction(MemIntrinCallbackPrefix + "memcpy",
+  //                                   IRB.getInt8PtrTy(), IRB.getInt8PtrTy(),
+  //                                   IRB.getInt8PtrTy(), IntptrTy);
+  //AsanMemset = M.getOrInsertFunction(MemIntrinCallbackPrefix + "memset",
+  //                                   IRB.getInt8PtrTy(), IRB.getInt8PtrTy(),
+  //                                   IRB.getInt32Ty(), IntptrTy);
+
+  // TVM local begin
+  AsanMemmove = checkSanitizerInterfaceFunction(dyn_cast<Constant>(M.getOrInsertFunction(
+      MemIntrinCallbackPrefix + "memmove", IRB.getIntBytePtrTy(),
+      IRB.getIntBytePtrTy(), IRB.getIntBytePtrTy(), IntptrTy).getCallee()));
+  AsanMemcpy = checkSanitizerInterfaceFunction(dyn_cast<Constant>(M.getOrInsertFunction(
+      MemIntrinCallbackPrefix + "memcpy", IRB.getIntBytePtrTy(),
+      IRB.getIntBytePtrTy(), IRB.getIntBytePtrTy(), IntptrTy).getCallee()));
+  AsanMemset = checkSanitizerInterfaceFunction(dyn_cast<Constant>(M.getOrInsertFunction(
+      MemIntrinCallbackPrefix + "memset", IRB.getIntBytePtrTy(),
+      IRB.getIntBytePtrTy(), IRB.getInt32Ty(), IntptrTy).getCallee()));
+  // TVM local end
 
   AsanHandleNoReturnFunc =
       M.getOrInsertFunction(kAsanHandleNoReturnName, IRB.getVoidTy());
@@ -3537,7 +3559,10 @@ void FunctionStackPoisoner::processStaticAllocas() {
             IntptrTy, IRBPoison.CreateIntToPtr(SavedFlagPtrPtr, IntptrPtrTy));
         IRBPoison.CreateStore(
             Constant::getNullValue(IRBPoison.getInt8Ty()),
-            IRBPoison.CreateIntToPtr(SavedFlagPtr, IRBPoison.getInt8PtrTy()));
+            //IRBPoison.CreateIntToPtr(SavedFlagPtr, IRBPoison.getInt8PtrTy()));
+            // TVM local begin
+            IRBPoison.CreateIntToPtr(SavedFlagPtr, IRBPoison.getIntBytePtrTy()));
+            // TVM local end
       } else {
         // For larger frames call __asan_stack_free_*.
         IRBPoison.CreateCall(

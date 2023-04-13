@@ -962,6 +962,10 @@ def i16imm : Operand<i16>;
 def i32imm : Operand<i32>;
 def i64imm : Operand<i64>;
 
+// TVM local begin
+def i257imm : Operand<i257>;
+// TVM local end
+
 def f32imm : Operand<f32>;
 def f64imm : Operand<f64>;
 }

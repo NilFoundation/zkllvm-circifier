@@ -940,7 +940,10 @@ bool DeadArgumentEliminationPass::removeDeadStuffFromFunction(Function *F) {
     Args.clear();
     ArgAttrVec.clear();
 
+    //if (!CB.use_empty() || CB.isUsedByMetadata()) {
+    // TVM local begin: from 2474ce586227b5c11bc50994841281dbaff129d8 upstream
     if (!CB.use_empty() || CB.isUsedByMetadata()) {
+    // TVM local end
       if (NewCB->getType() == CB.getType()) {
         // Return type not changed? Just replace users then.
         CB.replaceAllUsesWith(NewCB);

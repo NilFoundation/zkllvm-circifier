@@ -315,6 +315,11 @@ public:
   /// -fsymbol-partition (see https://lld.llvm.org/Partitions.html).
   std::string SymbolPartition;
 
+  // TVM local begin
+  /// The name of the text global constant to print
+  std::string EmitTextConstant;
+  // TVM local end
+
   enum RemarkKind {
     RK_Missing,            // Remark argument not present on the command line.
     RK_Enabled,            // Remark enabled via '-Rgroup'.

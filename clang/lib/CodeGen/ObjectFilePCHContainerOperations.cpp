@@ -293,7 +293,8 @@ public:
       auto *NameAndContent = llvm::MDTuple::get(*VMContext, Ops);
       MD->addOperand(NameAndContent);
     } else {
-      auto Int8Ty = llvm::Type::getInt8Ty(*VMContext);
+      // TVM local nextline
+      auto Int8Ty = llvm::Type::getByteTy(*VMContext);
       auto *Ty = llvm::ArrayType::get(Int8Ty, Size);
       auto *Data = llvm::ConstantDataArray::getString(
           *VMContext, StringRef(SerializedAST.data(), Size),

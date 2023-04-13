@@ -9178,7 +9178,7 @@ ScalarEvolution::computeExitLimitFromICmp(const Loop *L,
       InnerLHS = ZExt->getOperand();
     if (const SCEVAddRecExpr *AR = dyn_cast<SCEVAddRecExpr>(InnerLHS)) {
       auto *StrideC = dyn_cast<SCEVConstant>(AR->getStepRecurrence(*this));
-      if (!AR->hasNoSelfWrap() && AR->getLoop() == L && AR->isAffine() && 
+      if (!AR->hasNoSelfWrap() && AR->getLoop() == L && AR->isAffine() &&
           StrideC && StrideC->getAPInt().isPowerOf2()) {
         auto Flags = AR->getNoWrapFlags();
         Flags = setFlags(Flags, SCEV::FlagNW);
@@ -9808,11 +9808,13 @@ static Constant *BuildConstantFromSCEV(const SCEV *V) {
       if (auto *PT = dyn_cast<PointerType>(OpC->getType())) {
         // The offsets have been converted to bytes.  We can add bytes to an
         // i8* by GEP with the byte count in the first index.
-        Type *DestPtrTy =
-            Type::getInt8PtrTy(PT->getContext(), PT->getAddressSpace());
+        // TVM local begin
+        Type *DestPtrTy = Type::getIntBytePtrTy(
+            PT->getContext(), PT->getAddressSpace());
         OpC = ConstantExpr::getBitCast(OpC, DestPtrTy);
-        C = ConstantExpr::getGetElementPtr(Type::getInt8Ty(C->getContext()),
+        C = ConstantExpr::getGetElementPtr(Type::getByteTy(C->getContext()),
                                            OpC, C);
+        // TVM local end
       } else {
         C = ConstantExpr::getAdd(C, OpC);
       }

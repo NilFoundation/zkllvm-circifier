@@ -391,7 +391,10 @@ void splitAndWriteThinLTOBitcode(
     else
       Linkage = CFL_Declaration;
     Elts.push_back(ConstantAsMetadata::get(
-        llvm::ConstantInt::get(Type::getInt8Ty(Ctx), Linkage)));
+    //    llvm::ConstantInt::get(Type::getInt8Ty(Ctx), Linkage)));
+    // TVM local begin
+        llvm::ConstantInt::get(Type::getByteTy(Ctx), Linkage)));
+        // TVM local end
     append_range(Elts, Types);
     CfiFunctionMDs.push_back(MDTuple::get(Ctx, Elts));
   }
@@ -412,10 +415,16 @@ void splitAndWriteThinLTOBitcode(
     Metadata *Elts[] = {
         MDString::get(Ctx, A.getName()),
         MDString::get(Ctx, F->getName()),
+        //ConstantAsMetadata::get(
+        //    ConstantInt::get(Type::getInt8Ty(Ctx), A.getVisibility())),
+        //ConstantAsMetadata::get(
+        //    ConstantInt::get(Type::getInt8Ty(Ctx), A.isWeakForLinker())),
+        // TVM local begin
         ConstantAsMetadata::get(
-            ConstantInt::get(Type::getInt8Ty(Ctx), A.getVisibility())),
+            ConstantInt::get(Type::getByteTy(Ctx), A.getVisibility())),
         ConstantAsMetadata::get(
-            ConstantInt::get(Type::getInt8Ty(Ctx), A.isWeakForLinker())),
+            ConstantInt::get(Type::getByteTy(Ctx), A.isWeakForLinker())),
+        // TVM local end
     };
 
     FunctionAliases.push_back(MDTuple::get(Ctx, Elts));

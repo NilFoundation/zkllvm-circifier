@@ -1458,7 +1458,12 @@ llvm::GlobalValue *ConstantEmitter::getCurrentAddrPrivate() {
 
   // Make an obviously ill-formed global that should blow up compilation
   // if it survives.
-  auto global = new llvm::GlobalVariable(CGM.getModule(), CGM.Int8Ty, true,
+  auto global = new llvm::GlobalVariable(CGM.getModule(),
+                                         // CGM.Int8Ty,
+                                         // TVM local begin
+                                         CGM.ByteTy,
+                                         // TVM local end
+                                         true,
                                          llvm::GlobalValue::PrivateLinkage,
                                          /*init*/ nullptr,
                                          /*name*/ "",
@@ -1724,7 +1729,10 @@ llvm::Constant *ConstantEmitter::emitForMemory(CodeGenModule &CGM,
     llvm::Constant *elts[] = {
       C,
       llvm::ConstantAggregateZero::get(
-          llvm::ArrayType::get(CGM.Int8Ty, (outerSize - innerSize) / 8))
+          //llvm::ArrayType::get(CGM.Int8Ty, (outerSize - innerSize) / 8))
+          // TVM local begin
+          llvm::ArrayType::get(CGM.ByteTy, (outerSize - innerSize) / ByteSizeInBits))
+          // TVM local end
     };
     return llvm::ConstantStruct::getAnon(elts);
   }
@@ -1833,9 +1841,17 @@ private:
 
     llvm::Type *origPtrTy = C->getType();
     unsigned AS = origPtrTy->getPointerAddressSpace();
-    llvm::Type *charPtrTy = CGM.Int8Ty->getPointerTo(AS);
+    // llvm::Type *charPtrTy = CGM.Int8Ty->getPointerTo(AS);
+    // TVM local begin
+    llvm::Type *charPtrTy = CGM.ByteTy->getPointerTo(AS);
+    // TVM local end
+
     C = llvm::ConstantExpr::getBitCast(C, charPtrTy);
-    C = llvm::ConstantExpr::getGetElementPtr(CGM.Int8Ty, C, getOffset());
+    // C = llvm::ConstantExpr::getGetElementPtr(CGM.Int8Ty, C, getOffset());
+    // TVM local begin
+    C = llvm::ConstantExpr::getGetElementPtr(CGM.ByteTy, C, getOffset());
+    // TVM local end
+
     C = llvm::ConstantExpr::getPointerCast(C, origPtrTy);
     return C;
   }

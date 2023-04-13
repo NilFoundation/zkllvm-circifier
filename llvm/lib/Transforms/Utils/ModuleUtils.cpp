@@ -33,7 +33,8 @@ static void appendToGlobalArray(StringRef ArrayName, Module &M, Function *F,
   SmallVector<Constant *, 16> CurrentCtors;
   StructType *EltTy = StructType::get(
       IRB.getInt32Ty(), PointerType::get(FnTy, F->getAddressSpace()),
-      IRB.getInt8PtrTy());
+      // TVM local nextline
+      IRB.getIntBytePtrTy());
 
   if (GlobalVariable *GVCtor = M.getNamedGlobal(ArrayName)) {
     if (Constant *Init = GVCtor->getInitializer()) {
@@ -49,8 +50,16 @@ static void appendToGlobalArray(StringRef ArrayName, Module &M, Function *F,
   Constant *CSVals[3];
   CSVals[0] = IRB.getInt32(Priority);
   CSVals[1] = F;
-  CSVals[2] = Data ? ConstantExpr::getPointerCast(Data, IRB.getInt8PtrTy())
-                   : Constant::getNullValue(IRB.getInt8PtrTy());
+  CSVals[2] = Data ? ConstantExpr::getPointerCast(Data,
+                     //IRB.getInt8PtrTy())
+                     // TVM local begin
+                     IRB.getIntBytePtrTy())
+                     // TVM local end
+                   : Constant::getNullValue(
+                     //IRB.getInt8PtrTy());
+                     // TVM local end
+                     IRB.getIntBytePtrTy());
+                     // TVM local end
   Constant *RuntimeCtorInit =
       ConstantStruct::get(EltTy, ArrayRef(CSVals, EltTy->getNumElements()));
 
@@ -92,7 +101,8 @@ static void appendToUsedList(Module &M, StringRef Name, ArrayRef<GlobalValue *> 
   if (GV)
     GV->eraseFromParent();
 
-  Type *ArrayEltTy = llvm::Type::getInt8PtrTy(M.getContext());
+  // TVM local nextline
+  Type *ArrayEltTy = llvm::Type::getIntBytePtrTy(M.getContext());
   for (auto *V : Values)
     Init.insert(ConstantExpr::getPointerBitCastOrAddrSpaceCast(V, ArrayEltTy));
 
@@ -113,6 +123,19 @@ void llvm::appendToUsed(Module &M, ArrayRef<GlobalValue *> Values) {
 void llvm::appendToCompilerUsed(Module &M, ArrayRef<GlobalValue *> Values) {
   appendToUsedList(M, "llvm.compiler.used", Values);
 }
+
+// TVM local begin
+Function *llvm::checkSanitizerInterfaceFunction(Constant *FuncOrBitcast) {
+  if (isa<Function>(FuncOrBitcast))
+    return cast<Function>(FuncOrBitcast);
+  FuncOrBitcast->print(errs());
+  errs() << '\n';
+  std::string Err;
+  raw_string_ostream Stream(Err);
+  Stream << "Sanitizer interface function redefined: " << *FuncOrBitcast;
+  report_fatal_error(Err);
+}
+// TVM local end
 
 static void removeFromUsedList(Module &M, StringRef Name,
                                function_ref<bool(Constant *)> ShouldRemove) {

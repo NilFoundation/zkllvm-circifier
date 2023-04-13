@@ -489,6 +489,16 @@ public:
     return ConstantInt::get(Context, AI);
   }
 
+    // TVM local begin
+  /// Geta byte-sized constant value
+  ConstantInt *getByte(uint64_t C) {
+    return ConstantInt::get(getIntNTy(ByteSizeInBits), C);
+  }
+  ConstantInt *getInt257(uint64_t C) {
+    return ConstantInt::get(getInt257Ty(), C);
+  }
+  // TVM local end
+
   //===--------------------------------------------------------------------===//
   // Type creation methods
   //===--------------------------------------------------------------------===//
@@ -526,30 +536,23 @@ public:
     return Type::getIntNTy(Context, N);
   }
 
-  /// Fetch the type representing a 16-bit floating point value.
-  Type *getHalfTy() {
-    return Type::getHalfTy(Context);
-  }
+  // TVM local begin
+  /// Fetch the type representing byte-sized int
+  IntegerType *getByteTy() { return Type::getByteTy(Context); }
+  IntegerType *getInt257Ty() { return Type::getInt257Ty(Context); }
+  // TVM local end
 
-  /// Fetch the type representing a 16-bit brain floating point value.
-  Type *getBFloatTy() {
-    return Type::getBFloatTy(Context);
-  }
+  /// Fetch the type representing a 16-bit floating point value.
+  Type *getHalfTy() { return Type::getHalfTy(Context); }
 
   /// Fetch the type representing a 32-bit floating point value.
-  Type *getFloatTy() {
-    return Type::getFloatTy(Context);
-  }
+  Type *getFloatTy() { return Type::getFloatTy(Context); }
 
   /// Fetch the type representing a 64-bit floating point value.
-  Type *getDoubleTy() {
-    return Type::getDoubleTy(Context);
-  }
+  Type *getDoubleTy() { return Type::getDoubleTy(Context); }
 
   /// Fetch the type representing void.
-  Type *getVoidTy() {
-    return Type::getVoidTy(Context);
-  }
+  Type *getVoidTy() { return Type::getVoidTy(Context); }
 
   /// Fetch the type representing a pointer.
   PointerType *getPtrTy(unsigned AddrSpace = 0) {
@@ -559,6 +562,18 @@ public:
   /// Fetch the type representing a pointer to an 8-bit integer value.
   PointerType *getInt8PtrTy(unsigned AddrSpace = 0) {
     return Type::getInt8PtrTy(Context, AddrSpace);
+  }
+
+  // TVM local begin
+  /// Fetch the type representing a pointer to an Byte-bit integer value.
+  PointerType *getIntBytePtrTy(unsigned AddrSpace = 0) {
+    return Type::getIntBytePtrTy(Context, AddrSpace);
+  }
+  // TVM local end
+
+  /// Fetch the type representing a 16-bit brain floating point value.
+  Type *getBFloatTy() {
+    return Type::getBFloatTy(Context);
   }
 
   /// Fetch the type of an integer with size at least as big as that of a
@@ -802,6 +817,10 @@ public:
   CallInst *
   CreateAssumption(Value *Cond,
                    ArrayRef<OperandBundleDef> OpBundles = std::nullopt);
+
+  // TVM local begin
+  Value *getCastedIntBytePtrValue(Value *Ptr);
+  // TVM local end
 
   /// Create a llvm.experimental.noalias.scope.decl intrinsic call.
   Instruction *CreateNoAliasScopeDeclaration(Value *Scope);

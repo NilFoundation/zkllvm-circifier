@@ -977,6 +977,20 @@ void ModuleBitcodeWriter::writeTypeTable() {
     case Type::X86_MMXTyID:   Code = bitc::TYPE_CODE_X86_MMX;   break;
     case Type::X86_AMXTyID:   Code = bitc::TYPE_CODE_X86_AMX;   break;
     case Type::TokenTyID:     Code = bitc::TYPE_CODE_TOKEN;     break;
+      // TVM local begin
+    case Type::TVMSliceID:
+      Code = bitc::TYPE_CODE_TVMSLICE;
+      break;
+    case Type::TVMBuilderID:
+      Code = bitc::TYPE_CODE_TVMBUILDER;
+      break;
+    case Type::TVMCellID:
+      Code = bitc::TYPE_CODE_TVMCELL;
+      break;
+    case Type::TVMTupleID:
+      Code = bitc::TYPE_CODE_TVMTUPLE;
+      break;
+    // TVM local end
     case Type::IntegerTyID:
       // INTEGER: [width]
       Code = bitc::TYPE_CODE_INTEGER;
@@ -5181,7 +5195,11 @@ void llvm::embedBitcodeInModule(llvm::Module &M, llvm::MemoryBufferRef Buf,
   // Save llvm.compiler.used and remove it.
   SmallVector<Constant *, 2> UsedArray;
   SmallVector<GlobalValue *, 4> UsedGlobals;
-  Type *UsedElementType = Type::getInt8Ty(M.getContext())->getPointerTo(0);
+  //Type *UsedElementType = Type::getInt8Ty(M.getContext())->getPointerTo(0);
+  // TVM local begin
+  Type *UsedElementType = Type::getByteTy(M.getContext())->getPointerTo(0);
+  // TVM local end
+
   GlobalVariable *Used = collectUsedGlobalVariables(M, UsedGlobals, true);
   for (auto *GV : UsedGlobals) {
     if (GV->getName() != "llvm.embedded.module" &&

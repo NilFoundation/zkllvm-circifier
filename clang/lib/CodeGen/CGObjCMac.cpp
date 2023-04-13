@@ -1998,7 +1998,10 @@ CGObjCCommonMac::GenerateConstantNSString(const StringLiteral *Literal) {
     NSConstantStringType =
       llvm::StructType::create({
         CGM.Int32Ty->getPointerTo(),
-        CGM.Int8PtrTy,
+        //CGM.Int8PtrTy,
+        // TVM local begin
+        CGM.BytePtrTy,
+        // TVM local end
         CGM.IntTy
       }, "struct.__builtin_NSString");
   }
@@ -2022,7 +2025,10 @@ CGObjCCommonMac::GenerateConstantNSString(const StringLiteral *Literal) {
   // Don't enforce the target's minimum global alignment, since the only use
   // of the string is via this class initializer.
   GV->setAlignment(llvm::Align(1));
-  Fields.addBitCast(GV, CGM.Int8PtrTy);
+  // Fields.addBitCast(GV, CGM.Int8PtrTy);
+  // TVM local begin
+  Fields.addBitCast(GV, CGM.BytePtrTy);
+  // TVM local end
 
   // String length.
   Fields.addInt(CGM.IntTy, StringLength);
@@ -2340,7 +2346,10 @@ namespace {
 llvm::Constant *CGObjCCommonMac::BuildGCBlockLayout(CodeGenModule &CGM,
                                                 const CGBlockInfo &blockInfo) {
 
-  llvm::Constant *nullPtr = llvm::Constant::getNullValue(CGM.Int8PtrTy);
+  // llvm::Constant *nullPtr = llvm::Constant::getNullValue(CGM.Int8PtrTy);
+  // TVM local begin
+  llvm::Constant *nullPtr = llvm::Constant::getNullValue(CGM.BytePtrTy);
+  // TVM local end
   if (CGM.getLangOpts().getGC() == LangOptions::NonGC)
     return nullPtr;
 
@@ -2698,7 +2707,11 @@ uint64_t CGObjCCommonMac::InlineLayoutInstruction(
 }
 
 llvm::Constant *CGObjCCommonMac::getBitmapBlockLayout(bool ComputeByrefLayout) {
-  llvm::Constant *nullPtr = llvm::Constant::getNullValue(CGM.Int8PtrTy);
+  // llvm::Constant *nullPtr = llvm::Constant::getNullValue(CGM.Int8PtrTy);
+  // TVM local begin
+  llvm::Constant *nullPtr = llvm::Constant::getNullValue(CGM.BytePtrTy);
+  // TVM local end
+
   if (RunSkipBlockVars.empty())
     return nullPtr;
   unsigned WordSizeInBits = CGM.getTarget().getPointerWidth(LangAS::Default);
@@ -2956,10 +2969,16 @@ llvm::Constant *CGObjCCommonMac::BuildByrefLayout(CodeGen::CodeGenModule &CGM,
     BuildRCBlockVarRecordLayout(record, fieldOffset, hasUnion, true /*ByrefLayout */);
     llvm::Constant *Result = getBitmapBlockLayout(true);
     if (isa<llvm::ConstantInt>(Result))
-      Result = llvm::ConstantExpr::getIntToPtr(Result, CGM.Int8PtrTy);
+      // Result = llvm::ConstantExpr::getIntToPtr(Result, CGM.Int8PtrTy);
+      // TVM local begin
+      Result = llvm::ConstantExpr::getIntToPtr(Result, CGM.BytePtrTy);
+      // TVM local end
     return Result;
   }
-  llvm::Constant *nullPtr = llvm::Constant::getNullValue(CGM.Int8PtrTy);
+  // llvm::Constant *nullPtr = llvm::Constant::getNullValue(CGM.Int8PtrTy);
+  // TVM local begin
+  llvm::Constant *nullPtr = llvm::Constant::getNullValue(CGM.BytePtrTy);
+  // TVM local end
   return nullPtr;
 }
 
@@ -3723,7 +3742,10 @@ CGObjCMac::EmitClassExtension(const ObjCImplementationDecl *ID,
   // Weak ivar layout.
   llvm::Constant *layout;
   if (isMetaclass) {
-    layout = llvm::ConstantPointerNull::get(CGM.Int8PtrTy);
+    // layout = llvm::ConstantPointerNull::get(CGM.Int8PtrTy);
+    // TVM local begin
+    layout = llvm::ConstantPointerNull::get(CGM.BytePtrTy);
+    // TVM local end
   } else {
     layout = BuildWeakIvarLayout(ID, CharUnits::Zero(), InstanceSize,
                                  hasMRCWeakIvars);
@@ -5525,7 +5547,11 @@ llvm::Constant *IvarLayoutBuilder::buildBitmap(CGObjCCommonMac &CGObjC,
   }
 
   if (buffer.empty())
-    return llvm::ConstantPointerNull::get(CGM.Int8PtrTy);
+    // return llvm::ConstantPointerNull::get(CGM.Int8PtrTy);
+    // TVM local begin
+    return llvm::ConstantPointerNull::get(CGM.BytePtrTy);
+    // TVM local end
+
 
   // For GC layouts, emit a skip to the end of the allocation so that we
   // have precise information about the entire thing.  This isn't useful
@@ -5568,7 +5594,11 @@ CGObjCCommonMac::BuildIvarLayout(const ObjCImplementationDecl *OMD,
                                  bool ForStrongLayout, bool HasMRCWeakIvars) {
   // If this is MRC, and we're either building a strong layout or there
   // are no weak ivars, bail out early.
-  llvm::Type *PtrTy = CGM.Int8PtrTy;
+  // llvm::Type *PtrTy = CGM.Int8PtrTy;
+  // TVM local begin
+  llvm::Type *PtrTy = CGM.BytePtrTy;
+  // TVM local end
+
   if (CGM.getLangOpts().getGC() == LangOptions::NonGC &&
       !CGM.getLangOpts().ObjCAutoRefCount &&
       (ForStrongLayout || !HasMRCWeakIvars))
@@ -5752,9 +5782,11 @@ ObjCCommonTypesHelper::ObjCCommonTypesHelper(CodeGen::CodeGenModule &cgm)
   ShortTy = cast<llvm::IntegerType>(Types.ConvertType(Ctx.ShortTy));
   IntTy = CGM.IntTy;
   LongTy = cast<llvm::IntegerType>(Types.ConvertType(Ctx.LongTy));
-  Int8PtrTy = CGM.Int8PtrTy;
+  // TVM local begin
+  Int8PtrTy = CGM.BytePtrTy;
   Int8PtrProgramASTy = llvm::PointerType::get(CGM.Int8Ty, ProgramAS);
-  Int8PtrPtrTy = CGM.Int8PtrPtrTy;
+  Int8PtrPtrTy = CGM.BytePtrPtrTy;
+  // TVM local end
 
   // arm64 targets use "int" ivar offset variables. All others,
   // including OS X x86_64 and Windows x86_64, use "long" ivar offsets.
@@ -5985,7 +6017,10 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
   uint64_t SetJmpBufferSize = 18;
 
   // Exceptions
-  llvm::Type *StackPtrTy = llvm::ArrayType::get(CGM.Int8PtrTy, 4);
+  // llvm::Type *StackPtrTy = llvm::ArrayType::get(CGM.Int8PtrTy, 4);
+  // TVM local begin
+  llvm::Type *StackPtrTy = llvm::ArrayType::get(CGM.BytePtrTy, 4);
+  // TVM local end
 
   ExceptionDataTy = llvm::StructType::create(
       "struct._objc_exception_data",

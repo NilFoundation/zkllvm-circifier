@@ -919,7 +919,105 @@ bool Sema::LookupBuiltin(LookupResult &R) {
         } else if (II == getASTContext().getTypePackElementName()) {
           R.addDecl(getASTContext().getTypePackElementDecl());
           return true;
-        }
+      // TVM local begin
+      } else if (II == getASTContext().getReflectFieldName()) {
+        R.addDecl(getASTContext().getReflectFieldDecl());
+        return true;
+      } else if (II == getASTContext().getReflectFieldsCountName()) {
+        R.addDecl(getASTContext().getReflectFieldsCountDecl());
+        return true;
+      } else if (II == getASTContext().getReflectMethodsCountName()) {
+        R.addDecl(getASTContext().getReflectMethodsCountDecl());
+        return true;
+      } else if (II == getASTContext().getReflectMethodNameName()) {
+        R.addDecl(getASTContext().getReflectMethodNameDecl());
+        return true;
+      } else if (II == getASTContext().getReflectMethodPtrNameName()) {
+        R.addDecl(getASTContext().getReflectMethodPtrNameDecl());
+        return true;
+      } else if (II == getASTContext().getReflectReturnNameName()) {
+        R.addDecl(getASTContext().getReflectReturnNameDecl());
+        return true;
+      } else if (II == getASTContext().getReflectMethodFuncIdName()) {
+        R.addDecl(getASTContext().getReflectMethodFuncIdDecl());
+        return true;
+      } else if (II == getASTContext().getReflectMethodInternalName()) {
+        R.addDecl(getASTContext().getReflectMethodInternalDecl());
+        return true;
+      } else if (II == getASTContext().getReflectMethodPtrInternalName()) {
+        R.addDecl(getASTContext().getReflectMethodPtrInternalDecl());
+        return true;
+      } else if (II == getASTContext().getReflectMethodAnswerIdName()) {
+        R.addDecl(getASTContext().getReflectMethodAnswerIdDecl());
+        return true;
+      } else if (II == getASTContext().getReflectMethodPtrAnswerIdName()) {
+        R.addDecl(getASTContext().getReflectMethodPtrAnswerIdDecl());
+        return true;
+      } else if (II == getASTContext().getReflectMethodExternalName()) {
+        R.addDecl(getASTContext().getReflectMethodExternalDecl());
+        return true;
+      } else if (II == getASTContext().getReflectMethodGetterName()) {
+        R.addDecl(getASTContext().getReflectMethodGetterDecl());
+        return true;
+      } else if (II == getASTContext().getReflectMethodNoAcceptName()) {
+        R.addDecl(getASTContext().getReflectMethodNoAcceptDecl());
+        return true;
+      } else if (II == getASTContext().getReflectMethodImplicitFuncIdName()) {
+        R.addDecl(getASTContext().getReflectMethodImplicitFuncIdDecl());
+        return true;
+      } else if (II == getASTContext().getReflectMethodDynChainParseName()) {
+        R.addDecl(getASTContext().getReflectMethodDynChainParseDecl());
+        return true;
+      } else if (II == getASTContext().getReflectMethodDeployName()) {
+        R.addDecl(getASTContext().getReflectMethodDeployDecl());
+        return true;
+      } else if (II == getASTContext().getReflectMethodNoReadPersistentName()) {
+        R.addDecl(getASTContext().getReflectMethodNoReadPersistentDecl());
+        return true;
+      } else if (II == getASTContext().getReflectMethodNoWritePersistentName()) {
+        R.addDecl(getASTContext().getReflectMethodNoWritePersistentDecl());
+        return true;
+      } else if (II == getASTContext().getReflectMethodPtrFuncIdName()) {
+        R.addDecl(getASTContext().getReflectMethodPtrFuncIdDecl());
+        return true;
+      } else if (II == getASTContext().getReflectMethodRvName()) {
+        R.addDecl(getASTContext().getReflectMethodRvDecl());
+        return true;
+      } else if (II == getASTContext().getReflectMethodPtrRvName()) {
+        R.addDecl(getASTContext().getReflectMethodPtrRvDecl());
+        return true;
+      } else if (II == getASTContext().getReflectMethodArgStructName()) {
+        R.addDecl(getASTContext().getReflectMethodArgStructDecl());
+        return true;
+      } else if (II == getASTContext().getReflectMethodPtrArgStructName()) {
+        R.addDecl(getASTContext().getReflectMethodPtrArgStructDecl());
+        return true;
+      } else if (II == getASTContext().getReflectSmartInterfaceName()) {
+        R.addDecl(getASTContext().getReflectSmartInterfaceDecl());
+        return true;
+      } else if (II == getASTContext().getReflectProxyName()) {
+        R.addDecl(getASTContext().getReflectProxyDecl());
+        return true;
+      } else if (II == getASTContext().getReflectMethodPtrName()) {
+        R.addDecl(getASTContext().getReflectMethodPtrDecl());
+        return true;
+      } else if (II == getASTContext().getReflectInterfaceHasPubkeyName()) {
+        R.addDecl(getASTContext().getReflectInterfaceHasPubkeyDecl());
+        return true;
+      } else if (II == getASTContext().getReflectInterfaceHasTimestampName()) {
+        R.addDecl(getASTContext().getReflectInterfaceHasTimestampDecl());
+        return true;
+      } else if (II == getASTContext().getReflectInterfaceHasExpireName()) {
+        R.addDecl(getASTContext().getReflectInterfaceHasExpireDecl());
+        return true;
+      } else if (II == getASTContext().getReflectSignatureFuncIdName()) {
+        R.addDecl(getASTContext().getReflectSignatureFuncIdDecl());
+        return true;
+      } else if (II == getASTContext().getReflectEchoName()) {
+        R.addDecl(getASTContext().getReflectEchoDecl());
+        return true;
+      }
+      // TVM local end
       }
 
       // Check if this is an OpenCL Builtin, and if so, insert its overloads.

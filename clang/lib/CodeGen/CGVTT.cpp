@@ -42,8 +42,13 @@ CodeGenVTables::EmitVTTDefinition(llvm::GlobalVariable *VTT,
                                   llvm::GlobalVariable::LinkageTypes Linkage,
                                   const CXXRecordDecl *RD) {
   VTTBuilder Builder(CGM.getContext(), RD, /*GenerateDefinition=*/true);
+  //llvm::ArrayType *ArrayType =
+  //    llvm::ArrayType::get(CGM.Int8PtrTy, Builder.getVTTComponents().size());
+  // TVM local begin
+  llvm::Type *Int8PtrTy = CGM.BytePtrTy, *Int32Ty = CGM.Int32Ty;
+  // TVM local end
   llvm::ArrayType *ArrayType =
-      llvm::ArrayType::get(CGM.Int8PtrTy, Builder.getVTTComponents().size());
+      llvm::ArrayType::get(Int8PtrTy, Builder.getVTTComponents().size());
 
   SmallVector<llvm::GlobalVariable *, 8> VTables;
   SmallVector<VTableAddressPointsMapTy, 8> VTableAddressPoints;
@@ -81,9 +86,12 @@ CodeGenVTables::EmitVTTDefinition(llvm::GlobalVariable *VTT,
          VTable->getValueType(), VTable, Idxs, /*InBounds=*/true,
          /*InRangeIndex=*/1);
 
+     //Init = llvm::ConstantExpr::getPointerBitCastOrAddrSpaceCast(Init,
+     //                                                            CGM.Int8PtrTy);
+     // TVM local begin
      Init = llvm::ConstantExpr::getPointerBitCastOrAddrSpaceCast(Init,
-                                                                 CGM.Int8PtrTy);
-
+                                                                 CGM.BytePtrTy);
+     // TVM local end
      VTTComponents.push_back(Init);
   }
 
@@ -112,9 +120,11 @@ llvm::GlobalVariable *CodeGenVTables::GetAddrOfVTT(const CXXRecordDecl *RD) {
 
   VTTBuilder Builder(CGM.getContext(), RD, /*GenerateDefinition=*/false);
 
+  // TVM local begin
   llvm::ArrayType *ArrayType =
-    llvm::ArrayType::get(CGM.Int8PtrTy, Builder.getVTTComponents().size());
-  llvm::Align Align = CGM.getDataLayout().getABITypeAlign(CGM.Int8PtrTy);
+    llvm::ArrayType::get(CGM.BytePtrTy, Builder.getVTTComponents().size());
+  llvm::Align Align = CGM.getDataLayout().getABITypeAlign(CGM.BytePtrTy);
+  // TVM local end
 
   llvm::GlobalVariable *GV = CGM.CreateOrReplaceCXXRuntimeVariable(
       Name, ArrayType, llvm::GlobalValue::ExternalLinkage, Align);

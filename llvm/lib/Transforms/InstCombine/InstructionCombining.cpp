@@ -138,7 +138,10 @@ static constexpr unsigned InstCombineDefaultInfiniteLoopThreshold = 1000;
 
 static cl::opt<bool>
 EnableCodeSinking("instcombine-code-sinking", cl::desc("Enable code sinking"),
-                                              cl::init(true));
+                                              // cl::init(true));
+                                              // TVM local begin
+                                              cl::init(false));
+                                              // TVM local end
 
 static cl::opt<unsigned> MaxSinkNumUsers(
     "instcombine-max-sink-users", cl::init(32),
@@ -4237,8 +4240,7 @@ bool InstCombinerImpl::run() {
         // Add operands to the worklist.
         replaceInstUsesWith(*I, C);
         ++NumConstProp;
-        if (isInstructionTriviallyDead(I, &TLI))
-          eraseInstFromFunction(*I);
+        eraseInstFromFunction(*I);
         MadeIRChange = true;
         continue;
       }

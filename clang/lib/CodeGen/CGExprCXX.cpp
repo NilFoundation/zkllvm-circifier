@@ -18,6 +18,7 @@
 #include "ConstantEmitter.h"
 #include "TargetInfo.h"
 #include "clang/Basic/CodeGenOptions.h"
+#include "clang/Basic/Specifiers.h"
 #include "clang/CodeGen/CGFunctionInfo.h"
 #include "llvm/IR/Intrinsics.h"
 
@@ -435,8 +436,47 @@ CodeGenFunction::EmitCXXMemberPointerCallExpr(const CXXMemberCallExpr *E,
                                               ReturnValueSlot ReturnValue) {
   const BinaryOperator *BO =
       cast<BinaryOperator>(E->getCallee()->IgnoreParens());
-  const Expr *BaseExpr = BO->getLHS();
-  const Expr *MemFnExpr = BO->getRHS();
+
+  //const Expr *BaseExpr = BO->getLHS();
+  //const Expr *MemFnExpr = BO->getRHS();
+
+  // TVM local begin
+  Expr *BaseExpr = BO->getLHS();
+  Expr *MemFnExpr = BO->getRHS();
+
+  // Optimization of known (Obj.(&F::method))(Args...) call
+  //  into Obj.method(Args...)
+  if (Target.getTriple().getArch() == llvm::Triple::tvm)
+    if (auto *FoundDec = MemFnExpr->getReferencedDeclOfCallee()) {
+      while (VarDecl *VD = dyn_cast<VarDecl>(FoundDec)) {
+        if (!VD->isUsableInConstantExpressions(getContext())
+            // TODO ||
+          //  ||  !VD->checkInitIsICE()
+          )
+          break;
+        FoundDec = VD->getInit()->getReferencedDeclOfCallee();
+      }
+      if (FoundDec)
+        if (CXXMethodDecl *CalleeMeth = dyn_cast<CXXMethodDecl>(FoundDec)) {
+          DeclAccessPair FoundDecl =
+              DeclAccessPair::make(CalleeMeth, AS_public);
+          DeclarationNameInfo MemberNameInfo(CalleeMeth->getDeclName(),
+                                             CalleeMeth->getLocation());
+          auto *ME = MemberExpr::Create(
+              getContext(), BaseExpr, false, BO->getOperatorLoc(),
+              CalleeMeth->getQualifierLoc(), SourceLocation{}, CalleeMeth,
+              FoundDecl, MemberNameInfo,
+              /* TemplateArgumentListInfo=*/nullptr, getContext().BoundMemberTy,
+              VK_PRValue, OK_Ordinary, NOUR_None);
+          auto OldArgs = const_cast<CXXMemberCallExpr *>(E)->arguments();
+          SmallVector<Expr *, 16> Args(OldArgs);
+          auto *Call = CXXMemberCallExpr::Create(
+              getContext(), ME, Args, E->getType(), E->getValueKind(),
+              E->getEndLoc(), E->getFPFeatures());
+          return EmitCXXMemberCallExpr(Call, ReturnValue);
+        }
+    }
+  // TVM local end
 
   const auto *MPT = MemFnExpr->getType()->castAs<MemberPointerType>();
   const auto *FPT = MPT->getPointeeType()->castAs<FunctionProtoType>();
@@ -502,7 +542,10 @@ static void EmitNullBaseClassInitialization(CodeGenFunction &CGF,
   if (Base->isEmpty())
     return;
 
-  DestPtr = CGF.Builder.CreateElementBitCast(DestPtr, CGF.Int8Ty);
+  // DestPtr = CGF.Builder.CreateElementBitCast(DestPtr, CGF.Int8Ty);
+  // TVM local begin
+  DestPtr = CGF.Builder.CreateElementBitCast(DestPtr, CGF.ByteTy);
+  // TVM local end
 
   const ASTRecordLayout &Layout = CGF.getContext().getASTRecordLayout(Base);
   CharUnits NVSize = Layout.getNonVirtualSize();

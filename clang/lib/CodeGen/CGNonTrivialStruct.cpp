@@ -65,7 +65,7 @@ template <class Derived> struct StructVisitor {
   }
 
   CharUnits getFieldOffset(const FieldDecl *FD) {
-    return Ctx.toCharUnitsFromBits(getFieldOffsetInBits(FD));
+    return Ctx.toCharUnitsFromBits(getFieldOffsetInBits(FD), true);
   }
 
   Derived &asDerived() { return static_cast<Derived &>(*this); }
@@ -365,11 +365,15 @@ template <class Derived> struct GenFuncBase {
         llvm::ConstantInt::get(NumElts->getType(), BaseEltSize);
     llvm::Value *SizeInBytes =
         CGF.Builder.CreateNUWMul(BaseEltSizeVal, NumElts);
-    Address BC = CGF.Builder.CreateElementBitCast(DstAddr, CGF.CGM.Int8Ty);
+    // TVM local begin
+    Address BC = CGF.Builder.CreateElementBitCast(DstAddr, CGF.CGM.BytePtrTy);
+    // TVM local end
     llvm::Value *DstArrayEnd =
         CGF.Builder.CreateInBoundsGEP(CGF.Int8Ty, BC.getPointer(), SizeInBytes);
+    // TVM local begin
     DstArrayEnd = CGF.Builder.CreateBitCast(
-        DstArrayEnd, CGF.CGM.Int8PtrPtrTy, "dstarray.end");
+        DstArrayEnd, CGF.CGM.BytePtrPtrTy, "dstarray.end");
+    // TVM local end
     llvm::BasicBlock *PreheaderBB = CGF.Builder.GetInsertBlock();
 
     // Create the header block and insert the phi instructions.
@@ -378,7 +382,10 @@ template <class Derived> struct GenFuncBase {
     llvm::PHINode *PHIs[N];
 
     for (unsigned I = 0; I < N; ++I) {
-      PHIs[I] = CGF.Builder.CreatePHI(CGF.CGM.Int8PtrPtrTy, 2, "addr.cur");
+      // PHIs[I] = CGF.Builder.CreatePHI(CGF.CGM.Int8PtrPtrTy, 2, "addr.cur");
+      // TVM local begin
+      PHIs[I] = CGF.Builder.CreatePHI(CGF.CGM.BytePtrPtrTy, 2, "addr.cur");
+      // TVM local end
       PHIs[I]->addIncoming(StartAddrs[I].getPointer(), PreheaderBB);
     }
 
@@ -426,9 +433,11 @@ template <class Derived> struct GenFuncBase {
     assert(Addr.isValid() && "invalid address");
     if (Offset.getQuantity() == 0)
       return Addr;
-    Addr = CGF->Builder.CreateElementBitCast(Addr, CGF->CGM.Int8Ty);
+    // TVM local begin
+    Addr = CGF->Builder.CreateElementBitCast(Addr, CGF->CGM.BytePtrTy);
     Addr = CGF->Builder.CreateConstInBoundsGEP(Addr, Offset.getQuantity());
-    return CGF->Builder.CreateElementBitCast(Addr, CGF->CGM.Int8PtrTy);
+    return CGF->Builder.CreateElementBitCast(Addr, CGF->CGM.BytePtrPtrTy);
+    // TVM local end
   }
 
   Address getAddrWithOffset(Address Addr, CharUnits StructFieldOffset,
@@ -448,7 +457,10 @@ template <class Derived> struct GenFuncBase {
         WrongType = true;
       else {
         for (const llvm::Argument &Arg : F->args())
-          if (Arg.getType() != CGM.Int8PtrPtrTy)
+          // if (Arg.getType() != CGM.Int8PtrPtrTy)
+          // TVM local begin
+          if (Arg.getType() != CGM.BytePtrPtrTy)
+          // TVM local end
             WrongType = true;
       }
 
@@ -492,7 +504,9 @@ template <class Derived> struct GenFuncBase {
     for (unsigned I = 0; I < N; ++I) {
       Alignments[I] = Addrs[I].getAlignment();
       Ptrs[I] = CallerCGF.Builder.CreateElementBitCast(
-          Addrs[I], CallerCGF.CGM.Int8PtrTy).getPointer();
+          // TVM local begin
+          Addrs[I], CallerCGF.CGM.BytePtrPtrTy).getPointer();
+          // TVM local end
     }
 
     if (llvm::Function *F =
@@ -526,9 +540,15 @@ struct GenBinaryFunc : CopyStructVisitor<Derived, IsMove>,
       llvm::Value *SizeVal =
           llvm::ConstantInt::get(this->CGF->SizeTy, Size.getQuantity());
       DstAddr =
-          this->CGF->Builder.CreateElementBitCast(DstAddr, this->CGF->Int8Ty);
+          // this->CGF->Builder.CreateElementBitCast(DstAddr, this->CGF->Int8Ty);
+          // TVM local begin
+          this->CGF->Builder.CreateElementBitCast(DstAddr, this->CGF->ByteTy);
+          // TVM local end
       SrcAddr =
-          this->CGF->Builder.CreateElementBitCast(SrcAddr, this->CGF->Int8Ty);
+          // this->CGF->Builder.CreateElementBitCast(SrcAddr, this->CGF->Int8Ty);
+          // TVM local begin
+          this->CGF->Builder.CreateElementBitCast(SrcAddr, this->CGF->ByteTy);
+          // TVM local end
       this->CGF->Builder.CreateMemCpy(DstAddr, SrcAddr, SizeVal, false);
     } else {
       llvm::Type *Ty = llvm::Type::getIntNTy(
@@ -665,9 +685,14 @@ struct GenDefaultInitialize
 
     llvm::Constant *SizeVal = CGF->Builder.getInt64(Size.getQuantity());
     Address DstAddr = getAddrWithOffset(Addrs[DstIdx], CurStructOffset, FD);
-    Address Loc = CGF->Builder.CreateElementBitCast(DstAddr, CGF->Int8Ty);
-    CGF->Builder.CreateMemSet(Loc, CGF->Builder.getInt8(0), SizeVal,
-                              IsVolatile);
+    //Address Loc = CGF->Builder.CreateElementBitCast(DstAddr, CGF->Int8Ty);
+    //CGF->Builder.CreateMemSet(Loc, CGF->Builder.getInt8(0), SizeVal,
+    //                          IsVolatile);
+    // TVM local begin
+    Address Loc = CGF->Builder.CreateElementBitCast(DstAddr, CGF->ByteTy);
+    CGF->Builder.CreateMemSet(Loc, CGF->Builder.getIntN(ByteSizeInBits, 0),
+                              SizeVal, IsVolatile);
+    // TVM local end
   }
 
   void callSpecialFunction(QualType FT, CharUnits Offset,
@@ -818,7 +843,8 @@ void CodeGenFunction::destroyNonTrivialCStruct(CodeGenFunction &CGF,
 void CodeGenFunction::defaultInitNonTrivialCStructVar(LValue Dst) {
   GenDefaultInitialize Gen(getContext());
   Address DstPtr =
-      Builder.CreateElementBitCast(Dst.getAddress(*this), CGM.Int8PtrTy);
+      // TVM local nextline
+      Builder.CreateElementBitCast(Dst.getAddress(*this), CGM.BytePtrPtrTy);
   Gen.setCGF(this);
   QualType QT = Dst.getType();
   QT = Dst.isVolatile() ? QT.withVolatile() : QT;
@@ -831,7 +857,8 @@ static void callSpecialFunction(G &&Gen, StringRef FuncName, QualType QT,
                                 std::array<Address, N> Addrs) {
   auto SetArtificialLoc = ApplyDebugLocation::CreateArtificial(CGF);
   for (unsigned I = 0; I < N; ++I)
-    Addrs[I] = CGF.Builder.CreateElementBitCast(Addrs[I], CGF.CGM.Int8PtrTy);
+    // TVM local nextline
+    Addrs[I] = CGF.Builder.CreateElementBitCast(Addrs[I], CGF.CGM.BytePtrPtrTy);
   QT = IsVolatile ? QT.withVolatile() : QT;
   Gen.callFunc(FuncName, QT, Addrs, CGF);
 }

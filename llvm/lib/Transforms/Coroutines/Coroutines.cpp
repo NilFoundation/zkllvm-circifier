@@ -37,7 +37,10 @@ using namespace llvm;
 // Construct the lowerer base class and initialize its members.
 coro::LowererBase::LowererBase(Module &M)
     : TheModule(M), Context(M.getContext()),
-      Int8Ptr(Type::getInt8PtrTy(Context)),
+//      Int8Ptr(Type::getInt8PtrTy(Context)),
+      // TVM local begin
+      Int8Ptr(Type::getIntBytePtrTy(Context)),
+      // TVM local end
       ResumeFnType(FunctionType::get(Type::getVoidTy(Context), Int8Ptr,
                                      /*isVarArg=*/false)),
       NullPtr(ConstantPointerNull::get(Int8Ptr)) {}
@@ -50,7 +53,11 @@ coro::LowererBase::LowererBase(Module &M)
 
 Value *coro::LowererBase::makeSubFnCall(Value *Arg, int Index,
                                         Instruction *InsertPt) {
-  auto *IndexVal = ConstantInt::get(Type::getInt8Ty(Context), Index);
+//  auto *IndexVal = ConstantInt::get(Type::getInt8Ty(Context), Index);
+  // TVM local begin
+  auto *IndexVal = ConstantInt::get(Type::getByteTy(Context), Index, true);
+  // TVM local end
+
   auto *Fn = Intrinsic::getDeclaration(&TheModule, Intrinsic::coro_subfn_addr);
 
   assert(Index >= CoroSubFnInst::IndexFirst &&
@@ -94,6 +101,10 @@ static const char *const CoroIntrinsics[] = {
     "llvm.coro.suspend",
     "llvm.coro.suspend.async",
     "llvm.coro.suspend.retcon",
+    // TVM local begin
+    "llvm.coro.tvm.deserialize",
+    "llvm.coro.tvm.serialize",
+    // TVM local end
 };
 
 #ifndef NDEBUG
@@ -137,7 +148,11 @@ void coro::replaceCoroFree(CoroIdInst *CoroId, bool Elide) {
     return;
 
   Value *Replacement =
-      Elide ? ConstantPointerNull::get(Type::getInt8PtrTy(CoroId->getContext()))
+      // Elide ? ConstantPointerNull::get(Type::getInt8PtrTy(CoroId->getContext()))
+      // TVM local begin
+      Elide ? ConstantPointerNull::get(
+        Type::getIntBytePtrTy(CoroId->getContext()))
+      // TVM local end
             : CoroFrees.front()->getFrame();
 
   for (CoroFreeInst *CF : CoroFrees) {
@@ -267,7 +282,11 @@ void coro::Shape::buildFrom(Function &F) {
   if (!CoroBegin) {
     // Replace coro.frame which are supposed to be lowered to the result of
     // coro.begin with undef.
-    auto *Undef = UndefValue::get(Type::getInt8PtrTy(F.getContext()));
+    // auto *Undef = UndefValue::get(Type::getInt8PtrTy(F.getContext()));
+    // TVM local begin
+    auto *Undef = UndefValue::get(Type::getIntBytePtrTy(F.getContext()));
+    // TVM local end
+
     for (CoroFrameInst *CF : CoroFrames) {
       CF->replaceAllUsesWith(Undef);
       CF->eraseFromParent();

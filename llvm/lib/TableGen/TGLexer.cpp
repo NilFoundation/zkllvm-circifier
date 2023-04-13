@@ -583,6 +583,8 @@ tgtok::TokKind TGLexer::LexExclaim() {
     .Case("foreach", tgtok::XForEach)
     .Case("filter", tgtok::XFilter)
     .Case("listconcat", tgtok::XListConcat)
+    //.Case("listsplat", tgtok::XListSplat)
+    // TVM local begin
     .Case("listsplat", tgtok::XListSplat)
     .Case("listremove", tgtok::XListRemove)
     .Case("strconcat", tgtok::XStrConcat)

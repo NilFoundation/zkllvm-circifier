@@ -443,6 +443,10 @@ static LinearExpression GetLinearExpression(
 /// that rely on two's complement wrap-arounds for precise alias information
 /// where the maximum index size is 64b.
 static APInt adjustToIndexSize(const APInt &Offset, unsigned IndexSize) {
+  // TVM local begin
+  if (IndexSize > 64)
+    return Offset;
+  // TVM local end
   assert(IndexSize <= Offset.getBitWidth() && "Invalid IndexSize!");
   unsigned ShiftBits = Offset.getBitWidth() - IndexSize;
   return (Offset << ShiftBits).ashr(ShiftBits);
@@ -604,8 +608,10 @@ BasicAAResult::DecomposeGEPExpression(const Value *V, const DataLayout &DL,
 
       // For an array/pointer, add the element offset, explicitly scaled.
       if (const ConstantInt *CIdx = dyn_cast<ConstantInt>(Index)) {
-        if (CIdx->isZero())
+        // TVM local begin: 64-bit check
+        if (CIdx->isZero() || !CIdx->getValue().isSignedIntN(64))
           continue;
+        // TVM local end
 
         // Don't attempt to analyze GEPs if the scalable index is not zero.
         TypeSize AllocTypeSize = DL.getTypeAllocSize(GTI.getIndexedType());

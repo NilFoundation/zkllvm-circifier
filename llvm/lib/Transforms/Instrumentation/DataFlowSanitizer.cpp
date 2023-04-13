@@ -411,7 +411,11 @@ class DataFlowSanitizer {
   friend struct DFSanFunction;
   friend class DFSanVisitor;
 
-  enum { ShadowWidthBits = 8, ShadowWidthBytes = ShadowWidthBits / 8 };
+  enum { ShadowWidthBits = 8, ShadowWidthBytes = ShadowWidthBits / 8,
+         // TVM local begin
+         ShadowWidth = 16
+         // TVM local end
+  };
 
   enum { OriginWidthBits = 32, OriginWidthBytes = OriginWidthBits / 8 };
 
@@ -2910,8 +2914,11 @@ void DFSanVisitor::visitMemSetInst(MemSetInst &I) {
   IRB.CreateCall(
       DFSF.DFS.DFSanSetLabelFn,
       {ValShadow, ValOrigin,
-       IRB.CreateBitCast(I.getDest(), Type::getInt8PtrTy(*DFSF.DFS.Ctx)),
-       IRB.CreateZExtOrTrunc(I.getLength(), DFSF.DFS.IntptrTy)});
+ //      IRB.CreateBitCast(I.getDest(), Type::getInt8PtrTy(*DFSF.DFS.Ctx)),
+      // TVM local begin
+      IRB.CreateBitCast(I.getDest(), Type::getIntBytePtrTy(*DFSF.DFS.Ctx)),
+      // TVM local end
+      IRB.CreateZExtOrTrunc(I.getLength(), DFSF.DFS.IntptrTy)});
 }
 
 void DFSanVisitor::visitMemTransferInst(MemTransferInst &I) {
@@ -2929,11 +2936,34 @@ void DFSanVisitor::visitMemTransferInst(MemTransferInst &I) {
 
   Value *RawDestShadow = DFSF.DFS.getShadowAddress(I.getDest(), &I);
   Value *SrcShadow = DFSF.DFS.getShadowAddress(I.getSource(), &I);
-  Value *LenShadow =
-      IRB.CreateMul(I.getLength(), ConstantInt::get(I.getLength()->getType(),
-                                                    DFSF.DFS.ShadowWidthBytes));
-  Type *Int8Ptr = Type::getInt8PtrTy(*DFSF.DFS.Ctx);
-  Value *DestShadow = IRB.CreateBitCast(RawDestShadow, Int8Ptr);
+
+//  Value *LenShadow =
+//  IRB.CreateMul(I.getLength(), ConstantInt::get(I.getLength()->getType(),
+//                                                    DFSF.DFS.ShadowWidthBytes));
+//  Type *Int8Ptr = Type::getInt8PtrTy(*DFSF.DFS.Ctx);
+//  Value *DestShadow = IRB.CreateBitCast(RawDestShadow, Int8Ptr);
+// SrcShadow = IRB.CreateBitCast(SrcShadow, Int8Ptr);
+//  auto *MTI = cast<MemTransferInst>(
+//      IRB.CreateCall(I.getFunctionType(), I.getCalledOperand(),
+//                     {DestShadow, SrcShadow, LenShadow, I.getVolatileCst()}));
+//  if (ClPreserveAlignment) {
+//    MTI->setDestAlignment(I.getDestAlign() * DFSF.DFS.ShadowWidthBytes);
+//    MTI->setSourceAlignment(I.getSourceAlign() * DFSF.DFS.ShadowWidthBytes);
+//  } else {
+//    MTI->setDestAlignment(Align(DFSF.DFS.ShadowWidthBytes));
+//    MTI->setSourceAlignment(Align(DFSF.DFS.ShadowWidthBytes));
+//  }
+//  if (ClEventCallbacks) {
+//    IRB.CreateCall(DFSF.DFS.DFSanMemTransferCallbackFn,
+//                   {RawDestShadow,
+//                    IRB.CreateZExtOrTrunc(I.getLength(), DFSF.DFS.IntptrTy)});
+//  }
+
+  Value *LenShadow = IRB.CreateMul(
+      I.getLength(),
+      ConstantInt::get(I.getLength()->getType(), DFSF.DFS.ShadowWidth / ByteSizeInBits));
+  Type *Int8Ptr = Type::getIntBytePtrTy(*DFSF.DFS.Ctx);
+  Value *DestShadow = IRB.CreateBitCast(DestShadow, Int8Ptr);
   SrcShadow = IRB.CreateBitCast(SrcShadow, Int8Ptr);
   auto *MTI = cast<MemTransferInst>(
       IRB.CreateCall(I.getFunctionType(), I.getCalledOperand(),

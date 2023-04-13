@@ -57,6 +57,18 @@ using namespace clang;
 
 void AccessSpecDecl::anchor() {}
 
+// TVM local begin
+BindingDecl *BindingDecl::Create(ASTContext &C, DeclContext *DC,
+                                 SourceLocation IdLoc, IdentifierInfo *Id,
+                                 Expr *BindExisting) {
+  return new (C, DC) BindingDecl(DC, IdLoc, Id, BindExisting);
+}
+
+BindingDecl *BindingDecl::CreateDeserialized(ASTContext &C, unsigned ID) {
+  return new (C, ID) BindingDecl(nullptr, SourceLocation(), nullptr, nullptr);
+}
+// TVM local end
+
 AccessSpecDecl *AccessSpecDecl::CreateDeserialized(ASTContext &C, unsigned ID) {
   return new (C, ID) AccessSpecDecl(EmptyShell());
 }
@@ -3261,14 +3273,14 @@ VarDecl *ValueDecl::getPotentiallyDecomposedVarDecl() {
 
 void BindingDecl::anchor() {}
 
-BindingDecl *BindingDecl::Create(ASTContext &C, DeclContext *DC,
-                                 SourceLocation IdLoc, IdentifierInfo *Id) {
-  return new (C, DC) BindingDecl(DC, IdLoc, Id);
-}
+//BindingDecl *BindingDecl::Create(ASTContext &C, DeclContext *DC,
+//                                 SourceLocation IdLoc, IdentifierInfo *Id) {
+//  return new (C, DC) BindingDecl(DC, IdLoc, Id);
+//}
 
-BindingDecl *BindingDecl::CreateDeserialized(ASTContext &C, unsigned ID) {
-  return new (C, ID) BindingDecl(nullptr, SourceLocation(), nullptr);
-}
+//BindingDecl *BindingDecl::CreateDeserialized(ASTContext &C, unsigned ID) {
+//  return new (C, ID) BindingDecl(nullptr, SourceLocation(), nullptr);
+//}
 
 VarDecl *BindingDecl::getHoldingVar() const {
   Expr *B = getBinding();

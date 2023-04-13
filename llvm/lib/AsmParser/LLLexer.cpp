@@ -808,6 +808,13 @@ lltok::Kind LLLexer::LexIdentifier() {
   TYPEKEYWORD("x86_amx",   Type::getX86_AMXTy(Context));
   TYPEKEYWORD("token",     Type::getTokenTy(Context));
 
+  // TVM local begin
+  TYPEKEYWORD("slice", Type::getTVMSliceTy(Context));
+  TYPEKEYWORD("builder", Type::getTVMBuilderTy(Context));
+  TYPEKEYWORD("cell", Type::getTVMCellTy(Context));
+  TYPEKEYWORD("tuple", Type::getTVMTupleTy(Context));
+  // TVM local end
+
 #define GALOIS_FIELD_TYPE(Name, EnumId, SingletonId, FrontendId)  \
   TYPEKEYWORD(Name, GaloisFieldType::get(Context, EnumId));
 #include "llvm/IR/GaloisFieldTypes.def"

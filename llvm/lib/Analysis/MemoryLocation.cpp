@@ -12,6 +12,7 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/IntrinsicsARM.h"
+#include "llvm/IR/IntrinsicsTVM.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
 #include <optional>
@@ -180,8 +181,11 @@ MemoryLocation MemoryLocation::getForArgument(const CallBase *Call,
       assert((ArgIdx == 0 || ArgIdx == 1) &&
              "Invalid argument index for memory intrinsic");
       if (ConstantInt *LenCI = dyn_cast<ConstantInt>(II->getArgOperand(2)))
-        return MemoryLocation(Arg, LocationSize::precise(LenCI->getZExtValue()),
-                              AATags);
+        //  return MemoryLocation(Arg, LocationSize::precise(LenCI->getZExtValue()), AATags);
+        // TVM local begin: 64-bit check
+        if (LenCI->getValue().isIntN(64))
+          return MemoryLocation(Arg, LenCI->getZExtValue(), AATags);
+        // TVM local end
       return MemoryLocation::getAfter(Arg, AATags);
 
     case Intrinsic::lifetime_start:

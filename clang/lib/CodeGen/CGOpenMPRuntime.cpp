@@ -1662,8 +1662,10 @@ CGOpenMPRuntime::getOrCreateThreadPrivateCache(const VarDecl *VD) {
          !CGM.getContext().getTargetInfo().isTLSSupported());
   // Lookup the entry, lazily creating it if necessary.
   std::string Suffix = getName({"cache", ""});
+  // TVM local begin
   return OMPBuilder.getOrCreateInternalVariable(
-      CGM.Int8PtrPtrTy, Twine(CGM.getMangledName(VD)).concat(Suffix).str());
+      CGM.BytePtrPtrTy, Twine(CGM.getMangledName(VD)).concat(Suffix).str());
+  // TVM local end
 }
 
 Address CGOpenMPRuntime::getAddrOfThreadPrivate(CodeGenFunction &CGF,
@@ -1677,7 +1679,9 @@ Address CGOpenMPRuntime::getAddrOfThreadPrivate(CodeGenFunction &CGF,
   llvm::Type *VarTy = VDAddr.getElementType();
   llvm::Value *Args[] = {
       emitUpdateLocation(CGF, Loc), getThreadID(CGF, Loc),
-      CGF.Builder.CreatePointerCast(VDAddr.getPointer(), CGM.Int8PtrTy),
+      // TVM local begin
+      CGF.Builder.CreatePointerCast(VDAddr.getPointer(), CGM.BytePtrTy),
+      // TVM local end
       CGM.getSize(CGM.GetTargetTypeStoreSize(VarTy)),
       getOrCreateThreadPrivateCache(VD)};
   return Address(
@@ -1685,7 +1689,9 @@ Address CGOpenMPRuntime::getAddrOfThreadPrivate(CodeGenFunction &CGF,
           OMPBuilder.getOrCreateRuntimeFunction(
               CGM.getModule(), OMPRTL___kmpc_threadprivate_cached),
           Args),
-      CGF.Int8Ty, VDAddr.getAlignment());
+      // TVM local begin
+      CGF.ByteTy, VDAddr.getAlignment());
+      // TVM local end
 }
 
 void CGOpenMPRuntime::emitThreadPrivateVarInit(
@@ -1742,7 +1748,9 @@ llvm::Function *CGOpenMPRuntime::emitThreadPrivateVarDefinition(
       llvm::Value *ArgVal = CtorCGF.EmitLoadOfScalar(
           CtorCGF.GetAddrOfLocalVar(&Dst), /*Volatile=*/false,
           CGM.getContext().VoidPtrTy, Dst.getLocation());
-      Address Arg(ArgVal, CtorCGF.Int8Ty, VDAddr.getAlignment());
+      // TVM local begin
+      Address Arg(ArgVal, CtorCGF.ByteTy, VDAddr.getAlignment());
+      // TVM local end
       Arg = CtorCGF.Builder.CreateElementBitCast(
           Arg, CtorCGF.ConvertTypeForMem(ASTTy));
       CtorCGF.EmitAnyExprToMem(Init, Arg, Init->getType().getQualifiers(),
@@ -1779,7 +1787,9 @@ llvm::Function *CGOpenMPRuntime::emitThreadPrivateVarDefinition(
           DtorCGF.GetAddrOfLocalVar(&Dst),
           /*Volatile=*/false, CGM.getContext().VoidPtrTy, Dst.getLocation());
       DtorCGF.emitDestroy(
-          Address(ArgVal, DtorCGF.Int8Ty, VDAddr.getAlignment()), ASTTy,
+          // TVM local begin
+          Address(ArgVal, DtorCGF.ByteTy, VDAddr.getAlignment()), ASTTy,
+          // TVM local end
           DtorCGF.getDestroyer(ASTTy.isDestructedType()),
           DtorCGF.needsEHCleanup(ASTTy.isDestructedType()));
       DtorCGF.FinishFunction();
@@ -1892,12 +1902,16 @@ bool CGOpenMPRuntime::emitDeclareTargetVarDefinition(const VarDecl *VD,
                                /*IsInitializer=*/true);
       CtorCGF.FinishFunction();
       Ctor = Fn;
-      ID = llvm::ConstantExpr::getBitCast(Fn, CGM.Int8PtrTy);
+      // TVM local begin
+      ID = llvm::ConstantExpr::getBitCast(Fn, CGM.BytePtrTy);
+      // TVM local end
     } else {
       Ctor = new llvm::GlobalVariable(
-          CGM.getModule(), CGM.Int8Ty, /*isConstant=*/true,
+          // TVM local begin
+          CGM.getModule(), CGM.ByteTy, /*isConstant=*/true,
           llvm::GlobalValue::PrivateLinkage,
-          llvm::Constant::getNullValue(CGM.Int8Ty), Twine(Buffer, "_ctor"));
+          llvm::Constant::getNullValue(CGM.ByteTy), Twine(Buffer, "_ctor"));
+          // TVM local end
       ID = Ctor;
     }
 
@@ -1942,12 +1956,16 @@ bool CGOpenMPRuntime::emitDeclareTargetVarDefinition(const VarDecl *VD,
                           DtorCGF.needsEHCleanup(ASTTy.isDestructedType()));
       DtorCGF.FinishFunction();
       Dtor = Fn;
-      ID = llvm::ConstantExpr::getBitCast(Fn, CGM.Int8PtrTy);
+      // TVM local begin
+      ID = llvm::ConstantExpr::getBitCast(Fn, CGM.BytePtrTy);
+      // TVM local end
     } else {
       Dtor = new llvm::GlobalVariable(
-          CGM.getModule(), CGM.Int8Ty, /*isConstant=*/true,
+          // TVM local begin
+          CGM.getModule(), CGM.ByteTy, /*isConstant=*/true,
           llvm::GlobalValue::PrivateLinkage,
-          llvm::Constant::getNullValue(CGM.Int8Ty), Twine(Buffer, "_dtor"));
+          llvm::Constant::getNullValue(CGM.ByteTy), Twine(Buffer, "_dtor"));
+          // TVM local end
       ID = Dtor;
     }
     // Register the information for the entry associated with the destructor.
@@ -2437,7 +2455,9 @@ void CGOpenMPRuntime::emitSingleRegion(CodeGenFunction &CGF,
         SrcExprs, DstExprs, AssignmentOps, Loc);
     llvm::Value *BufSize = CGF.getTypeSize(CopyprivateArrayTy);
     Address CL = CGF.Builder.CreatePointerBitCastOrAddrSpaceCast(
-        CopyprivateList, CGF.VoidPtrTy, CGF.Int8Ty);
+        // TVM local begin
+        CopyprivateList, CGF.VoidPtrTy, CGF.ByteTy);
+        // TVM local end
     llvm::Value *DidItVal = CGF.Builder.CreateLoad(DidIt);
     llvm::Value *Args[] = {
         emitUpdateLocation(CGF, Loc), // ident_t *<loc>
@@ -2570,7 +2590,8 @@ void CGOpenMPRuntime::emitErrorCall(CodeGenFunction &CGF, SourceLocation Loc,
   llvm::Value *Args[] = {
       emitUpdateLocation(CGF, Loc, /*Flags=*/0, /*GenLoc=*/true),
       llvm::ConstantInt::get(CGM.Int32Ty, IsFatal ? 2 : 1),
-      CGF.Builder.CreatePointerCast(MVL, CGM.Int8PtrTy)};
+      // TVM local nextline
+      CGF.Builder.CreatePointerCast(MVL, CGM.BytePtrTy)};
   CGF.EmitRuntimeCall(OMPBuilder.getOrCreateRuntimeFunction(
                           CGM.getModule(), OMPRTL___kmpc_error),
                       Args);
@@ -3245,7 +3266,8 @@ emitProxyTaskFunction(CodeGenModule &CGM, SourceLocation Loc,
       GtidParam, PartidParam, PrivatesParam, TaskPrivatesMap,
       CGF.Builder
           .CreatePointerBitCastOrAddrSpaceCast(TDBase.getAddress(CGF),
-                                               CGF.VoidPtrTy, CGF.Int8Ty)
+                                               // TVM local nextline
+                                               CGF.VoidPtrTy, CGF.ByteTy)
           .getPointer()};
   SmallVector<llvm::Value *, 16> CallArgs(std::begin(CommonArgs),
                                           std::end(CommonArgs));
@@ -3648,7 +3670,8 @@ emitTaskDupFunction(CodeGenModule &CGM, SourceLocation Loc,
                                  Base, *std::next(KmpTaskTQTyRD->field_begin(),
                                                   KmpTaskTShareds)),
                              Loc),
-        CGF.Int8Ty, CGM.getNaturalTypeAlignment(SharedsTy));
+        // TVM local nextline
+        CGF.ByteTy, CGM.getNaturalTypeAlignment(SharedsTy));
   }
   emitPrivatesInit(CGF, D, KmpTaskSharedsPtr, TDBase, KmpTaskTWithPrivatesQTyRD,
                    SharedsTy, SharedsPtrTy, Data, Privates, /*ForDup=*/true);
@@ -4134,7 +4157,8 @@ CGOpenMPRuntime::emitTaskInit(CodeGenFunction &CGF, SourceLocation Loc,
                 TDBase,
                 *std::next(KmpTaskTQTyRD->field_begin(), KmpTaskTShareds)),
             Loc),
-        CGF.Int8Ty, CGM.getNaturalTypeAlignment(SharedsTy));
+        // TVM local nextline
+        CGF.ByteTy, CGM.getNaturalTypeAlignment(SharedsTy));
     LValue Dest = CGF.MakeAddrLValue(KmpTaskSharedsPtr, SharedsTy);
     LValue Src = CGF.MakeAddrLValue(Shareds, SharedsTy);
     CGF.EmitAggregateCopy(Dest, Src, SharedsTy, AggValueSlot::DoesNotOverlap);
@@ -4527,7 +4551,8 @@ std::pair<llvm::Value *, Address> CGOpenMPRuntime::emitDependClause(
     }
   }
   DependenciesArray = CGF.Builder.CreatePointerBitCastOrAddrSpaceCast(
-      DependenciesArray, CGF.VoidPtrTy, CGF.Int8Ty);
+      // TVM local nextline
+      DependenciesArray, CGF.VoidPtrTy, CGF.ByteTy);
   return std::make_pair(NumOfElements, DependenciesArray);
 }
 
@@ -4614,7 +4639,8 @@ Address CGOpenMPRuntime::emitDepobjDependClause(
   emitDependData(CGF, KmpDependInfoTy, Pos, Dependencies, DependenciesArray);
   DependenciesArray = CGF.Builder.CreatePointerBitCastOrAddrSpaceCast(
       CGF.Builder.CreateConstGEP(DependenciesArray, 1), CGF.VoidPtrTy,
-      CGF.Int8Ty);
+      // TVM local nextline
+      CGF.ByteTy);
   return DependenciesArray;
 }
 
@@ -9042,7 +9068,9 @@ static void emitNonContiguousDescriptor(
     }
     // args[I] = &dims
     Address DAddr = CGF.Builder.CreatePointerBitCastOrAddrSpaceCast(
-        DimsAddr, CGM.Int8PtrTy, CGM.Int8Ty);
+        // TVM local begin
+        DimsAddr, CGM.BytePtrTy, CGM.ByteTy);
+        // TVM local end
     llvm::Value *P = CGF.Builder.CreateConstInBoundsGEP2_32(
         llvm::ArrayType::get(CGM.VoidPtrTy, Info.NumberOfPtrs),
         Info.RTArgs.PointersArray, 0, I);

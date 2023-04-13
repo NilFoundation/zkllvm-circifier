@@ -873,11 +873,25 @@ void AggExprEmitter::VisitCastExpr(CastExpr *E) {
 
   case CK_NoOp:
   case CK_UserDefinedConversion:
-  case CK_ConstructorConversion:
-    assert(CGF.getContext().hasSameUnqualifiedType(E->getSubExpr()->getType(),
-                                                   E->getType()) &&
+  case CK_ConstructorConversion: {
+    // assert(CGF.getContext().hasSameUnqualifiedType(E->getSubExpr()->getType(),
+    //                                               E->getType()) &&
+    //       "Implicit cast types must be compatible");
+    //Visit(E->getSubExpr());
+    // TVM local begin
+    auto SrcTy = E->getSubExpr()->getType();
+    auto DstTy = E->getType();
+    [[maybe_unused]] bool TVMTupleConv =
+        ((SrcTy->isTVMTupleStructType() && DstTy->isTVMLiteralStructType()) ||
+         (DstTy->isTVMTupleStructType() && SrcTy->isTVMLiteralStructType())) &&
+        (CGF.getContext().getTypeSizeInChars(SrcTy).getQuantity() ==
+         CGF.getContext().getTypeSizeInChars(DstTy).getQuantity());
+    assert((TVMTupleConv ||
+            CGF.getContext().hasSameUnqualifiedType(SrcTy, DstTy)) &&
            "Implicit cast types must be compatible");
     Visit(E->getSubExpr());
+    }
+    // TVM local end
     break;
 
   case CK_LValueBitCast:
@@ -938,6 +952,8 @@ void AggExprEmitter::VisitCastExpr(CastExpr *E) {
     llvm_unreachable("cast kind invalid for aggregate types");
   }
 }
+
+static int vcnt = 0;
 
 void AggExprEmitter::VisitCallExpr(const CallExpr *E) {
   if (E->getCallReturnType(CGF.getContext())->isReferenceType()) {
@@ -1374,8 +1390,12 @@ AggExprEmitter::VisitLambdaExpr(LambdaExpr *E) {
       if (CGF.needsEHCleanup(DtorKind)) {
         if (!CleanupDominator)
           CleanupDominator = CGF.Builder.CreateAlignedLoad(
-              CGF.Int8Ty,
-              llvm::Constant::getNullValue(CGF.Int8PtrTy),
+              //CGF.Int8Ty,
+              //llvm::Constant::getNullValue(CGF.Int8PtrTy),
+              // TVM local begin
+              CGF.ByteTy,
+              llvm::Constant::getNullValue(CGF.BytePtrTy),
+              // TVM local end
               CharUnits::One()); // placeholder
 
         CGF.pushDestroy(EHCleanup, LV.getAddress(CGF), CurField->getType(),
@@ -1676,7 +1696,10 @@ void AggExprEmitter::VisitCXXParenListOrInitListExpr(
     cleanups.push_back(cleanup);
     if (!cleanupDominator) // create placeholder once needed
       cleanupDominator = CGF.Builder.CreateAlignedLoad(
-          CGF.Int8Ty, llvm::Constant::getNullValue(CGF.Int8PtrTy),
+          // CGF.Int8Ty, llvm::Constant::getNullValue(CGF.Int8PtrTy),
+          // TVM local begin
+          CGF.Int8Ty, llvm::Constant::getNullValue(CGF.BytePtrTy),
+          // TVM local end
           CharUnits::One());
   };
 
@@ -2012,14 +2035,17 @@ static void CheckAggExprForMemSetUse(AggValueSlot &Slot, const Expr *E,
   llvm::Constant *SizeVal = CGF.Builder.getInt64(Size.getQuantity());
 
   Address Loc = Slot.getAddress();
-  Loc = CGF.Builder.CreateElementBitCast(Loc, CGF.Int8Ty);
-  CGF.Builder.CreateMemSet(Loc, CGF.Builder.getInt8(0), SizeVal, false);
+  //Loc = CGF.Builder.CreateElementBitCast(Loc, CGF.Int8Ty);
+  //CGF.Builder.CreateMemSet(Loc, CGF.Builder.getInt8(0), SizeVal, false);
+  // TVM local begin
+  Loc = CGF.Builder.CreateElementBitCast(Loc, CGF.ByteTy);
+  CGF.Builder.CreateMemSet(Loc, CGF.Builder.getIntN(ByteSizeInBits, 0), SizeVal,
+                           false);
+  // TVM local end
 
   // Tell the AggExprEmitter that the slot is known zero.
   Slot.setZeroed();
 }
-
-
 
 
 /// EmitAggExpr - Emit the computation of the specified expression of aggregate
@@ -2176,8 +2202,12 @@ void CodeGenFunction::EmitAggregateCopy(LValue Dest, LValue Src, QualType Ty,
   // we need to use a different call here.  We use isVolatile to indicate when
   // either the source or the destination is volatile.
 
-  DestPtr = Builder.CreateElementBitCast(DestPtr, Int8Ty);
-  SrcPtr = Builder.CreateElementBitCast(SrcPtr, Int8Ty);
+  // DestPtr = Builder.CreateElementBitCast(DestPtr, Int8Ty);
+  // SrcPtr = Builder.CreateElementBitCast(SrcPtr, Int8Ty);
+  // TVM local begin
+  DestPtr = Builder.CreateElementBitCast(DestPtr, ByteTy);
+  SrcPtr = Builder.CreateElementBitCast(SrcPtr, ByteTy);
+  // TVM local end
 
   // Don't do any of the memmove_collectable tests if GC isn't set.
   if (CGM.getLangOpts().getGC() == LangOptions::NonGC) {

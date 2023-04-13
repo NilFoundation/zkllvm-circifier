@@ -336,7 +336,8 @@ Value *LibCallSimplifier::emitStrLenMemCpy(Value *Src, Value *Dst, uint64_t Len,
   // Now that we have the destination's length, we must index into the
   // destination's pointer to get the actual memcpy destination (end of
   // the string .. we're concatenating).
-  Value *CpyDst = B.CreateInBoundsGEP(B.getInt8Ty(), Dst, DstLen, "endptr");
+  // TVM local nextline
+  Value *CpyDst = B.CreateInBoundsGEP(B.getByteTy(), Dst, DstLen, "endptr");
 
   // We have enough information to now generate the memcpy call to do the
   // concatenation for us.  Make a memcpy to copy the nul byte with align = 1.
@@ -460,7 +461,8 @@ Value *LibCallSimplifier::optimizeStrChr(CallInst *CI, IRBuilderBase &B) {
   if (!getConstantStringInfo(SrcStr, Str)) {
     if (CharC->isZero()) // strchr(p, 0) -> p + strlen(p)
       if (Value *StrLen = emitStrLen(SrcStr, B, DL, TLI))
-        return B.CreateInBoundsGEP(B.getInt8Ty(), SrcStr, StrLen, "strchr");
+        // TVM local nextline
+        return B.CreateInBoundsGEP(B.getByteTy(), SrcStr, StrLen, "strchr");
     return nullptr;
   }
 
@@ -473,7 +475,8 @@ Value *LibCallSimplifier::optimizeStrChr(CallInst *CI, IRBuilderBase &B) {
     return Constant::getNullValue(CI->getType());
 
   // strchr(s+n,c)  -> gep(s+n+i,c)
-  return B.CreateInBoundsGEP(B.getInt8Ty(), SrcStr, B.getInt64(I), "strchr");
+  // TVM local nextline
+  return B.CreateInBoundsGEP(B.getByteTy(), SrcStr, B.getInt64(I), "strchr");
 }
 
 Value *LibCallSimplifier::optimizeStrRChr(CallInst *CI, IRBuilderBase &B) {
@@ -682,7 +685,10 @@ Value *LibCallSimplifier::optimizeStpCpy(CallInst *CI, IRBuilderBase &B) {
 
   if (Dst == Src) { // stpcpy(x,x)  -> x+strlen(x)
     Value *StrLen = emitStrLen(Src, B, DL, TLI);
-    return StrLen ? B.CreateInBoundsGEP(B.getInt8Ty(), Dst, StrLen) : nullptr;
+    //return StrLen ? B.CreateInBoundsGEP(B.getInt8Ty(), Dst, StrLen) : nullptr;
+    // TVM local begin: Byte instead of Int8
+    return StrLen ? B.CreateInBoundsGEP(B.getByteTy(), Dst, StrLen) : nullptr;
+    // TVM local end
   }
 
   // See if we can get the length of the input string.
@@ -695,7 +701,8 @@ Value *LibCallSimplifier::optimizeStpCpy(CallInst *CI, IRBuilderBase &B) {
   Type *PT = Callee->getFunctionType()->getParamType(0);
   Value *LenV = ConstantInt::get(DL.getIntPtrType(PT), Len);
   Value *DstEnd = B.CreateInBoundsGEP(
-      B.getInt8Ty(), Dst, ConstantInt::get(DL.getIntPtrType(PT), Len - 1));
+      // TVM local nextline
+      B.getByteTy(), Dst, ConstantInt::get(DL.getIntPtrType(PT), Len - 1));
 
   // We have enough information to now generate the memcpy call to do the
   // copy for us.  Make a memcpy to copy the nul byte with align = 1.
@@ -836,6 +843,9 @@ Value *LibCallSimplifier::optimizeStringNCpy(CallInst *CI, bool RetEnd,
   --SrcLen; // Unbias length.
 
   if (SrcLen == 0) {
+#ifdef __TVM__
+    B.CreateMemSet(Dst, B.getByte('\0'), Size, Align(1));
+#else
     // Transform st{p,r}ncpy(D, "", N) to memset(D, '\0', N) for any N.
     Align MemSetAlign =
       CI->getAttributes().getParamAttrs(0).getAlignment().valueOrOne();
@@ -844,6 +854,7 @@ Value *LibCallSimplifier::optimizeStringNCpy(CallInst *CI, bool RetEnd,
     NewCI->setAttributes(NewCI->getAttributes().addParamAttributes(
         CI->getContext(), 0, ArgAttrs));
     copyFlags(*CI, NewCI);
+#endif
     return Dst;
   }
 
@@ -1037,7 +1048,8 @@ Value *LibCallSimplifier::optimizeStrPBrk(CallInst *CI, IRBuilderBase &B) {
     if (I == StringRef::npos) // No match.
       return Constant::getNullValue(CI->getType());
 
-    return B.CreateInBoundsGEP(B.getInt8Ty(), CI->getArgOperand(0),
+    // TVM local nextline
+    return B.CreateInBoundsGEP(B.getByteTy(), CI->getArgOperand(0),
                                B.getInt64(I), "strpbrk");
   }
 
@@ -1640,7 +1652,11 @@ Value *LibCallSimplifier::optimizeMemSet(CallInst *CI, IRBuilderBase &B) {
     return nullptr;
 
   // memset(p, v, n) -> llvm.memset(align 1 p, v, n)
-  Value *Val = B.CreateIntCast(CI->getArgOperand(1), B.getInt8Ty(), false);
+  //Value *Val = B.CreateIntCast(CI->getArgOperand(1), B.getInt8Ty(), false);
+  // TVM local begin: Byte instead of Int8
+  Value *Val = B.CreateIntCast(CI->getArgOperand(1), B.getByteTy(), false);
+  // TVM local end
+
   CallInst *NewCI = B.CreateMemSet(CI->getArgOperand(0), Val, Size, Align(1));
   mergeAttributesAndFlags(NewCI, *CI);
   return CI->getArgOperand(0);
@@ -2951,8 +2967,12 @@ Value *LibCallSimplifier::optimizeSPrintFString(CallInst *CI,
   // Decode the second character of the format string.
   if (FormatStr[1] == 'c') {
     // sprintf(dst, "%c", chr) --> *(i8*)dst = chr; *((i8*)dst+1) = 0
+    //if (!CI->getArgOperand(2)->getType()->isIntegerTy())
+    //  return nullptr;
+    // sprintf(dst, "%c", chr) --> *(i8*)dst = chr; *((i8*)dst+1) = 0
     if (!CI->getArgOperand(2)->getType()->isIntegerTy())
       return nullptr;
+    // TVM local begin: Byte instead of Int8
     Value *V = B.CreateTrunc(CI->getArgOperand(2), B.getInt8Ty(), "char");
     Value *Ptr = castToCStr(Dest, B);
     B.CreateStore(V, Ptr);
@@ -3816,7 +3836,11 @@ Value *FortifiedLibCallSimplifier::optimizeMemMoveChk(CallInst *CI,
 Value *FortifiedLibCallSimplifier::optimizeMemSetChk(CallInst *CI,
                                                      IRBuilderBase &B) {
   if (isFortifiedCallFoldable(CI, 3, 2)) {
-    Value *Val = B.CreateIntCast(CI->getArgOperand(1), B.getInt8Ty(), false);
+    //Value *Val = B.CreateIntCast(CI->getArgOperand(1), B.getInt8Ty(), false);
+    // TVM local begin: Byte instead of Int8
+    Value *Val = B.CreateIntCast(CI->getArgOperand(1), B.getByteTy(), false);
+    // TVM local end
+
     CallInst *NewCI = B.CreateMemSet(CI->getArgOperand(0), Val,
                                      CI->getArgOperand(2), Align(1));
     mergeAttributesAndFlags(NewCI, *CI);
@@ -3846,7 +3870,10 @@ Value *FortifiedLibCallSimplifier::optimizeStrpCpyChk(CallInst *CI,
   // __stpcpy_chk(x,x,...)  -> x+strlen(x)
   if (Func == LibFunc_stpcpy_chk && !OnlyLowerUnknownSize && Dst == Src) {
     Value *StrLen = emitStrLen(Src, B, DL, TLI);
-    return StrLen ? B.CreateInBoundsGEP(B.getInt8Ty(), Dst, StrLen) : nullptr;
+    //return StrLen ? B.CreateInBoundsGEP(B.getInt8Ty(), Dst, StrLen) : nullptr;
+    // TVM local begin: Byte instead of Int8
+    return StrLen ? B.CreateInBoundsGEP(B.getByteTy(), Dst, StrLen) : nullptr;
+    // TVM local end
   }
 
   // If a) we don't have any length information, or b) we know this will
@@ -3878,7 +3905,8 @@ Value *FortifiedLibCallSimplifier::optimizeStrpCpyChk(CallInst *CI,
   // If the function was an __stpcpy_chk, and we were able to fold it into
   // a __memcpy_chk, we still need to return the correct end pointer.
   if (Ret && Func == LibFunc_stpcpy_chk)
-    return B.CreateInBoundsGEP(B.getInt8Ty(), Dst,
+    // TVM local nextline
+    return B.CreateInBoundsGEP(B.getByteTy(), Dst,
                                ConstantInt::get(SizeTTy, Len - 1));
   return copyFlags(*CI, cast<CallInst>(Ret));
 }

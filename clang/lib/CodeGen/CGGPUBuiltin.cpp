@@ -23,8 +23,10 @@ using namespace CodeGen;
 
 namespace {
 llvm::Function *GetVprintfDeclaration(llvm::Module &M) {
-  llvm::Type *ArgTypes[] = {llvm::Type::getInt8PtrTy(M.getContext()),
-                            llvm::Type::getInt8PtrTy(M.getContext())};
+  // TVM local begin
+  llvm::Type *ArgTypes[] = {llvm::Type::getIntBytePtrTy(M.getContext()),
+                            llvm::Type::getIntBytePtrTy(M.getContext())};
+  // TVM local end
   llvm::FunctionType *VprintfFuncType = llvm::FunctionType::get(
       llvm::Type::getInt32Ty(M.getContext()), ArgTypes, false);
 
@@ -99,7 +101,10 @@ packArgsIntoNVPTXFormatBuffer(CodeGenFunction *CGF, const CallArgList &Args) {
   // Construct and fill the args buffer that we'll pass to vprintf.
   if (Args.size() <= 1) {
     // If there are no args, pass a null pointer and size 0
-    llvm::Value * BufferPtr = llvm::ConstantPointerNull::get(llvm::Type::getInt8PtrTy(Ctx));
+    // TVM local begin
+    llvm::Value * BufferPtr =
+        llvm::ConstantPointerNull::get(llvm::Type::getIntBytePtrTy(Ctx));
+    // TVM local end
     return {BufferPtr, llvm::TypeSize::Fixed(0)};
   } else {
     llvm::SmallVector<llvm::Type *, 8> ArgTypes;
@@ -119,8 +124,10 @@ packArgsIntoNVPTXFormatBuffer(CodeGenFunction *CGF, const CallArgList &Args) {
       llvm::Value *Arg = Args[I].getRValue(*CGF).getScalarVal();
       Builder.CreateAlignedStore(Arg, P, DL.getPrefTypeAlign(Arg->getType()));
     }
+    // TVM local begin
     llvm::Value *BufferPtr =
-        Builder.CreatePointerCast(Alloca, llvm::Type::getInt8PtrTy(Ctx));
+        Builder.CreatePointerCast(Alloca, llvm::Type::getIntBytePtrTy(Ctx));
+    // TVM local end
     return {BufferPtr, DL.getTypeAllocSize(AllocaTy)};
   }
 }

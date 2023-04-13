@@ -1061,9 +1061,13 @@ Type *TargetTransformInfo::getMemcpyLoopLoweringType(
     LLVMContext &Context, Value *Length, unsigned SrcAddrSpace,
     unsigned DestAddrSpace, unsigned SrcAlign, unsigned DestAlign,
     std::optional<uint32_t> AtomicElementSize) const {
+#if 1 //def __TVM__
+  return Type::getByteTy(Context);
+#else
   return TTIImpl->getMemcpyLoopLoweringType(Context, Length, SrcAddrSpace,
                                             DestAddrSpace, SrcAlign, DestAlign,
                                             AtomicElementSize);
+#endif
 }
 
 void TargetTransformInfo::getMemcpyLoopResidualLoweringType(
@@ -1071,9 +1075,14 @@ void TargetTransformInfo::getMemcpyLoopResidualLoweringType(
     unsigned RemainingBytes, unsigned SrcAddrSpace, unsigned DestAddrSpace,
     unsigned SrcAlign, unsigned DestAlign,
     std::optional<uint32_t> AtomicCpySize) const {
+#if 1 //def __TVM__
+  for (unsigned i = 0; i != RemainingBytes; ++i)
+    OpsOut.push_back(Type::getByteTy(Context));
+#else
   TTIImpl->getMemcpyLoopResidualLoweringType(
       OpsOut, Context, RemainingBytes, SrcAddrSpace, DestAddrSpace, SrcAlign,
       DestAlign, AtomicCpySize);
+#endif
 }
 
 bool TargetTransformInfo::areInlineCompatible(const Function *Caller,

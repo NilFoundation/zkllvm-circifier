@@ -852,7 +852,10 @@ void SeparateConstOffsetFromGEP::lowerToSingleIndexGEPs(
   Type *IntPtrTy = DL->getIntPtrType(Variadic->getType());
 
   Type *I8PtrTy =
-      Builder.getInt8PtrTy(Variadic->getType()->getPointerAddressSpace());
+  //      Builder.getInt8PtrTy(Variadic->getType()->getPointerAddressSpace());
+  // TVM local begin
+      Builder.getIntBytePtrTy(Variadic->getType()->getPointerAddressSpace());
+  // TVM local end
   Value *ResultPtr = Variadic->getOperand(0);
   Loop *L = LI->getLoopFor(Variadic->getParent());
   // Check if the base is not loop invariant or used more than once.
@@ -1132,10 +1135,12 @@ bool SeparateConstOffsetFromGEP::splitGEP(GetElementPtrInst *GEP) {
     // Emit an uglygep in this case.
     IRBuilder<> Builder(GEP);
     Type *I8PtrTy =
-        Builder.getInt8Ty()->getPointerTo(GEP->getPointerAddressSpace());
+        // TVM local nextline
+        Builder.getByteTy()->getPointerTo(GEP->getPointerAddressSpace());
 
     NewGEP = cast<Instruction>(Builder.CreateGEP(
-        Builder.getInt8Ty(), Builder.CreateBitCast(NewGEP, I8PtrTy),
+        // TVM local nextline
+        Builder.getByteTy(), Builder.CreateBitCast(NewGEP, I8PtrTy),
         {ConstantInt::get(IntPtrTy, AccumulativeByteOffset, true)}, "uglygep",
         GEPWasInBounds));
 

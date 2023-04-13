@@ -767,6 +767,7 @@ void TargetPassConfig::addPass(Pass *P) {
 AnalysisID TargetPassConfig::addPass(AnalysisID PassID) {
   IdentifyingPassPtr TargetID = getPassSubstitution(PassID);
   IdentifyingPassPtr FinalPtr = overridePass(PassID, TargetID);
+
   if (!FinalPtr.isValid())
     return nullptr;
 
@@ -1401,7 +1402,12 @@ bool TargetPassConfig::addRegAssignAndRewriteFast() {
 
 bool TargetPassConfig::addRegAssignAndRewriteOptimized() {
   // Add the selected register allocation pass.
-  addPass(createRegAllocPass(true));
+  // TVM local begin
+  Pass *P = createRegAllocPass(true);
+  if (!P)
+    return false;
+  addPass(P);
+  // TVM local end
 
   // Allow targets to change the register assignments before rewriting.
   addPreRewrite();

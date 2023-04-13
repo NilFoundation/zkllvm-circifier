@@ -499,6 +499,19 @@ bool CodeGenPrepare::runOnFunction(Function &F) {
   PromotedInsts.clear();
   FreshBBs.clear();
 
+  // TVM local begin
+  if (auto *TPC = getAnalysisIfAvailable<TargetPassConfig>()) {
+    // TODO: remove TVM local change.
+    // The pass doesn't expose public ID, thus disablePass doesn't apply.
+    // We need to find another way to disable it for TVM target.
+    // We also need to localize the functionality that is broken by empty basic
+    // block insertion and try to disable it rather that the whole pass.
+    const Triple &T = TPC->getTM<TargetMachine>().getTargetTriple();
+    if (T.getArch() == Triple::tvm)
+      return false;
+  }
+  // TVM local end
+
   TM = &getAnalysis<TargetPassConfig>().getTM<TargetMachine>();
   SubtargetInfo = TM->getSubtargetImpl(F);
   TLI = SubtargetInfo->getTargetLowering();
@@ -5411,7 +5424,10 @@ bool CodeGenPrepare::optimizeMemoryInst(Instruction *MemoryInst, Value *Addr,
       return Modified;
     } else {
       Type *I8PtrTy =
-          Builder.getInt8PtrTy(Addr->getType()->getPointerAddressSpace());
+          //Builder.getInt8PtrTy(Addr->getType()->getPointerAddressSpace());
+      // TVM local begin
+          Builder.getIntBytePtrTy(Addr->getType()->getPointerAddressSpace());
+      // TVM local end
       Type *I8Ty = Builder.getInt8Ty();
 
       // Start with the base register. Do this first so that subsequent address
@@ -6045,8 +6061,14 @@ bool CodeGenPrepare::splitLargeGEPOffsets() {
       // Generate a new GEP to replace the current one.
       LLVMContext &Ctx = GEP->getContext();
       Type *IntPtrTy = DL->getIntPtrType(GEP->getType());
+      // TVM local begin
+      IRBuilder<> Builder(GEP);
+      // TVM local end
       Type *I8PtrTy =
-          Type::getInt8PtrTy(Ctx, GEP->getType()->getPointerAddressSpace());
+//          Type::getInt8PtrTy(Ctx, GEP->getType()->getPointerAddressSpace());
+          // TVM local begin
+          Builder.getIntBytePtrTy(GEP->getType()->getPointerAddressSpace());
+      // TVM local end
       Type *I8Ty = Type::getInt8Ty(Ctx);
 
       if (!NewBaseGEP) {
@@ -6083,7 +6105,7 @@ bool CodeGenPrepare::splitLargeGEPOffsets() {
         NewGEPBases.insert(NewBaseGEP);
       }
 
-      IRBuilder<> Builder(GEP);
+      //IRBuilder<> Builder(GEP);
       Value *NewGEP = NewBaseGEP;
       if (Offset == BaseOffset) {
         if (GEP->getType() != I8PtrTy)

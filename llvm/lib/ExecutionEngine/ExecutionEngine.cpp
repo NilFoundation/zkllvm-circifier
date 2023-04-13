@@ -340,7 +340,10 @@ void *ArgvArray::reset(LLVMContext &C, ExecutionEngine *EE,
   Array = std::make_unique<char[]>((InputArgv.size()+1)*PtrSize);
 
   LLVM_DEBUG(dbgs() << "JIT: ARGV = " << (void *)Array.get() << "\n");
-  Type *SBytePtr = Type::getInt8PtrTy(C);
+//  Type *SBytePtr = Type::getInt8PtrTy(C);
+  // TVM local begin
+  Type *SBytePtr = Type::getIntBytePtrTy(C);
+  // TVM local end
 
   for (unsigned i = 0; i != InputArgv.size(); ++i) {
     unsigned Size = InputArgv[i].size()+1;
@@ -430,7 +433,10 @@ int ExecutionEngine::runFunctionAsMain(Function *Fn,
   // Check main() type
   unsigned NumArgs = Fn->getFunctionType()->getNumParams();
   FunctionType *FTy = Fn->getFunctionType();
-  Type* PPInt8Ty = Type::getInt8PtrTy(Fn->getContext())->getPointerTo();
+  // Type* PPInt8Ty = Type::getInt8PtrTy(Fn->getContext())->getPointerTo();
+  // TVM local begin
+  Type *PPInt8Ty = Type::getIntBytePtrTy(Fn->getContext())->getPointerTo();
+  // TVM local end
 
   // Check the argument types.
   if (NumArgs > 3)

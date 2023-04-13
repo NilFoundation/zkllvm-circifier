@@ -236,7 +236,10 @@ CodeGenFunction::GetAddressOfDirectBaseInCompleteClass(Address This,
   // TODO: for complete types, this should be possible with a GEP.
   Address V = This;
   if (!Offset.isZero()) {
-    V = Builder.CreateElementBitCast(V, Int8Ty);
+    //V = Builder.CreateElementBitCast(V, Int8Ty);
+    // TVM local begin
+    V = Builder.CreateElementBitCast(V, ByteTy);
+    // TVM local end
     V = Builder.CreateConstInBoundsByteGEP(V, Offset);
   }
   V = Builder.CreateElementBitCast(V, ConvertType(Base));
@@ -273,8 +276,12 @@ ApplyNonVirtualAndVirtualOffset(CodeGenFunction &CGF, Address addr,
   // Apply the base offset.
   llvm::Value *ptr = addr.getPointer();
   unsigned AddrSpace = ptr->getType()->getPointerAddressSpace();
-  ptr = CGF.Builder.CreateBitCast(ptr, CGF.Int8Ty->getPointerTo(AddrSpace));
-  ptr = CGF.Builder.CreateInBoundsGEP(CGF.Int8Ty, ptr, baseOffset, "add.ptr");
+  //ptr = CGF.Builder.CreateBitCast(ptr, CGF.Int8Ty->getPointerTo(AddrSpace));
+  //ptr = CGF.Builder.CreateInBoundsGEP(CGF.Int8Ty, ptr, baseOffset, "add.ptr");
+  // TVM local begin
+  ptr = CGF.Builder.CreateBitCast(ptr, CGF.BytePtrTy);
+  ptr = CGF.Builder.CreateInBoundsGEP(CGF.ByteTy, ptr, baseOffset, "add.ptr");
+  // TVM local end
 
   // If we have a virtual component, the alignment of the result will
   // be relative only to the known alignment of that vbase.
@@ -435,7 +442,10 @@ CodeGenFunction::GetAddressOfDerivedClass(Address BaseAddr,
   }
 
   // Apply the offset.
-  llvm::Value *Value = Builder.CreateBitCast(BaseAddr.getPointer(), Int8PtrTy);
+  //llvm::Value *Value = Builder.CreateBitCast(BaseAddr.getPointer(), Int8PtrTy);
+  // TVM local begin
+  llvm::Value *Value = Builder.CreateBitCast(BaseAddr.getPointer(), BytePtrTy);
+  // TVM local end
   Value = Builder.CreateInBoundsGEP(
       Int8Ty, Value, Builder.CreateNeg(NonVirtualOffset), "sub.ptr");
 
@@ -949,7 +959,11 @@ namespace {
                     Ctx.getTypeInfoDataSizeInChars(LastField->getType()).Width);
       uint64_t MemcpySizeBits = LastFieldOffset + LastFieldSize -
                                 FirstByteOffset + Ctx.getCharWidth() - 1;
-      CharUnits MemcpySize = Ctx.toCharUnitsFromBits(MemcpySizeBits);
+      //CharUnits MemcpySize = Ctx.toCharUnitsFromBits(MemcpySizeBits);
+      // TVM local begin - truncate flag for toCharUnitsFromBits
+      //   Or remove "+ Ctx.getCharWidth() - 1" here ^^
+      CharUnits MemcpySize = Ctx.toCharUnitsFromBits(MemcpySizeBits, true);
+      // TVM local end
       return MemcpySize;
     }
 
@@ -998,8 +1012,11 @@ namespace {
 
   private:
     void emitMemcpyIR(Address DestPtr, Address SrcPtr, CharUnits Size) {
-      DestPtr = CGF.Builder.CreateElementBitCast(DestPtr, CGF.Int8Ty);
-      SrcPtr = CGF.Builder.CreateElementBitCast(SrcPtr, CGF.Int8Ty);
+      // TVM local begin
+      auto I8Ptr = CGF.Int8Ty;
+      // TVM local end
+      DestPtr = CGF.Builder.CreateElementBitCast(DestPtr, I8Ptr);
+      SrcPtr = CGF.Builder.CreateElementBitCast(SrcPtr, I8Ptr);
       CGF.Builder.CreateMemCpy(DestPtr, SrcPtr, Size.getQuantity());
     }
 
@@ -1760,8 +1777,12 @@ namespace {
           llvm::ConstantInt::get(CGF.SizeTy, PoisonStart.getQuantity());
 
       llvm::Value *OffsetPtr = CGF.Builder.CreateGEP(
-          CGF.Int8Ty,
-          CGF.Builder.CreateBitCast(CGF.LoadCXXThis(), CGF.Int8PtrTy),
+          //CGF.Int8Ty,
+          //CGF.Builder.CreateBitCast(CGF.LoadCXXThis(), CGF.Int8PtrTy),
+          // TVM local begin
+          CGF.BytePtrTy,
+          CGF.Builder.CreateBitCast(CGF.LoadCXXThis(), CGF.BytePtrTy),
+          // TVM local end
           OffsetSizePtr);
 
       CharUnits PoisonEnd;
@@ -2744,7 +2765,9 @@ void CodeGenFunction::EmitTypeMetadataCodeForVCall(const CXXRecordDecl *RD,
     llvm::Value *TypeId =
         llvm::MetadataAsValue::get(CGM.getLLVMContext(), MD);
 
-    llvm::Value *CastedVTable = Builder.CreateBitCast(VTable, Int8PtrTy);
+    // TVM local begin
+    llvm::Value *CastedVTable = Builder.CreateBitCast(VTable, BytePtrTy);
+    // TVM local end
     // If we already know that the call has hidden LTO visibility, emit
     // @llvm.type.test(). Otherwise emit @llvm.public.type.test(), which WPD
     // will convert to @llvm.type.test() if we assert at link time that we have
@@ -2857,12 +2880,18 @@ void CodeGenFunction::EmitVTablePtrCheck(const CXXRecordDecl *RD,
       CGM.CreateMetadataIdentifierForType(QualType(RD->getTypeForDecl(), 0));
   llvm::Value *TypeId = llvm::MetadataAsValue::get(getLLVMContext(), MD);
 
-  llvm::Value *CastedVTable = Builder.CreateBitCast(VTable, Int8PtrTy);
+  //llvm::Value *CastedVTable = Builder.CreateBitCast(VTable, Int8PtrTy);
+  // TVM local begin
+  llvm::Value *CastedVTable = Builder.CreateBitCast(VTable, BytePtrTy);
+  // TVM local end
   llvm::Value *TypeTest = Builder.CreateCall(
       CGM.getIntrinsic(llvm::Intrinsic::type_test), {CastedVTable, TypeId});
 
   llvm::Constant *StaticData[] = {
-      llvm::ConstantInt::get(Int8Ty, TCK),
+      //llvm::ConstantInt::get(Int8Ty, TCK),
+      // TVM local begin
+      llvm::ConstantInt::get(ByteTy, TCK),
+      // TVM local end
       EmitCheckSourceLocation(Loc),
       EmitCheckTypeDescriptor(QualType(RD->getTypeForDecl(), 0)),
   };
@@ -2915,7 +2944,10 @@ llvm::Value *CodeGenFunction::EmitVTableTypeCheckedLoad(
       CGM.CreateMetadataIdentifierForType(QualType(RD->getTypeForDecl(), 0));
   llvm::Value *TypeId = llvm::MetadataAsValue::get(CGM.getLLVMContext(), MD);
 
-  llvm::Value *CastedVTable = Builder.CreateBitCast(VTable, Int8PtrTy);
+  //llvm::Value *CastedVTable = Builder.CreateBitCast(VTable, Int8PtrTy);
+  // TVM local begin
+  llvm::Value *CastedVTable = Builder.CreateBitCast(VTable, BytePtrTy);
+  // TVM local end
   llvm::Value *CheckedLoad = Builder.CreateCall(
       CGM.getIntrinsic(llvm::Intrinsic::type_checked_load),
       {CastedVTable, llvm::ConstantInt::get(Int32Ty, VTableByteOffset),

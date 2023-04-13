@@ -171,6 +171,12 @@ typedef enum {
   LLVMBFloatTypeKind,    /**< 16 bit brain floating point type */
   LLVMX86_AMXTypeKind,   /**< X86 AMX */
   LLVMTargetExtTypeKind, /**< Target extension type */
+  // TVM local begin
+  LLVMTVMSliceKind,      /**< TVM Slice */
+  LLVMTVMBuilderKind,    /**< TVM Builder */
+  LLVMTVMCellKind,       /**< TVM Cell */
+  LLVMTVMTupleKind,      /**< TVM Tuple */
+  // TVM local end
 } LLVMTypeKind;
 
 typedef enum {
@@ -1243,6 +1249,26 @@ LLVMTypeRef LLVMFP128TypeInContext(LLVMContextRef C);
  * Obtain a 128-bit floating point type (two 64-bits) from a context.
  */
 LLVMTypeRef LLVMPPCFP128TypeInContext(LLVMContextRef C);
+
+/**
+ * Create a TVM Slice type in a context.
+ */
+LLVMTypeRef LLVMTVMSliceInContext(LLVMContextRef C);
+
+/**
+ * Create a TVM Builder type in a context.
+ */
+LLVMTypeRef LLVMTVMBuilderInContext(LLVMContextRef C);
+
+/**
+ * Create a TVM Cell type in a context.
+ */
+LLVMTypeRef LLVMTVMCellInContext(LLVMContextRef C);
+
+/**
+ * Create a TVM Tuple type in a context.
+ */
+LLVMTypeRef LLVMTVMTupleInContext(LLVMContextRef C);
 
 /**
  * Obtain a floating point type from the global context.

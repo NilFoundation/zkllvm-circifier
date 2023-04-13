@@ -116,6 +116,11 @@ LANGOPT(WChar             , 1, 0, "wchar_t keyword")
 LANGOPT(Char8             , 1, 0, "char8_t keyword")
 LANGOPT(IEEE128           , 1, 0, "__ieee128 keyword")
 LANGOPT(DeclSpecKeyword   , 1, 0, "__declspec keyword")
+
+// TVM local begin
+LANGOPT(DecompositionBindingOverride, 1, 0, "auto[=k, =v] = foo()")
+// TVM local end
+
 BENIGN_LANGOPT(DollarIdents   , 1, 1, "'$' in identifiers")
 BENIGN_LANGOPT(AsmPreprocessor, 1, 0, "preprocessor in asm mode")
 LANGOPT(GNUMode           , 1, 1, "GNU extensions")

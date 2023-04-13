@@ -514,6 +514,14 @@ def err_decomp_decl_multiple_bases_with_members : Error<
   "have non-static data members">;
 def err_decomp_decl_ambiguous_base : Error<
   "cannot decompose members of ambiguous base class %1 of %0:%2">;
+
+// TVM local begin
+def err_decomp_decl_non_public_base : Error<
+  "cannot decompose members of non-public base class %1 of %0">;
+def err_attribute_invalid_for_non_pod : Error<
+  "%0 attribute can only be used on a POD (plain old data) class or structure">;
+// TVM local end
+
 def err_decomp_decl_inaccessible_base : Error<
   "cannot decompose members of inaccessible base class %1 of %0">,
   AccessControl;
@@ -2946,6 +2954,16 @@ def err_integer_sequence_integral_element_type : Error<
 // __type_pack_element
 def err_type_pack_element_out_of_bounds : Error<
   "a parameter pack may not be accessed at an out of bounds index">;
+
+// TVM local begin
+// __reflect_field
+def err_reflect_field_not_struct_arg : Error<
+  "field name requested from non-struct type">;
+def err_reflect_field_big_index : Error<
+  "Too big index for field name">;
+def err_reflect_method_not_struct_arg : Error<
+  "reflect method requested from non-struct type">;
+// TVM local end
 
 // Objective-C++
 def err_objc_decls_may_only_appear_in_global_scope : Error<

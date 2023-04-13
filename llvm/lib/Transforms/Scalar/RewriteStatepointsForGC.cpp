@@ -1545,7 +1545,11 @@ static void CreateGCRelocates(ArrayRef<Value *> LiveVariables,
   auto getGCRelocateDecl = [&] (Type *Ty) {
     assert(isHandledGCPointerType(Ty));
     auto AS = Ty->getScalarType()->getPointerAddressSpace();
-    Type *NewTy = Type::getInt8PtrTy(M->getContext(), AS);
+    // Type *NewTy = Type::getInt8PtrTy(M->getContext(), AS);
+    // TVM local begin
+    Type *NewTy = Type::getIntBytePtrTy(M->getContext(), AS);
+    // TVM local end
+
     if (auto *VT = dyn_cast<VectorType>(Ty))
       NewTy = FixedVectorType::get(NewTy,
                                    cast<FixedVectorType>(VT)->getNumElements());

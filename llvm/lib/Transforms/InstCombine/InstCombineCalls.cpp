@@ -46,6 +46,7 @@
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 #include "llvm/IR/IntrinsicsARM.h"
 #include "llvm/IR/IntrinsicsHexagon.h"
+#include "llvm/IR/IntrinsicsTVM.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/PatternMatch.h"
@@ -161,6 +162,10 @@ Instruction *InstCombinerImpl::SimplifyAnyMemTransfer(AnyMemTransferInst *MI) {
   uint64_t Size = MemOpLength->getLimitedValue();
   assert(Size && "0-sized memory transferring should be removed already.");
 
+  // TVM local begin
+  if (ByteSizeInBits != 8)
+    return nullptr;
+  // TVM local end
   if (Size > 8 || (Size&(Size-1)))
     return nullptr;  // If not 1/2/4/8 bytes, exit.
 
@@ -286,7 +291,10 @@ Instruction *InstCombinerImpl::SimplifyAnyMemSet(AnyMemSetInst *MI) {
       return nullptr;
 
   // memset(s,c,n) -> store s, c (for n=1,2,4,8)
-  if (Len <= 8 && isPowerOf2_32((uint32_t)Len)) {
+//  if (Len <= 8 && isPowerOf2_32((uint32_t)Len)) {
+  // TVM local begin
+  if (ByteSizeInBits == 8 && Len <= 8 && isPowerOf2_32((uint32_t)Len)) {
+    // TVM local end
     Type *ITy = IntegerType::get(MI->getContext(), Len*8);  // n=1 -> i8.
 
     Value *Dest = MI->getDest();
@@ -1155,6 +1163,7 @@ foldShuffledIntrinsicOperands(IntrinsicInst *II,
 Instruction *InstCombinerImpl::visitCallInst(CallInst &CI) {
   // Don't try to simplify calls without uses. It will not do anything useful,
   // but will result in the following folds being skipped.
+
   if (!CI.use_empty())
     if (Value *V = simplifyCall(&CI, SQ.getWithInstruction(&CI)))
       return replaceInstUsesWith(CI, V);
@@ -2216,6 +2225,54 @@ Instruction *InstCombinerImpl::visitCallInst(CallInst &CI) {
     }
     break;
   }
+
+  // TVM local begin: optimization of untuple into index requests
+#include "TVMUntupleN.def"
+    {
+      unsigned NumElements = II->getType()->getStructNumElements();
+      if (NumElements < 4)
+        break;
+      SmallSetVector<unsigned, 4> UsedIndices;
+      auto OptToIndex = [&]() -> bool {
+        for (const User *U : II->users()) {
+          auto *Extract = dyn_cast<ExtractValueInst>(U);
+          if (!Extract)
+            return false;
+          auto Indices = Extract->getIndices();
+          if (Indices.size() != 1)
+            return false;
+          UsedIndices.insert(Indices[0]);
+          // If we are using more than 1/3 of elements, do full untuple
+          if (UsedIndices.size() > NumElements / 3)
+            return false;
+        }
+        return true;
+      };
+
+      if (OptToIndex()) {
+
+        Function *NewF =
+            Intrinsic::getDeclaration(II->getModule(), Intrinsic::tvm_index);
+
+        for (User *U : II->users()) {
+          auto *Extract = dyn_cast<ExtractValueInst>(U);
+          assert(Extract);
+          auto Indices = Extract->getIndices();
+          assert(Indices.size() == 1);
+          Value *IdxC =
+              ConstantInt::get(Type::getInt257Ty(II->getContext()), Indices[0]);
+          std::vector<Value *> vArgs = {II->getArgOperand(0), IdxC};
+          ArrayRef<Value *> Args(vArgs);
+          CallInst *NewCall = Builder.CreateCall(NewF, Args);
+          replaceInstUsesWith(*Extract, NewCall);
+        }
+
+        return nullptr;
+      }
+      break;
+    }
+    // TVM local end
+
   case Intrinsic::stackrestore: {
     enum class ClassifyResult {
       None,

@@ -661,6 +661,20 @@ void USRGenerator::VisitType(QualType T) {
 
     if (const BuiltinType *BT = T->getAs<BuiltinType>()) {
       switch (BT->getKind()) {
+        // TVM local begin
+        case BuiltinType::TVMSlice:
+          Out << "TVMs";
+          return;
+        case BuiltinType::TVMBuilder:
+          Out << "TVMb";
+          return;
+        case BuiltinType::TVMCell:
+          Out << "TVMc";
+          return;
+        case BuiltinType::TVMTuple:
+          Out << "TVMt";
+          return;
+        // TVM local end
         case BuiltinType::Void:
           Out << 'v'; break;
         case BuiltinType::Bool:

@@ -35,6 +35,9 @@ static bool lowerLoadRelative(Function &F) {
   Type *Int32Ty = Type::getInt32Ty(F.getContext());
   Type *Int32PtrTy = Int32Ty->getPointerTo();
   Type *Int8Ty = Type::getInt8Ty(F.getContext());
+  // TVM local begin
+  Type *ByteTy = Type::getByteTy(F.getContext());
+  // TVM local end
 
   for (Use &U : llvm::make_early_inc_range(F.uses())) {
     auto CI = dyn_cast<CallInst>(U.getUser());
@@ -42,12 +45,19 @@ static bool lowerLoadRelative(Function &F) {
       continue;
 
     IRBuilder<> B(CI);
+    //Value *OffsetPtr = B.CreateGEP(Int8Ty, CI->getArgOperand(0), CI->getArgOperand(1));
+    // TVM local begin
     Value *OffsetPtr =
-        B.CreateGEP(Int8Ty, CI->getArgOperand(0), CI->getArgOperand(1));
+        B.CreateGEP(ByteTy, CI->getArgOperand(0), CI->getArgOperand(1));
+    // TVM local end
+
     Value *OffsetPtrI32 = B.CreateBitCast(OffsetPtr, Int32PtrTy);
     Value *OffsetI32 = B.CreateAlignedLoad(Int32Ty, OffsetPtrI32, Align(4));
 
-    Value *ResultPtr = B.CreateGEP(Int8Ty, CI->getArgOperand(0), OffsetI32);
+//    Value *ResultPtr = B.CreateGEP(Int8Ty, CI->getArgOperand(0), OffsetI32);
+    // TVM local begin
+    Value *ResultPtr = B.CreateGEP(ByteTy, CI->getArgOperand(0), OffsetI32);
+    // TVM local end//
 
     CI->replaceAllUsesWith(ResultPtr);
     CI->eraseFromParent();

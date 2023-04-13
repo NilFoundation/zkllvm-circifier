@@ -64,6 +64,12 @@ StringRef llvm::getEnumName(MVT::SimpleValueType T) {
   case MVT::i32:      return "MVT::i32";
   case MVT::i64:      return "MVT::i64";
   case MVT::i128:     return "MVT::i128";
+  // TVM local begin
+  case MVT::i256:
+    return "MVT::i256";
+  case MVT::i257:
+    return "MVT::i257";
+  // TVM local end
   case MVT::Any:      return "MVT::Any";
   case MVT::iAny:     return "MVT::iAny";
   case MVT::fAny:     return "MVT::fAny";
@@ -258,6 +264,16 @@ StringRef llvm::getEnumName(MVT::SimpleValueType T) {
   case MVT::Untyped:   return "MVT::Untyped";
   case MVT::funcref:   return "MVT::funcref";
   case MVT::externref: return "MVT::externref";
+  // TVM local begin
+  case MVT::TVMSlice:
+    return "MVT::TVMSlice";
+  case MVT::TVMBuilder:
+    return "MVT::TVMBuilder";
+  case MVT::TVMCell:
+    return "MVT::TVMCell";
+  case MVT::TVMTuple:
+    return "MVT::TVMTuple";
+  // TVM local end
   default: llvm_unreachable("ILLEGAL VALUE TYPE!");
   }
   // clang-format on

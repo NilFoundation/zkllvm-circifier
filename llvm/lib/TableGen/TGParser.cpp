@@ -1207,7 +1207,9 @@ Init *TGParser::ParseOperation(Record *CurRec, RecTy *ItemType) {
     case tgtok::XLt:     Code = BinOpInit::LT; break;
     case tgtok::XGe:     Code = BinOpInit::GE; break;
     case tgtok::XGt:     Code = BinOpInit::GT; break;
+    // TVM local begin
     case tgtok::XListConcat: Code = BinOpInit::LISTCONCAT; break;
+    // TVM local end
     case tgtok::XListSplat:  Code = BinOpInit::LISTSPLAT; break;
     case tgtok::XListRemove: Code = BinOpInit::LISTREMOVE; break;
     case tgtok::XStrConcat:  Code = BinOpInit::STRCONCAT; break;
@@ -1251,6 +1253,7 @@ Init *TGParser::ParseOperation(Record *CurRec, RecTy *ItemType) {
       // We don't know the list type until we parse the first argument.
       ArgType = ItemType;
       break;
+    // TVM local begin
     case tgtok::XListSplat:
       // Can't do any typechecking until we parse the first argument.
       break;
@@ -1258,6 +1261,7 @@ Init *TGParser::ParseOperation(Record *CurRec, RecTy *ItemType) {
       // We don't know the list type until we parse the first argument.
       ArgType = ItemType;
       break;
+    // TVM local end
     case tgtok::XStrConcat:
       Type = StringRecTy::get(Records);
       ArgType = StringRecTy::get(Records);
@@ -1308,6 +1312,7 @@ Init *TGParser::ParseOperation(Record *CurRec, RecTy *ItemType) {
             return nullptr;
           }
           break;
+        // TVM local begin
         case BinOpInit::LISTSPLAT:
           if (ItemType && InitList.size() == 1) {
             if (!isa<ListRecTy>(ItemType)) {
@@ -1342,6 +1347,7 @@ Init *TGParser::ParseOperation(Record *CurRec, RecTy *ItemType) {
             return nullptr;
           }
           break;
+        // TVM local end
         case BinOpInit::EQ:
         case BinOpInit::NE:
           if (!ArgType->typeIsConvertibleTo(IntRecTy::get(Records)) &&
@@ -1431,11 +1437,13 @@ Init *TGParser::ParseOperation(Record *CurRec, RecTy *ItemType) {
     }
 
     // listconcat returns a list with type of the argument.
+    // TVM local begin
     if (Code == BinOpInit::LISTCONCAT)
       Type = ArgType;
     // listsplat returns a list of type of the *first* argument.
     if (Code == BinOpInit::LISTSPLAT)
       Type = cast<TypedInit>(InitList.front())->getType()->getListTy();
+    // TVM local end
     // listremove returns a list with type of the argument.
     if (Code == BinOpInit::LISTREMOVE)
       Type = ArgType;
@@ -1474,6 +1482,7 @@ Init *TGParser::ParseOperation(Record *CurRec, RecTy *ItemType) {
 
     tgtok::TokKind LexCode = Lex.getCode();
     Lex.Lex();  // eat the operation
+
     switch (LexCode) {
     default: llvm_unreachable("Unhandled code!");
     case tgtok::XDag:
@@ -2169,7 +2178,9 @@ Init *TGParser::ParseOperationCond(Record *CurRec, RecTy *ItemType) {
 ///   SimpleValue ::= SRATOK '(' Value ',' Value ')'
 ///   SimpleValue ::= SRLTOK '(' Value ',' Value ')'
 ///   SimpleValue ::= LISTCONCATTOK '(' Value ',' Value ')'
+// TVM local begin
 ///   SimpleValue ::= LISTSPLATTOK '(' Value ',' Value ')'
+// TVM local end
 ///   SimpleValue ::= LISTREMOVETOK '(' Value ',' Value ')'
 ///   SimpleValue ::= STRCONCATTOK '(' Value ',' Value ')'
 ///   SimpleValue ::= COND '(' [Value ':' Value,]+ ')'

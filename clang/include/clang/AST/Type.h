@@ -2190,6 +2190,16 @@ public:
   bool isObjCIndirectLifetimeType() const;      // (pointer to)* lifetime type
   bool isObjCNSObjectType() const;              // __attribute__((NSObject))
   bool isObjCIndependentClassType() const;      // __attribute__((objc_independent_class))
+
+  // TVM local begin
+  bool isTVMTupleStructType() const;          // __attribute__((tvm_tuple))
+  bool isTVMNoPubkeyInterfaceType() const;    // __attribute__((no_pubkey))
+  bool isTVMNoTimestampInterfaceType() const; // __attribute__((no_timestamp))
+  bool isTVMNoExpireInterfaceType() const;    // __attribute__((no_expire))
+  // Generated into literal llvm struct like { ty, ty, ... }
+  bool isTVMLiteralStructType() const;
+  // TVM local end
+
   // FIXME: change this to 'raw' interface type, so we can used 'interface' type
   // for the common case.
   bool isObjCObjectType() const;                // NSString or typeof(*(id)0)
@@ -2256,6 +2266,13 @@ public:
   bool isClkEventT() const;                     // OpenCL clk_event_t
   bool isQueueT() const;                        // OpenCL queue_t
   bool isReserveIDT() const;                    // OpenCL reserve_id_t
+
+  // TVM local begin
+  bool isTVMTupleT() const;   // TVM Tuple
+  bool isTVMSliceT() const;   // TVM Slice
+  bool isTVMBuilderT() const; // TVM Builder
+  bool isTVMCellT() const;    // TVM Cell
+  // TVM local end
 
 #define EXT_OPAQUE_TYPE(ExtType, Id, Ext) \
   bool is##Id##Type() const;
@@ -7119,6 +7136,21 @@ inline bool Type::isQueueT() const {
 inline bool Type::isReserveIDT() const {
   return isSpecificBuiltinType(BuiltinType::OCLReserveID);
 }
+
+// TVM local begin
+inline bool Type::isTVMTupleT() const {
+  return isSpecificBuiltinType(BuiltinType::TVMTuple);
+}
+inline bool Type::isTVMSliceT() const {
+  return isSpecificBuiltinType(BuiltinType::TVMSlice);
+}
+inline bool Type::isTVMBuilderT() const {
+  return isSpecificBuiltinType(BuiltinType::TVMBuilder);
+}
+inline bool Type::isTVMCellT() const {
+  return isSpecificBuiltinType(BuiltinType::TVMCell);
+}
+// TVM local end
 
 inline bool Type::isImageType() const {
 #define IMAGE_TYPE(ImgType, Id, SingletonId, Access, Suffix) is##Id##Type() ||

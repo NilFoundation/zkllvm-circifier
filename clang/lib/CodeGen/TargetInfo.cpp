@@ -335,8 +335,12 @@ static Address emitVoidPtrDirectVAArg(CodeGenFunction &CGF,
                                       bool ForceRightAdjust = false) {
   // Cast the element type to i8* if necessary.  Some platforms define
   // va_list as a struct containing an i8* instead of just an i8*.
-  if (VAListAddr.getElementType() != CGF.Int8PtrTy)
-    VAListAddr = CGF.Builder.CreateElementBitCast(VAListAddr, CGF.Int8PtrTy);
+  //if (VAListAddr.getElementType() != CGF.Int8PtrTy)
+  //  VAListAddr = CGF.Builder.CreateElementBitCast(VAListAddr, CGF.Int8PtrTy);
+  // TVM local begin
+  if (VAListAddr.getElementType() != CGF.BytePtrTy)
+    VAListAddr = CGF.Builder.CreateElementBitCast(VAListAddr, CGF.BytePtrTy);
+  // TVM local end
 
   llvm::Value *Ptr = CGF.Builder.CreateLoad(VAListAddr, "argp.cur");
 
@@ -970,6 +974,127 @@ Address WebAssemblyABIInfo::EmitVAArg(CodeGenFunction &CGF, Address VAListAddr,
                           getContext().getTypeInfoInChars(Ty),
                           CharUnits::fromQuantity(4),
                           /*AllowHigherAlign=*/true);
+}
+
+//===----------------------------------------------------------------------===//
+// TVM ABI Implementation
+//
+// This is a very simple ABI that relies a lot on DefaultABIInfo.
+//===----------------------------------------------------------------------===//
+
+// useFirstFieldIfTransparentUnion analog for tvm: returns { i257, i257, ... }
+// struct
+static QualType getSplatI257IfTransparentUnion(ASTContext &Context,
+                                               QualType Ty) {
+  if (const RecordType *UT = Ty->getAsUnionType()) {
+    const RecordDecl *UD = UT->getDecl();
+    if (UD->hasAttr<TransparentUnionAttr>()) {
+      CharUnits Size = Context.getTypeSizeInChars(Ty);
+      return Context.getTVMTuple(static_cast<unsigned>(Size.getQuantity()));
+    }
+  }
+  return Ty;
+}
+
+class TVMABIInfo final : public DefaultABIInfo {
+public:
+  explicit TVMABIInfo(CodeGen::CodeGenTypes &CGT) : DefaultABIInfo(CGT) {}
+
+private:
+  ABIArgInfo classifyReturnType(QualType RetTy) const;
+  ABIArgInfo classifyArgumentType(QualType Ty) const;
+
+  // DefaultABIInfo's classifyReturnType and classifyArgumentType are
+  // non-virtual, but computeInfo is virtual, so we overload it.
+  void computeInfo(CGFunctionInfo &FI) const override {
+    if (!getCXXABI().classifyReturnType(FI))
+      FI.getReturnInfo() = classifyReturnType(FI.getReturnType());
+    for (auto &Arg : FI.arguments())
+      Arg.info = classifyArgumentType(Arg.type);
+  }
+};
+
+class TVMTargetCodeGenInfo final : public TargetCodeGenInfo {
+public:
+  explicit TVMTargetCodeGenInfo(CodeGen::CodeGenTypes &CGT)
+      : TargetCodeGenInfo(std::make_unique<TVMABIInfo>(CGT)) {}
+
+  void setTargetAttributes(const Decl *D, llvm::GlobalValue *GV,
+                           CodeGen::CodeGenModule &CGM) const override {
+    if (auto *FD = dyn_cast_or_null<FunctionDecl>(D)) {
+      if (FD->hasAttr<TVMRawFuncAttr>()) {
+        llvm::Function *Fn = cast<llvm::Function>(GV);
+        Fn->addFnAttr("tvm_raw_func");
+      }
+      if (llvm::any_of(FD->parameters(), [](ParmVarDecl *P) {
+            return P->getType()->isPointerType();
+          })) {
+        if (FD->hasAttr<NoInlineAttr>()) {
+          auto &Diag = CGM.getContext().getDiagnostics();
+          unsigned CustomDiagID =
+              Diag.getCustomDiagID(DiagnosticsEngine::Error, "%0");
+          Diag.Report(FD->getLocation(), CustomDiagID)
+              << "Function with pointer argument can't have `noinline` "
+                 "attribute";
+        }
+        llvm::Function *Fn = cast<llvm::Function>(GV);
+        Fn->addFnAttr(llvm::Attribute::AlwaysInline);
+      }
+    }
+    if (auto *MD = dyn_cast_or_null<CXXMethodDecl>(D)) {
+      if (!MD->isStatic()) {
+        if (MD->hasAttr<NoInlineAttr>()) {
+          auto &Diag = CGM.getContext().getDiagnostics();
+          unsigned CustomDiagID =
+              Diag.getCustomDiagID(DiagnosticsEngine::Error, "%0");
+          Diag.Report(MD->getLocation(), CustomDiagID)
+              << "Non-static method can't have `noinline` attribute";
+        }
+        llvm::Function *Fn = cast<llvm::Function>(GV);
+        Fn->addFnAttr(llvm::Attribute::AlwaysInline);
+      }
+    }
+  }
+};
+
+/// Classify argument of given type \p Ty.
+ABIArgInfo TVMABIInfo::classifyArgumentType(QualType Ty) const {
+  Ty = getSplatI257IfTransparentUnion(getContext(), Ty);
+
+  if (isAggregateTypeForABI(Ty)) {
+    // Records with non-trivial destructors/copy-constructors should not be
+    // passed by value.
+    if (auto RAA = getRecordArgABI(Ty, getCXXABI()))
+      return getNaturalAlignIndirect(Ty, RAA == CGCXXABI::RAA_DirectInMemory);
+    // Ignore empty structs/unions.
+    if (isEmptyRecord(getContext(), Ty, true))
+      return ABIArgInfo::getIgnore();
+    if (const Type *SeltTy = isSingleElementStruct(Ty, getContext()))
+      if (!isAggregateTypeForABI(QualType(SeltTy, 0)))
+        return ABIArgInfo::getDirect(CGT.ConvertType(QualType(SeltTy, 0)));
+    return ABIArgInfo::getExpand();
+  }
+
+  // Otherwise just do the default thing.
+  return DefaultABIInfo::classifyArgumentType(Ty);
+}
+
+ABIArgInfo TVMABIInfo::classifyReturnType(QualType RetTy) const {
+  if (isAggregateTypeForABI(RetTy)) {
+    // Records with non-trivial destructors/copy-constructors should not be
+    // returned by value.
+    if (!getRecordArgABI(RetTy, getCXXABI())) {
+      // Ignore empty structs/unions.
+      if (isEmptyRecord(getContext(), RetTy, true))
+        return ABIArgInfo::getIgnore();
+      if (const Type *SeltTy = isSingleElementStruct(RetTy, getContext()))
+        return ABIArgInfo::getDirect(CGT.ConvertType(QualType(SeltTy, 0)));
+      return ABIArgInfo::getDirect(CGT.ConvertType(RetTy));
+    }
+  }
+
+  // Otherwise just do the default thing.
+  return DefaultABIInfo::classifyReturnType(RetTy);
 }
 
 //===----------------------------------------------------------------------===//
@@ -6203,7 +6328,10 @@ Address AArch64ABIInfo::EmitAAPCSVAArg(Address VAListAddr, QualType Ty,
         OnStackPtr, llvm::ConstantInt::get(CGF.Int64Ty, -Align),
         "align_stack");
 
-    OnStackPtr = CGF.Builder.CreateIntToPtr(OnStackPtr, CGF.Int8PtrTy);
+    // OnStackPtr = CGF.Builder.CreateIntToPtr(OnStackPtr, CGF.Int8PtrTy);
+    // TVM local begin
+    OnStackPtr = CGF.Builder.CreateIntToPtr(OnStackPtr, CGF.BytePtrTy);
+    // TVM local end
   }
   Address OnStackAddr = Address(OnStackPtr, CGF.Int8Ty,
                                 std::max(CharUnits::fromQuantity(8), TyAlign));
@@ -8867,7 +8995,8 @@ Address HexagonABIInfo::EmitVAArgForHexagon(CodeGenFunction &CGF,
                                             Address VAListAddr,
                                             QualType Ty) const {
   // FIXME: Need to handle alignment
-  llvm::Type *BP = CGF.Int8PtrTy;
+  // TVM local nextline
+  llvm::Type *BP = CGF.BytePtrTy;
   CGBuilderTy &Builder = CGF.Builder;
   Address VAListAddrAsBPP = Builder.CreateElementBitCast(VAListAddr, BP, "ap");
   llvm::Value *Addr = Builder.CreateLoad(VAListAddrAsBPP, "ap.cur");
@@ -12245,6 +12374,9 @@ const TargetCodeGenInfo &CodeGenModule::getTargetCodeGenInfo() {
       Kind = WebAssemblyABIInfo::ExperimentalMV;
     return SetCGInfo(new WebAssemblyTargetCodeGenInfo(Types, Kind));
   }
+
+  case llvm::Triple::tvm:
+    return SetCGInfo(new TVMTargetCodeGenInfo(Types));
 
   case llvm::Triple::arm:
   case llvm::Triple::armeb:

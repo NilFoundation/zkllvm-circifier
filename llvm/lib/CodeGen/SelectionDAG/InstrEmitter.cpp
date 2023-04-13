@@ -192,18 +192,30 @@ void InstrEmitter::CreateVirtualRegisters(SDNode *Node,
          "IMPLICIT_DEF should have been handled as a special case elsewhere!");
 
   unsigned NumResults = CountResults(Node);
+  // TVM local begin
+  // Support for variable return values
+  unsigned NumDefs =
+      II.isVariadic() ? NumResults - II.getNumImplicitDefs() : II.getNumDefs();
+  // TVM local end
   bool HasVRegVariadicDefs = !MF->getTarget().usesPhysRegsForValues() &&
                              II.isVariadic() && II.variadicOpsAreDefs();
   unsigned NumVRegs = HasVRegVariadicDefs ? NumResults : II.getNumDefs();
   if (Node->getMachineOpcode() == TargetOpcode::STATEPOINT)
     NumVRegs = NumResults;
-  for (unsigned i = 0; i < NumVRegs; ++i) {
+  //for (unsigned i = 0; i < NumVRegs; ++i) {
+  // TVM local begin
+  for (unsigned i = 0; i < NumDefs; ++i) {
+  // TVM local end
     // If the specific node value is only used by a CopyToReg and the dest reg
     // is a vreg in the same register class, use the CopyToReg'd destination
     // register instead of creating a new vreg.
     Register VRBase;
+    // TVM local begin
     const TargetRegisterClass *RC =
-      TRI->getAllocatableClass(TII->getRegClass(II, i, TRI, *MF));
+        i < II.getNumDefs()
+            ? TRI->getAllocatableClass(TII->getRegClass(II, i, TRI, *MF))
+            : nullptr;
+    // TVM local end
     // Always let the value type influence the used register class. The
     // constraints on the instruction may be too lax to represent the value
     // type correctly. For example, a 64-bit float (X86::FR64) can't live in
@@ -218,7 +230,11 @@ void InstrEmitter::CreateVirtualRegisters(SDNode *Node,
         RC = VTRC;
     }
 
+#if 1 //def __TVM__
+    if (i < II.getNumDefs() && II.OpInfo[i].isOptionalDef()) {
+#else
     if (!II.operands().empty() && II.operands()[i].isOptionalDef()) {
+#endif
       // Optional def must be a physical register.
       VRBase = cast<RegisterSDNode>(Node->getOperand(i-NumResults))->getReg();
       assert(VRBase.isPhysical());
@@ -378,7 +394,12 @@ void InstrEmitter::AddOperand(MachineInstrBuilder &MIB,
     AddRegisterOperand(MIB, Op, IIOpNum, II, VRBaseMap,
                        IsDebug, IsClone, IsCloned);
   } else if (ConstantSDNode *C = dyn_cast<ConstantSDNode>(Op)) {
-    MIB.addImm(C->getSExtValue());
+    // TVM local begin
+    if (C->getConstantIntValue()->getBitWidth() > 64)
+      MIB.addCImm(C->getConstantIntValue());
+    else
+      MIB.addImm(C->getSExtValue());
+    // TVM local end
   } else if (ConstantFPSDNode *F = dyn_cast<ConstantFPSDNode>(Op)) {
     MIB.addFPImm(F->getConstantFPValue());
   } else if (RegisterSDNode *R = dyn_cast<RegisterSDNode>(Op)) {

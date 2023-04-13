@@ -379,6 +379,12 @@ Constant *Constant::getNullValue(Type *Ty) {
     return ConstantTokenNone::get(Ty->getContext());
   case Type::TargetExtTyID:
     return ConstantTargetNone::get(cast<TargetExtType>(Ty));
+  // TVM local begin
+  case Type::TVMCellID: {
+    ConstantInt *Zero = ConstantInt::get(Type::getByteTy(Ty->getContext()), 0);
+    return ConstantExpr::getBitCast(Zero, Ty);
+  }
+  // TVM local end
   default:
     // Function, Label, or Opaque type?
     llvm_unreachable("Cannot create a null constant of that type!");
@@ -1813,8 +1819,11 @@ BlockAddress *BlockAddress::get(Function *F, BasicBlock *BB) {
 }
 
 BlockAddress::BlockAddress(Function *F, BasicBlock *BB)
-    : Constant(Type::getInt8PtrTy(F->getContext(), F->getAddressSpace()),
-               Value::BlockAddressVal, &Op<0>(), 2) {
+   //: Constant(Type::getInt8PtrTy(F->getContext(), F->getAddressSpace()),
+  // TVM local begin
+    : Constant(Type::getIntBytePtrTy(F->getContext(), F->getAddressSpace()),
+  // TVM local end
+    Value::BlockAddressVal, &Op<0>(), 2) {
   setOperand(0, F);
   setOperand(1, BB);
   BB->AdjustBlockAddressRefCount(1);

@@ -3671,7 +3671,12 @@ static bool performBranchToCommonDestFolding(BranchInst *BI, BranchInst *PBI,
   // or/and the two conditions together.
   Value *BICond = VMap[BI->getCondition()];
   PBI->setCondition(
-      createLogicalOp(Builder, Opc, PBI->getCondition(), BICond, "or.cond"));
+      //createLogicalOp(Builder, Opc, PBI->getCondition(), BICond, "or.cond")
+      // TVM local begin
+      // TODO
+      Builder.CreateBinOp(Opc, PBI->getCondition(), BICond, "or.cond")
+      // TVM local end
+  );
 
   // Copy any debug value intrinsics into the end of PredBlock.
   for (Instruction &I : *BB) {
@@ -5097,10 +5102,25 @@ bool SimplifyCFGOpt::simplifyCleanupReturn(CleanupReturnInst *RI) {
   return false;
 }
 
+static void EraseTerminatorInstAndDCECond(Instruction *TI) {
+  Instruction *Cond = nullptr;
+  if (SwitchInst *SI = dyn_cast<SwitchInst>(TI)) {
+    Cond = dyn_cast<Instruction>(SI->getCondition());
+  } else if (BranchInst *BI = dyn_cast<BranchInst>(TI)) {
+    if (BI->isConditional())
+      Cond = dyn_cast<Instruction>(BI->getCondition());
+  } else if (IndirectBrInst *IBI = dyn_cast<IndirectBrInst>(TI)) {
+    Cond = dyn_cast<Instruction>(IBI->getAddress());
+  }
+
+  TI->eraseFromParent();
+  if (Cond)
+    RecursivelyDeleteTriviallyDeadInstructions(Cond);
+}
+
 // WARNING: keep in sync with InstCombinerImpl::visitUnreachableInst()!
 bool SimplifyCFGOpt::simplifyUnreachable(UnreachableInst *UI) {
   BasicBlock *BB = UI->getParent();
-
   bool Changed = false;
 
   // If there are any instructions immediately before the unreachable that can
@@ -5150,16 +5170,28 @@ bool SimplifyCFGOpt::simplifyUnreachable(UnreachableInst *UI) {
         Value* Cond = BI->getCondition();
         assert(BI->getSuccessor(0) != BI->getSuccessor(1) &&
                "The destinations are guaranteed to be different here.");
+        // TVM local begin
+        //if (BI->getSuccessor(0) == BB) {
+        //  Builder.CreateAssumption(Builder.CreateNot(Cond));
+        //  Builder.CreateBr(BI->getSuccessor(1));
+        //} else {
+        //  assert(BI->getSuccessor(1) == BB && "Incorrect CFG");
+        //  Builder.CreateAssumption(Cond);
+        //  Builder.CreateBr(BI->getSuccessor(0));
+        //}
+        //EraseTerminatorAndDCECond(BI);
+        //Changed = true;
+
         if (BI->getSuccessor(0) == BB) {
-          Builder.CreateAssumption(Builder.CreateNot(Cond));
           Builder.CreateBr(BI->getSuccessor(1));
-        } else {
-          assert(BI->getSuccessor(1) == BB && "Incorrect CFG");
-          Builder.CreateAssumption(Cond);
+          EraseTerminatorInstAndDCECond(BI);
+        } else if (BI->getSuccessor(1) == BB) {
           Builder.CreateBr(BI->getSuccessor(0));
+          EraseTerminatorInstAndDCECond(BI);
+          Changed = true;
         }
-        EraseTerminatorAndDCECond(BI);
-        Changed = true;
+
+        // TVM local end
       }
       if (DTU)
         Updates.push_back({DominatorTree::Delete, Predecessor, BB});
@@ -7293,6 +7325,7 @@ bool SimplifyCFGOpt::simplifyOnce(BasicBlock *BB) {
 
   Instruction *Terminator = BB->getTerminator();
   Builder.SetInsertPoint(Terminator);
+
   switch (Terminator->getOpcode()) {
   case Instruction::Br:
     Changed |= simplifyBranch(cast<BranchInst>(Terminator), Builder);

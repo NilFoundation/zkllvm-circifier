@@ -1,3 +1,5 @@
+add_llvm_component_group(Projects)
+
 # Discover the projects that use CMake in the subdirectories.
 # Note that explicit cmake invocation is required every time a new project is
 # added or removed.
@@ -11,9 +13,8 @@ foreach(entry ${entries})
        (NOT ${entry} STREQUAL ${CMAKE_CURRENT_SOURCE_DIR}/libunwind) AND
        (NOT ${entry} STREQUAL ${CMAKE_CURRENT_SOURCE_DIR}/test-suite) AND
        (NOT ${entry} STREQUAL ${CMAKE_CURRENT_SOURCE_DIR}/openmp) AND
-       (NOT ${entry} STREQUAL ${CMAKE_CURRENT_SOURCE_DIR}/cross-project-tests))
-      get_filename_component(entry_name "${entry}" NAME)
-      add_llvm_external_project(${entry_name})
+       (NOT ${entry} STREQUAL ${CMAKE_CURRENT_SOURCE_DIR}/debuginfo-tests))
+      add_subdirectory(${entry})
     endif()
   endif()
 endforeach(entry)
@@ -29,8 +30,6 @@ if(${LLVM_BUILD_RUNTIME})
     # Add the projects in reverse order of their dependencies so that the
     # dependent projects can see the target names of their dependencies.
     add_llvm_external_project(libunwind)
-    add_llvm_external_project(pstl)
-    add_llvm_external_project(libc)
     add_llvm_external_project(libcxxabi)
     add_llvm_external_project(libcxx)
   endif()
@@ -43,5 +42,5 @@ add_llvm_external_project(dragonegg)
 add_llvm_external_project(openmp)
 
 if(LLVM_INCLUDE_TESTS)
-  add_llvm_external_project(cross-project-tests)
+  add_llvm_external_project(debuginfo-tests)
 endif()

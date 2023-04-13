@@ -89,6 +89,11 @@ TYPE("lto-ir",                   LTO_IR,       INVALID,         "s",      phases
 TYPE("lto-bc",                   LTO_BC,       INVALID,         "o",      phases::Compile, phases::Backend, phases::Assemble, phases::Link)
 
 // Misc.
+// TVM local begin
+TYPE("text-const",               TextConst,    INVALID,         "txt",    phases::Compile, phases::Backend, phases::Assemble, phases::Link)
+TYPE("json-abi",                 JsonABI,      CXXHeader,       "abi",    phases::Compile, phases::Backend, phases::Assemble, phases::Link, phases::Precompile)
+// TVM local end
+
 TYPE("ast",                      AST,          INVALID,         "ast",    phases::Compile, phases::Backend, phases::Assemble, phases::Link)
 TYPE("ifs",                      IFS,          INVALID,         "ifs",    phases::IfsMerge)
 TYPE("ifs-cpp",                  IFS_CPP,      INVALID,         "ifs",    phases::Compile, phases::IfsMerge)

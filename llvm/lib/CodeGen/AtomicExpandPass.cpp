@@ -1865,9 +1865,10 @@ bool AtomicExpand::expandAtomicOpToLibcall(
   // that property, we'd need to extend this mechanism to support AS-specific
   // families of atomic intrinsics.
   auto PtrTypeAS = PointerOperand->getType()->getPointerAddressSpace();
+  // TVM local begin
   Value *PtrVal =
-      Builder.CreateBitCast(PointerOperand, Type::getInt8PtrTy(Ctx, PtrTypeAS));
-  PtrVal = Builder.CreateAddrSpaceCast(PtrVal, Type::getInt8PtrTy(Ctx));
+    Builder.CreateBitCast(PointerOperand, Type::getIntBytePtrTy(Ctx));
+  // TVM local end
   Args.push_back(PtrVal);
 
   // 'expected' argument, if present.
@@ -1876,8 +1877,10 @@ bool AtomicExpand::expandAtomicOpToLibcall(
     AllocaCASExpected->setAlignment(AllocaAlignment);
     unsigned AllocaAS = AllocaCASExpected->getType()->getPointerAddressSpace();
 
-    AllocaCASExpected_i8 = Builder.CreateBitCast(
-        AllocaCASExpected, Type::getInt8PtrTy(Ctx, AllocaAS));
+    AllocaCASExpected_i8 =
+      // TVM local begin
+      Builder.CreateBitCast(AllocaCASExpected, Type::getIntBytePtrTy(Ctx));
+      // TVM local end
     Builder.CreateLifetimeStart(AllocaCASExpected_i8, SizeVal64);
     Builder.CreateAlignedStore(CASExpected, AllocaCASExpected, AllocaAlignment);
     Args.push_back(AllocaCASExpected_i8);
@@ -1893,7 +1896,11 @@ bool AtomicExpand::expandAtomicOpToLibcall(
       AllocaValue = AllocaBuilder.CreateAlloca(ValueOperand->getType());
       AllocaValue->setAlignment(AllocaAlignment);
       AllocaValue_i8 =
-          Builder.CreateBitCast(AllocaValue, Type::getInt8PtrTy(Ctx));
+//          Builder.CreateBitCast(AllocaValue, Type::getInt8PtrTy(Ctx));
+      // TVM local begin
+          Builder.CreateBitCast(AllocaValue, Type::getIntBytePtrTy(Ctx));
+      // TVM local end
+
       Builder.CreateLifetimeStart(AllocaValue_i8, SizeVal64);
       Builder.CreateAlignedStore(ValueOperand, AllocaValue, AllocaAlignment);
       Args.push_back(AllocaValue_i8);
@@ -1906,7 +1913,9 @@ bool AtomicExpand::expandAtomicOpToLibcall(
     AllocaResult->setAlignment(AllocaAlignment);
     unsigned AllocaAS = AllocaResult->getType()->getPointerAddressSpace();
     AllocaResult_i8 =
-        Builder.CreateBitCast(AllocaResult, Type::getInt8PtrTy(Ctx, AllocaAS));
+    // TVM local begin
+      Builder.CreateBitCast(AllocaResult, Type::getIntBytePtrTy(Ctx));
+    // TVM local end
     Builder.CreateLifetimeStart(AllocaResult_i8, SizeVal64);
     Args.push_back(AllocaResult_i8);
   }

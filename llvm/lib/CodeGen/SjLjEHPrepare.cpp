@@ -90,7 +90,10 @@ FunctionPass *llvm::createSjLjEHPreparePass(const TargetMachine *TM) {
 bool SjLjEHPrepare::doInitialization(Module &M) {
   // Build the function context structure.
   // builtin_setjmp uses a five word jbuf
-  Type *VoidPtrTy = Type::getInt8PtrTy(M.getContext());
+  // Type *VoidPtrTy = Type::getInt8PtrTy(M.getContext());
+  // TVM local begin
+  Type *VoidPtrTy = Type::getIntBytePtrTy(M.getContext());
+  // TVM local end
   unsigned DataBits =
       TM ? TM->getSjLjDataSize() : TargetMachine::DefaultSjLjDataSize;
   DataTy = Type::getIntNTy(M.getContext(), DataBits);
@@ -200,7 +203,10 @@ Value *SjLjEHPrepare::setupFunctionContext(Function &F,
     Value *ExceptionAddr = Builder.CreateConstGEP2_32(doubleUnderDataTy, FCData,
                                                       0, 0, "exception_gep");
     Value *ExnVal = Builder.CreateLoad(DataTy, ExceptionAddr, true, "exn_val");
-    ExnVal = Builder.CreateIntToPtr(ExnVal, Builder.getInt8PtrTy());
+    //ExnVal = Builder.CreateIntToPtr(ExnVal, Builder.getInt8PtrTy());
+    // TVM local begin
+    ExnVal = Builder.CreateIntToPtr(ExnVal, Builder.getIntBytePtrTy());
+    // TVM local end
 
     Value *SelectorAddr = Builder.CreateConstGEP2_32(doubleUnderDataTy, FCData,
                                                      0, 1, "exn_selector_gep");
@@ -219,7 +225,10 @@ Value *SjLjEHPrepare::setupFunctionContext(Function &F,
   Value *PersonalityFieldPtr = Builder.CreateConstGEP2_32(
       FunctionContextTy, FuncCtx, 0, 3, "pers_fn_gep");
   Builder.CreateStore(
-      Builder.CreateBitCast(PersonalityFn, Builder.getInt8PtrTy()),
+      //Builder.CreateBitCast(PersonalityFn, Builder.getInt8PtrTy()),
+      // TVM local begin
+      Builder.CreateBitCast(PersonalityFn, Builder.getIntBytePtrTy()),
+      // TVM local end
       PersonalityFieldPtr, /*isVolatile=*/true);
 
   // LSDA address
@@ -418,7 +427,11 @@ bool SjLjEHPrepare::setupEntryBlockAndCallSites(Function &F) {
 
   // Store a pointer to the function context so that the back-end will know
   // where to look for it.
-  Value *FuncCtxArg = Builder.CreateBitCast(FuncCtx, Builder.getInt8PtrTy());
+  // Value *FuncCtxArg = Builder.CreateBitCast(FuncCtx, Builder.getInt8PtrTy());
+  // where to look for it.
+  // TVM local begin
+  Value *FuncCtxArg = Builder.CreateBitCast(FuncCtx, Builder.getIntBytePtrTy());
+  // TVM local end
   Builder.CreateCall(FuncCtxFn, FuncCtxArg);
 
   // At this point, we are all set up, update the invoke instructions to mark

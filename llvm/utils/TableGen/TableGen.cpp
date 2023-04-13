@@ -59,6 +59,7 @@ enum ActionType {
   GenDirectivesEnumImpl,
   GenDXILOperation,
   GenRISCVTargetDef,
+  GenTVMInstMappingInfo,
 };
 
 namespace llvm {
@@ -144,7 +145,10 @@ cl::opt<ActionType> Action(
         clEnumValN(GenDXILOperation, "gen-dxil-operation",
                    "Generate DXIL operation information"),
         clEnumValN(GenRISCVTargetDef, "gen-riscv-target-def",
-                   "Generate the list of CPU for RISCV")));
+                   "Generate the list of CPU for RISCV")),
+        clEnumValN(GenTVMInstMappingInfo, "gen-tvm-instr-mapping-info",
+                       "Generate TVM tables")));
+
 cl::OptionCategory PrintEnumsCat("Options for -print-enums");
 cl::opt<std::string> Class("class", cl::desc("Print Enum list for this class"),
                            cl::value_desc("class name"),
@@ -282,6 +286,9 @@ bool LLVMTableGenMain(raw_ostream &OS, RecordKeeper &Records) {
     break;
   case GenRISCVTargetDef:
     EmitRISCVTargetDef(Records, OS);
+    break;
+  case GenTVMInstMappingInfo:
+    EmitTVMInstMappingInfo(Records, OS);
     break;
   }
 

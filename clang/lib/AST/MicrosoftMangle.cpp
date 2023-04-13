@@ -2259,6 +2259,20 @@ void MicrosoftCXXNameMangler::mangleType(QualType T, SourceRange Range,
                    T->isReferenceType() || T->isBlockPointerType();
 
   switch (QMM) {
+  // TVM local begin
+  case BuiltinType::TVMSlice:
+    Out << "TVMs";
+    break;
+  case BuiltinType::TVMBuilder:
+    Out << "TVMb";
+    break;
+  case BuiltinType::TVMCell:
+    Out << "TVMc";
+    break;
+  case BuiltinType::TVMTuple:
+    Out << "TVMt";
+    break;
+  // TVM local end
   case QMM_Drop:
     if (Quals.hasObjCLifetime())
       Quals = Quals.withoutObjCLifetime();

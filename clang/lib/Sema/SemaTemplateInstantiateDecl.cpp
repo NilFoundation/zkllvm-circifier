@@ -1075,8 +1075,21 @@ TemplateDeclInstantiator::VisitTypeAliasTemplateDecl(TypeAliasTemplateDecl *D) {
 }
 
 Decl *TemplateDeclInstantiator::VisitBindingDecl(BindingDecl *D) {
+  //auto *NewBD = BindingDecl::Create(SemaRef.Context, Owner, D->getLocation(),
+  //                                  D->getIdentifier());
+
+  // TVM local begin
+  Expr *BindExisting = D->getBindExisting();
+  if (BindExisting) {
+    auto InstantiatedExpr = SemaRef.SubstExpr(BindExisting, TemplateArgs);
+    if (InstantiatedExpr.isInvalid())
+      return nullptr;
+    BindExisting = InstantiatedExpr.get();
+  }
   auto *NewBD = BindingDecl::Create(SemaRef.Context, Owner, D->getLocation(),
-                                    D->getIdentifier());
+                                    D->getIdentifier(), BindExisting);
+  // TVM local end
+
   NewBD->setReferenced(D->isReferenced());
   SemaRef.CurrentInstantiationScope->InstantiatedLocal(D, NewBD);
   return NewBD;

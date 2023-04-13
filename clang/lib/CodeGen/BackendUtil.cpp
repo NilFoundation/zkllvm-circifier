@@ -329,7 +329,10 @@ static CodeGenFileType getCodeGenFileType(BackendAction Action) {
 
 static bool actionRequiresCodeGen(BackendAction Action) {
   return Action != Backend_EmitNothing && Action != Backend_EmitBC &&
-         Action != Backend_EmitLL;
+         Action != Backend_EmitLL &&
+         // TVM local begin
+         Action != Backend_EmitTextConst);
+         // TVM local end
 }
 
 static bool initTargetOptions(DiagnosticsEngine &Diags,
@@ -1060,6 +1063,10 @@ void EmitAssemblyHelper::RunCodegenPipeline(
 
   // Append any output we need to the pass manager.
   switch (Action) {
+    // TVM local begin
+  case Backend_EmitTextConst:
+    break;
+    // TVM local end
   case Backend_EmitAssembly:
   case Backend_EmitMCNull:
   case Backend_EmitObj:
@@ -1201,6 +1208,12 @@ static void runThinLTOBackend(
       return false;
     };
     break;
+  // TVM local begin
+  case Backend_EmitTextConst:
+    PerModulePasses.add(
+        createPrintTextConstantPass(*OS, CodeGenOpts.EmitTextConstant));
+    break;
+  // TVM local end
   default:
     Conf.CGFileType = getCodeGenFileType(Action);
     break;

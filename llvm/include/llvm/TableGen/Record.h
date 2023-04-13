@@ -836,9 +836,11 @@ class BinOpInit : public OpInit, public FoldingSetNode {
 public:
   enum BinaryOp : uint8_t {
     ADD,
+#ifndef __TVM__
     SUB,
     MUL,
     DIV,
+#endif
     AND,
     OR,
     XOR,
@@ -878,6 +880,9 @@ public:
                         RecTy *Type);
   static Init *getStrConcat(Init *lhs, Init *rhs);
   static Init *getListConcat(TypedInit *lhs, Init *rhs);
+  // TVM local begin
+  static Init *getListSplat(TypedInit *lhs, Init *rhs);
+  // TVM local end
 
   void Profile(FoldingSetNodeID &ID) const;
 

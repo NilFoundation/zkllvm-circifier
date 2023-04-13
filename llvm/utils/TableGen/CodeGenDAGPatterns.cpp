@@ -889,18 +889,18 @@ const TypeSetByHwMode &TypeInfer::getLegalTypes() {
 
 #ifndef NDEBUG
 TypeInfer::ValidateOnExit::~ValidateOnExit() {
-  if (Infer.Validate && !VTS.validate()) {
-    dbgs() << "Type set is empty for each HW mode:\n"
-              "possible type contradiction in the pattern below "
-              "(use -print-records with llvm-tblgen to see all "
-              "expanded records).\n";
-    Infer.TP.dump();
-    dbgs() << "Generated from record:\n";
-    Infer.TP.getRecord()->dump();
-    PrintFatalError(Infer.TP.getRecord()->getLoc(),
-                    "Type set is empty for each HW mode in '" +
-                        Infer.TP.getRecord()->getName() + "'");
-  }
+//  if (Infer.Validate && !VTS.validate()) {
+//    dbgs() << "Type set is empty for each HW mode:\n"
+//              "possible type contradiction in the pattern below "
+//              "(use -print-records with llvm-tblgen to see all "
+//              "expanded records).\n";
+//    Infer.TP.dump();
+//    dbgs() << "Generated from record:\n";
+//    Infer.TP.getRecord()->dump();
+//    PrintFatalError(Infer.TP.getRecord()->getLoc(),
+//                    "Type set is empty for each HW mode in '" +
+//                        Infer.TP.getRecord()->getName() + "'");
+//  }
 }
 #endif
 

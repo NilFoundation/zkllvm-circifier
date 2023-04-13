@@ -324,6 +324,11 @@ void initializePreISelIntrinsicLoweringLegacyPassPass(PassRegistry&);
 void initializePredicateInfoPrinterLegacyPassPass(PassRegistry&);
 void initializePrintFunctionPassWrapperPass(PassRegistry&);
 void initializePrintModulePassWrapperPass(PassRegistry&);
+
+// TVM local begin
+void initializePrintTextConstantPassPass(PassRegistry &);
+// TVM local end
+
 void initializeProcessImplicitDefsPass(PassRegistry&);
 void initializeProfileSummaryInfoWrapperPassPass(PassRegistry&);
 void initializePromoteLegacyPassPass(PassRegistry&);

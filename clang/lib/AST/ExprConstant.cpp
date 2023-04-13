@@ -2342,6 +2342,10 @@ static bool CheckLiteralType(EvalInfo &Info, const Expr *E,
   if (This && Info.EvaluatingDecl == This->getLValueBase())
     return true;
 
+  // TVM local begin
+  return true;
+  // TVM local end
+
   // Prvalue constant expressions must be of literal types.
   if (Info.getLangOpts().CPlusPlus11)
     Info.FFDiag(E, diag::note_constexpr_nonliteral)
@@ -8356,6 +8360,7 @@ bool LValueExprEvaluator::VisitVarDecl(const Expr *E, const VarDecl *VD) {
       Result.set({VD, Frame->Index, Version});
       return true;
     }
+
     return Success(VD);
   }
 
@@ -11461,6 +11466,14 @@ EvaluateBuiltinClassifyType(QualType T, const LangOptions &LangOpts) {
 #include "llvm/IR/EllipticCurveTypes.def"
       return GCCTypeClass::None;
 
+    // TVM local begin
+    case BuiltinType::TVMSlice:
+    case BuiltinType::TVMBuilder:
+    case BuiltinType::TVMCell:
+    case BuiltinType::TVMTuple:
+      return GCCTypeClass::None;
+    // TVM local end
+
     case BuiltinType::Dependent:
       llvm_unreachable("unexpected dependent type");
     };
@@ -13243,10 +13256,19 @@ EvaluateComparisonBinaryOperator(EvalInfo &Info, const BinaryOperator *E,
     unsigned PtrSize = Info.Ctx.getTypeSize(LHSTy);
     uint64_t CompareLHS = LHSOffset.getQuantity();
     uint64_t CompareRHS = RHSOffset.getQuantity();
-    assert(PtrSize <= 64 && "Unexpected pointer width");
-    uint64_t Mask = ~0ULL >> (64 - PtrSize);
-    CompareLHS &= Mask;
-    CompareRHS &= Mask;
+
+    //assert(PtrSize <= 64 && "Unexpected pointer width");
+    //uint64_t Mask = ~0ULL >> (64 - PtrSize);
+    //CompareLHS &= Mask;
+    //CompareRHS &= Mask;
+    //
+    // TVM local begin
+    if (PtrSize <= 64) {
+      uint64_t Mask = ~0ULL >> (64 - PtrSize);
+      CompareLHS &= Mask;
+      CompareRHS &= Mask;
+    }
+    // TVM local end
 
     // If there is a base and this is a relational operator, we can only
     // compare pointers within the object in question; otherwise, the result
@@ -13496,17 +13518,43 @@ bool IntExprEvaluator::VisitBinaryOperator(const BinaryOperator *E) {
 
     // Compute (LHSOffset - RHSOffset) / Size carefully, checking for
     // overflow in the final conversion to ptrdiff_t.
-    APSInt LHS(llvm::APInt(65, (int64_t)LHSOffset.getQuantity(), true), false);
-    APSInt RHS(llvm::APInt(65, (int64_t)RHSOffset.getQuantity(), true), false);
-    APSInt ElemSize(llvm::APInt(65, (int64_t)ElementSize.getQuantity(), true),
-                    false);
-    APSInt TrueResult = (LHS - RHS) / ElemSize;
-    APSInt Result = TrueResult.trunc(Info.Ctx.getIntWidth(E->getType()));
+    //APSInt LHS(llvm::APInt(65, (int64_t)LHSOffset.getQuantity(), true), false);
+    //APSInt RHS(llvm::APInt(65, (int64_t)RHSOffset.getQuantity(), true), false);
+    //APSInt ElemSize(llvm::APInt(65, (int64_t)ElementSize.getQuantity(), true),
+    //                false);
+    //APSInt TrueResult = (LHS - RHS) / ElemSize;
+    //APSInt Result = TrueResult.trunc(Info.Ctx.getIntWidth(E->getType()));
+    //
+    //if (Result.extend(65) != TrueResult &&
+    //    !HandleOverflow(Info, E, TrueResult, E->getType()))
+    //  return false;
+    //return Success(Result, E);
 
-    if (Result.extend(65) != TrueResult &&
-        !HandleOverflow(Info, E, TrueResult, E->getType()))
-      return false;
+   // TVM local begin
+    if (Info.Ctx.getIntWidth(E->getType()) <= 64) {
+      APSInt LHS(llvm::APInt(65, (int64_t)LHSOffset.getQuantity(), true),
+                 false);
+      APSInt RHS(llvm::APInt(65, (int64_t)RHSOffset.getQuantity(), true),
+                 false);
+      APSInt ElemSize(llvm::APInt(65, (int64_t)ElementSize.getQuantity(), true),
+                      false);
+      APSInt TrueResult = (LHS - RHS) / ElemSize;
+      APSInt Result = TrueResult.trunc(Info.Ctx.getIntWidth(E->getType()));
+
+      if (Result.extend(65) != TrueResult &&
+          !HandleOverflow(Info, E, TrueResult, E->getType()))
+        return false;
+      return Success(Result, E);
+    }
+    // FIXME: disabled overflow check for pointer types > 64 bit
+    int64_t LHS = LHSOffset.getQuantity();
+    int64_t RHS = RHSOffset.getQuantity();
+    int64_t ElemSize = ElementSize.getQuantity();
+    int64_t Val = (LHS - RHS) / ElemSize;
+    APSInt Result(llvm::APInt(Info.Ctx.getIntWidth(E->getType()), Val, true),
+                  false);
     return Success(Result, E);
+    // TVM local end
   }
 
   return ExprEvaluatorBaseTy::VisitBinaryOperator(E);
@@ -16255,6 +16303,25 @@ bool Expr::isIntegerConstantExpr(const ASTContext &Ctx,
   }
   return true;
 }
+
+// TVM local begin
+bool Expr::isIntegerConstantExpr(llvm::APSInt &Value, const ASTContext &Ctx,
+                                 SourceLocation *Loc, bool isEvaluated) const {
+  assert(!isValueDependent() &&
+         "Expression evaluator can't be called on a dependent expression.");
+
+  if (Ctx.getLangOpts().CPlusPlus11)
+    return EvaluateCPlusPlus11IntegralConstantExpr(Ctx, this, &Value, Loc);
+
+  ICEDiag D = CheckICE(this, Ctx);
+  if (D.Kind != IK_ICE) {
+    if (Loc)
+      *Loc = D.Loc;
+    return false;
+  }
+  return true;
+}
+// TVM local end
 
 std::optional<llvm::APSInt>
 Expr::getIntegerConstantExpr(const ASTContext &Ctx, SourceLocation *Loc,

@@ -4026,22 +4026,43 @@ class BindingDecl : public ValueDecl {
   /// binding).
   Expr *Binding = nullptr;
 
-  BindingDecl(DeclContext *DC, SourceLocation IdLoc, IdentifierInfo *Id)
-      : ValueDecl(Decl::Binding, DC, IdLoc, Id, QualType()) {}
+  //BindingDecl(DeclContext *DC, SourceLocation IdLoc, IdentifierInfo *Id)
+  //    : ValueDecl(Decl::Binding, DC, IdLoc, Id, QualType()) {}
+
+  // TVM local begin
+  Expr *BindExisting = nullptr;
+
+  BindingDecl(DeclContext *DC, SourceLocation IdLoc, IdentifierInfo *Id,
+              Expr *BindExisting = nullptr)
+      : ValueDecl(Decl::Binding, DC, IdLoc, Id, QualType()),
+        BindExisting(BindExisting) {}
+  // TVM local end
 
   void anchor() override;
 
 public:
   friend class ASTDeclReader;
 
+  // TVM local begin
   static BindingDecl *Create(ASTContext &C, DeclContext *DC,
-                             SourceLocation IdLoc, IdentifierInfo *Id);
+                             SourceLocation IdLoc, IdentifierInfo *Id,
+                             Expr *BindExisting = nullptr);
+
+  // TVM local end
+
+  //static BindingDecl *Create(ASTContext &C, DeclContext *DC,
+  //                           SourceLocation IdLoc, IdentifierInfo *Id);
+
   static BindingDecl *CreateDeserialized(ASTContext &C, unsigned ID);
 
   /// Get the expression to which this declaration is bound. This may be null
   /// in two different cases: while parsing the initializer for the
   /// decomposition declaration, and when the initializer is type-dependent.
   Expr *getBinding() const { return Binding; }
+
+  // TVM local begin
+  Expr *getBindExisting() const { return BindExisting; }
+  // TVM local end
 
   /// Get the decomposition declaration that this binding represents a
   /// decomposition of.

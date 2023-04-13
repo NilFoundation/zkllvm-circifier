@@ -237,15 +237,18 @@ template <typename IntTy> static Error getInt(StringRef R, IntTy &Result) {
 
 /// Get an unsigned integer representing the number of bits and convert it into
 /// bytes. Error out of not a byte width multiple.
+// TVM local begin
 template <typename IntTy>
 static Error getIntInBytes(StringRef R, IntTy &Result) {
   if (Error Err = getInt<IntTy>(R, Result))
     return Err;
-  if (Result % 8)
-    return reportError("number of bits must be a byte width multiple");
-  Result /= 8;
+  if (Result % ByteSizeInBits) {
+    report_fatal_error("number of bits must be a byte width multiple");
+  }
+  Result /= ByteSizeInBits;
   return Error::success();
 }
+// TVM local end
 
 static Error getAddrSpace(StringRef R, unsigned &AddrSpace) {
   if (Error Err = getInt(R, AddrSpace))
@@ -750,6 +753,14 @@ unsigned DataLayout::getIndexTypeSizeInBits(Type *Ty) const {
 Align DataLayout::getAlignment(Type *Ty, bool abi_or_pref) const {
   assert(Ty->isSized() && "Cannot getTypeInfo() on a type that is unsized!");
   switch (Ty->getTypeID()) {
+  // TVM local begin
+  case Type::TVMSliceID:
+  case Type::TVMBuilderID:
+  case Type::TVMCellID:
+  case Type::TVMTupleID:
+    return Align(1);
+  // TVM local end
+
   // Early escape for the non-numeric types.
   case Type::LabelTyID:
     return abi_or_pref ? getPointerABIAlignment(0) : getPointerPrefAlignment(0);

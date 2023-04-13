@@ -1023,8 +1023,12 @@ void GCOVProfiler::emitGlobalConstructor(
 
 FunctionCallee GCOVProfiler::getStartFileFunc(const TargetLibraryInfo *TLI) {
   Type *Args[] = {
-      Type::getInt8PtrTy(*Ctx), // const char *orig_filename
-      Type::getInt32Ty(*Ctx),   // uint32_t version
+//      Type::getInt8PtrTy(*Ctx), // const char *orig_filename
+//      Type::getInt32Ty(*Ctx),   // uint32_t version
+      // TVM local begin
+      Type::getIntBytePtrTy(*Ctx), // const char *orig_filename
+      Type::getIntBytePtrTy(*Ctx), // const char version[4]
+      // TVM local end
       Type::getInt32Ty(*Ctx),   // uint32_t checksum
   };
   FunctionType *FTy = FunctionType::get(Type::getVoidTy(*Ctx), Args, false);
@@ -1035,6 +1039,9 @@ FunctionCallee GCOVProfiler::getStartFileFunc(const TargetLibraryInfo *TLI) {
 FunctionCallee GCOVProfiler::getEmitFunctionFunc(const TargetLibraryInfo *TLI) {
   Type *Args[] = {
     Type::getInt32Ty(*Ctx),    // uint32_t ident
+    // TVM local begin
+    Type::getIntBytePtrTy(*Ctx), // const char *function_name
+    // TVM local end
     Type::getInt32Ty(*Ctx),    // uint32_t func_checksum
     Type::getInt32Ty(*Ctx),    // uint32_t cfg_checksum
   };
@@ -1091,12 +1098,22 @@ Function *GCOVProfiler::insertCounterWriteout(
 
   // Collect the relevant data into a large constant data structure that we can
   // walk to write out everything.
-  StructType *StartFileCallArgsTy = StructType::create(
-      {Builder.getInt8PtrTy(), Builder.getInt32Ty(), Builder.getInt32Ty()},
-      "start_file_args_ty");
+  //StructType *StartFileCallArgsTy = StructType::create(
+  //    {Builder.getInt8PtrTy(), Builder.getInt32Ty(), Builder.getInt32Ty()},
+  //    "start_file_args_ty");
+  //StructType *EmitFunctionCallArgsTy = StructType::create(
+  //    {Builder.getInt32Ty(), Builder.getInt32Ty(), Builder.getInt32Ty()},
+  //    "emit_function_args_ty");
+
+  // TVM local begin
+  StructType *StartFileCallArgsTy =
+      StructType::create({Builder.getIntBytePtrTy(), Builder.getIntBytePtrTy(),
+                          Builder.getInt32Ty()});
   StructType *EmitFunctionCallArgsTy = StructType::create(
-      {Builder.getInt32Ty(), Builder.getInt32Ty(), Builder.getInt32Ty()},
-      "emit_function_args_ty");
+      {Builder.getInt32Ty(), Builder.getIntBytePtrTy(), Builder.getInt32Ty(),
+       Builder.getInt8Ty(), Builder.getInt32Ty()});
+  // TVM local end
+
   StructType *EmitArcsCallArgsTy = StructType::create(
       {Builder.getInt32Ty(), Builder.getInt64Ty()->getPointerTo()},
       "emit_arcs_args_ty");
@@ -1133,6 +1150,9 @@ Function *GCOVProfiler::insertCounterWriteout(
       EmitFunctionCallArgsArray.push_back(ConstantStruct::get(
           EmitFunctionCallArgsTy,
           {Builder.getInt32(j),
+           // TVM local begin
+           Constant::getNullValue(Builder.getIntBytePtrTy()),
+           // TVM local end
            Builder.getInt32(FuncChecksum),
            Builder.getInt32(CfgChecksum)}));
 

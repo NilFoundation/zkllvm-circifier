@@ -4002,8 +4002,15 @@ bool llvm::isKnownNeverNaN(const Value *V, const TargetLibraryInfo *TLI,
 Value *llvm::isBytewiseValue(Value *V, const DataLayout &DL) {
 
   // All byte-wide stores are splatable, even of arbitrary variables.
-  if (V->getType()->isIntegerTy(8))
+  // TVM local begin
+  if (V->getType()->isIntegerTy(ByteSizeInBits))
     return V;
+
+  // Handle 'null' ConstantArrayZero etc.
+  if (Constant *C = dyn_cast<Constant>(V))
+    if (C->isNullValue())
+      return Constant::getNullValue(Type::getByteTy(V->getContext()));
+  // TVM local end
 
   LLVMContext &Ctx = V->getContext();
 
@@ -4048,12 +4055,18 @@ Value *llvm::isBytewiseValue(Value *V, const DataLayout &DL) {
 
   // We can handle constant integers that are multiple of 8 bits.
   if (ConstantInt *CI = dyn_cast<ConstantInt>(C)) {
-    if (CI->getBitWidth() % 8 == 0) {
-      assert(CI->getBitWidth() > 8 && "8 bits should be handled above!");
-      if (!CI->getValue().isSplat(8))
+    // TVM local begin
+    if (CI->getBitWidth() % ByteSizeInBits == 0) {
+      assert(CI->getBitWidth() > ByteSizeInBits &&
+             "ByteSizeInBits bits should be handled above!");
+
+      if (!CI->getValue().isSplat(ByteSizeInBits))
         return nullptr;
-      return ConstantInt::get(Ctx, CI->getValue().trunc(8));
+      return ConstantInt::get(V->getContext(),
+                              CI->getValue().trunc(ByteSizeInBits));
     }
+    // TVM local end
+
   }
 
   if (auto *CE = dyn_cast<ConstantExpr>(C)) {

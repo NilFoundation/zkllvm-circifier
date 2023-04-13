@@ -88,7 +88,7 @@ std::string getClangFullRepositoryVersion() {
 std::string getClangFullVersion() {
   return getClangToolFullVersion("clang");
 }
-
+/*
 std::string getClangToolFullVersion(StringRef ToolName) {
   std::string buf;
   llvm::raw_string_ostream OS(buf);
@@ -103,6 +103,24 @@ std::string getClangToolFullVersion(StringRef ToolName) {
   }
 
   return buf;
+}
+*/
+
+std::string getClangToolFullVersion(StringRef ToolName) {
+  std::string buf;
+  llvm::raw_string_ostream OS(buf);
+#ifdef CLANG_VENDOR
+  OS << CLANG_VENDOR;
+#endif
+  OS << ToolName << " for TVM. Version " CLANG_VERSION_STRING " "
+     << getClangFullRepositoryVersion();
+
+  // If vendor supplied, include the base LLVM version as well.
+#ifdef CLANG_VENDOR
+  OS << " (based on " << BACKEND_PACKAGE_STRING << ")";
+#endif
+
+  return OS.str();
 }
 
 std::string getClangFullCPPVersion() {

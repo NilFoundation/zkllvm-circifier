@@ -647,13 +647,19 @@ void InstrProfiling::lowerValueProfileInst(InstrProfValueProfileInst *Ind) {
   Ind->getOperandBundlesAsDefs(OpBundles);
   if (!IsMemOpSize) {
     Value *Args[3] = {Ind->getTargetValue(),
-                      Builder.CreateBitCast(DataVar, Builder.getInt8PtrTy()),
+                      // Builder.CreateBitCast(DataVar, Builder.getInt8PtrTy()),
+                      // TVM local begin
+                      Builder.CreateBitCast(DataVar, Builder.getIntBytePtrTy()),
+                      // TVM local end
                       Builder.getInt32(Index)};
     Call = Builder.CreateCall(getOrInsertValueProfilingCall(*M, *TLI), Args,
                               OpBundles);
   } else {
     Value *Args[3] = {Ind->getTargetValue(),
-                      Builder.CreateBitCast(DataVar, Builder.getInt8PtrTy()),
+                      // Builder.CreateBitCast(DataVar, Builder.getInt8PtrTy()),
+                      // TVM local begin
+                      Builder.CreateBitCast(DataVar, Builder.getIntBytePtrTy()),
+                      // TVM local end
                       Builder.getInt32(Index)};
     Call = Builder.CreateCall(
         getOrInsertValueProfilingCall(*M, *TLI, ValueProfilingCallType::MemOp),
@@ -976,7 +982,11 @@ InstrProfiling::getOrCreateRegionCounters(InstrProfInstBase *Inc) {
     }
   }
 
-  auto *Int8PtrTy = Type::getInt8PtrTy(Ctx);
+  //auto *Int8PtrTy = Type::getInt8PtrTy(Ctx);
+  // TVM local begin
+  auto *Int8PtrTy = Type::getIntBytePtrTy(Ctx);
+  // TVM local end
+
   // Allocate statically the array of pointers to value profile nodes for
   // the current function.
   Constant *ValuesPtrExpr = ConstantPointerNull::get(Int8PtrTy);
@@ -995,7 +1005,10 @@ InstrProfiling::getOrCreateRegionCounters(InstrProfInstBase *Inc) {
     ValuesVar->setAlignment(Align(8));
     MaybeSetComdat(ValuesVar);
     ValuesPtrExpr =
-        ConstantExpr::getBitCast(ValuesVar, Type::getInt8PtrTy(Ctx));
+      //    ConstantExpr::getBitCast(ValuesVar, Type::getInt8PtrTy(Ctx));
+      // TVM local begin
+      ConstantExpr::getBitCast(ValuesVar, Type::getIntBytePtrTy(Ctx));
+      // TVM local end
   }
 
   if (DebugInfoCorrelate) {
@@ -1160,7 +1173,11 @@ void InstrProfiling::emitRegistration() {
 
   // Construct the function.
   auto *VoidTy = Type::getVoidTy(M->getContext());
-  auto *VoidPtrTy = Type::getInt8PtrTy(M->getContext());
+  // auto *VoidPtrTy = Type::getInt8PtrTy(M->getContext());
+  // TVM local begin
+  auto *VoidPtrTy = Type::getIntBytePtrTy(M->getContext());
+  // TVM local end
+
   auto *Int64Ty = Type::getInt64Ty(M->getContext());
   auto *RegisterFTy = FunctionType::get(VoidTy, false);
   auto *RegisterF = Function::Create(RegisterFTy, GlobalValue::InternalLinkage,

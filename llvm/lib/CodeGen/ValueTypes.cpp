@@ -173,6 +173,16 @@ std::string EVT::getEVTString() const {
   case MVT::Untyped:   return "Untyped";
   case MVT::funcref:   return "funcref";
   case MVT::externref: return "externref";
+  // TVM local begin
+  case MVT::TVMSlice:
+    return "TVMSlice";
+  case MVT::TVMBuilder:
+    return "TVMBuilder";
+  case MVT::TVMCell:
+    return "TVMCell";
+  case MVT::TVMTuple:
+    return "TVMTuple";
+    // TVM local end
   }
 }
 
@@ -194,6 +204,12 @@ Type *EVT::getTypeForEVT(LLVMContext &Context) const {
   case MVT::i32:     return Type::getInt32Ty(Context);
   case MVT::i64:     return Type::getInt64Ty(Context);
   case MVT::i128:    return IntegerType::get(Context, 128);
+  // TVM local begin
+  case MVT::i256:
+    return IntegerType::get(Context, 256);
+  case MVT::i257:
+    return IntegerType::get(Context, 257);
+  // TVM local end
   case MVT::f16:     return Type::getHalfTy(Context);
   case MVT::bf16:    return Type::getBFloatTy(Context);
   case MVT::f32:     return Type::getFloatTy(Context);
@@ -553,6 +569,16 @@ Type *EVT::getTypeForEVT(LLVMContext &Context) const {
   case MVT::nxv8f64:
     return ScalableVectorType::get(Type::getDoubleTy(Context), 8);
   case MVT::Metadata: return Type::getMetadataTy(Context);
+    // TVM local begin
+  case MVT::TVMSlice:
+    return Type::getTVMSliceTy(Context);
+  case MVT::TVMBuilder:
+    return Type::getTVMBuilderTy(Context);
+  case MVT::TVMCell:
+    return Type::getTVMCellTy(Context);
+  case MVT::TVMTuple:
+    return Type::getTVMTupleTy(Context);
+    // TVM local end
   }
   // clang-format on
 }
@@ -567,6 +593,16 @@ MVT MVT::getVT(Type *Ty, bool HandleUnknown){
     llvm_unreachable("Unknown type!");
   case Type::VoidTyID:
     return MVT::isVoid;
+  // TVM local begin
+  case Type::TVMSliceID:
+    return MVT(MVT::TVMSlice);
+  case Type::TVMBuilderID:
+    return MVT(MVT::TVMBuilder);
+  case Type::TVMCellID:
+    return MVT(MVT::TVMCell);
+  case Type::TVMTupleID:
+    return MVT(MVT::TVMTuple);
+  // TVM local end
   case Type::IntegerTyID:
     return getIntegerVT(cast<IntegerType>(Ty)->getBitWidth());
   case Type::GaloisFieldTyID:

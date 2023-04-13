@@ -1117,7 +1117,11 @@ bool LoopIdiomRecognize::processLoopStridedStore(
   SCEVExpander Expander(*SE, *DL, "loop-idiom");
   SCEVExpanderCleaner ExpCleaner(Expander);
 
-  Type *DestInt8PtrTy = Builder.getInt8PtrTy(DestAS);
+  // Type *DestInt8PtrTy = Builder.getInt8PtrTy(DestAS);
+  // TVM local begin
+  Type *DestInt8PtrTy = Builder.getIntBytePtrTy(DestAS);
+  // TVM local end
+
   Type *IntIdxTy = DL->getIndexType(DestPtr->getType());
 
   bool Changed = false;
@@ -1365,7 +1369,10 @@ bool LoopIdiomRecognize::processLoopStoreOfLoopLoad(
   // feeds the stores.  Check for an alias by generating the base address and
   // checking everything.
   Value *StoreBasePtr = Expander.expandCodeFor(
-      StrStart, Builder.getInt8PtrTy(StrAS), Preheader->getTerminator());
+      // StrStart, Builder.getInt8PtrTy(StrAS), Preheader->getTerminator());
+      // TVM local begin
+      StrStart, Builder.getIntBytePtrTy(StrAS), Preheader->getTerminator());
+      // TVM local end
 
   // From here on out, conservatively report to the pass manager that we've
   // changed the IR, even if we later clean up these added instructions. There
@@ -1418,7 +1425,10 @@ bool LoopIdiomRecognize::processLoopStoreOfLoopLoad(
   // For a memcpy, we have to make sure that the input array is not being
   // mutated by the loop.
   Value *LoadBasePtr = Expander.expandCodeFor(
-      LdStart, Builder.getInt8PtrTy(LdAS), Preheader->getTerminator());
+      // LdStart, Builder.getInt8PtrTy(LdAS), Preheader->getTerminator());
+      // TVM local begin
+      LdStart, Builder.getIntBytePtrTy(LdAS), Preheader->getTerminator());
+      // TVM local end
 
   // If the store is a memcpy instruction, we must check if it will write to
   // the load memory locations. So remove it from the ignored stores.

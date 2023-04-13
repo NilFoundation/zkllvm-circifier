@@ -22,6 +22,7 @@
 #include "clang/Frontend/FrontendDiagnostic.h"
 #include "clang/Frontend/FrontendPluginRegistry.h"
 #include "clang/Frontend/Utils.h"
+#include "clang/Frontend/TVMImportJsonAbi.h"
 #include "clang/FrontendTool/Utils.h"
 #include "clang/Rewrite/Frontend/FrontendActions.h"
 #include "clang/StaticAnalyzer/Frontend/AnalyzerHelpFlags.h"
@@ -55,6 +56,12 @@ CreateFrontendBaseAction(CompilerInstance &CI) {
   case EmitBC:                 return std::make_unique<EmitBCAction>();
   case EmitHTML:               return std::make_unique<HTMLPrintAction>();
   case EmitLLVM:               return std::make_unique<EmitLLVMAction>();
+  // TVM local begin
+  case EmitTextConst:
+    return std::make_unique<EmitTextConstAction>();
+  case ImportJsonAbi:
+    return std::make_unique<ImportJsonAbiAction>();
+  // TVM local end
   case EmitLLVMOnly:           return std::make_unique<EmitLLVMOnlyAction>();
   case EmitCodeGenOnly:        return std::make_unique<EmitCodeGenOnlyAction>();
   case EmitObj:                return std::make_unique<EmitObjAction>();

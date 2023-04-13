@@ -559,6 +559,12 @@ Value *llvm::getFreedOperand(const CallBase *CB, const TargetLibraryInfo *TLI) {
   if (checkFnAllocKind(CB, AllocFnKind::Free))
     return CB->getArgOperandWithAttribute(Attribute::AllocatedPointer);
 
+  // TVM local begin
+  FunctionType *FTy = Callee->getFunctionType();
+  if (FTy->getParamType(0) != Type::getIntBytePtrTy(Callee->getContext()))
+    return nullptr;
+  // TVM local end
+
   return nullptr;
 }
 

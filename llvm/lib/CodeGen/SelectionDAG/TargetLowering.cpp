@@ -207,15 +207,19 @@ bool TargetLowering::findOptimalMemOpLowering(
     // Use the largest integer type whose alignment constraints are satisfied.
     // We only need to check DstAlign here as SrcAlign is always greater or
     // equal to DstAlign (or zero).
-    VT = MVT::i64;
-    if (Op.isFixedDstAlign())
-      while (Op.getDstAlign() < (VT.getSizeInBits() / 8) &&
-             !allowsMisalignedMemoryAccesses(VT, DstAS, Op.getDstAlign()))
-        VT = (MVT::SimpleValueType)(VT.getSimpleVT().SimpleTy - 1);
+    // TVM local begin
+    VT = MVT::i257;
+    while (DstAS && DstAS < VT.getSizeInBits() / ByteSizeInBits &&
+           !allowsMisalignedMemoryAccesses(VT, DstAS, Op.getDstAlign()))
+      VT = (MVT::SimpleValueType)(VT.getSimpleVT().SimpleTy - 1);
+    // TVM local end
+
     assert(VT.isInteger());
 
     // Find the largest legal integer type.
-    MVT LVT = MVT::i64;
+    // TVM local begin
+    MVT LVT = MVT::i257;
+    // TVM local end
     while (!isTypeLegal(LVT))
       LVT = (MVT::SimpleValueType)(LVT.SimpleTy - 1);
     assert(LVT.isInteger());
@@ -229,7 +233,9 @@ bool TargetLowering::findOptimalMemOpLowering(
   unsigned NumMemOps = 0;
   uint64_t Size = Op.size();
   while (Size) {
-    unsigned VTSize = VT.getSizeInBits() / 8;
+    // TVM local begin
+    unsigned VTSize = VT.getSizeInBits() / ByteSizeInBits;
+    // TVM local end
     while (VTSize > Size) {
       // For now, only use non-vector load / store's for the left-over pieces.
       EVT NewVT = VT;
@@ -5145,13 +5151,27 @@ bool TargetLowering::isGAPlusOffset(SDNode *WN, const GlobalValue *&GA,
     SDValue N2 = N->getOperand(1);
     if (isGAPlusOffset(N1.getNode(), GA, Offset)) {
       if (auto *V = dyn_cast<ConstantSDNode>(N2)) {
-        Offset += V->getSExtValue();
-        return true;
+        //Offset += V->getSExtValue();
+        //return true;
+
+        // TVM local begin: 64-bit check
+        if (V->getAPIntValue().isSignedIntN(64)) {
+          Offset += V->getSExtValue();
+          return true;
+        }
+        // TVM local end
       }
     } else if (isGAPlusOffset(N2.getNode(), GA, Offset)) {
       if (auto *V = dyn_cast<ConstantSDNode>(N1)) {
-        Offset += V->getSExtValue();
-        return true;
+        //Offset += V->getSExtValue();
+        //return true;
+
+        // TVM local begin: 64-bit check
+        if (V->getAPIntValue().isSignedIntN(64)) {
+          Offset += V->getSExtValue();
+          return true;
+        }
+        // TVM local end
       }
     }
   }
@@ -9433,7 +9453,11 @@ SDValue TargetLowering::LowerToTLSEmulatedModel(const GlobalAddressSDNode *GA,
   // Access to address of TLS varialbe xyz is lowered to a function call:
   //   __emutls_get_address( address of global variable named "__emutls_v.xyz" )
   EVT PtrVT = getPointerTy(DAG.getDataLayout());
-  PointerType *VoidPtrType = Type::getInt8PtrTy(*DAG.getContext());
+  //PointerType *VoidPtrType = Type::getInt8PtrTy(*DAG.getContext());
+  // TVM local begin
+  PointerType *VoidPtrType = Type::getIntBytePtrTy(*DAG.getContext());
+  // TVM local end
+
   SDLoc dl(GA);
 
   ArgListTy Args;

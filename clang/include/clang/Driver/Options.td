@@ -1116,6 +1116,23 @@ def emit_ast : Flag<["-"], "emit-ast">, Flags<[CoreOption]>,
   HelpText<"Emit Clang AST files for source inputs">;
 def emit_llvm : Flag<["-"], "emit-llvm">, Flags<[CC1Option, FC1Option, FlangOption]>, Group<Action_Group>,
   HelpText<"Use the LLVM representation for assembler and object files">;
+// TVM local begin
+def emit_text_const : Joined<["-"], "emit-text-const=">, Flags<[CC1Option]>, Group<Action_Group>,
+  HelpText<"Emit text global constant">;
+def export_json_abi : Flag<["-"], "export-json-abi">, Flags<[CC1Option]>, Group<Action_Group>,
+  HelpText<"Print json abi for TVM c++ contract">;
+def import_json_abi : Flag<["-"], "import-json-abi">, Flags<[CC1Option]>, Group<Action_Group>,
+  HelpText<"Import json abi for TVM contract">;
+def import_json_name : Joined<["-"], "import-json-name=">, Flags<[CC1Option]>,
+  HelpText<"Override name for imported interface structure (file name by default)">;
+def lto_S : Flag<["-"], "lto-S">, Flags<[CC1Option]>, Group<Action_Group>,
+  HelpText<"Emit after lto assembly">;
+
+// TODO DriverOption - ?
+// def tvm_refunc : Flag<["-"], "mtvm-refunc">, Group<m_Group>, Flags<[DriverOption,CC1Option]>,
+def tvm_refunc : Flag<["-"], "mtvm-refunc">, Group<m_Group>, Flags<[CC1Option]>,
+  HelpText<"Enable TVM ReFunc pass">;
+// TVM local end
 def emit_interface_stubs : Flag<["-"], "emit-interface-stubs">, Flags<[CC1Option]>, Group<Action_Group>,
   HelpText<"Generate Interface Stub Files.">;
 def emit_merged_ifs : Flag<["-"], "emit-merged-ifs">,
@@ -1522,6 +1539,14 @@ def fdiagnostics_show_template_tree : Flag<["-"], "fdiagnostics-show-template-tr
     Group<f_Group>, Flags<[CC1Option]>,
     HelpText<"Print a template comparison tree for differing templates">,
     MarshallingInfoFlag<DiagnosticOpts<"ShowTemplateTree">>;
+
+// TVM local begin
+def fdecomposition_binding_override : Flag<["-"], "fdecomposition-binding-override">, Group<f_clang_Group>,
+  HelpText<"Allow decomposition binding override (auto [=rv1, =rv2] = foo())">, Flags<[CC1Option]>;
+def fno_decomposition_binding_override : Flag<["-"], "fno-decomposition-binding-override">, Group<f_clang_Group>,
+  HelpText<"Disable decomposition binding override (auto [=rv1, =rv2] = foo())">, Flags<[CC1Option]>;
+// TVM local end
+
 def fdiscard_value_names : Flag<["-"], "fdiscard-value-names">, Group<f_clang_Group>,
   HelpText<"Discard value names in LLVM IR">, Flags<[NoXarchOption]>;
 def fno_discard_value_names : Flag<["-"], "fno-discard-value-names">, Group<f_clang_Group>,

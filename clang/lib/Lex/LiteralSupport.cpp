@@ -188,7 +188,9 @@ static unsigned ProcessCharEscape(const char *ThisTokBegin,
       ResultChar |= CharVal;
     }
     // See if any bits will be truncated when evaluated as a character.
-    if (CharWidth != 32 && (ResultChar >> CharWidth) != 0) {
+    // TVM local begin
+    if (CharWidth < 32 && ((ResultChar >> CharWidth) != 0)) {
+      // TVM local end
       Overflow = true;
       ResultChar &= ~0U >> (32-CharWidth);
     }
@@ -220,7 +222,10 @@ static unsigned ProcessCharEscape(const char *ThisTokBegin,
              ThisTokBuf[0] >= '0' && ThisTokBuf[0] <= '7');
 
     // Check for overflow.  Reject '\777', but not L'\777'.
-    if (CharWidth != 32 && (ResultChar >> CharWidth) != 0) {
+    // TVM local begin
+    if (CharWidth < 32 && (ResultChar >> CharWidth) != 0) {
+      // TVM local end
+    //if (CharWidth != 32 && (ResultChar >> CharWidth) != 0) {
       if (Diags)
         Diag(Diags, Features, Loc, ThisTokBegin, EscapeBegin, ThisTokBuf,
              diag::err_escape_too_large) << 1;
@@ -998,6 +1003,9 @@ NumericLiteralParser::NumericLiteralParser(StringRef TokSpelling,
       continue;
     case 'i':
     case 'I':
+      // TVM local begin
+      break; // In TVM we have user-defined literals for i8-i256
+      // TVM local end
       if (LangOpts.MicrosoftExt && !isFPConstant) {
         // Allow i8, i16, i32, and i64. First, look ahead and check if
         // suffixes are Microsoft integers and not the imaginary unit.
@@ -1175,6 +1183,21 @@ bool NumericLiteralParser::isValidUDSuffix(const LangOptions &LangOpts,
   // In C++11, there are no library suffixes.
   if (!LangOpts.CPlusPlus14)
     return false;
+
+  // TVM local begin
+  if (llvm::StringSwitch<bool>(Suffix)
+          .Cases("nanoton", "nano", "nTon", "nT", true)
+          .Cases("microton", "micro", "mcTon", "mcT", true)
+          .Cases("milliton", "milli", "mTon", "mT", true)
+          .Cases("ton", "Ton", "T", "UT", true)
+          .Cases("kiloton", "kTon", "KT", "UKT", true)
+          .Cases("megaton", "MTon", "MT", "UMT", true)
+          .Cases("gigaton", "GTon", "GT", "UGT", true)
+          .Cases("u8", "u16", "u32", "u64", "u128", "u256", true)
+          .Cases("i8", "i16", "i32", "i64", "i128", "i256", true)
+          .Default(false))
+    return true;
+  // TVM local end
 
   // In C++14, "s", "h", "min", "ms", "us", and "ns" are used in the library.
   // Per tweaked N3660, "il", "i", and "if" are also used in the library.
@@ -1637,13 +1660,15 @@ CharLiteralParser::CharLiteralParser(const char *begin, const char *end,
   // FIXME: The "Value" is an uint64_t so we can handle char literals of
   // up to 64-bits.
   // FIXME: This extensively assumes that 'char' is 8-bits.
-  assert(PP.getTargetInfo().getCharWidth() == 8 &&
-         "Assumes char is 8 bits");
-  assert(PP.getTargetInfo().getIntWidth() <= 64 &&
-         (PP.getTargetInfo().getIntWidth() & 7) == 0 &&
-         "Assumes sizeof(int) on target is <= 64 and a multiple of char");
-  assert(PP.getTargetInfo().getWCharWidth() <= 64 &&
-         "Assumes sizeof(wchar) on target is <= 64");
+  // TVM local begin
+  //assert(PP.getTargetInfo().getCharWidth() == 8 &&
+  //       "Assumes char is 8 bits");
+  //assert(PP.getTargetInfo().getIntWidth() <= 64 &&
+  //       (PP.getTargetInfo().getIntWidth() & 7) == 0 &&
+  //       "Assumes sizeof(int) on target is <= 64 and a multiple of char");
+  //assert(PP.getTargetInfo().getWCharWidth() <= 64 &&
+  //       "Assumes sizeof(wchar) on target is <= 64");
+  // TVM local end
 
   SmallVector<uint32_t, 4> codepoint_buffer;
   codepoint_buffer.resize(end - begin);
@@ -1655,8 +1680,15 @@ CharLiteralParser::CharLiteralParser(const char *begin, const char *end,
   // by this implementation.
   uint32_t largest_character_for_kind;
   if (tok::wide_char_constant == Kind) {
-    largest_character_for_kind =
-        0xFFFFFFFFu >> (32-PP.getTargetInfo().getWCharWidth());
+//    largest_character_for_kind =
+//        0xFFFFFFFFu >> (32-PP.getTargetInfo().getWCharWidth());
+    // TVM local begin
+    if (PP.getTargetInfo().getWCharWidth() > 32)
+      largest_character_for_kind = 0xFFFFFFFFu;
+    else
+      largest_character_for_kind =
+          0xFFFFFFFFu >> (32 - PP.getTargetInfo().getWCharWidth());
+    // TVM local end
   } else if (tok::utf8_char_constant == Kind) {
     largest_character_for_kind = 0x7F;
   } else if (tok::utf16_char_constant == Kind) {
@@ -1898,10 +1930,13 @@ void StringLiteralParser::init(ArrayRef<Token> StringToks){
 
   // TODO: K&R warning: "traditional C rejects string constant concatenation"
 
+  // TVM local begin
   // Get the width in bytes of char/wchar_t/char16_t/char32_t
   CharByteWidth = getCharWidth(Kind, Target);
-  assert((CharByteWidth & 7) == 0 && "Assumes character size is byte multiple");
-  CharByteWidth /= 8;
+  assert((CharByteWidth % ByteSizeInBits) == 0 &&
+         "Assumes character size is byte multiple");
+  CharByteWidth /= ByteSizeInBits;
+  // TVM local end
 
   // The output buffer size needs to be large enough to hold wide characters.
   // This is a worst-case assumption which basically corresponds to L"" "long".

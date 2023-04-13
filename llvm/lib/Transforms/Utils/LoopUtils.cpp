@@ -1413,6 +1413,11 @@ int llvm::rewriteLoopExitValues(Loop *L, LoopInfo *LI, TargetLibraryInfo *TLI,
   for (const RewritePhi &Phi : RewritePhiSet) {
     PHINode *PN = Phi.PN;
 
+    // TVM local begin
+    if (ByteSizeInBits == 257)
+      LoopCanBeDel = false;
+    // TVM local end
+
     // Only do the rewrite when the ExitValue can be expanded cheaply.
     // If LoopCanBeDel is true, rewrite exit value aggressively.
     if ((ReplaceExitValue == OnlyCheapRepl ||

@@ -295,6 +295,11 @@ private:
   /// the implementation rather than explicitly written by the user.
   unsigned Implicit : 1;
 
+ // TVM local begin
+  /// Literal - literal llvm structure should be generated.
+  unsigned Literal : 1;
+  // TVM local end
+
   /// Whether this declaration was "used", meaning that a definition is
   /// required.
   unsigned Used : 1;
@@ -379,24 +384,28 @@ public:
   Decl &operator=(Decl&&) = delete;
 
 protected:
+ // TVM local begin
   Decl(Kind DK, DeclContext *DC, SourceLocation L)
       : NextInContextAndBits(nullptr, getModuleOwnershipKindForChildOf(DC)),
         DeclCtx(DC), Loc(L), DeclKind(DK), InvalidDecl(false), HasAttrs(false),
-        Implicit(false), Used(false), Referenced(false),
+        Implicit(false), Literal(false), Used(false), Referenced(false),
         TopLevelDeclInObjCContainer(false), Access(AS_none), FromASTFile(0),
         IdentifierNamespace(getIdentifierNamespaceForKind(DK)),
         CacheValidAndLinkage(0) {
-    if (StatisticsEnabled) add(DK);
+    if (StatisticsEnabled)
+      add(DK);
   }
 
   Decl(Kind DK, EmptyShell Empty)
       : DeclKind(DK), InvalidDecl(false), HasAttrs(false), Implicit(false),
-        Used(false), Referenced(false), TopLevelDeclInObjCContainer(false),
-        Access(AS_none), FromASTFile(0),
+        Literal(false), Used(false), Referenced(false),
+        TopLevelDeclInObjCContainer(false), Access(AS_none), FromASTFile(0),
         IdentifierNamespace(getIdentifierNamespaceForKind(DK)),
         CacheValidAndLinkage(0) {
-    if (StatisticsEnabled) add(DK);
+    if (StatisticsEnabled)
+      add(DK);
   }
+  // TVM local end
 
   virtual ~Decl();
 
@@ -575,6 +584,12 @@ public:
   /// was written explicitly in the source code.
   bool isImplicit() const { return Implicit; }
   void setImplicit(bool I = true) { Implicit = I; }
+
+ // TVM local begin
+  /// isLiteral - Indicates that literal llvm structure should be generated.
+  bool isLiteral() const { return Literal; }
+  void setLiteral(bool I = true) { Literal = I; }
+  // TVM local end
 
   /// Whether *any* (re-)declaration of the entity was used, meaning that
   /// a definition is required.
@@ -1498,11 +1513,19 @@ class DeclContext {
 
     /// Width in bits required to store all the non-negative
     /// enumerators of this enum.
-    uint64_t NumPositiveBits : 8;
+    //uint64_t NumPositiveBits : 8;
+    // These are used by (and only defined for) EnumDecl.
+    // TVM local begin: 8 -> 9
+    uint64_t NumPositiveBits : 9;
+    // TVM local end
 
     /// Width in bits required to store all the negative
     /// enumerators of this enum.
-    uint64_t NumNegativeBits : 8;
+    //uint64_t NumNegativeBits : 8;
+    // These are used by (and only defined for) EnumDecl.
+    // TVM local begin: 8 -> 9
+    uint64_t NumNegativeBits : 9;
+    // TVM local end
 
     /// True if this tag declaration is a scoped enumeration. Only
     /// possible in C++11 mode.

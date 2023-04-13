@@ -237,6 +237,16 @@ def externref : ValueType<0,    193>;  // WebAssembly's externref type
 def x86amx    : ValueType<8192, 194>;  // X86 AMX value
 def i64x8     : ValueType<512,  195>;  // 8 Consecutive GPRs (AArch64)
 
+// TVM local begin
+def i256   : ValueType<256,  195>;   // tvm 256-bit integer value
+def i257   : ValueType<257,  196>;   // tvm 257-bit signed integer value
+
+def TVMSlice : ValueType<0, 197>;   // TVM's slice type
+def TVMBuilder:ValueType<0, 198>;   // TVM's builder type
+def TVMCell :  ValueType<0, 199>;   // TVM's cell type
+def TVMTuple : ValueType<0, 200>;   // TVM's tuple type
+// TVM local end
+
 def token      : ValueType<0, 248>;  // TokenTy
 def MetadataVT : ValueType<0, 249>;  // Metadata
 

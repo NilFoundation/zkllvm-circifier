@@ -161,10 +161,20 @@ void CodeGenFunction::EmitDecl(const Decl &D) {
     assert(VD.isLocalVarDecl() &&
            "Should not see file-scope variables inside a function!");
     EmitVarDecl(VD);
+    //if (auto *DD = dyn_cast<DecompositionDecl>(&VD))
+    //  for (auto *B : DD->bindings())
+    //    if (auto *HD = B->getHoldingVar())
+    //      EmitVarDecl(*HD);
+    // TVM local begin
     if (auto *DD = dyn_cast<DecompositionDecl>(&VD))
-      for (auto *B : DD->bindings())
+      for (auto *B : DD->bindings()) {
         if (auto *HD = B->getHoldingVar())
           EmitVarDecl(*HD);
+        if (B->getBindExisting()) {
+          EmitLValue(B->getBinding());
+        }
+      }
+    // TVM local end
     return;
   }
 
@@ -769,8 +779,13 @@ void CodeGenFunction::EmitNullabilityCheck(LValue LHS, llvm::Value *RHS,
   llvm::Value *IsNotNull = Builder.CreateIsNotNull(RHS);
   llvm::Constant *StaticData[] = {
       EmitCheckSourceLocation(Loc), EmitCheckTypeDescriptor(LHS.getType()),
-      llvm::ConstantInt::get(Int8Ty, 0), // The LogAlignment info is unused.
-      llvm::ConstantInt::get(Int8Ty, TCK_NonnullAssign)};
+      //llvm::ConstantInt::get(Int8Ty, 0), // The LogAlignment info is unused.
+      //llvm::ConstantInt::get(Int8Ty, TCK_NonnullAssign)};
+      // TVM local begin
+      llvm::ConstantInt::get(ByteTy, 0), // The LogAlignment info is unused.
+      llvm::ConstantInt::get(ByteTy, TCK_NonnullAssign)
+    };
+    // TVM local end
   EmitCheck({{IsNotNull, SanitizerKind::NullabilityAssign}},
             SanitizerHandler::TypeMismatch, StaticData, RHS);
 }
@@ -1170,7 +1185,9 @@ static Address createUnnamedGlobalForMemcpyFrom(CodeGenModule &CGM,
                                                 llvm::Constant *Constant,
                                                 CharUnits Align) {
   Address SrcPtr = CGM.createUnnamedGlobalFrom(D, Constant, Align);
-  return Builder.CreateElementBitCast(SrcPtr, CGM.Int8Ty);
+  // TVM local begin
+  return Builder.CreateElementBitCast(SrcPtr, CGM.ByteTy);
+  // TVM local end
 }
 
 static void emitStoresForConstant(CodeGenModule &CGM, const VarDecl &D,
@@ -1196,8 +1213,13 @@ static void emitStoresForConstant(CodeGenModule &CGM, const VarDecl &D,
   // If the initializer is all or mostly the same, codegen with bzero / memset
   // then do a few stores afterward.
   if (shouldUseBZeroPlusStoresToInitialize(constant, ConstantSize)) {
-    auto *I = Builder.CreateMemSet(Loc, llvm::ConstantInt::get(CGM.Int8Ty, 0),
-                                   SizeVal, isVolatile);
+    auto *I =
+        //Builder.CreateMemSet(Loc, llvm::ConstantInt::get(CGM.Int8Ty, 0),
+        //                           SizeVal, isVolatile);
+        // TVM local begin
+        Builder.CreateMemSet(Loc, llvm::ConstantInt::get(CGM.ByteTy, 0), SizeVal,
+                         isVolatile);
+        // TVM local end
     if (IsAutoInit)
       I->addAnnotationMetadata("auto-init");
 
@@ -1343,7 +1365,10 @@ llvm::Value *CodeGenFunction::EmitLifetimeStart(llvm::TypeSize Size,
          "Pointer should be in alloca address space");
   llvm::Value *SizeV = llvm::ConstantInt::get(
       Int64Ty, Size.isScalable() ? -1 : Size.getFixedValue());
-  Addr = Builder.CreateBitCast(Addr, AllocaInt8PtrTy);
+  //Addr = Builder.CreateBitCast(Addr, AllocaBytePtrTy);
+  // TVM local begin
+  Addr = Builder.CreateBitCast(Addr, AllocaBytePtrTy);
+  // TVM local end
   llvm::CallInst *C =
       Builder.CreateCall(CGM.getLLVMLifetimeStartFn(), {SizeV, Addr});
   C->setDoesNotThrow();
@@ -1354,7 +1379,10 @@ void CodeGenFunction::EmitLifetimeEnd(llvm::Value *Size, llvm::Value *Addr) {
   assert(Addr->getType()->getPointerAddressSpace() ==
              CGM.getDataLayout().getAllocaAddrSpace() &&
          "Pointer should be in alloca address space");
-  Addr = Builder.CreateBitCast(Addr, AllocaInt8PtrTy);
+  //Addr = Builder.CreateBitCast(Addr, AllocaBytePtrTy);
+  // TVM local begin
+  Addr = Builder.CreateBitCast(Addr, AllocaBytePtrTy);
+  // TVM local end
   llvm::CallInst *C =
       Builder.CreateCall(CGM.getLLVMLifetimeEndFn(), {Size, Addr});
   C->setDoesNotThrow();
@@ -1584,7 +1612,10 @@ CodeGenFunction::EmitAutoVarAlloca(const VarDecl &D) {
     if (!DidCallStackSave) {
       // Save the stack.
       Address Stack =
-        CreateTempAlloca(Int8PtrTy, getPointerAlign(), "saved_stack");
+        // CreateTempAlloca(Int8PtrTy, getPointerAlign(), "saved_stack");
+        // TVM local begin
+        CreateTempAlloca(BytePtrTy, getPointerAlign(), "saved_stack");
+        // TVM local end
 
       llvm::Function *F = CGM.getIntrinsic(llvm::Intrinsic::stacksave);
       llvm::Value *V = Builder.CreateCall(F);
@@ -1919,7 +1950,9 @@ void CodeGenFunction::EmitAutoVarInit(const AutoVarEmission &emission) {
     return EmitStoreThroughLValue(RValue::get(constant), lv, true);
   }
 
-  emitStoresForConstant(CGM, D, Builder.CreateElementBitCast(Loc, CGM.Int8Ty),
+  // TVM local begin
+  emitStoresForConstant(CGM, D, Builder.CreateElementBitCast(Loc, CGM.ByteTy),
+  // TVM local end
                         type.isVolatileQualified(), Builder, constant,
                         /*IsAutoInit=*/false);
 }
@@ -2410,7 +2443,10 @@ llvm::Function *CodeGenModule::getLLVMLifetimeStartFn() {
   if (LifetimeStartFn)
     return LifetimeStartFn;
   LifetimeStartFn = llvm::Intrinsic::getDeclaration(&getModule(),
-    llvm::Intrinsic::lifetime_start, AllocaInt8PtrTy);
+    // llvm::Intrinsic::lifetime_start, AllocaBytePtrTy);
+    // TVM local begin
+    llvm::Intrinsic::lifetime_start, AllocaBytePtrTy);
+    // TVM local end
   return LifetimeStartFn;
 }
 
@@ -2419,7 +2455,10 @@ llvm::Function *CodeGenModule::getLLVMLifetimeEndFn() {
   if (LifetimeEndFn)
     return LifetimeEndFn;
   LifetimeEndFn = llvm::Intrinsic::getDeclaration(&getModule(),
-    llvm::Intrinsic::lifetime_end, AllocaInt8PtrTy);
+    //llvm::Intrinsic::lifetime_end, AllocaBytePtrTy);
+    // TVM local begin
+    llvm::Intrinsic::lifetime_end, AllocaBytePtrTy);
+    // TVM local end
   return LifetimeEndFn;
 }
 

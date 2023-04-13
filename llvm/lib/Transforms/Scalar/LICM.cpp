@@ -1059,12 +1059,20 @@ static bool isLoadInvariantInLoop(LoadInst *LI, DominatorTree *DT,
 
   // if the type is i8 addrspace(x)*, we know this is the type of
   // llvm.invariant.start operand
-  auto *PtrInt8Ty = PointerType::get(Type::getInt8Ty(LI->getContext()),
+  //auto *PtrInt8Ty = PointerType::get(Type::getInt8Ty(LI->getContext()),
+  //                                   LI->getPointerAddressSpace());
+  // TVM local begin
+  auto *PtrByteTy = PointerType::get(Type::getByteTy(LI->getContext()),
                                      LI->getPointerAddressSpace());
+  // TVM local end
+
   unsigned BitcastsVisited = 0;
   // Look through bitcasts until we reach the i8* type (this is invariant.start
   // operand type).
-  while (Addr->getType() != PtrInt8Ty) {
+  //while (Addr->getType() != PtrInt8Ty) {
+  // TVM local begin
+  while (Addr->getType() != PtrByteTy) {
+  // TVM local end
     auto *BC = dyn_cast<BitCastInst>(Addr);
     // Avoid traversing high number of bitcast uses.
     if (++BitcastsVisited > MaxNumUsesTraversed || !BC)

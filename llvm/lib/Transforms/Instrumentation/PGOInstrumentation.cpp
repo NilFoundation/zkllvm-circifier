@@ -859,7 +859,8 @@ static void instrumentOneFunc(
   FuncPGOInstrumentation<PGOEdge, BBInfo> FuncInfo(
       F, TLI, ComdatMembers, true, BPI, BFI, IsCS, PGOInstrumentEntry);
 
-  Type *I8PtrTy = Type::getInt8PtrTy(M->getContext());
+  // TVM local nextline
+  Type *I8PtrTy = Type::getIntBytePtrTy(M->getContext());
   auto Name = ConstantExpr::getBitCast(FuncInfo.FuncNameVar, I8PtrTy);
   auto CFGHash = ConstantInt::get(Type::getInt64Ty(M->getContext()),
                                   FuncInfo.FunctionHash);
@@ -1742,7 +1743,11 @@ void SelectInstVisitor::instrumentOneSelectInst(SelectInst &SI) {
   Module *M = F.getParent();
   IRBuilder<> Builder(&SI);
   Type *Int64Ty = Builder.getInt64Ty();
-  Type *I8PtrTy = Builder.getInt8PtrTy();
+  // Type *I8PtrTy = Builder.getInt8PtrTy();
+  // TVM local begin
+  Type *I8PtrTy = Builder.getIntBytePtrTy();
+  // TVM local end
+
   auto *Step = Builder.CreateZExt(SI.getCondition(), Int64Ty);
   Builder.CreateCall(
       Intrinsic::getDeclaration(M, Intrinsic::instrprof_increment_step),

@@ -1267,8 +1267,11 @@ SDNode *SelectionDAG::FindModifiedNodeSlot(SDNode *N, ArrayRef<SDValue> Ops,
 
 Align SelectionDAG::getEVTAlign(EVT VT) const {
   Type *Ty = VT == MVT::iPTR ?
-                   PointerType::get(Type::getInt8Ty(*getContext()), 0) :
-                   VT.getTypeForEVT(*getContext());
+  // TVM local begin
+                 PointerType::get(Type::getByteTy(*getContext()), 0)
+                             :
+  // TVM local end
+                 VT.getTypeForEVT(*getContext());
 
   return getDataLayout().getABITypeAlign(Ty);
 }
@@ -5737,9 +5740,13 @@ SDValue SelectionDAG::FoldSymbolOffset(unsigned Opcode, EVT VT,
     return SDValue();
   if (!TLI->isOffsetFoldingLegal(GA))
     return SDValue();
-  auto *C2 = dyn_cast<ConstantSDNode>(N2);
+  const ConstantSDNode *C2 = dyn_cast<ConstantSDNode>(N2);
   if (!C2)
     return SDValue();
+  // TVM local begin: 64-bit check
+  if (!C2->getAPIntValue().isSignedIntN(64))
+    return SDValue();
+  // TVM local end
   int64_t Offset = C2->getSExtValue();
   switch (Opcode) {
   case ISD::ADD: break;
@@ -6817,7 +6824,9 @@ static SDValue getMemsetValue(SDValue Value, EVT VT, SelectionDAG &DAG,
 
   unsigned NumBits = VT.getScalarSizeInBits();
   if (ConstantSDNode *C = dyn_cast<ConstantSDNode>(Value)) {
-    assert(C->getAPIntValue().getBitWidth() == 8);
+    // TVM local begin
+    assert(C->getAPIntValue().getBitWidth() == ByteSizeInBits);
+    // TVM local end
     APInt Val = APInt::getSplat(NumBits, C->getAPIntValue());
     if (VT.isInteger()) {
       bool IsOpaque = VT.getSizeInBits() > 64 ||
@@ -6834,10 +6843,14 @@ static SDValue getMemsetValue(SDValue Value, EVT VT, SelectionDAG &DAG,
     IntVT = EVT::getIntegerVT(*DAG.getContext(), IntVT.getSizeInBits());
 
   Value = DAG.getNode(ISD::ZERO_EXTEND, dl, IntVT, Value);
-  if (NumBits > 8) {
+  // TVM local begin
+  if (NumBits > ByteSizeInBits) {
+    // TVM local end
     // Use a multiplication with 0x010101... to extend the input to the
     // required length.
-    APInt Magic = APInt::getSplat(NumBits, APInt(8, 0x01));
+    // TVM local begin
+    APInt Magic = APInt::getSplat(NumBits, APInt(ByteSizeInBits, 0x01));
+    // TVM local en
     Value = DAG.getNode(ISD::MUL, dl, IntVT, Value,
                         DAG.getConstant(Magic, dl, IntVT));
   }
@@ -6875,16 +6888,23 @@ static SDValue getMemsetStringVal(EVT VT, const SDLoc &dl, SelectionDAG &DAG,
 
   assert(!VT.isVector() && "Can't handle vector type here!");
   unsigned NumVTBits = VT.getSizeInBits();
-  unsigned NumVTBytes = NumVTBits / 8;
+  // TVM local begin
+  unsigned NumVTBytes = NumVTBits / ByteSizeInBits;
+  // TVM local end
   unsigned NumBytes = std::min(NumVTBytes, unsigned(Slice.Length));
 
   APInt Val(NumVTBits, 0);
   if (DAG.getDataLayout().isLittleEndian()) {
     for (unsigned i = 0; i != NumBytes; ++i)
-      Val |= (uint64_t)(unsigned char)Slice[i] << i*8;
+      // TVM local begin
+      Val |= (uint64_t)(unsigned char)Slice[i] << i * ByteSizeInBits;
+    // TVM local end
   } else {
     for (unsigned i = 0; i != NumBytes; ++i)
-      Val |= (uint64_t)(unsigned char)Slice[i] << (NumVTBytes-i-1)*8;
+      // TVM local begin
+      Val |= (uint64_t)(unsigned char)Slice[i]
+             << (NumVTBytes - i - 1) * ByteSizeInBits;
+    // TVM local end
   }
 
   // If the "cost" of materializing the integer immediate is less than the cost
@@ -6934,8 +6954,10 @@ static bool isMemSrcFromConstant(SDValue Src, ConstantDataArraySlice &Slice) {
   if (!G)
     return false;
 
-  return getConstantDataArrayInfo(G->getGlobal(), Slice, 8,
+  // TVM local begin
+  return getConstantDataArrayInfo(G->getGlobal(), Slice, ByteSizeInBits,
                                   SrcDelta + G->getOffset());
+  // TVM local end
 }
 
 static bool shouldLowerMemFuncForSize(const MachineFunction &MF,
@@ -7056,7 +7078,9 @@ static SDValue getMemcpyLoadsAndStores(SelectionDAG &DAG, const SDLoc &dl,
   uint64_t SrcOff = 0, DstOff = 0;
   for (unsigned i = 0; i != NumMemOps; ++i) {
     EVT VT = MemOps[i];
-    unsigned VTSize = VT.getSizeInBits() / 8;
+    // TVM local begin
+    unsigned VTSize = VT.getSizeInBits() / ByteSizeInBits;
+    // TVM local end
     SDValue Value, Store;
 
     if (VTSize > Size) {
@@ -7246,7 +7270,9 @@ static SDValue getMemmoveLoadsAndStores(SelectionDAG &DAG, const SDLoc &dl,
   unsigned NumMemOps = MemOps.size();
   for (unsigned i = 0; i < NumMemOps; i++) {
     EVT VT = MemOps[i];
-    unsigned VTSize = VT.getSizeInBits() / 8;
+    // TVM local begin
+    unsigned VTSize = VT.getSizeInBits() / ByteSizeInBits;
+    // TVM local end
     SDValue Value;
 
     bool isDereferenceable =
@@ -7267,7 +7293,9 @@ static SDValue getMemmoveLoadsAndStores(SelectionDAG &DAG, const SDLoc &dl,
   OutChains.clear();
   for (unsigned i = 0; i < NumMemOps; i++) {
     EVT VT = MemOps[i];
-    unsigned VTSize = VT.getSizeInBits() / 8;
+    // TVM local begin
+    unsigned VTSize = VT.getSizeInBits() / ByteSizeInBits;
+    // TVM local end
     SDValue Store;
 
     Store = DAG.getStore(
@@ -7369,7 +7397,9 @@ static SDValue getMemsetStores(SelectionDAG &DAG, const SDLoc &dl,
 
   for (unsigned i = 0; i < NumMemOps; i++) {
     EVT VT = MemOps[i];
-    unsigned VTSize = VT.getSizeInBits() / 8;
+    // TVM local begin
+    unsigned VTSize = VT.getSizeInBits() / ByteSizeInBits;
+    // TVM local end
     if (VTSize > Size) {
       // Issuing an unaligned load / store pair  that overlaps with the previous
       // pair. Adjust the offset accordingly.
@@ -7395,7 +7425,9 @@ static SDValue getMemsetStores(SelectionDAG &DAG, const SDLoc &dl,
         isVol ? MachineMemOperand::MOVolatile : MachineMemOperand::MONone,
         NewAAInfo);
     OutChains.push_back(Store);
-    DstOff += VT.getSizeInBits() / 8;
+    // TVM local begin
+    DstOff += VT.getSizeInBits() / ByteSizeInBits;
+    // TVM local end
     Size -= VTSize;
   }
 
@@ -7426,12 +7458,24 @@ SDValue SelectionDAG::getMemcpy(SDValue Chain, const SDLoc &dl, SDValue Dst,
     if (ConstantSize->isZero())
       return Chain;
 
+#if 1 //def __TVM__
+    // TVM local begin: 64-bit check
+    if (ConstantSize->getAPIntValue().isIntN(64)) {
+      SDValue Result = getMemcpyLoadsAndStores(
+          *this, dl, Chain, Dst, Src, ConstantSize->getZExtValue(), Alignment,
+          isVol, false, DstPtrInfo, SrcPtrInfo, AAInfo, AA);
+      if (Result.getNode())
+        return Result;
+    }
+    // TVM local end
+#else
     SDValue Result = getMemcpyLoadsAndStores(
         *this, dl, Chain, Dst, Src, ConstantSize->getZExtValue(), Alignment,
         isVol, false, DstPtrInfo, SrcPtrInfo, AAInfo, AA);
     if (Result.getNode())
       return Result;
   }
+#endif
 
   // Then check to see if we should lower the memcpy with target-specific
   // code. If the target chooses to do this, this is the next best.
@@ -7464,7 +7508,10 @@ SDValue SelectionDAG::getMemcpy(SDValue Chain, const SDLoc &dl, SDValue Dst,
   // Emit a library call.
   TargetLowering::ArgListTy Args;
   TargetLowering::ArgListEntry Entry;
-  Entry.Ty = Type::getInt8PtrTy(*getContext());
+  //Entry.Ty = Type::getInt8PtrTy(*getContext());
+  // TVM local begin
+  Entry.Ty = getDataLayout().getIntPtrType(*getContext());
+  // TVM local end
   Entry.Node = Dst; Args.push_back(Entry);
   Entry.Node = Src; Args.push_back(Entry);
 
@@ -7540,11 +7587,15 @@ SDValue SelectionDAG::getMemmove(SDValue Chain, const SDLoc &dl, SDValue Dst,
     if (ConstantSize->isZero())
       return Chain;
 
-    SDValue Result = getMemmoveLoadsAndStores(
-        *this, dl, Chain, Dst, Src, ConstantSize->getZExtValue(), Alignment,
-        isVol, false, DstPtrInfo, SrcPtrInfo, AAInfo);
-    if (Result.getNode())
-      return Result;
+    // TVM local begin: 64-bit check
+    if (ConstantSize->getAPIntValue().isIntN(64)) {
+      SDValue Result = getMemmoveLoadsAndStores(
+          *this, dl, Chain, Dst, Src, ConstantSize->getZExtValue(), Alignment,
+          isVol, false, DstPtrInfo, SrcPtrInfo, AAInfo);
+      if (Result.getNode())
+        return Result;
+    }
+    // TVM local end
   }
 
   // Then check to see if we should lower the memmove with target-specific
@@ -7641,12 +7692,22 @@ SDValue SelectionDAG::getMemset(SDValue Chain, const SDLoc &dl, SDValue Dst,
     if (ConstantSize->isZero())
       return Chain;
 
+#if 1 //def __TVM__
+    // TVM local begin: 64-bit check
+    if (ConstantSize->getAPIntValue().isIntN(64)) {
+      SDValue Result = getMemsetStores(*this, dl, Chain, Dst, Src,
+                                       ConstantSize->getZExtValue(), Alignment,
+                                       isVol, DstPtrInfo, AAInfo);
+
+      if (Result.getNode())
+        return Result;
+    }
+    // TVM local end
+#else
     SDValue Result = getMemsetStores(*this, dl, Chain, Dst, Src,
                                      ConstantSize->getZExtValue(), Alignment,
                                      isVol, false, DstPtrInfo, AAInfo);
-
-    if (Result.getNode())
-      return Result;
+#endif
   }
 
   // Then check to see if we should lower the memset with target-specific
@@ -7729,6 +7790,9 @@ SDValue SelectionDAG::getAtomicMemset(SDValue Chain, const SDLoc &dl,
   Entry.Ty = getDataLayout().getIntPtrType(*getContext());
   Entry.Node = Dst;
   Args.push_back(Entry);
+  // TVM local begin
+  Entry.Ty = Type::getByteTy(*getContext());
+  // TVM local end
 
   Entry.Ty = Type::getInt8Ty(*getContext());
   Entry.Node = Value;
@@ -11525,8 +11589,10 @@ bool SelectionDAG::areNonVolatileConsecutiveLoads(LoadSDNode *LD,
   if (LD->getChain() != Base->getChain())
     return false;
   EVT VT = LD->getMemoryVT();
-  if (VT.getSizeInBits() / 8 != Bytes)
+  // TVM local begin
+  if (VT.getSizeInBits() / ByteSizeInBits != Bytes)
     return false;
+  // TVM local end
 
   auto BaseLocDecomp = BaseIndexOffset::match(Base, *this);
   auto LocDecomp = BaseIndexOffset::match(LD, *this);
@@ -11562,6 +11628,10 @@ MaybeAlign SelectionDAG::InferPtrAlign(SDValue Ptr) const {
              isa<FrameIndexSDNode>(Ptr.getOperand(0))) {
     // Handle FI+Cst
     FrameIdx = cast<FrameIndexSDNode>(Ptr.getOperand(0))->getIndex();
+    // TVM local begin: 64-bit check
+    if (!cast<ConstantSDNode>(Ptr.getOperand(1))->getAPIntValue().isIntN(64))
+      return None /*0 */;
+    // TVM local end
     FrameOffset = Ptr.getConstantOperandVal(1);
   }
 

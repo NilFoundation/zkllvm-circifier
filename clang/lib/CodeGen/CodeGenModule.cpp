@@ -137,10 +137,42 @@ CodeGenModule::CodeGenModule(ASTContext &C,
   IntTy = llvm::IntegerType::get(LLVMContext, C.getTargetInfo().getIntWidth());
   IntPtrTy = llvm::IntegerType::get(LLVMContext,
     C.getTargetInfo().getMaxPointerWidth());
-  Int8PtrTy = Int8Ty->getPointerTo(0);
-  Int8PtrPtrTy = Int8PtrTy->getPointerTo(0);
   const llvm::DataLayout &DL = M.getDataLayout();
-  AllocaInt8PtrTy = Int8Ty->getPointerTo(DL.getAllocaAddrSpace());
+  //Int8PtrTy = Int8Ty->getPointerTo(0);
+  //Int8PtrPtrTy = Int8PtrTy->getPointerTo(0);
+  // TVM local begin
+  BytePtrTy = Int8Ty->getPointerTo(0);
+  BytePtrPtrTy = BytePtrTy->getPointerTo(0);
+  // TVM local end
+
+  //AllocaInt8PtrTy = Int8Ty->getPointerTo(
+  //    M.getDataLayout().getAllocaAddrSpace());
+
+  // TVM local begin
+  switch (ByteSizeInBits) {
+  case 8:
+    ByteTy = Int8Ty;
+    break;
+  case 16:
+    ByteTy = Int16Ty;
+    break;
+  case 32:
+    ByteTy = Int32Ty;
+    break;
+  case 64:
+    ByteTy = Int64Ty;
+    break;
+  default:
+    ByteTy = llvm::Type::getIntNTy(LLVMContext, ByteSizeInBits);
+    break;
+  }
+
+  BytePtrTy = ByteTy->getPointerTo(0);
+  BytePtrPtrTy = BytePtrTy->getPointerTo(0);
+  AllocaBytePtrTy =
+      ByteTy->getPointerTo(M.getDataLayout().getAllocaAddrSpace());
+  // TVM local end
+
   GlobalsInt8PtrTy = Int8Ty->getPointerTo(DL.getDefaultGlobalsAddressSpace());
   ConstGlobalsPtrTy = Int8Ty->getPointerTo(
       C.getTargetAddressSpace(GetGlobalConstantAddressSpace()));
@@ -2094,6 +2126,9 @@ void CodeGenModule::SetLLVMFunctionAttributesForDefinition(const Decl *D,
       };
       if (CheckForInline(FD)) {
         B.addAttribute(llvm::Attribute::InlineHint);
+        // TVM local begin
+        //B.addAttribute(llvm::Attribute::AlwaysInline);
+        // TVM local end
       } else if (CodeGenOpts.getInlining() ==
                      CodeGenOptions::OnlyHintInlining &&
                  !FD->isInlined() &&
@@ -2549,12 +2584,18 @@ static void emitUsed(CodeGenModule &CGM, StringRef Name,
   for (unsigned i = 0, e = List.size(); i != e; ++i) {
     UsedArray[i] =
         llvm::ConstantExpr::getPointerBitCastOrAddrSpaceCast(
-            cast<llvm::Constant>(&*List[i]), CGM.Int8PtrTy);
+            // cast<llvm::Constant>(&*List[i]), CGM.Int8PtrTy);
+            // TVM local begin
+            cast<llvm::Constant>(&*List[i]), CGM.BytePtrTy);
+    // TVM local end
   }
 
   if (UsedArray.empty())
     return;
-  llvm::ArrayType *ATy = llvm::ArrayType::get(CGM.Int8PtrTy, UsedArray.size());
+  // llvm::ArrayType *ATy = llvm::ArrayType::get(CGM.Int8PtrTy, UsedArray.size());
+  // TVM local begin
+  llvm::ArrayType *ATy = llvm::ArrayType::get(CGM.BytePtrTy, UsedArray.size());
+  // TVM local end
 
   auto *GV = new llvm::GlobalVariable(
       CGM.getModule(), ATy, false, llvm::GlobalValue::AppendingLinkage,
@@ -2907,7 +2948,10 @@ llvm::Constant *CodeGenModule::EmitAnnotationArgs(const AnnotateAttr *Attr) {
                                       ".args");
   GV->setSection(AnnotationSection);
   GV->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
-  auto *Bitcasted = llvm::ConstantExpr::getBitCast(GV, GlobalsInt8PtrTy);
+  // auto *Bitcasted = llvm::ConstantExpr::getBitCast(GV, GlobalsInt8PtrTy);
+  // TVM local begin
+  auto *Bitcasted = llvm::ConstantExpr::getBitCast(GV, BytePtrTy);
+  // TVM local end
 
   Lookup = Bitcasted;
   return Bitcasted;
@@ -5753,7 +5797,10 @@ CodeGenModule::GetAddrOfConstantCFString(const StringLiteral *Literal) {
 
   if (isUTF16)
     // Cast the UTF16 string to the correct type.
-    Str = llvm::ConstantExpr::getBitCast(Str, Int8PtrTy);
+    // Str = llvm::ConstantExpr::getBitCast(Str, Int8PtrTy);
+    // TVM local begin
+    Str = llvm::ConstantExpr::getBitCast(Str, BytePtrTy);
+  // TVM local end
   Fields.add(Str);
 
   // String length.
@@ -5841,6 +5888,25 @@ QualType CodeGenModule::getObjCFastEnumerationStateType() {
 llvm::Constant *
 CodeGenModule::GetConstantArrayFromStringLiteral(const StringLiteral *E) {
   assert(!E->getType()->isPointerType() && "Strings are always arrays");
+
+  // TVM local begin
+  if (getTriple().getArch() == llvm::Triple::tvm) {
+    auto *ATy = cast<llvm::ArrayType>(getTypes().ConvertType(E->getType()));
+    llvm::Type *ETy = ATy->getElementType();
+    unsigned NumElements = ATy->getNumElements();
+
+    SmallVector<llvm::Constant *, 32> Array;
+    Array.reserve(NumElements);
+    for (unsigned i = 0, e = E->getLength(); i != e; ++i)
+      Array.push_back(llvm::ConstantInt::get(ETy, E->getCodeUnit(i)));
+    if (NumElements > E->getLength())
+      Array.append(NumElements - E->getLength(),
+                   llvm::ConstantInt::get(ETy, 0));
+    Array.resize(NumElements);
+
+    return llvm::ConstantArray::get(ATy, Array);
+  }
+  // TVM local end
 
   // Don't emit it as the address of the string, emit the string data itself
   // as an inline array.
@@ -6902,7 +6968,10 @@ llvm::Constant *CodeGenModule::GetAddrOfRTTIDescriptor(QualType Ty,
   if ((!ForEH && !getLangOpts().RTTI) || getLangOpts().CUDAIsDevice ||
       (getLangOpts().OpenMP && getLangOpts().OpenMPIsDevice &&
        getTriple().isNVPTX()))
-    return llvm::Constant::getNullValue(Int8PtrTy);
+    // return llvm::Constant::getNullValue(Int8PtrTy);
+    // TVM local begin
+    return llvm::Constant::getNullValue(BytePtrTy);
+    // TVM local end
 
   if (ForEH && Ty->isObjCObjectPointerType() &&
       LangOpts.ObjCRuntime.isGNUFamily())

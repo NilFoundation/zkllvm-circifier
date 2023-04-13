@@ -174,6 +174,15 @@ public:
     return CompleteObjectType;
   }
 
+  // TVM local begin
+  /// Override type after converting into literal
+  void updateToLiteralType(llvm::StructType *newTy) {
+    assert(CompleteObjectType == BaseSubobjectType || !BaseSubobjectType);
+    CompleteObjectType = newTy;
+    BaseSubobjectType = newTy;
+  }
+  // TVM local end
+
   /// Return the "base subobject" LLVM type associated with
   /// this record.
   llvm::StructType *getBaseSubobjectLLVMType() const {

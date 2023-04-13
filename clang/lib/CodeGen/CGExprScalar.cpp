@@ -2258,8 +2258,25 @@ Value *ScalarExprEmitter::VisitCastExpr(CastExpr *CE) {
 
   case CK_ArrayToPointerDecay:
     return CGF.EmitArrayToPointerDecay(E).getPointer();
-  case CK_FunctionToPointerDecay:
-    return EmitLValue(E).getPointer(CGF);
+
+  // TVM local begin
+  case CK_FunctionToPointerDecay: {
+    if (CGF.getContext().getTargetInfo().getTriple().getArch() ==
+        llvm::Triple::tvm) {
+      if (auto *decl = E->getReferencedDeclOfCallee()) {
+        // A member function pointer.
+        if (const CXXMethodDecl *method = dyn_cast<CXXMethodDecl>(decl)) {
+          if (method->hasAttr<FinalAttr>() ||
+              method->getParent()->hasAttr<FinalAttr>()) {
+            auto *Rv = CGF.CGM.GetAddrOfFunction(method);
+            return llvm::ConstantExpr::getBitCast(Rv, CGF.CGM.VoidPtrTy);
+          }
+        }
+      }
+    }
+    return CGF.EmitLValue(E).getPointer(CGF);
+  }
+  // TVM local end
 
   case CK_NullToPointer:
     if (MustVisitNullValue(E))

@@ -18,6 +18,10 @@ namespace llvm {
 
 class CallGraph;
 
+// TVM local begin
+void initializeCoroTVMExpandPass(PassRegistry &);
+// TVM local end
+
 namespace coro {
 
 bool declaresAnyIntrinsic(const Module &M);

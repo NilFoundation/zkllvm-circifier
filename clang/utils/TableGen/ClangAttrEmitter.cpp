@@ -3311,7 +3311,12 @@ static void GenerateHasAttrSpellingStringSwitch(
     // be taken from the specification of the attribute in the C Standard.
     int Version = 1;
 
-    if (Variety == "CXX11" || Variety == "C2x") {
+    if (Variety == "CXX11"
+        // TODO C2x attributes version
+        // TVM local begin
+        //|| Variety == "C2x"
+        // TVM local end
+        )  {
       std::vector<Record *> Spellings = Attr->getValueAsListOfDefs("Spellings");
       for (const auto &Spelling : Spellings) {
         if (Spelling->getValueAsString("Variety") == Variety) {

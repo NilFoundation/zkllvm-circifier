@@ -2158,7 +2158,11 @@ CGObjCGNU::CGObjCGNU(CodeGenModule &cgm, unsigned runtimeABIVersion,
       Types.ConvertType(CGM.getContext().getPointerDiffType()));
   BoolTy = CGM.getTypes().ConvertType(CGM.getContext().BoolTy);
 
-  Int8Ty = llvm::Type::getInt8Ty(VMContext);
+  // Int8Ty = llvm::Type::getInt8Ty(VMContext);
+  // TVM local begin
+  Int8Ty = llvm::Type::getByteTy(VMContext);
+  // TVM local end
+
   // C string type.  Used in lots of places.
   PtrToInt8Ty = llvm::PointerType::getUnqual(Int8Ty);
   ProtocolPtrTy = llvm::PointerType::getUnqual(
@@ -2875,7 +2879,10 @@ GenerateMethodList(StringRef ClassName,
   ConstantInitBuilder Builder(CGM);
 
   auto MethodList = Builder.beginStruct();
-  MethodList.addNullPointer(CGM.Int8PtrTy);
+  //MethodList.addNullPointer(CGM.Int8PtrTy);
+  // TVM local begin
+  MethodList.addNullPointer(CGM.BytePtrTy);
+  // TVM local end
   MethodList.addInt(Int32Ty, Methods.size());
 
   // Get the method structure type.

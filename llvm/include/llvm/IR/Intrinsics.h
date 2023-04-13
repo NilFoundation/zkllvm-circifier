@@ -138,6 +138,14 @@ namespace Intrinsic {
       AMX,
       PPCQuad,
       AnyPtrToElt,
+      AMX,
+
+      // TVM local begin
+      TVMSlice,
+      TVMBuilder,
+      TVMCell,
+      TVMTuple
+      // TVM local end
     } Kind;
 
     union {

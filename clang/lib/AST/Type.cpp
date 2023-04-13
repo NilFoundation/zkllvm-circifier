@@ -2986,6 +2986,16 @@ const char *Type::getTypeClassName() const {
 
 StringRef BuiltinType::getName(const PrintingPolicy &Policy) const {
   switch (getKind()) {
+  // TVM local begin
+  case TVMSlice:
+    return "__tvm_slice";
+  case TVMBuilder:
+    return "__tvm_builder";
+  case TVMCell:
+    return "__tvm_cell";
+  case TVMTuple:
+    return "__tvm_tuple";
+  // TVM local end
   case Void:
     return "void";
   case Bool:
@@ -4256,6 +4266,14 @@ bool Type::canHaveNullability(bool ResultIfUnknown) const {
 #include "clang/AST/BuiltinTypes.def"
       return false;
 
+    // TVM local begin
+    case BuiltinType::TVMSlice:
+    case BuiltinType::TVMBuilder:
+    case BuiltinType::TVMCell:
+    case BuiltinType::TVMTuple:
+      return false;
+    // TVM local end
+
     // Dependent types that could instantiate to a pointer type.
     case BuiltinType::Dependent:
     case BuiltinType::Overload:
@@ -4433,6 +4451,47 @@ bool Type::isObjCIndependentClassType() const {
     return typedefType->getDecl()->hasAttr<ObjCIndependentClassAttr>();
   return false;
 }
+
+// TVM local begin
+bool Type::isTVMTupleStructType() const {
+  if (const auto *RT = getAs<RecordType>())
+    return RT->getDecl()->hasAttr<TVMTupleStructAttr>();
+  if (const auto *typedefType = dyn_cast<TypedefType>(this))
+    return typedefType->getDecl()->hasAttr<TVMTupleStructAttr>();
+  return false;
+}
+
+bool Type::isTVMNoPubkeyInterfaceType() const {
+  if (const auto *RT = getAs<RecordType>())
+    return RT->getDecl()->hasAttr<TVMNoPubkeyInterfaceAttr>();
+  if (const auto *typedefType = dyn_cast<TypedefType>(this))
+    return typedefType->getDecl()->hasAttr<TVMNoPubkeyInterfaceAttr>();
+  return false;
+}
+
+bool Type::isTVMNoTimestampInterfaceType() const {
+  if (const auto *RT = getAs<RecordType>())
+    return RT->getDecl()->hasAttr<TVMNoTimestampInterfaceAttr>();
+  if (const auto *typedefType = dyn_cast<TypedefType>(this))
+    return typedefType->getDecl()->hasAttr<TVMNoTimestampInterfaceAttr>();
+  return false;
+}
+
+bool Type::isTVMNoExpireInterfaceType() const {
+  if (const auto *RT = getAs<RecordType>())
+    return RT->getDecl()->hasAttr<TVMNoExpireInterfaceAttr>();
+  if (const auto *typedefType = dyn_cast<TypedefType>(this))
+    return typedefType->getDecl()->hasAttr<TVMNoExpireInterfaceAttr>();
+  return false;
+}
+
+bool Type::isTVMLiteralStructType() const {
+  if (const auto *RT = getAs<RecordType>())
+    return RT->getDecl()->isLiteral() &&
+           !RT->getDecl()->hasAttr<TVMTupleStructAttr>();
+  return false;
+}
+// TVM local end
 
 bool Type::isObjCRetainableType() const {
   return isObjCObjectPointerType() ||

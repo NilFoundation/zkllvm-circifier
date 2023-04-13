@@ -3617,8 +3617,12 @@ static void DumpRecordLayout(raw_ostream &OS, const RecordDecl *RD,
          E = RD->field_end(); I != E; ++I, ++FieldNo) {
     const FieldDecl &Field = **I;
     uint64_t LocalFieldOffsetInBits = Layout.getFieldOffset(FieldNo);
+    //CharUnits FieldOffset =
+    //  Offset + C.toCharUnitsFromBits(LocalFieldOffsetInBits);
+    // TVM local begin
     CharUnits FieldOffset =
-      Offset + C.toCharUnitsFromBits(LocalFieldOffsetInBits);
+        Offset + C.toCharUnitsFromBits(LocalFieldOffsetInBits, true);
+    // TVM local end
 
     // Recursively dump fields of record type.
     if (auto RT = Field.getType()->getAs<RecordType>()) {

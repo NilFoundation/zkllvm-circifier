@@ -1612,6 +1612,12 @@ bool CompilerInvocation::ParseCodeGenArgs(CodeGenOptions &Opts, ArgList &Args,
 #include "clang/Driver/Options.inc"
 #undef CODEGEN_OPTION_WITH_MARSHALLING
 
+  // TVM local begin
+  Opts.LegacyPassManager = 1;
+  // For compatibility with Clang7, maybe excessive
+  Opts.setFiniteLoops(CodeGenOptions::FiniteLoopsKind::Never);
+  // TVM local end
+
   // At O0 we want to fully disable inlining outside of cases marked with
   // 'alwaysinline' that are required for correctness.
   if (Opts.OptimizationLevel == 0) {
@@ -1742,6 +1748,10 @@ bool CompilerInvocation::ParseCodeGenArgs(CodeGenOptions &Opts, ArgList &Args,
             << A->getAsString(Args) << A->getValue();
     }
   }
+
+  // TVM local begin
+  Opts.EmitTextConstant = Args.getLastArgValue(OPT_emit_text_const);
+  // TVM local end
 
   Opts.PrepareForLTO = false;
   Opts.PrepareForThinLTO = false;
@@ -2477,6 +2487,11 @@ static const auto &getFrontendActionTable() {
       {frontend::EmitObj, OPT_emit_obj},
       {frontend::ExtractAPI, OPT_extract_api},
 
+      // TVM local begin
+      {frontend::EmitTextConst, OPT_emit_text_const },
+      {frontend::ImportJsonAbi, OPT_import_json_name },
+      // TVM local end
+
       {frontend::FixIt, OPT_fixit_EQ},
       {frontend::FixIt, OPT_fixit},
 
@@ -2723,6 +2738,13 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     std::optional<frontend::ActionKind> ProgramAction = getFrontendAction(Opt);
     assert(ProgramAction && "Option specifier not in Action_Group.");
 
+    // TVM local begin
+    if (ProgramAction == frontend::ImportJsonAbi) {
+      if (auto *Arg = Args.getLastArg(options::OPT_import_json_name))
+        Opts.TVMJsonAbiStructName = Arg->getValue();
+    }
+    // TVM local end
+
     if (ProgramAction == frontend::ASTDump &&
         (Opt == OPT_ast_dump_all_EQ || Opt == OPT_ast_dump_EQ)) {
       unsigned Val = llvm::StringSwitch<unsigned>(A->getValue())
@@ -2896,6 +2918,9 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
                   .Cases("ast", "pcm", "precompiled-header",
                          InputKind(Language::Unknown, InputKind::Precompiled))
                   .Case("ir", Language::LLVM_IR)
+                  // TVM local begin
+                  .Case("json-abi", Language::JsonAbi)
+                  // TVM local end
                   .Default(Language::Unknown);
 
     if (DashX.isUnknown())
@@ -3227,6 +3252,9 @@ static bool ParseHeaderSearchArgs(HeaderSearchOptions &Opts, ArgList &Args,
 static bool IsInputCompatibleWithStandard(InputKind IK,
                                           const LangStandard &S) {
   switch (IK.getLanguage()) {
+  // TVM local begin
+  case Language::JsonAbi:
+  // TVM local end
   case Language::Unknown:
   case Language::LLVM_IR:
     llvm_unreachable("should not parse language flags for this input");
@@ -3271,6 +3299,10 @@ static bool IsInputCompatibleWithStandard(InputKind IK,
 /// Get language name for given input kind.
 static StringRef GetInputKindName(InputKind IK) {
   switch (IK.getLanguage()) {
+    // TVM local begin
+  case Language::JsonAbi:
+    return "Json ABI";
+  // TVM local end
   case Language::C:
     return "C";
   case Language::ObjC:
@@ -3746,6 +3778,14 @@ bool CompilerInvocation::ParseLangArgs(LangOptions &Opts, ArgList &Args,
         (Opts.ObjCRuntime.getKind() == ObjCRuntime::FragileMacOSX);
   }
 
+  // TVM local begin
+  bool isTVM = T.getArch() == llvm::Triple::tvm;
+  Opts.DecompositionBindingOverride =
+      Args.hasFlag(OPT_fdecomposition_binding_override,
+                   OPT_fno_decomposition_binding_override, isTVM);
+  Opts.GNUCVersion = 0x9d09;  // gnuc 4.2.1
+  // TVM local end
+
   if (Arg *A = Args.getLastArg(options::OPT_fgnuc_version_EQ)) {
     // Check that the version has 1 to 3 components and the minor and patch
     // versions fit in two decimal digits.
@@ -4136,6 +4176,9 @@ static bool isStrictlyPreprocessorAction(frontend::ActionKind Action) {
   case frontend::EmitBC:
   case frontend::EmitHTML:
   case frontend::EmitLLVM:
+    // TVM local begin
+  case frontend::EmitTextConst:
+  // TVM local end
   case frontend::EmitLLVMOnly:
   case frontend::EmitCodeGenOnly:
   case frontend::EmitObj:
@@ -4166,6 +4209,9 @@ static bool isStrictlyPreprocessorAction(frontend::ActionKind Action) {
   case frontend::RewriteMacros:
   case frontend::RunPreprocessorOnly:
   case frontend::PrintDependencyDirectivesSourceMinimizerOutput:
+  // TVM local begin
+  case frontend::ImportJsonAbi:
+    // TVM local end
     return true;
   }
   llvm_unreachable("invalid frontend action");

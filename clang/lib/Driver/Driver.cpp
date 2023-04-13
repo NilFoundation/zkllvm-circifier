@@ -48,6 +48,7 @@
 #include "ToolChains/SPIRV.h"
 #include "ToolChains/Solaris.h"
 #include "ToolChains/TCE.h"
+#include "ToolChains/TVM.h"
 #include "ToolChains/VEToolchain.h"
 #include "ToolChains/WebAssembly.h"
 #include "ToolChains/XCore.h"
@@ -361,6 +362,8 @@ phases::ID Driver::getFinalPhase(const DerivedArgList &DAL,
       (PhaseArg = DAL.getLastArg(options::OPT__SLASH_EP)) ||
       (PhaseArg = DAL.getLastArg(options::OPT_M, options::OPT_MM)) ||
       (PhaseArg = DAL.getLastArg(options::OPT__SLASH_P)) ||
+      // TVM local nextline
+      (PhaseArg = DAL.getLastArg(options::OPT_import_json_abi)) ||
       CCGenDiagnostics) {
     FinalPhase = phases::Preprocess;
 
@@ -385,7 +388,14 @@ phases::ID Driver::getFinalPhase(const DerivedArgList &DAL,
     FinalPhase = phases::Compile;
 
   // -S only runs up to the backend.
-  } else if ((PhaseArg = DAL.getLastArg(options::OPT_S))) {
+  } else if ((PhaseArg = DAL.getLastArg(options::OPT_S))
+              // TVM local begin
+              ||
+              (PhaseArg = DAL.getLastArg(options::OPT_export_json_abi)) ||
+              (PhaseArg = DAL.getLastArg(options::OPT_emit_text_const))
+              // TVM local end
+
+    ) {
     FinalPhase = phases::Backend;
 
   // -c compilation only runs up to the assembler.
@@ -1934,6 +1944,23 @@ void Driver::PrintVersion(const Compilation &C, raw_ostream &OS) const {
   const ToolChain &TC = C.getDefaultToolChain();
   OS << "Target: " << TC.getTripleString() << '\n';
 
+ // TVM local begin
+  // Don't display target and the thread model if the compiler is built
+  // with cmake/Cache/ton-compiler.cmake
+  if (!TC.getTriple().isTVM()) {
+    OS << "Target: " << TC.getTripleString() << '\n';
+
+    // Print the threading model.
+    if (Arg *A = C.getArgs().getLastArg(options::OPT_mthread_model)) {
+      // Don't print if the ToolChain would have barfed on it already
+      if (TC.isThreadModelSupported(A->getValue()))
+        OS << "Thread model: " << A->getValue();
+    } else
+      OS << "Thread model: " << TC.getThreadModel();
+    OS << '\n';
+  }
+  // TVM local end
+
   // Print the threading model.
   if (Arg *A = C.getArgs().getLastArg(options::OPT_mthread_model)) {
     // Don't print if the ToolChain would have barfed on it already
@@ -2576,6 +2603,13 @@ void Driver::BuildInputs(const ToolChain &TC, DerivedArgList &Args,
     if (LastXArg && LastInputArg && LastInputArg->getIndex() < LastXArg->getIndex())
       Diag(clang::diag::warn_drv_unused_x) << LastXArg->getValue();
   }
+
+  // TVM local begin
+  if (Arg *TCTP = Args.getLastArgNoClaim(options::OPT_import_json_abi)) {
+    InputTypeArg = TCTP;
+    InputType = types::TY_JsonABI;
+  }
+  // TVM local end
 
   for (Arg *A : Args) {
     if (A->getOption().getKind() == Option::InputClass) {
@@ -3958,6 +3992,22 @@ void Driver::BuildActions(Compilation &C, DerivedArgList &Args,
     return;
   }
 
+  // TVM local begin
+  Arg *FinalPhaseArg;
+  phases::ID FinalPhase = getFinalPhase(Args, &FinalPhaseArg);
+  if (C.getDefaultToolChain().getTriple().isTVM() &&
+      FinalPhase == phases::Assemble && !Args.hasArg(options::OPT_emit_llvm)) {
+    Diag(clang::diag::warn_tvm_unsupported_assembler);
+    FinalPhase = phases::Link;
+    FinalPhaseArg = nullptr;
+  }
+  // TVM local end
+
+  // Reject -Z* at the top level, these options should never have been exposed
+  // by gcc.
+  if (Arg *A = Args.getLastArg(options::OPT_Z_Joined))
+    Diag(clang::diag::err_drv_use_of_Z_option) << A->getAsString(Args);
+
   // Diagnose misuse of /Fo.
   if (Arg *A = Args.getLastArg(options::OPT__SLASH_Fo)) {
     StringRef V = A->getValue();
@@ -4013,6 +4063,17 @@ void Driver::BuildActions(Compilation &C, DerivedArgList &Args,
     types::ID InputType = I.first;
     const Arg *InputArg = I.second;
 
+    // TVM local begin
+    // The only "objects" that are possible for TVM are really -Xlinker / -Wl
+    // options, so ignore them as "inputs" and make the linker responsible for
+    // their proper handling.
+    if (C.getDefaultToolChain().getTriple().isTVM() &&
+        InputType == types::TY_Object) {
+      InputArg->claim();
+      continue;
+    }
+    // TVM local end
+
     auto PL = types::getCompilationPhases(*this, Args, InputType);
     if (PL.empty())
       continue;
@@ -4028,7 +4089,16 @@ void Driver::BuildActions(Compilation &C, DerivedArgList &Args,
       if (OffloadBuilder->addHostDependenceToDeviceActions(Current, InputArg))
         break;
 
-    for (phases::ID Phase : PL) {
+    // TVM local begin
+    //for (phases::ID Phase : PL) {
+    for (SmallVectorImpl<phases::ID>::iterator i = PL.begin(), e = PL.end();
+         i != e; ++i) {
+      phases::ID Phase = *i;
+
+      // We are done if this step is past what the user requested.
+      if (Phase > FinalPhase)
+        break;
+    // TVM local end
 
       // Add any offload action the host action depends on.
       if (!UseNewOffloadingDriver)
@@ -4534,6 +4604,11 @@ Action *Driver::ConstructPhaseAction(
   if (Phase == phases::Assemble && Input->getType() != types::TY_PP_Asm)
     return Input;
 
+  // TVM local change begin
+  if (Phase == phases::Assemble && C.getDefaultToolChain().getTriple().isTVM())
+    return Input;
+  // TVM local change end
+
   // Build the appropriate action.
   switch (Phase) {
   case phases::Link:
@@ -4642,6 +4717,17 @@ Action *Driver::ConstructPhaseAction(
               : types::TY_LLVM_BC;
       return C.MakeAction<BackendJobAction>(Input, Output);
     }
+    // TVM local begin
+    if (Args.hasArg(options::OPT_emit_text_const) ||
+        Args.hasArg(options::OPT_export_json_abi)) {
+      types::ID Output = types::TY_TextConst;
+      return C.MakeAction<BackendJobAction>(Input, Output);
+    }
+    if (C.getDefaultToolChain().getTriple().isTVM()) {
+      if (!Args.hasArg(options::OPT_S))
+        return C.MakeAction<BackendJobAction>(Input, types::TY_LLVM_BC);
+    }
+    // TVM local end
     return C.MakeAction<BackendJobAction>(Input, types::TY_PP_Asm);
   }
   case phases::Assemble:
@@ -6125,6 +6211,11 @@ const ToolChain &Driver::getToolChain(const ArgList &Args,
       case llvm::Triple::wasm64:
         TC = std::make_unique<toolchains::WebAssembly>(*this, Target, Args);
         break;
+      // TVM local begin
+      case llvm::Triple::tvm:
+        TC = std::make_unique<toolchains::TVM>(*this, Target, Args);
+        break;
+      // TVM local end
       case llvm::Triple::avr:
         TC = std::make_unique<toolchains::AVRToolChain>(*this, Target, Args);
         break;

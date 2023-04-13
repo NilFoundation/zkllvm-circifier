@@ -717,4 +717,11 @@ def err_drv_riscv_unsupported_with_linker_relaxation : Error<
 
 def err_drv_loongarch_invalid_mfpu_EQ : Error<
   "invalid argument '%0' to -mfpu=; must be one of: 64, 32, none, 0 (alias for none)">;
+
+// TVM local begin
+def warn_tvm_unsupported_assembler : Warning<
+"TVM doesn't support assembler; -c flag ignored">,
+InGroup<OptionIgnored>;
+// TVM local end
+
 }

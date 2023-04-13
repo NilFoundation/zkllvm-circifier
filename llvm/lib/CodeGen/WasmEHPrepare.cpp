@@ -136,7 +136,10 @@ FunctionPass *llvm::createWasmEHPass() { return new WasmEHPrepare(); }
 bool WasmEHPrepare::doInitialization(Module &M) {
   IRBuilder<> IRB(M.getContext());
   LPadContextTy = StructType::get(IRB.getInt32Ty(),   // lpad_index
-                                  IRB.getInt8PtrTy(), // lsda
+ //                               IRB.getInt8PtrTy(), // lsda
+                                  // TVM local begin
+                                  IRB.getIntBytePtrTy(), // lsda
+                                  // TVM local end
                                   IRB.getInt32Ty()    // selector
   );
   return false;
@@ -243,7 +246,10 @@ bool WasmEHPrepare::prepareEHPads(Function &F) {
 
   // _Unwind_CallPersonality() wrapper function, which calls the personality
   CallPersonalityF = M.getOrInsertFunction(
-      "_Unwind_CallPersonality", IRB.getInt32Ty(), IRB.getInt8PtrTy());
+      // "_Unwind_CallPersonality", IRB.getInt32Ty(), IRB.getInt8PtrTy());
+      // TVM local begin
+      "_Unwind_CallPersonality", IRB.getInt32Ty(), IRB.getIntBytePtrTy());
+      // TVM local end
   if (Function *F = dyn_cast<Function>(CallPersonalityF.getCallee()))
     F->setDoesNotThrow();
 

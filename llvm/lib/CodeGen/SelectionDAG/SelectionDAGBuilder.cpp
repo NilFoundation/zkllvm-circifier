@@ -2424,7 +2424,13 @@ void SelectionDAGBuilder::visitBr(const BranchInst &I) {
 
     // If this is not a fall-through branch or optimizations are switched off,
     // emit the branch.
-    if (Succ0MBB != NextBlock(BrMBB) || TM.getOptLevel() == CodeGenOpt::None)
+    // TVM local change begin
+    // TODO: TVM backend doesn't handle fallthrough properly, so it requires an
+    // MBB to always end up with an explicit terminator instruction.
+    if (Succ0MBB != NextBlock(BrMBB) || TM.getOptLevel() == CodeGenOpt::None ||
+        DAG.getTarget().getTargetTriple().getArch() == Triple::tvm)
+    // TVM local change end
+//    if (Succ0MBB != NextBlock(BrMBB) || TM.getOptLevel() == CodeGenOpt::None)
       DAG.setRoot(DAG.getNode(ISD::BR, getCurSDLoc(),
                               MVT::Other, getControlRoot(),
                               DAG.getBasicBlock(Succ0MBB)));
@@ -2455,7 +2461,11 @@ void SelectionDAGBuilder::visitBr(const BranchInst &I) {
   //     cmp D, E
   //     jle foo
   const Instruction *BOp = dyn_cast<Instruction>(CondVal);
-  if (!DAG.getTargetLoweringInfo().isJumpExpensive() && BOp &&
+  // TVM local begin
+  const auto &Triple = DAG.getTarget().getTargetTriple();
+  if (Triple.getArch() != Triple::tvm &&
+  // TVM local end
+    !DAG.getTargetLoweringInfo().isJumpExpensive() && BOp &&
       BOp->hasOneUse() && !I.hasMetadata(LLVMContext::MD_unpredictable)) {
     Value *Vec;
     const Value *BOp0, *BOp1;
@@ -2582,11 +2592,20 @@ void SelectionDAGBuilder::visitSwitchCase(CaseBlock &CB,
 
   // If the lhs block is the next block, invert the condition so that we can
   // fall through to the lhs instead of the rhs block.
-  if (CB.TrueBB == NextBlock(SwitchBB)) {
-    std::swap(CB.TrueBB, CB.FalseBB);
-    SDValue True = DAG.getConstant(1, dl, Cond.getValueType());
-    Cond = DAG.getNode(ISD::XOR, dl, Cond.getValueType(), Cond, True);
+  // TVM Local change: we need true successor to be the loop header,
+  // an IR pass ensures that, so we don't need to reorder when building DAG.
+  // TVM local begin
+  const auto &Triple = DAG.getTarget().getTargetTriple();
+  if (Triple.getArch() != Triple::tvm) {
+  // TVM local end
+    if (CB.TrueBB == NextBlock(SwitchBB)) {
+      std::swap(CB.TrueBB, CB.FalseBB);
+      SDValue True = DAG.getConstant(1, dl, Cond.getValueType());
+      Cond = DAG.getNode(ISD::XOR, dl, Cond.getValueType(), Cond, True);
+    }
+  // TVM local begin
   }
+  // TVM local end
 
   SDValue BrCond = DAG.getNode(ISD::BRCOND, dl,
                                MVT::Other, getControlRoot(), Cond,
@@ -2718,8 +2737,10 @@ void SelectionDAGBuilder::visitSPDescriptorParent(StackProtectorDescriptor &SPD,
   SDLoc dl = getCurSDLoc();
   SDValue StackSlotPtr = DAG.getFrameIndex(FI, PtrTy);
   const Module &M = *ParentBB->getParent()->getFunction().getParent();
-  Align Align =
-      DAG.getDataLayout().getPrefTypeAlign(Type::getInt8PtrTy(M.getContext()));
+  // TVM local begin
+  Align Align = DAG.getDataLayout().getPrefTypeAlign(
+      Type::getIntBytePtrTy(M.getContext()));
+  // TVM local end
 
   // Generate code to load the content of the guard slot.
   SDValue GuardVal = DAG.getLoad(

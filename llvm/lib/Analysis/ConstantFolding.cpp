@@ -47,6 +47,7 @@
 #include "llvm/IR/IntrinsicsARM.h"
 #include "llvm/IR/IntrinsicsWebAssembly.h"
 #include "llvm/IR/IntrinsicsX86.h"
+#include "llvm/IR/IntrinsicsTVM.h"
 #include "llvm/IR/Operator.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Value.h"
@@ -104,6 +105,11 @@ static Constant *foldConstVectorToAPInt(APInt &Result, Type *DestTy,
 Constant *FoldBitCast(Constant *C, Type *DestTy, const DataLayout &DL) {
   assert(CastInst::castIsValid(Instruction::BitCast, C, DestTy) &&
          "Invalid constantexpr bitcast!");
+
+  // TVM local begin
+  if (!DestTy->isTVMBuiltinTy())
+    return Constant::getNullValue(DestTy);
+  // TVM local end
 
   // Catch the obvious splat cases.
   if (Constant *Res = ConstantFoldLoadFromUniformValue(C, DestTy))

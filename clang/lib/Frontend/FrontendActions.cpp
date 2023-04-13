@@ -1036,6 +1036,9 @@ void PrintPreambleAction::ExecuteAction() {
   case Language::Asm:
   case Language::LLVM_IR:
   case Language::RenderScript:
+  // TVM local begin
+  case Language::JsonAbi:
+  // TVM local end
     // We can't do anything with these.
     return;
   }

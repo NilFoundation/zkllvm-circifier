@@ -304,7 +304,105 @@ enum BuiltinTemplateKind : int {
   BTK__make_integer_seq,
 
   /// This names the __type_pack_element BuiltinTemplateDecl.
-  BTK__type_pack_element
+  BTK__type_pack_element,
+
+  // TVM local begin
+  /// This names the __reflect_field BuiltinTemplateDecl.
+  BTK__reflect_field,
+
+  /// This names the __reflect_fields_count BuiltinTemplateDecl.
+  BTK__reflect_fields_count,
+
+  /// This names the __reflect_methods_count BuiltinTemplateDecl.
+  BTK__reflect_methods_count,
+
+  /// This names the __reflect_method_name BuiltinTemplateDecl.
+  BTK__reflect_method_name,
+
+  /// This names the __reflect_method_ptr_name BuiltinTemplateDecl.
+  BTK__reflect_method_ptr_name,
+
+  /// This names the __reflect_return_name BuiltinTemplateDecl.
+  BTK__reflect_return_name,
+
+  /// This names the __reflect_method_func_id BuiltinTemplateDecl.
+  BTK__reflect_method_func_id,
+
+  /// This names the __reflect_method_internal BuiltinTemplateDecl.
+  BTK__reflect_method_internal,
+
+  /// This names the __reflect_method_ptr_internal BuiltinTemplateDecl.
+  BTK__reflect_method_ptr_internal,
+
+  /// This names the __reflect_method_answer_id BuiltinTemplateDecl.
+  BTK__reflect_method_answer_id,
+
+  /// This names the __reflect_method_ptr_answer_id BuiltinTemplateDecl.
+  BTK__reflect_method_ptr_answer_id,
+
+  /// This names the __reflect_method_external BuiltinTemplateDecl.
+  BTK__reflect_method_external,
+
+  /// This names the __reflect_method_getter BuiltinTemplateDecl.
+  BTK__reflect_method_getter,
+
+  /// This names the __reflect_method_noaccept BuiltinTemplateDecl.
+  BTK__reflect_method_noaccept,
+
+  /// This names the __reflect_method_implicit_func_id BuiltinTemplateDecl.
+  BTK__reflect_method_implicit_func_id,
+
+  /// This names the __reflect_method_dyn_chain_parse BuiltinTemplateDecl.
+  BTK__reflect_method_dyn_chain_parse,
+
+  /// This names the __reflect_method_deploy BuiltinTemplateDecl.
+  BTK__reflect_method_deploy,
+
+  /// This names the __reflect_method_no_read_persistent BuiltinTemplateDecl.
+  BTK__reflect_method_no_read_persistent,
+
+  /// This names the __reflect_method_no_write_persistent BuiltinTemplateDecl.
+  BTK__reflect_method_no_write_persistent,
+
+  /// This names the __reflect_method_ptr_func_id BuiltinTemplateDecl.
+  BTK__reflect_method_ptr_func_id,
+
+  /// This names the __reflect_method_rv BuiltinTemplateDecl.
+  BTK__reflect_method_rv,
+
+  /// This names the __reflect_method_ptr_rv BuiltinTemplateDecl.
+  BTK__reflect_method_ptr_rv,
+
+  /// This names the __reflect_method_arg_struct BuiltinTemplateDecl.
+  BTK__reflect_method_arg_struct,
+
+  /// This names the __reflect_method_ptr_arg_struct BuiltinTemplateDecl.
+  BTK__reflect_method_ptr_arg_struct,
+
+  /// This names the __reflect_smart_interface BuiltinTemplateDecl.
+  BTK__reflect_smart_interface,
+
+  /// This names the __reflect_proxy BuiltinTemplateDecl.
+  BTK__reflect_proxy,
+
+  /// This names the __reflect_method_ptr BuiltinTemplateDecl.
+  BTK__reflect_method_ptr,
+
+  /// This names the __reflect_interface_has_pubkey BuiltinTemplateDecl.
+  BTK__reflect_interface_has_pubkey,
+
+  /// This names the __reflect_interface_has_timestamp BuiltinTemplateDecl.
+  BTK__reflect_interface_has_timestamp,
+
+  /// This names the __reflect_interface_has_expire BuiltinTemplateDecl.
+  BTK__reflect_interface_has_expire,
+
+  /// This names the __reflect_signature_func_id BuiltinTemplateDecl.
+  BTK__reflect_signature_func_id,
+
+  /// This names the __reflect_echo BuiltinTemplateDecl.
+  BTK__reflect_echo,
+  // TVM local end
 };
 
 } // end namespace clang

@@ -227,9 +227,17 @@ static BaseIndexOffset matchLSNode(const LSBaseSDNode *N,
       break;
     case ISD::ADD:
       if (auto *C = dyn_cast<ConstantSDNode>(Base->getOperand(1))) {
-        Offset += C->getSExtValue();
-        Base = DAG.getTargetLoweringInfo().unwrapAddress(Base->getOperand(0));
-        continue;
+        //Offset += C->getSExtValue();
+        //Base = DAG.getTargetLoweringInfo().unwrapAddress(Base->getOperand(0));
+        //continue;
+
+       // TVM local begin: 64-bit check
+        if (C->getAPIntValue().isSignedIntN(64)) {
+          Offset += C->getSExtValue();
+          Base = Base->getOperand(0);
+          continue;
+        }
+        // TVM local end
       }
       break;
     case ISD::LOAD:
@@ -238,14 +246,27 @@ static BaseIndexOffset matchLSNode(const LSBaseSDNode *N,
       unsigned int IndexResNo = (Base->getOpcode() == ISD::LOAD) ? 1 : 0;
       if (LSBase->isIndexed() && Base.getResNo() == IndexResNo)
         if (auto *C = dyn_cast<ConstantSDNode>(LSBase->getOffset())) {
-          auto Off = C->getSExtValue();
-          if (LSBase->getAddressingMode() == ISD::PRE_DEC ||
-              LSBase->getAddressingMode() == ISD::POST_DEC)
-            Offset -= Off;
-          else
-            Offset += Off;
-          Base = DAG.getTargetLoweringInfo().unwrapAddress(LSBase->getBasePtr());
-          continue;
+          //auto Off = C->getSExtValue();
+          //if (LSBase->getAddressingMode() == ISD::PRE_DEC ||
+          //    LSBase->getAddressingMode() == ISD::POST_DEC)
+          //  Offset -= Off;
+          //else
+          //  Offset += Off;
+          //Base = DAG.getTargetLoweringInfo().unwrapAddress(LSBase->getBasePtr());
+          //continue;
+
+         // TVM local begin: 64-bit check
+          if (C->getAPIntValue().isSignedIntN(64)) {
+            auto Off = C->getSExtValue();
+            if (LSBase->getAddressingMode() == ISD::PRE_DEC ||
+                LSBase->getAddressingMode() == ISD::POST_DEC)
+              Offset -= Off;
+            else
+              Offset += Off;
+            Base = LSBase->getBasePtr();
+            continue;
+          }
+          // TVM local end
         }
       break;
     }

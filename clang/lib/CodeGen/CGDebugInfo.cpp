@@ -655,6 +655,14 @@ llvm::DIType *CGDebugInfo::CreateType(const BuiltinType *BT) {
 #define BUILTIN_TYPE(Id, SingletonId)
 #define PLACEHOLDER_TYPE(Id, SingletonId) case BuiltinType::Id:
 #include "clang/AST/BuiltinTypes.def"
+  // TVM local begin
+  // TODO support debug info for Slice/Builder/Cell/Tuple
+  case BuiltinType::TVMSlice:
+  case BuiltinType::TVMBuilder:
+  case BuiltinType::TVMCell:
+  case BuiltinType::TVMTuple:
+    return nullptr;
+    // TVM local end
   case BuiltinType::Dependent:
     llvm_unreachable("Unexpected builtin type");
   case BuiltinType::NullPtr:
@@ -2099,7 +2107,10 @@ CGDebugInfo::CollectTemplateParams(std::optional<TemplateArgs> OArgs,
         if (MPT->isMemberDataPointer())
           V = CGM.getCXXABI().EmitNullMemberPointer(MPT);
       if (!V)
-        V = llvm::ConstantInt::get(CGM.Int8Ty, 0);
+        // V = llvm::ConstantInt::get(CGM.Int8Ty, 0);
+        // TVM local begin
+        V = llvm::ConstantInt::get(CGM.ByteTy, 0);
+        // TVM local end
       TemplateParams.push_back(DBuilder.createTemplateValueParameter(
           TheCU, Name, TTy, defaultParameter, V));
     } break;

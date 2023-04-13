@@ -31,8 +31,13 @@ bool canCoerceMustAliasedValueToLoad(Value *StoredVal, Type *LoadTy,
   uint64_t StoreSize = DL.getTypeSizeInBits(StoredTy).getFixedValue();
 
   // The store size must be byte-aligned to support future type casts.
-  if (llvm::alignTo(StoreSize, 8) != StoreSize)
+  //if (llvm::alignTo(StoreSize, 8) != StoreSize)
+  //  return false;
+
+  // TVM local begin
+  if (llvm::alignTo(StoreSize, ByteSizeInBits) != StoreSize)
     return false;
+  // TVM local end
 
   // The store has to be at least as big as the load.
   if (StoreSize < DL.getTypeSizeInBits(LoadTy).getFixedValue())
@@ -188,10 +193,16 @@ static int analyzeLoadFromClobberingWrite(Type *LoadTy, Value *LoadPtr,
 
   uint64_t LoadSize = DL.getTypeSizeInBits(LoadTy).getFixedValue();
 
-  if ((WriteSizeInBits & 7) | (LoadSize & 7))
+  //if ((WriteSizeInBits & 7) | (LoadSize & 7))
+  //  return -1;
+  //uint64_t StoreSize = WriteSizeInBits / 8; // Convert to bytes.
+  //LoadSize /= 8;
+  // TVM local begin
+  if ((WriteSizeInBits % ByteSizeInBits) | (LoadSize % ByteSizeInBits))
     return -1;
-  uint64_t StoreSize = WriteSizeInBits / 8; // Convert to bytes.
-  LoadSize /= 8;
+  uint64_t StoreSize = WriteSizeInBits / ByteSizeInBits; // Convert to bytes.
+  LoadSize /= ByteSizeInBits;
+  // TVM local end
 
   // If the Load isn't completely contained within the stored bits, we don't
   // have all the bits to feed it.  We could do something crazy in the future
@@ -346,7 +357,11 @@ int analyzeLoadFromClobberingLoad(Type *LoadTy, Value *LoadPtr, LoadInst *DepLI,
   assert(DepLI->isSimple() && "Cannot widen volatile/atomic load!");
   assert(DepLI->getType()->isIntegerTy() && "Can't widen non-integer load");
 
-  return analyzeLoadFromClobberingWrite(LoadTy, LoadPtr, DepPtr, Size * 8, DL);
+  //return analyzeLoadFromClobberingWrite(LoadTy, LoadPtr, DepPtr, Size * 8, DL);
+  // TVM local begin
+  return analyzeLoadFromClobberingWrite(LoadTy, LoadPtr, DepPtr,
+                                        Size * ByteSizeInBits, DL);
+  // TVM local end
 }
 
 int analyzeLoadFromClobberingMemInst(Type *LoadTy, Value *LoadPtr,
@@ -355,7 +370,10 @@ int analyzeLoadFromClobberingMemInst(Type *LoadTy, Value *LoadPtr,
   ConstantInt *SizeCst = dyn_cast<ConstantInt>(MI->getLength());
   if (!SizeCst)
     return -1;
-  uint64_t MemSizeInBits = SizeCst->getZExtValue() * 8;
+  //uint64_t MemSizeInBits = SizeCst->getZExtValue() * 8;
+  // TVM local begin
+  uint64_t MemSizeInBits = SizeCst->getZExtValue() * ByteSizeInBits;
+  // TVM local end
 
   // If this is memset, we just need to see if the offset is valid in the size
   // of the memset..
@@ -410,31 +428,50 @@ static Value *getStoreValueForLoadHelper(Value *SrcVal, unsigned Offset,
     return SrcVal;
   }
 
+  //uint64_t StoreSize =
+  //    (DL.getTypeSizeInBits(SrcVal->getType()).getFixedSize() + 7) / 8;
+  //uint64_t LoadSize = (DL.getTypeSizeInBits(LoadTy).getFixedSize() + 7) / 8;
+  // TVM local begin
   uint64_t StoreSize =
-      (DL.getTypeSizeInBits(SrcVal->getType()).getFixedValue() + 7) / 8;
-  uint64_t LoadSize = (DL.getTypeSizeInBits(LoadTy).getFixedValue() + 7) / 8;
+      (DL.getTypeSizeInBits(SrcVal->getType()).getFixedValue() +
+       (ByteSizeInBits - 1)) / ByteSizeInBits;
+  uint64_t LoadSize = (DL.getTypeSizeInBits(LoadTy).getFixedValue() +
+                       (ByteSizeInBits - 1)) / ByteSizeInBits;
+  // TVM local end
+
   // Compute which bits of the stored value are being used by the load.  Convert
   // to an integer type to start with.
   if (SrcVal->getType()->isPtrOrPtrVectorTy())
     SrcVal =
         Builder.CreatePtrToInt(SrcVal, DL.getIntPtrType(SrcVal->getType()));
+  // TVM local begin
   if (!SrcVal->getType()->isIntegerTy())
-    SrcVal =
-        Builder.CreateBitCast(SrcVal, IntegerType::get(Ctx, StoreSize * 8));
+    SrcVal = Builder.CreateBitCast(
+            SrcVal, IntegerType::get(Ctx, StoreSize * ByteSizeInBits));
+  // TVM local end
 
   // Shift the bits to the least significant depending on endianness.
   unsigned ShiftAmt;
+  //if (DL.isLittleEndian())
+  //  ShiftAmt = Offset * 8;
+  //else
+  //  ShiftAmt = (StoreSize - LoadSize - Offset) * 8;
+  // TVM local begin
   if (DL.isLittleEndian())
-    ShiftAmt = Offset * 8;
+    ShiftAmt = Offset * ByteSizeInBits;
   else
-    ShiftAmt = (StoreSize - LoadSize - Offset) * 8;
+    ShiftAmt = (StoreSize - LoadSize - Offset) * ByteSizeInBits;
+  // TVM local end
+
   if (ShiftAmt)
     SrcVal = Builder.CreateLShr(SrcVal,
                                 ConstantInt::get(SrcVal->getType(), ShiftAmt));
 
+  // TVM local begin
   if (LoadSize != StoreSize)
-    SrcVal = Builder.CreateTruncOrBitCast(SrcVal,
-                                          IntegerType::get(Ctx, LoadSize * 8));
+    SrcVal = Builder.CreateTruncOrBitCast(
+        SrcVal, IntegerType::get(Ctx, LoadSize * ByteSizeInBits));
+  // TVM local end
   return SrcVal;
 }
 
@@ -481,9 +518,14 @@ Value *getLoadValueForLoad(LoadInst *SrcVal, unsigned Offset, Type *LoadTy,
     // memdep queries will find the new load.  We can't easily remove the old
     // load completely because it is already in the value numbering table.
     IRBuilder<> Builder(SrcVal->getParent(), ++BasicBlock::iterator(SrcVal));
-    Type *DestTy = IntegerType::get(LoadTy->getContext(), NewLoadSize * 8);
+    // Type *DestTy = IntegerType::get(LoadTy->getContext(), NewLoadSize * 8);
+    // TVM local begin
+    Type *DestTy =
+        IntegerType::get(LoadTy->getContext(), NewLoadSize * ByteSizeInBits);
+    // TVM local end
     Type *DestPTy =
         PointerType::get(DestTy, PtrVal->getType()->getPointerAddressSpace());
+
     Builder.SetCurrentDebugLocation(SrcVal->getDebugLoc());
     PtrVal = Builder.CreateBitCast(PtrVal, DestPTy);
     LoadInst *NewLoad = Builder.CreateLoad(DestTy, PtrVal);
@@ -496,8 +538,13 @@ Value *getLoadValueForLoad(LoadInst *SrcVal, unsigned Offset, Type *LoadTy,
     // Replace uses of the original load with the wider load.  On a big endian
     // system, we need to shift down to get the relevant bits.
     Value *RV = NewLoad;
+    //if (DL.isBigEndian())
+    //  RV = Builder.CreateLShr(RV, (NewLoadSize - SrcValStoreSize) * 8);
+    // TVM local begin
     if (DL.isBigEndian())
-      RV = Builder.CreateLShr(RV, (NewLoadSize - SrcValStoreSize) * 8);
+      RV = Builder.CreateLShr(RV,
+                              (NewLoadSize - SrcValStoreSize) * ByteSizeInBits);
+    // TVM local end
     RV = Builder.CreateTrunc(RV, SrcVal->getType());
     SrcVal->replaceAllUsesWith(RV);
 
@@ -523,7 +570,9 @@ Value *getMemInstValueForLoad(MemIntrinsic *SrcInst, unsigned Offset,
                               Type *LoadTy, Instruction *InsertPt,
                               const DataLayout &DL) {
   LLVMContext &Ctx = LoadTy->getContext();
-  uint64_t LoadSize = DL.getTypeSizeInBits(LoadTy).getFixedValue() / 8;
+  uint64_t LoadSize = DL.getTypeSizeInBits(LoadTy).getFixedValue() /
+                      // TVM local nextline
+                      ByteSizeInBits;
   IRBuilder<> Builder(InsertPt);
 
   // We know that this method is only called when the mem transfer fully
@@ -533,8 +582,9 @@ Value *getMemInstValueForLoad(MemIntrinsic *SrcInst, unsigned Offset,
     // independently of what the offset is.
     Value *Val = MSI->getValue();
     if (LoadSize != 1)
-      Val =
-          Builder.CreateZExtOrBitCast(Val, IntegerType::get(Ctx, LoadSize * 8));
+      Val = Builder.CreateZExtOrBitCast(
+          // TVM local nextline
+          Val, IntegerType::get(Ctx, LoadSize * ByteSizeInBits));
     Value *OneElt = Val;
 
     // Splat the value out to the right number of bits.
@@ -542,21 +592,24 @@ Value *getMemInstValueForLoad(MemIntrinsic *SrcInst, unsigned Offset,
       // If we can double the number of bytes set, do it.
       if (NumBytesSet * 2 <= LoadSize) {
         Value *ShVal = Builder.CreateShl(
-            Val, ConstantInt::get(Val->getType(), NumBytesSet * 8));
+            // TVM local nextline
+            Val, ConstantInt::get(Val->getType(), NumBytesSet * ByteSizeInBits));
         Val = Builder.CreateOr(Val, ShVal);
         NumBytesSet <<= 1;
         continue;
       }
 
       // Otherwise insert one byte at a time.
-      Value *ShVal =
-          Builder.CreateShl(Val, ConstantInt::get(Val->getType(), 1 * 8));
+      Value *ShVal = Builder.CreateShl(
+          // TVM local nextline
+          Val, ConstantInt::get(Val->getType(), 1 * ByteSizeInBits));
       Val = Builder.CreateOr(OneElt, ShVal);
       ++NumBytesSet;
     }
 
     return coerceAvailableValueToLoadType(Val, LoadTy, Builder, DL);
   }
+  // TVM local end
 
   // Otherwise, this is a memcpy/memmove from a constant global.
   MemTransferInst *MTI = cast<MemTransferInst>(SrcInst);
@@ -569,7 +622,9 @@ Value *getMemInstValueForLoad(MemIntrinsic *SrcInst, unsigned Offset,
 Constant *getConstantMemInstValueForLoad(MemIntrinsic *SrcInst, unsigned Offset,
                                          Type *LoadTy, const DataLayout &DL) {
   LLVMContext &Ctx = LoadTy->getContext();
-  uint64_t LoadSize = DL.getTypeSizeInBits(LoadTy).getFixedValue() / 8;
+  uint64_t LoadSize = DL.getTypeSizeInBits(LoadTy).getFixedValue() /
+                      // TVM local nextline
+                      ByteSizeInBits;
 
   // We know that this method is only called when the mem transfer fully
   // provides the bits for the load.
@@ -578,7 +633,9 @@ Constant *getConstantMemInstValueForLoad(MemIntrinsic *SrcInst, unsigned Offset,
     if (!Val)
       return nullptr;
 
-    Val = ConstantInt::get(Ctx, APInt::getSplat(LoadSize * 8, Val->getValue()));
+    Val = ConstantInt::get(
+        // TVM local nextline
+        Ctx, APInt::getSplat(LoadSize * ByteSizeInBits, Val->getValue()));
     return ConstantFoldLoadFromConst(Val, LoadTy, DL);
   }
 

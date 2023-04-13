@@ -1019,6 +1019,12 @@ Init *BinOpInit::getStrConcat(Init *I0, Init *I1) {
                         StringRecTy::get(I0->getRecordKeeper()));
 }
 
+// TVM local begin
+Init *BinOpInit::getListSplat(TypedInit *LHS, Init *RHS) {
+  return BinOpInit::get(BinOpInit::LISTSPLAT, LHS, RHS, LHS->getType());
+}
+// TVM local end
+
 static ListInit *ConcatListInits(const ListInit *LHS,
                                  const ListInit *RHS) {
   SmallVector<Init *, 8> Args;
@@ -1158,6 +1164,17 @@ std::optional<bool> BinOpInit::CompareInit(unsigned Opc, Init *LHS, Init *RHS) c
     }
     break;
   }
+  //case LISTSPLAT: {
+  //  TypedInit *Value = dyn_cast<TypedInit>(LHS);
+  //  IntInit *Size = dyn_cast<IntInit>(RHS);
+  //  if (Value && Size) {
+  //    SmallVector<Init *, 8> Args(Size->getValue(), Value);
+  //    return ListInit::get(Args, Value->getType());
+  //  }
+  //  break;
+  //}
+
+  // TVM local begin
   case LISTSPLAT: {
     TypedInit *Value = dyn_cast<TypedInit>(LHS);
     IntInit *Size = dyn_cast<IntInit>(RHS);
@@ -1167,6 +1184,8 @@ std::optional<bool> BinOpInit::CompareInit(unsigned Opc, Init *LHS, Init *RHS) c
     }
     break;
   }
+  // TVM local end
+
   case LISTREMOVE: {
     ListInit *LHSs = dyn_cast<ListInit>(LHS);
     ListInit *RHSs = dyn_cast<ListInit>(RHS);
@@ -1196,6 +1215,7 @@ std::optional<bool> BinOpInit::CompareInit(unsigned Opc, Init *LHS, Init *RHS) c
       return ConcatStringInits(LHSs, RHSs);
     break;
   }
+
   case INTERLEAVE: {
     ListInit *List = dyn_cast<ListInit>(LHS);
     StringInit *Delim = dyn_cast<StringInit>(RHS);

@@ -85,6 +85,7 @@ StringRef Triple::getArchTypeName(ArchType Kind) {
   case x86_64:         return "x86_64";
   case xcore:          return "xcore";
   case xtensa:         return "xtensa";
+  case tvm:            return "tvm";
   }
 
   llvm_unreachable("Invalid ArchType!");
@@ -133,6 +134,8 @@ StringRef Triple::getArchTypePrefix(ArchType Kind) {
   case sparc:       return "sparc";
 
   case systemz:     return "s390";
+
+  case tvm:         return "tvm";
 
   case x86:
   case x86_64:      return "x86";
@@ -380,6 +383,7 @@ Triple::ArchType Triple::getArchTypeForLLVMName(StringRef Name) {
     .Case("loongarch64", loongarch64)
     .Case("dxil", dxil)
     .Case("xtensa", xtensa)
+    .Case("tvm", tvm)
     .Default(UnknownArch);
 }
 
@@ -523,6 +527,7 @@ static Triple::ArchType parseArch(StringRef ArchName) {
     .Case("dxil", Triple::dxil)
     .Case("xtensa", Triple::xtensa)
     .Case("assigner", Triple::assigner)
+    .Case("tvm", Triple::tvm)
     .Default(Triple::UnknownArch);
 
   // Some architectures require special parsing logic just to compute the
@@ -859,6 +864,10 @@ static Triple::ObjectFormatType getDefaultFormat(const Triple &T) {
   case Triple::ve:
   case Triple::xcore:
   case Triple::xtensa:
+    return Triple::ELF;
+
+  // TODO: Temporary
+  case Triple::tvm:
     return Triple::ELF;
 
   case Triple::ppc64:
@@ -1466,6 +1475,7 @@ static unsigned getArchPointerBitWidth(llvm::Triple::ArchType Arch) {
   case llvm::Triple::wasm64:
   case llvm::Triple::x86_64:
   case llvm::Triple::assigner:
+  case llvm::Triple::tvm:
     return 64;
   }
   llvm_unreachable("Invalid architecture value");
@@ -1495,6 +1505,7 @@ Triple Triple::get32BitArchVariant() const {
   case Triple::systemz:
   case Triple::ve:
   case Triple::assigner:
+  case Triple::tvm:
     T.setArch(UnknownArch);
     break;
 
@@ -1585,6 +1596,7 @@ Triple Triple::get64BitArchVariant() const {
   case Triple::xcore:
   case Triple::xtensa:
   case Triple::assigner:
+  case Triple::tvm:
     T.setArch(UnknownArch);
     break;
 

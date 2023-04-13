@@ -296,6 +296,11 @@ class ASTContext : public RefCountedBase<ASTContext> {
   /// Mapping from APValues to the corresponding TemplateParamObjects.
   mutable llvm::FoldingSet<TemplateParamObjectDecl> TemplateParamObjectDecls;
 
+ // TVM local begin
+  /// A cache mapping from CXXMethodDecl to its TVM arguments structure.
+  mutable llvm::DenseMap<const CXXMethodDecl *, QualType> TVMMethodArgStructs;
+  // TVM local end
+
   /// A cache mapping a string value to a StringLiteral object with the same
   /// value.
   ///
@@ -360,11 +365,83 @@ class ASTContext : public RefCountedBase<ASTContext> {
   /// The typedef for the predefined 'BOOL' type.
   mutable TypedefDecl *BOOLDecl = nullptr;
 
+ // TVM local begin
+  /// The identifier '__reflect_field'.
+  mutable IdentifierInfo *ReflectFieldName = nullptr;
+  /// The identifier '__reflect_fields_count'.
+  mutable IdentifierInfo *ReflectFieldsCountName = nullptr;
+  /// The identifier '__reflect_methods_count'.
+  mutable IdentifierInfo *ReflectMethodsCountName = nullptr;
+  /// The identifier '__reflect_method_name'.
+  mutable IdentifierInfo *ReflectMethodNameName = nullptr;
+  /// The identifier '__reflect_method_ptr_name'.
+  mutable IdentifierInfo *ReflectMethodPtrNameName = nullptr;
+  /// The identifier '__reflect_return_name'.
+  mutable IdentifierInfo *ReflectReturnNameName = nullptr;
+  /// The identifier '__reflect_method_func_id'.
+  mutable IdentifierInfo *ReflectMethodFuncIdName = nullptr;
+  /// The identifier '__reflect_method_internal'.
+  mutable IdentifierInfo *ReflectMethodInternalName = nullptr;
+  /// The identifier '__reflect_method_ptr_internal'.
+  mutable IdentifierInfo *ReflectMethodPtrInternalName = nullptr;
+  /// The identifier '__reflect_method_answer_id'.
+  mutable IdentifierInfo *ReflectMethodAnswerIdName = nullptr;
+  /// The identifier '__reflect_method_ptr_answer_id'.
+  mutable IdentifierInfo *ReflectMethodPtrAnswerIdName = nullptr;
+  /// The identifier '__reflect_method_external'.
+  mutable IdentifierInfo *ReflectMethodExternalName = nullptr;
+  /// The identifier '__reflect_method_getter'.
+  mutable IdentifierInfo *ReflectMethodGetterName = nullptr;
+  /// The identifier '__reflect_method_noaccept'.
+  mutable IdentifierInfo *ReflectMethodNoAcceptName = nullptr;
+  /// The identifier '__reflect_method_implicit_func_id'.
+  mutable IdentifierInfo *ReflectMethodImplicitFuncIdName = nullptr;
+  /// The identifier '__reflect_method_dyn_chain_parse'.
+  mutable IdentifierInfo *ReflectMethodDynChainParseName = nullptr;
+  /// The identifier '__reflect_method_deploy'.
+  mutable IdentifierInfo *ReflectMethodDeployName = nullptr;
+  /// The identifier '__reflect_method_no_read_persistent'.
+  mutable IdentifierInfo *ReflectMethodNoReadPersistentName = nullptr;
+  /// The identifier '__reflect_method_no_write_persistent'.
+  mutable IdentifierInfo *ReflectMethodNoWritePersistentName = nullptr;
+  /// The identifier '__reflect_method_ptr_func_id'.
+  mutable IdentifierInfo *ReflectMethodPtrFuncIdName = nullptr;
+  /// The identifier '__reflect_method_rv'.
+  mutable IdentifierInfo *ReflectMethodRvName = nullptr;
+  /// The identifier '__reflect_method_ptr_rv'.
+  mutable IdentifierInfo *ReflectMethodPtrRvName = nullptr;
+  /// The identifier '__reflect_method_arg_struct'.
+  mutable IdentifierInfo *ReflectMethodArgStructName = nullptr;
+  /// The identifier '__reflect_method_ptr_arg_struct'.
+  mutable IdentifierInfo *ReflectMethodPtrArgStructName = nullptr;
+  /// The identifier '__reflect_smart_interface'.
+  mutable IdentifierInfo *ReflectSmartInterfaceName = nullptr;
+  /// The identifier '__reflect_proxy'.
+  mutable IdentifierInfo *ReflectProxyName = nullptr;
+  /// The identifier '__reflect_method_ptr'.
+  mutable IdentifierInfo *ReflectMethodPtrName = nullptr;
+  /// The identifier '__reflect_interface_has_pubkey'.
+  mutable IdentifierInfo *ReflectInterfaceHasPubkeyName = nullptr;
+  /// The identifier '__reflect_interface_has_timestamp'.
+  mutable IdentifierInfo *ReflectInterfaceHasTimestampName = nullptr;
+  /// The identifier '__reflect_interface_has_expire'.
+  mutable IdentifierInfo *ReflectInterfaceHasExpireName = nullptr;
+  /// The identifier '__reflect_signature_func_id'.
+  mutable IdentifierInfo *ReflectSignatureFuncIdName = nullptr;
+  /// The identifier '__reflect_echo'.
+  mutable IdentifierInfo *ReflectEchoName = nullptr;
+  // TVM local end
+
   // Typedefs which may be provided defining the structure of Objective-C
   // pseudo-builtins
   QualType ObjCIdRedefinitionType;
   QualType ObjCClassRedefinitionType;
   QualType ObjCSelRedefinitionType;
+
+ // TVM local begin
+  QualType TVMTuples[256];
+  QualType TVMTuplePop;
+  // TVM local end
 
   /// The identifier 'bool'.
   mutable IdentifierInfo *BoolName = nullptr;
@@ -581,6 +658,41 @@ private:
   mutable BuiltinTemplateDecl *MakeIntegerSeqDecl = nullptr;
   mutable BuiltinTemplateDecl *TypePackElementDecl = nullptr;
 
+  // TVM local begin
+  mutable BuiltinTemplateDecl *ReflectFieldDecl = nullptr;
+  mutable BuiltinTemplateDecl *ReflectFieldsCountDecl = nullptr;
+  mutable BuiltinTemplateDecl *ReflectMethodsCountDecl = nullptr;
+  mutable BuiltinTemplateDecl *ReflectMethodNameDecl = nullptr;
+  mutable BuiltinTemplateDecl *ReflectMethodPtrNameDecl = nullptr;
+  mutable BuiltinTemplateDecl *ReflectReturnNameDecl = nullptr;
+  mutable BuiltinTemplateDecl *ReflectMethodFuncIdDecl = nullptr;
+  mutable BuiltinTemplateDecl *ReflectMethodInternalDecl = nullptr;
+  mutable BuiltinTemplateDecl *ReflectMethodPtrInternalDecl = nullptr;
+  mutable BuiltinTemplateDecl *ReflectMethodAnswerIdDecl = nullptr;
+  mutable BuiltinTemplateDecl *ReflectMethodPtrAnswerIdDecl = nullptr;
+  mutable BuiltinTemplateDecl *ReflectMethodExternalDecl = nullptr;
+  mutable BuiltinTemplateDecl *ReflectMethodGetterDecl = nullptr;
+  mutable BuiltinTemplateDecl *ReflectMethodNoAcceptDecl = nullptr;
+  mutable BuiltinTemplateDecl *ReflectMethodImplicitFuncIdDecl = nullptr;
+  mutable BuiltinTemplateDecl *ReflectMethodDynChainParseDecl = nullptr;
+  mutable BuiltinTemplateDecl *ReflectMethodDeployDecl = nullptr;
+  mutable BuiltinTemplateDecl *ReflectMethodNoReadPersistentDecl = nullptr;
+  mutable BuiltinTemplateDecl *ReflectMethodNoWritePersistentDecl = nullptr;
+  mutable BuiltinTemplateDecl *ReflectMethodPtrFuncIdDecl = nullptr;
+  mutable BuiltinTemplateDecl *ReflectMethodRvDecl = nullptr;
+  mutable BuiltinTemplateDecl *ReflectMethodPtrRvDecl = nullptr;
+  mutable BuiltinTemplateDecl *ReflectMethodArgStructDecl = nullptr;
+  mutable BuiltinTemplateDecl *ReflectMethodPtrArgStructDecl = nullptr;
+  mutable BuiltinTemplateDecl *ReflectSmartInterfaceDecl = nullptr;
+  mutable BuiltinTemplateDecl *ReflectProxyDecl = nullptr;
+  mutable BuiltinTemplateDecl *ReflectMethodPtrDecl = nullptr;
+  mutable BuiltinTemplateDecl *ReflectInterfaceHasPubkeyDecl = nullptr;
+  mutable BuiltinTemplateDecl *ReflectInterfaceHasTimestampDecl = nullptr;
+  mutable BuiltinTemplateDecl *ReflectInterfaceHasExpireDecl = nullptr;
+  mutable BuiltinTemplateDecl *ReflectSignatureFuncIdDecl = nullptr;
+  mutable BuiltinTemplateDecl *ReflectEchoDecl = nullptr;
+  // TVM local end
+
   /// The associated SourceManager object.
   SourceManager &SourceMgr;
 
@@ -627,6 +739,10 @@ private:
   DeclListNode *ListNodeFreeList = nullptr;
 
 public:
+  // TVM local begin
+  static constexpr unsigned TVM_max_tuple_size = 255;
+  // TVM local end
+
   IdentifierTable &Idents;
   SelectorTable &Selectors;
   Builtin::Context &BuiltinInfo;
@@ -1073,6 +1189,41 @@ public:
   BuiltinTemplateDecl *getMakeIntegerSeqDecl() const;
   BuiltinTemplateDecl *getTypePackElementDecl() const;
 
+ // TVM local begin
+  BuiltinTemplateDecl *getReflectFieldDecl() const;
+  BuiltinTemplateDecl *getReflectFieldsCountDecl() const;
+  BuiltinTemplateDecl *getReflectMethodsCountDecl() const;
+  BuiltinTemplateDecl *getReflectMethodNameDecl() const;
+  BuiltinTemplateDecl *getReflectMethodPtrNameDecl() const;
+  BuiltinTemplateDecl *getReflectReturnNameDecl() const;
+  BuiltinTemplateDecl *getReflectMethodFuncIdDecl() const;
+  BuiltinTemplateDecl *getReflectMethodInternalDecl() const;
+  BuiltinTemplateDecl *getReflectMethodPtrInternalDecl() const;
+  BuiltinTemplateDecl *getReflectMethodAnswerIdDecl() const;
+  BuiltinTemplateDecl *getReflectMethodPtrAnswerIdDecl() const;
+  BuiltinTemplateDecl *getReflectMethodExternalDecl() const;
+  BuiltinTemplateDecl *getReflectMethodGetterDecl() const;
+  BuiltinTemplateDecl *getReflectMethodNoAcceptDecl() const;
+  BuiltinTemplateDecl *getReflectMethodImplicitFuncIdDecl() const;
+  BuiltinTemplateDecl *getReflectMethodDynChainParseDecl() const;
+  BuiltinTemplateDecl *getReflectMethodDeployDecl() const;
+  BuiltinTemplateDecl *getReflectMethodNoReadPersistentDecl() const;
+  BuiltinTemplateDecl *getReflectMethodNoWritePersistentDecl() const;
+  BuiltinTemplateDecl *getReflectMethodPtrFuncIdDecl() const;
+  BuiltinTemplateDecl *getReflectMethodRvDecl() const;
+  BuiltinTemplateDecl *getReflectMethodPtrRvDecl() const;
+  BuiltinTemplateDecl *getReflectMethodArgStructDecl() const;
+  BuiltinTemplateDecl *getReflectMethodPtrArgStructDecl() const;
+  BuiltinTemplateDecl *getReflectSmartInterfaceDecl() const;
+  BuiltinTemplateDecl *getReflectProxyDecl() const;
+  BuiltinTemplateDecl *getReflectMethodPtrDecl() const;
+  BuiltinTemplateDecl *getReflectInterfaceHasPubkeyDecl() const;
+  BuiltinTemplateDecl *getReflectInterfaceHasTimestampDecl() const;
+  BuiltinTemplateDecl *getReflectInterfaceHasExpireDecl() const;
+  BuiltinTemplateDecl *getReflectSignatureFuncIdDecl() const;
+  BuiltinTemplateDecl *getReflectEchoDecl() const;
+  // TVM local end
+
   // Builtin Types.
   CanQualType VoidTy;
   CanQualType BoolTy;
@@ -1133,6 +1284,10 @@ public:
   CanQualType SingletonId;
 #include "llvm/IR/EllipticCurveTypes.def"
 
+ // TVM local begin
+  CanQualType TVMSliceTy, TVMBuilderTy, TVMCellTy, TVMTupleTy;
+  // TVM local end
+
   // Types for deductions in C++0x [stmt.ranged]'s desugaring. Built on demand.
   mutable QualType AutoDeductTy;     // Deduction against 'auto'.
   mutable QualType AutoRRefDeductTy; // Deduction against 'auto &&'.
@@ -1189,14 +1344,16 @@ public:
 
   BuiltinTemplateDecl *buildBuiltinTemplateDecl(BuiltinTemplateKind BTK,
                                                 const IdentifierInfo *II) const;
+  /// Create a new implicit TU-level typedef declaration.
+  TypedefDecl *buildImplicitTypedef(QualType T, StringRef Name) const;
 
+ // TVM local begin
   /// Create a new implicit TU-level CXXRecordDecl or RecordDecl
   /// declaration.
   RecordDecl *buildImplicitRecord(StringRef Name,
-                                  RecordDecl::TagKind TK = TTK_Struct) const;
-
-  /// Create a new implicit TU-level typedef declaration.
-  TypedefDecl *buildImplicitTypedef(QualType T, StringRef Name) const;
+                                  RecordDecl::TagKind TK = TTK_Struct,
+                                  SourceLocation Loc = {}) const;
+  // TVM local end
 
   /// Retrieve the declaration for the 128-bit signed integer type.
   TypedefDecl *getInt128Decl() const;
@@ -1277,6 +1434,33 @@ public:
   /// It can be reasonably expected that this will always be equivalent to
   /// calling T.withConst().
   QualType getConstType(QualType T) const { return T.withConst(); }
+
+  // TVM local begin
+  /// Return the unique reference to a structure type
+  /// of the specified element type (equal type fields) and size.
+  ///
+  /// \pre \p ElemType must be a built-in type.
+  QualType getSplatStructType(QualType ElemType, unsigned NumFields,
+                              StringRef StructName, StringRef FieldName) const;
+
+  /// Creating { tuple, i257 } literal struct for tvm tpop result
+  QualType prepareTVMTuplePopStructType(StringRef StructName) const;
+
+  /// Creating literal struct with Elems
+  ///  (for builtin functions with struct returns)
+  QualType prepareTVMLiteralStructType(ArrayRef<QualType> Elems,
+                                       StringRef ElemsStr) const;
+
+  /// Creating struct with combined arguments for Method (without `this`)
+  QualType prepareTVMArgumentsStructType(const CXXMethodDecl *Method,
+                                         SourceLocation Loc) const;
+  QualType getTVMArgumentsStructType(const CXXMethodDecl *Method,
+                                     SourceLocation Loc) const;
+
+  /// Creating struct with adapted smart interface for contract interface
+  QualType prepareTVMSmartInterfaceType(CXXRecordDecl *Rec) const;
+  QualType getTVMSmartInterfaceType(CXXRecordDecl *Rec) const;
+  // TVM local end
 
   /// Change the ExtInfo on a function type.
   const FunctionType *adjustFunctionType(const FunctionType *Fn,
@@ -1832,6 +2016,15 @@ public:
     ObjCIdRedefinitionType = RedefType;
   }
 
+  // TVM local begin
+  QualType getTVMTuple(unsigned Size) const {
+    assert(Size > 0 && Size < 256 && "Wrong size for TVMTuple");
+    return TVMTuples[Size - 1];
+  }
+
+  QualType getTVMTuplePop() const { return TVMTuplePop; }
+  // TVM local end
+
   /// Retrieve the type that \c Class has been defined to, which may be
   /// different from the built-in \c Class if \c Class has been typedef'd.
   QualType getObjCClassRedefinitionType() const {
@@ -1898,6 +2091,210 @@ public:
       TypePackElementName = &Idents.get("__type_pack_element");
     return TypePackElementName;
   }
+
+ // TVM local begin
+  IdentifierInfo *getReflectFieldName() const {
+    if (!ReflectFieldName)
+      ReflectFieldName = &Idents.get("__reflect_field");
+    return ReflectFieldName;
+  }
+
+  IdentifierInfo *getReflectFieldsCountName() const {
+    if (!ReflectFieldsCountName)
+      ReflectFieldsCountName = &Idents.get("__reflect_fields_count");
+    return ReflectFieldsCountName;
+  }
+
+  IdentifierInfo *getReflectMethodsCountName() const {
+    if (!ReflectMethodsCountName)
+      ReflectMethodsCountName = &Idents.get("__reflect_methods_count");
+    return ReflectMethodsCountName;
+  }
+
+  IdentifierInfo *getReflectMethodNameName() const {
+    if (!ReflectMethodNameName)
+      ReflectMethodNameName = &Idents.get("__reflect_method_name");
+    return ReflectMethodNameName;
+  }
+
+  IdentifierInfo *getReflectMethodPtrNameName() const {
+    if (!ReflectMethodPtrNameName)
+      ReflectMethodPtrNameName = &Idents.get("__reflect_method_ptr_name");
+    return ReflectMethodPtrNameName;
+  }
+
+  IdentifierInfo *getReflectReturnNameName() const {
+    if (!ReflectReturnNameName)
+      ReflectReturnNameName = &Idents.get("__reflect_return_name");
+    return ReflectReturnNameName;
+  }
+
+  IdentifierInfo *getReflectMethodFuncIdName() const {
+    if (!ReflectMethodFuncIdName)
+      ReflectMethodFuncIdName = &Idents.get("__reflect_method_func_id");
+    return ReflectMethodFuncIdName;
+  }
+
+  IdentifierInfo *getReflectMethodInternalName() const {
+    if (!ReflectMethodInternalName)
+      ReflectMethodInternalName = &Idents.get("__reflect_method_internal");
+    return ReflectMethodInternalName;
+  }
+
+  IdentifierInfo *getReflectMethodPtrInternalName() const {
+    if (!ReflectMethodPtrInternalName)
+      ReflectMethodPtrInternalName =
+          &Idents.get("__reflect_method_ptr_internal");
+    return ReflectMethodPtrInternalName;
+  }
+
+  IdentifierInfo *getReflectMethodAnswerIdName() const {
+    if (!ReflectMethodAnswerIdName)
+      ReflectMethodAnswerIdName = &Idents.get("__reflect_method_answer_id");
+    return ReflectMethodAnswerIdName;
+  }
+
+  IdentifierInfo *getReflectMethodPtrAnswerIdName() const {
+    if (!ReflectMethodPtrAnswerIdName)
+      ReflectMethodPtrAnswerIdName =
+          &Idents.get("__reflect_method_ptr_answer_id");
+    return ReflectMethodPtrAnswerIdName;
+  }
+
+  IdentifierInfo *getReflectMethodExternalName() const {
+    if (!ReflectMethodExternalName)
+      ReflectMethodExternalName = &Idents.get("__reflect_method_external");
+    return ReflectMethodExternalName;
+  }
+
+  IdentifierInfo *getReflectMethodGetterName() const {
+    if (!ReflectMethodGetterName)
+      ReflectMethodGetterName = &Idents.get("__reflect_method_getter");
+    return ReflectMethodGetterName;
+  }
+
+  IdentifierInfo *getReflectMethodNoAcceptName() const {
+    if (!ReflectMethodNoAcceptName)
+      ReflectMethodNoAcceptName = &Idents.get("__reflect_method_noaccept");
+    return ReflectMethodNoAcceptName;
+  }
+
+  IdentifierInfo *getReflectMethodImplicitFuncIdName() const {
+    if (!ReflectMethodImplicitFuncIdName)
+      ReflectMethodImplicitFuncIdName =
+          &Idents.get("__reflect_method_implicit_func_id");
+    return ReflectMethodImplicitFuncIdName;
+  }
+
+  IdentifierInfo *getReflectMethodDynChainParseName() const {
+    if (!ReflectMethodDynChainParseName)
+      ReflectMethodDynChainParseName =
+          &Idents.get("__reflect_method_dyn_chain_parse");
+    return ReflectMethodDynChainParseName;
+  }
+
+  IdentifierInfo *getReflectMethodDeployName() const {
+    if (!ReflectMethodDeployName)
+      ReflectMethodDeployName = &Idents.get("__reflect_method_deploy");
+    return ReflectMethodDeployName;
+  }
+
+  IdentifierInfo *getReflectMethodNoReadPersistentName() const {
+    if (!ReflectMethodNoReadPersistentName)
+      ReflectMethodNoReadPersistentName =
+          &Idents.get("__reflect_method_no_read_persistent");
+    return ReflectMethodNoReadPersistentName;
+  }
+
+  IdentifierInfo *getReflectMethodNoWritePersistentName() const {
+    if (!ReflectMethodNoWritePersistentName)
+      ReflectMethodNoWritePersistentName =
+          &Idents.get("__reflect_method_no_write_persistent");
+    return ReflectMethodNoWritePersistentName;
+  }
+
+  IdentifierInfo *getReflectMethodPtrFuncIdName() const {
+    if (!ReflectMethodPtrFuncIdName)
+      ReflectMethodPtrFuncIdName = &Idents.get("__reflect_method_ptr_func_id");
+    return ReflectMethodPtrFuncIdName;
+  }
+
+  IdentifierInfo *getReflectMethodRvName() const {
+    if (!ReflectMethodRvName)
+      ReflectMethodRvName = &Idents.get("__reflect_method_rv");
+    return ReflectMethodRvName;
+  }
+
+  IdentifierInfo *getReflectMethodPtrRvName() const {
+    if (!ReflectMethodPtrRvName)
+      ReflectMethodPtrRvName = &Idents.get("__reflect_method_ptr_rv");
+    return ReflectMethodPtrRvName;
+  }
+
+  IdentifierInfo *getReflectMethodArgStructName() const {
+    if (!ReflectMethodArgStructName)
+      ReflectMethodArgStructName = &Idents.get("__reflect_method_arg_struct");
+    return ReflectMethodArgStructName;
+  }
+
+  IdentifierInfo *getReflectMethodPtrArgStructName() const {
+    if (!ReflectMethodPtrArgStructName)
+      ReflectMethodPtrArgStructName =
+          &Idents.get("__reflect_method_ptr_arg_struct");
+    return ReflectMethodPtrArgStructName;
+  }
+
+  IdentifierInfo *getReflectSmartInterfaceName() const {
+    if (!ReflectSmartInterfaceName)
+      ReflectSmartInterfaceName = &Idents.get("__reflect_smart_interface");
+    return ReflectSmartInterfaceName;
+  }
+
+  IdentifierInfo *getReflectProxyName() const {
+    if (!ReflectProxyName)
+      ReflectProxyName = &Idents.get("__reflect_proxy");
+    return ReflectProxyName;
+  }
+
+  IdentifierInfo *getReflectMethodPtrName() const {
+    if (!ReflectMethodPtrName)
+      ReflectMethodPtrName = &Idents.get("__reflect_method_ptr");
+    return ReflectMethodPtrName;
+  }
+
+  IdentifierInfo *getReflectInterfaceHasPubkeyName() const {
+    if (!ReflectInterfaceHasPubkeyName)
+      ReflectInterfaceHasPubkeyName =
+          &Idents.get("__reflect_interface_has_pubkey");
+    return ReflectInterfaceHasPubkeyName;
+  }
+
+  IdentifierInfo *getReflectInterfaceHasTimestampName() const {
+    if (!ReflectInterfaceHasTimestampName)
+      ReflectInterfaceHasTimestampName =
+          &Idents.get("__reflect_interface_has_timestamp");
+    return ReflectInterfaceHasTimestampName;
+  }
+
+  IdentifierInfo *getReflectInterfaceHasExpireName() const {
+    if (!ReflectInterfaceHasExpireName)
+      ReflectInterfaceHasExpireName =
+          &Idents.get("__reflect_interface_has_expire");
+    return ReflectInterfaceHasExpireName;
+  }
+
+  IdentifierInfo *getReflectSignatureFuncIdName() const {
+    if (!ReflectSignatureFuncIdName)
+      ReflectSignatureFuncIdName = &Idents.get("__reflect_signature_func_id");
+    return ReflectSignatureFuncIdName;
+  }
+
+  IdentifierInfo *getReflectEchoName() const {
+    if (!ReflectEchoName)
+      ReflectEchoName = &Idents.get("__reflect_echo");
+    return ReflectEchoName;
+  }
+  // TVM local end
 
   /// Retrieve the Objective-C "instancetype" type, if already known;
   /// otherwise, returns a NULL type;
@@ -2285,7 +2682,10 @@ public:
   }
 
   /// Convert a size in bits to a size in characters.
-  CharUnits toCharUnitsFromBits(int64_t BitSize) const;
+  //CharUnits toCharUnitsFromBits(int64_t BitSize) const;
+
+  /// Convert a size in bits to a size in characters.
+  CharUnits toCharUnitsFromBits(int64_t BitSize, bool Trunc = true) const;
 
   /// Convert a size in characters to a size in bits.
   int64_t toBits(CharUnits CharSize) const;

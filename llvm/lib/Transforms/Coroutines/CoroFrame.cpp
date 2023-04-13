@@ -28,6 +28,9 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/IntrinsicInst.h"
+// TVM local begin
+#include "llvm/IR/IntrinsicsTVM.h"
+// TVM local end
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/OptimizedStructLayout.h"
@@ -1181,7 +1184,14 @@ static StructType *buildFrameType(Function &F, coro::Shape &Shape,
 
     // Add a field to store the suspend index.  This doesn't need to
     // be in the header.
-    unsigned IndexBits = std::max(1U, Log2_64_Ceil(Shape.CoroSuspends.size()));
+//    unsigned IndexBits = std::max(1U, Log2_64_Ceil(Shape.CoroSuspends.size()));
+    // TVM local begin
+    // TODO: Without +1 bit here we have problem with interpretation of
+    // constants
+    //  as negatives
+    unsigned IndexBits =
+        std::max(1U, Log2_64_Ceil(Shape.CoroSuspends.size())) + 1;
+    // TVM local end
     Type *IndexType = Type::getIntNTy(C, IndexBits);
 
     SwitchIndexFieldId = B.addField(IndexType, std::nullopt);
@@ -2096,6 +2106,52 @@ static bool materializable(Instruction &V) {
          isa<BinaryOperator>(&V) || isa<CmpInst>(&V) || isa<SelectInst>(&V);
 }
 
+// Check for instructions that we can recreate on resume as opposed to spill
+// the result into a coroutine frame.
+// TVM local begin
+static bool materializable(Instruction &V, Value *ThisPtr) {
+  if (auto *II = dyn_cast<IntrinsicInst>(&V)) {
+    switch (II->getIntrinsicID()) {
+    default:
+      break;
+    case Intrinsic::tvm_pushnull:
+    case Intrinsic::tvm_pushslice_empty:
+    case Intrinsic::tvm_newc:
+    case Intrinsic::tvm_newdict:
+    case Intrinsic::tvm_cast_from_slice:
+    case Intrinsic::tvm_cast_from_builder:
+    case Intrinsic::tvm_cast_from_cell:
+    case Intrinsic::tvm_cast_from_tuple:
+    case Intrinsic::tvm_ctos:
+    case Intrinsic::tvm_stu:
+    case Intrinsic::tvm_sti:
+    case Intrinsic::tvm_stref:
+    case Intrinsic::tvm_stslice:
+      return true;
+    case Intrinsic::tvm_cast_to_slice:
+    case Intrinsic::tvm_cast_to_builder:
+    case Intrinsic::tvm_cast_to_cell:
+    case Intrinsic::tvm_cast_to_tuple: {
+      if (auto *SrcI = dyn_cast<Instruction>(V.getOperand(0)))
+        return materializable(*SrcI, ThisPtr);
+      return true;
+    }
+    }
+  }
+  // Rematerializing load from contract class data for TVM
+  if (auto *Load = dyn_cast<LoadInst>(&V)) {
+    auto *Ptr = Load->getPointerOperand()->stripInBoundsConstantOffsets();
+    if (Ptr == ThisPtr)
+      return true;
+  }
+  if (isa<Constant>(&V))
+    return true;
+
+  return isa<CastInst>(&V) || isa<GetElementPtrInst>(&V) ||
+         isa<BinaryOperator>(&V) || isa<CmpInst>(&V) || isa<SelectInst>(&V);
+}
+// TVM local end
+
 // Check for structural coroutine intrinsics that should not be spilled into
 // the coroutine frame.
 static bool isCoroutineStructureIntrinsic(Instruction &I) {
@@ -2786,12 +2842,26 @@ void coro::buildCoroutineFrame(Function &F, Shape &Shape) {
       // See if there are materializable instructions across suspend points.
       // FIXME: We can use a worklist to track the possible materialize
       // instructions instead of iterating the whole function again and again.
+      /*
       for (Instruction &I : instructions(F))
         if (materializable(I)) {
           for (User *U : I.users())
             if (Checker.isDefinitionAcrossSuspend(I, U))
               Spills[&I].push_back(cast<Instruction>(U));
         }
+      */
+
+      // TVM local begin
+      assert(
+          F.arg_size() >= 2 &&
+          "We only support coroutine methods in TVM (resumable sret + this)");
+      auto *ThisPtr = &*std::next(F.arg_begin());
+      for (Instruction &I : instructions(F))
+        if (materializable(I, ThisPtr))
+          for (User *U : I.users())
+            if (Checker.isDefinitionAcrossSuspend(I, U))
+              Spills[&I].push_back(cast<Instruction>(U));
+      // TVM local end
 
       if (Spills.empty())
         break;
@@ -2858,6 +2928,11 @@ void coro::buildCoroutineFrame(Function &F, Shape &Shape) {
         if (I.getType()->isTokenTy())
           report_fatal_error(
               "token definition is separated from the use by a suspend point");
+        // TVM local begin
+        if (I.getType()->isTVMTupleTy())
+          report_fatal_error("TVM tuple definition is separated from the use "
+                             "by a suspend point");
+        // TVM local end
         FrameData.Spills[&I].push_back(cast<Instruction>(U));
       }
   }

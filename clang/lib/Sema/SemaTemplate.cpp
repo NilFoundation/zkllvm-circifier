@@ -37,6 +37,10 @@
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
+// TVM local begin
+#include "picosha2.h"
+// TVM local end
+
 
 #include <iterator>
 #include <optional>
@@ -3590,12 +3594,105 @@ void Sema::NoteAllFoundTemplates(TemplateName Name) {
   }
 }
 
+// TVM local begin
+template <class AttrT>
+static QualType processFlagAttribute(
+    Sema &SemaRef, const SmallVectorImpl<TemplateArgument> &Converted,
+    SourceLocation TemplateLoc, TemplateArgumentListInfo &TemplateArgs) {
+  ASTContext &Context = SemaRef.getASTContext();
+  assert(Converted.size() == 4 &&
+         "__reflect_method_'attr_name'<T, IntType, Interface, Index>");
+  TemplateArgument IntType = Converted[1], InterfaceArg = Converted[2],
+                   IndexArg = Converted[3];
+  llvm::APSInt Index = IndexArg.getAsIntegral();
+  assert(Index >= 0 &&
+         "the index used with __reflect_method_'attr_name' should be "
+         "of type std::size_t, and hence be non-negative");
+  QualType InterfaceTy = InterfaceArg.getAsType();
+  const auto *Rec = InterfaceTy->getAsCXXRecordDecl();
+  if (!Rec) {
+    SemaRef.Diag(TemplateArgs[1].getLocation(),
+                 diag::err_reflect_method_not_struct_arg);
+    return QualType();
+  }
+  QualType IntTy = IntType.getAsType();
+  auto it = std::next(Rec->method_begin(),
+                      static_cast<int64_t>(Index.getZExtValue()));
+  assert(it != Rec->method_end() && "method not found by index");
+  llvm::APSInt Rv(static_cast<uint32_t>(Context.getTypeSize(IntTy)));
+  Rv = it->hasAttr<AttrT>();
+
+  TemplateArgumentListInfo SyntheticTemplateArgs;
+  SyntheticTemplateArgs.addArgument(TemplateArgs[1]);
+  TemplateArgument RvArg(Context, Rv, IntTy);
+  SyntheticTemplateArgs.addArgument(SemaRef.getTrivialTemplateArgumentLoc(
+      RvArg, IntTy, TemplateArgs[0].getLocation()));
+  return SemaRef.CheckTemplateIdType(Converted[0].getAsTemplate(), TemplateLoc,
+                                     SyntheticTemplateArgs);
+}
+
+template <class AttrT>
+static QualType processByPtrFlagAttribute(
+    Sema &SemaRef, const SmallVectorImpl<TemplateArgument> &Converted,
+    SourceLocation TemplateLoc, TemplateArgumentListInfo &TemplateArgs) {
+  ASTContext &Context = SemaRef.getASTContext();
+  assert(Converted.size() == 3 && "__reflect_method_ptr_'attr_name'<T, "
+                                  "IntType, Rv Interface::* MethodPtr>");
+  TemplateArgument IntType = Converted[1], MethodPtr = Converted[2];
+  const auto *Decl = MethodPtr.getAsDecl();
+  assert(Decl && "MethodPtr is not declaration");
+  assert(Decl->getAsFunction() && "MethodPtr is not a function");
+  QualType IntTy = IntType.getAsType();
+  llvm::APSInt Rv(static_cast<uint32_t>(Context.getTypeSize(IntTy)));
+  Rv = Decl->getAsFunction()->hasAttr<AttrT>();
+
+  TemplateArgumentListInfo SyntheticTemplateArgs;
+  SyntheticTemplateArgs.addArgument(TemplateArgs[1]);
+  TemplateArgument RvArg(Context, Rv, IntTy);
+  SyntheticTemplateArgs.addArgument(SemaRef.getTrivialTemplateArgumentLoc(
+      RvArg, IntTy, TemplateArgs[0].getLocation()));
+  return SemaRef.CheckTemplateIdType(Converted[0].getAsTemplate(), TemplateLoc,
+                                     SyntheticTemplateArgs);
+}
+
+static ExprResult
+buildMemberCall(Sema &S, Expr *Base, SourceLocation Loc, StringRef Name,
+                MultiExprArg Args,
+                const TemplateArgumentListInfo *TemplateArgs) {
+  DeclarationNameInfo NameInfo(&S.PP.getIdentifierTable().get(Name), Loc);
+
+  CXXScopeSpec SS;
+  ExprResult Result = S.BuildMemberReferenceExpr(
+      Base, Base->getType(), Loc, /*IsPtr=*/true, SS, SourceLocation(), nullptr,
+      NameInfo, TemplateArgs,
+      /*Scope=*/nullptr);
+  if (Result.isInvalid())
+    return ExprError();
+
+  // We meant exactly what we asked for. No need for typo correction.
+  if (auto *TE = dyn_cast<TypoExpr>(Result.get())) {
+    S.clearDelayedTypo(TE);
+    S.Diag(Loc, diag::err_no_member)
+        << NameInfo.getName() << Base->getType()->getAsCXXRecordDecl()
+        << Base->getSourceRange();
+    return ExprError();
+  }
+
+  return S.ActOnCallExpr(nullptr, Result.get(), Loc, Args, Loc, nullptr);
+}
+// TVM local end
+
 static QualType
 checkBuiltinTemplateIdType(Sema &SemaRef, BuiltinTemplateDecl *BTD,
                            ArrayRef<TemplateArgument> Converted,
                            SourceLocation TemplateLoc,
                            TemplateArgumentListInfo &TemplateArgs) {
   ASTContext &Context = SemaRef.getASTContext();
+
+  // TVM local begin
+  unsigned CustomDiagID =
+      SemaRef.getDiagnostics().getCustomDiagID(DiagnosticsEngine::Error, "%0");
+  // TVM local end
 
   switch (BTD->getBuiltinTemplateKind()) {
   case BTK__make_integer_seq: {
@@ -3645,13 +3742,12 @@ checkBuiltinTemplateIdType(Sema &SemaRef, BuiltinTemplateDecl *BTD,
     return SemaRef.CheckTemplateIdType(Converted[0].getAsTemplate(),
                                        TemplateLoc, SyntheticTemplateArgs);
   }
-
-  case BTK__type_pack_element:
-    // Specializations of
-    //    __type_pack_element<Index, T_1, ..., T_N>
-    // are treated like T_Index.
-    assert(Converted.size() == 2 &&
-      "__type_pack_element should be given an index and a parameter pack");
+  case BTK__type_pack_element: {
+      // Specializations of
+      //    __type_pack_element<Index, T_1, ..., T_N>
+      // are treated like T_Index.
+      assert(Converted.size() == 2 &&
+           "__type_pack_element should be given an index and a parameter pack");
 
     TemplateArgument IndexArg = Converted[0], Ts = Converted[1];
     if (IndexArg.isDependent() || Ts.isDependent())
@@ -3667,11 +3763,815 @@ checkBuiltinTemplateIdType(Sema &SemaRef, BuiltinTemplateDecl *BTD,
                    diag::err_type_pack_element_out_of_bounds);
       return QualType();
     }
-
     // We simply return the type at index `Index`.
     int64_t N = Index.getExtValue();
     return Ts.getPackAsArray()[N].getAsType();
   }
+
+  // TVM local begin
+  case BTK__reflect_field: {
+    // __reflect_field<SubTemplate, Struct, FieldIdx> ==>
+    //     SubTemplate<FieldName[0], FieldName[1], ..., FieldName[N-1]>
+    assert(Converted.size() == 3 && "__reflect_field should be given a "
+                                    "SubTemplate, structure and field index");
+    TemplateArgument StructArg = Converted[1], IndexArg = Converted[2];
+    llvm::APSInt Index = IndexArg.getAsIntegral();
+    assert(Index >= 0 && "the index used with __reflect_field should be of "
+                         "type std::size_t, and hence be non-negative");
+
+    QualType ArgTy = StructArg.getAsType();
+    const auto *Rec = ArgTy->getAsCXXRecordDecl();
+    if (!Rec) {
+      SemaRef.Diag(TemplateArgs[1].getLocation(),
+                   diag::err_reflect_field_not_struct_arg);
+      return QualType();
+    }
+    CXXCastPath BasePath;
+    Rec = SemaRef.FindDecomposableBaseClass(TemplateLoc, Rec, BasePath);
+    auto N = count_if(Rec->fields(), [](auto) { return true; });
+    if (Index >= N) {
+      SemaRef.Diag(TemplateArgs[1].getLocation(),
+                   diag::err_reflect_field_big_index);
+      return QualType();
+    }
+    auto FieldIt = std::next(Rec->fields().begin(),
+                             static_cast<ptrdiff_t>(Index.getZExtValue()));
+    auto Name = FieldIt->getName();
+    auto ChTy = Context.CharTy;
+
+    llvm::APSInt NameLen = Index;
+    NameLen = Name.size();
+
+    TemplateArgumentListInfo SyntheticTemplateArgs;
+    // Expand Name into Name[0] ... Name[N-1].
+    for (unsigned i = 0; i < NameLen; ++i) {
+      llvm::APSInt Ch(static_cast<uint32_t>(Context.getCharWidth()));
+      Ch = static_cast<unsigned char>(Name[i]);
+      TemplateArgument TA(Context, Ch, ChTy);
+      SyntheticTemplateArgs.addArgument(SemaRef.getTrivialTemplateArgumentLoc(
+          TA, ChTy, TemplateArgs[0].getLocation()));
+    }
+    // The first template argument will be reused as the template decl that
+    // our synthetic template arguments will be applied to.
+    return SemaRef.CheckTemplateIdType(Converted[0].getAsTemplate(),
+                                       TemplateLoc, SyntheticTemplateArgs);
+  }
+  case BTK__reflect_fields_count: {
+    // __reflect_fields_count<SubTemplate, IntType, Struct> ==>
+    //     SubTemplate<IntType, FieldsCount>
+    assert(Converted.size() == 3 &&
+           "__reflect_fields_count<SubTemplate, IntType, Struct>");
+    TemplateArgument IntType = Converted[1], Struct = Converted[2];
+    QualType ArgTy = Struct.getAsType();
+    const auto *Rec = ArgTy->getAsCXXRecordDecl();
+    if (!Rec) {
+      SemaRef.Diag(TemplateArgs[2].getLocation(),
+                   diag::err_reflect_method_not_struct_arg);
+      return QualType();
+    }
+    QualType IntTy = IntType.getAsType();
+    CXXCastPath BasePath;
+    Rec = SemaRef.FindDecomposableBaseClass(TemplateLoc, Rec, BasePath);
+    auto FieldsVal = llvm::count_if(Rec->fields(), [](auto) { return true; });
+    llvm::APSInt FieldsNum(static_cast<uint32_t>(Context.getTypeSize(IntTy)));
+    FieldsNum = static_cast<uint64_t>(FieldsVal);
+    TemplateArgumentListInfo SyntheticTemplateArgs;
+    SyntheticTemplateArgs.addArgument(TemplateArgs[1]);
+    TemplateArgument FieldsCountArg(Context, FieldsNum, IntTy);
+    SyntheticTemplateArgs.addArgument(SemaRef.getTrivialTemplateArgumentLoc(
+        FieldsCountArg, IntTy, TemplateArgs[0].getLocation()));
+    return SemaRef.CheckTemplateIdType(Converted[0].getAsTemplate(),
+                                       TemplateLoc, SyntheticTemplateArgs);
+  }
+  case BTK__reflect_methods_count: {
+    // __reflect_methods_count<SubTemplate, IntType, Interface> ==>
+    //     SubTemplate<IntType, MethodsCount>
+    assert(Converted.size() == 3 &&
+           "__reflect_methods_count<SubTemplate, IntType, Interface>");
+    TemplateArgument IntType = Converted[1], Interface = Converted[2];
+    QualType ArgTy = Interface.getAsType();
+    const auto *Rec = ArgTy->getAsCXXRecordDecl();
+    if (!Rec) {
+      SemaRef.Diag(TemplateArgs[2].getLocation(),
+                   diag::err_reflect_method_not_struct_arg);
+      return QualType();
+    }
+    QualType IntTy = IntType.getAsType();
+    auto MethodsVal = std::count_if(
+        Rec->method_begin(), Rec->method_end(),
+        [](const CXXMethodDecl *Meth) { return !Meth->isImplicit(); });
+    llvm::APSInt MethodsNum(
+        static_cast<uint32_t>(Context.getTypeSize(IntTy)));
+    MethodsNum = static_cast<uint64_t>(MethodsVal);
+    TemplateArgumentListInfo SyntheticTemplateArgs;
+    SyntheticTemplateArgs.addArgument(TemplateArgs[1]);
+    TemplateArgument MethodsCountArg(Context, MethodsNum, IntTy);
+    SyntheticTemplateArgs.addArgument(SemaRef.getTrivialTemplateArgumentLoc(
+        MethodsCountArg, IntTy, TemplateArgs[0].getLocation()));
+    // The first template argument will be reused as the template decl that
+    // our synthetic template arguments will be applied to.
+    return SemaRef.CheckTemplateIdType(Converted[0].getAsTemplate(),
+                                       TemplateLoc, SyntheticTemplateArgs);
+  }
+  case BTK__reflect_method_name: {
+    // __reflect_method_name<T, Interface, MethodIdx> ==>
+    //     T<MethodName[0], MethodName[1], ..., MethodName[N-1]>
+    assert(Converted.size() == 3 && "__reflect_method_name should be given a "
+                                    "T, Interface and method index");
+    TemplateArgument InterfaceArg = Converted[1], IndexArg = Converted[2];
+    llvm::APSInt Index = IndexArg.getAsIntegral();
+    assert(Index >= 0 &&
+           "the index used with __reflect_method_name should be "
+           "of type std::size_t, and hence be non-negative");
+
+    QualType InterfaceTy = InterfaceArg.getAsType();
+    const auto *Rec = InterfaceTy->getAsCXXRecordDecl();
+    if (!Rec) {
+      SemaRef.Diag(TemplateArgs[1].getLocation(),
+                   diag::err_reflect_method_not_struct_arg);
+      return QualType();
+    }
+    auto it = std::next(Rec->method_begin(),
+                        static_cast<int64_t>(Index.getZExtValue()));
+    assert(it != Rec->method_end() && "method not found by index");
+    auto Name = it->getName();
+    auto ChTy = Context.CharTy;
+    llvm::APSInt NameLen = Index;
+    NameLen = Name.size();
+
+    TemplateArgumentListInfo SyntheticTemplateArgs;
+    // Expand Name into Name[0] ... Name[N-1].
+    for (unsigned i = 0; i < NameLen; ++i) {
+      llvm::APSInt Ch(static_cast<uint32_t>(Context.getCharWidth()));
+      Ch = static_cast<unsigned char>(Name[i]);
+      TemplateArgument TA(Context, Ch, ChTy);
+      SyntheticTemplateArgs.addArgument(SemaRef.getTrivialTemplateArgumentLoc(
+          TA, ChTy, TemplateArgs[0].getLocation()));
+    }
+    // The first template argument will be reused as the template decl that
+    // our synthetic template arguments will be applied to.
+    return SemaRef.CheckTemplateIdType(Converted[0].getAsTemplate(),
+                                       TemplateLoc, SyntheticTemplateArgs);
+  }
+  case BTK__reflect_method_ptr_name: {
+    // __reflect_method_ptr_name<T, MethodPtr> ==>
+    //     T<MethodName[0], MethodName[1], ..., MethodName[N-1]>
+    assert(Converted.size() == 2 &&
+           "__reflect_method_ptr_name<T, MethodPtr>");
+    TemplateArgument MethodPtr = Converted[1];
+    const auto *Decl = MethodPtr.getAsDecl();
+    assert(Decl && "MethodPtr is not declaration");
+    assert(Decl->getAsFunction() && "MethodPtr is not a function");
+    auto Name = Decl->getName();
+    auto ChTy = Context.CharTy;
+    unsigned NameLen = static_cast<unsigned>(Name.size());
+
+    TemplateArgumentListInfo SyntheticTemplateArgs;
+    // Expand Name into Name[0] ... Name[N-1].
+    for (unsigned i = 0; i < NameLen; ++i) {
+      llvm::APSInt Ch(static_cast<uint32_t>(Context.getCharWidth()));
+      Ch = static_cast<unsigned char>(Name[i]);
+      TemplateArgument TA(Context, Ch, ChTy);
+      SyntheticTemplateArgs.addArgument(SemaRef.getTrivialTemplateArgumentLoc(
+          TA, ChTy, TemplateArgs[0].getLocation()));
+    }
+    // The first template argument will be reused as the template decl that
+    // our synthetic template arguments will be applied to.
+    return SemaRef.CheckTemplateIdType(Converted[0].getAsTemplate(),
+                                       TemplateLoc, SyntheticTemplateArgs);
+  }
+  case BTK__reflect_return_name: {
+    // __reflect_return_name<T, Interface, MethodIdx> ==>
+    //     T<MethodName[0], MethodName[1], ..., MethodName[N-1]>
+    assert(Converted.size() == 3 && "__reflect_return_name should be given a "
+                                    "T, Interface and method index");
+    TemplateArgument InterfaceArg = Converted[1], IndexArg = Converted[2];
+    llvm::APSInt Index = IndexArg.getAsIntegral();
+    assert(Index >= 0 &&
+           "the index used with __reflect_return_name should be "
+           "of type std::size_t, and hence be non-negative");
+
+    QualType InterfaceTy = InterfaceArg.getAsType();
+    const auto *Rec = InterfaceTy->getAsCXXRecordDecl();
+    if (!Rec) {
+      SemaRef.Diag(TemplateArgs[1].getLocation(),
+                   diag::err_reflect_method_not_struct_arg);
+      return QualType();
+    }
+    auto it = std::next(Rec->method_begin(),
+                        static_cast<int64_t>(Index.getZExtValue()));
+    assert(it != Rec->method_end() && "method not found by index");
+    StringRef Name = "";
+    if (const auto *Attr = it->getAttr<TVMReturnNameFuncAttr>())
+      Name = Attr->getReturnName();
+    auto ChTy = Context.CharTy;
+    llvm::APSInt NameLen = Index;
+    NameLen = Name.size();
+
+    TemplateArgumentListInfo SyntheticTemplateArgs;
+    // Expand Name into Name[0] ... Name[N-1].
+    for (unsigned i = 0; i < NameLen; ++i) {
+      llvm::APSInt Ch(static_cast<uint32_t>(Context.getCharWidth()));
+      Ch = static_cast<unsigned char>(Name[i]);
+      TemplateArgument TA(Context, Ch, ChTy);
+      SyntheticTemplateArgs.addArgument(SemaRef.getTrivialTemplateArgumentLoc(
+          TA, ChTy, TemplateArgs[0].getLocation()));
+    }
+    // The first template argument will be reused as the template decl that
+    // our synthetic template arguments will be applied to.
+    return SemaRef.CheckTemplateIdType(Converted[0].getAsTemplate(),
+                                       TemplateLoc, SyntheticTemplateArgs);
+  }
+  case BTK__reflect_method_func_id: {
+    // __reflect_method_func_id<T, IntType, Interface, Index> -
+    //   FuncID of the Interface method number #Index,
+    //   provided into T<IntType, FuncID>
+    assert(Converted.size() == 4 &&
+           "__reflect_method_func_id<T, IntType, Interface, Index>");
+    TemplateArgument IntType = Converted[1], InterfaceArg = Converted[2],
+                     IndexArg = Converted[3];
+    llvm::APSInt Index = IndexArg.getAsIntegral();
+    assert(Index >= 0 &&
+           "the index used with __reflect_method_func_id should be "
+           "of type std::size_t, and hence be non-negative");
+    QualType InterfaceTy = InterfaceArg.getAsType();
+    const auto *Rec = InterfaceTy->getAsCXXRecordDecl();
+    if (!Rec) {
+      SemaRef.Diag(TemplateArgs[1].getLocation(),
+                   diag::err_reflect_method_not_struct_arg);
+      return QualType();
+    }
+    QualType IntTy = IntType.getAsType();
+    auto it = std::next(Rec->method_begin(),
+                        static_cast<int64_t>(Index.getZExtValue()));
+    assert(it != Rec->method_end() && "method not found by index");
+    llvm::APSInt FuncId(static_cast<uint32_t>(Context.getTypeSize(IntTy)));
+    FuncId = it->getTVMFuncId();
+
+    TemplateArgumentListInfo SyntheticTemplateArgs;
+    SyntheticTemplateArgs.addArgument(TemplateArgs[1]);
+    TemplateArgument FuncIdArg(Context, FuncId, IntTy);
+    SyntheticTemplateArgs.addArgument(SemaRef.getTrivialTemplateArgumentLoc(
+        FuncIdArg, IntTy, TemplateArgs[0].getLocation()));
+    // The first template argument will be reused as the template decl that
+    // our synthetic template arguments will be applied to.
+    return SemaRef.CheckTemplateIdType(Converted[0].getAsTemplate(),
+                                       TemplateLoc, SyntheticTemplateArgs);
+  }
+  case BTK__reflect_method_internal:
+    return processFlagAttribute<TVMInternalFuncAttr>(
+        SemaRef, Converted, TemplateLoc, TemplateArgs);
+  case BTK__reflect_method_answer_id:
+    return processFlagAttribute<TVMAnswerIdFuncAttr>(
+        SemaRef, Converted, TemplateLoc, TemplateArgs);
+  case BTK__reflect_method_external:
+    return processFlagAttribute<TVMExternalFuncAttr>(
+        SemaRef, Converted, TemplateLoc, TemplateArgs);
+  case BTK__reflect_method_getter:
+    return processFlagAttribute<TVMGetterFuncAttr>(SemaRef, Converted,
+                                                   TemplateLoc, TemplateArgs);
+  case BTK__reflect_method_noaccept:
+    return processFlagAttribute<TVMNoAcceptFuncAttr>(
+        SemaRef, Converted, TemplateLoc, TemplateArgs);
+  case BTK__reflect_method_implicit_func_id:
+    return processFlagAttribute<TVMImplicitFuncIdFuncAttr>(
+        SemaRef, Converted, TemplateLoc, TemplateArgs);
+  case BTK__reflect_method_dyn_chain_parse:
+    return processFlagAttribute<TVMDynChainParseFuncAttr>(
+        SemaRef, Converted, TemplateLoc, TemplateArgs);
+  case BTK__reflect_method_deploy:
+    return processFlagAttribute<TVMDeployFuncAttr>(SemaRef, Converted,
+                                                   TemplateLoc, TemplateArgs);
+  case BTK__reflect_method_no_read_persistent:
+    return processFlagAttribute<TVMNoReadPersistentFuncAttr>(
+        SemaRef, Converted, TemplateLoc, TemplateArgs);
+  case BTK__reflect_method_no_write_persistent:
+    return processFlagAttribute<TVMNoWritePersistentFuncAttr>(
+        SemaRef, Converted, TemplateLoc, TemplateArgs);
+  case BTK__reflect_method_ptr_func_id: {
+    // __reflect_method_ptr_func_id<T, IntType, Rv Interface::* MethodPtr> -
+    //   FuncID of the Interface method MethodPtr,
+    //   provided into T<IntType, FuncID>
+    assert(Converted.size() == 3 &&
+           "__reflect_method_func_id<T, IntType, Rv Interface::* MethodPtr>");
+    TemplateArgument IntType = Converted[1], MethodPtr = Converted[2];
+    const auto *Decl = MethodPtr.getAsDecl();
+    assert(Decl && "MethodPtr is not declaration");
+    assert(Decl->getAsFunction() && "MethodPtr is not a function");
+    QualType IntTy = IntType.getAsType();
+    llvm::APSInt FuncId(static_cast<uint32_t>(Context.getTypeSize(IntTy)));
+    FuncId = Decl->getAsFunction()->getTVMFuncId();
+
+    TemplateArgumentListInfo SyntheticTemplateArgs;
+    SyntheticTemplateArgs.addArgument(TemplateArgs[1]);
+    TemplateArgument FuncIdArg(Context, FuncId, IntTy);
+    SyntheticTemplateArgs.addArgument(SemaRef.getTrivialTemplateArgumentLoc(
+        FuncIdArg, IntTy, TemplateArgs[0].getLocation()));
+    // The first template argument will be reused as the template decl that
+    // our synthetic template arguments will be applied to.
+    return SemaRef.CheckTemplateIdType(Converted[0].getAsTemplate(),
+                                       TemplateLoc, SyntheticTemplateArgs);
+  }
+  case BTK__reflect_method_ptr_internal:
+    return processByPtrFlagAttribute<TVMInternalFuncAttr>(
+        SemaRef, Converted, TemplateLoc, TemplateArgs);
+  case BTK__reflect_method_ptr_answer_id:
+    return processByPtrFlagAttribute<TVMAnswerIdFuncAttr>(
+        SemaRef, Converted, TemplateLoc, TemplateArgs);
+  case BTK__reflect_method_rv: {
+    // __reflect_method_rv<Interface, Index> -
+    //   return value of the Interface method number #Index
+    assert(Converted.size() == 2 && "__reflect_method_rv<Interface, Index>");
+    TemplateArgument InterfaceArg = Converted[0], IndexArg = Converted[1];
+    llvm::APSInt Index = IndexArg.getAsIntegral();
+    assert(Index >= 0 && "the index used with __reflect_method_rv should be "
+                         "of type std::size_t, and hence be non-negative");
+    QualType InterfaceTy = InterfaceArg.getAsType();
+    const auto *Rec = InterfaceTy->getAsCXXRecordDecl();
+    if (!Rec) {
+      SemaRef.Diag(TemplateArgs[0].getLocation(),
+                   diag::err_reflect_method_not_struct_arg);
+      return QualType();
+    }
+    auto it = std::next(Rec->method_begin(),
+                        static_cast<int64_t>(Index.getZExtValue()));
+    assert(it != Rec->method_end() && "method not found by index");
+    return it->getReturnType();
+  }
+  case BTK__reflect_method_ptr_rv: {
+    // __reflect_method_ptr_rv<MethodPtr> -
+    //   return value of the MethodPtr
+    assert(Converted.size() == 1 && "__reflect_method_ptr_rv<MethodPtr>");
+    TemplateArgument MethodPtr = Converted[0];
+    const auto *Decl = MethodPtr.getAsDecl();
+    assert(Decl && "MethodPtr is not declaration");
+    assert(Decl->getAsFunction() && "MethodPtr is not a function");
+    const CXXMethodDecl *Method =
+        dyn_cast<CXXMethodDecl>(Decl->getAsFunction());
+    assert(Method && "MethodPtr is not a method");
+    return Method->getReturnType();
+  }
+  case BTK__reflect_method_arg_struct: {
+    // __reflect_method_arg_struct<Interface, Index> -
+    //   combined (in struct) arguments of the Interface method number #Index
+    assert(Converted.size() == 2 &&
+           "__reflect_method_arg_struct<Interface, Index>");
+    TemplateArgument InterfaceArg = Converted[0], IndexArg = Converted[1];
+    llvm::APSInt Index = IndexArg.getAsIntegral();
+    assert(Index >= 0 && "the index used with __reflect_method_arg_struct "
+                         "should be non-negative");
+    QualType InterfaceTy = InterfaceArg.getAsType();
+    const auto *Rec = InterfaceTy->getAsCXXRecordDecl();
+    if (!Rec) {
+      SemaRef.Diag(TemplateArgs[0].getLocation(),
+                   diag::err_reflect_method_not_struct_arg);
+      return QualType();
+    }
+    auto it = std::next(Rec->method_begin(),
+                        static_cast<int64_t>(Index.getZExtValue()));
+    assert(it != Rec->method_end() && "method not found by index");
+    for (auto param : it->parameters()) {
+      QualType FieldT = param->getOriginalType();
+      if (SemaRef.RequireCompleteType(
+              TemplateLoc, FieldT, diag::err_tentative_def_incomplete_type)) {
+        return QualType();
+      }
+    }
+    return Context.getTVMArgumentsStructType(*it, TemplateLoc);
+  }
+  case BTK__reflect_method_ptr_arg_struct: {
+    // __reflect_method_ptr_arg_struct<MethodPtr> -
+    //   combined (in struct) arguments of the MethodPtr
+    assert(Converted.size() == 1 &&
+           "__reflect_method_ptr_arg_struct<MethodPtr>");
+    TemplateArgument MethodPtr = Converted[0];
+    const auto *Decl = MethodPtr.getAsDecl();
+    assert(Decl && "MethodPtr is not declaration");
+    assert(Decl->getAsFunction() && "MethodPtr is not a function");
+    const CXXMethodDecl *Method =
+        dyn_cast<CXXMethodDecl>(Decl->getAsFunction());
+    assert(Method && "MethodPtr is not a method");
+    return Context.getTVMArgumentsStructType(Method, TemplateLoc);
+  }
+  case BTK__reflect_smart_interface: {
+    // __reflect_smart_interface<parsed_value, built_value, Interface>  -
+    //   Transformed interface struct
+    // For each interface method "Rv Meth(ArgN...)" generates method
+    //  virtual built_value<Rv> Meth(parsed_value<ArgN>...)
+
+    assert(Converted.size() == 3 &&
+           "__reflect_smart_interface<parsed_value, built_value, Interface>");
+    TemplateArgument ParsedValueT = Converted[0], BuiltValueT = Converted[1],
+                     InterfaceArg = Converted[2];
+
+    QualType InterfaceTy = InterfaceArg.getAsType();
+    const auto *Rec = InterfaceTy->getAsCXXRecordDecl();
+    if (!Rec) {
+      SemaRef.Diag(TemplateArgs[0].getLocation(), CustomDiagID)
+          << "Wrong Interface argument";
+      return QualType();
+    }
+    auto ApplySingleMetafunc = [&](TemplateArgument Func, QualType Arg) {
+      TemplateArgumentListInfo SyntheticTemplateArgs;
+      auto TL = SemaRef.getTrivialTemplateArgumentLoc(
+          TemplateArgument(Arg), QualType(), TemplateLoc);
+      SyntheticTemplateArgs.addArgument(TL);
+      return SemaRef.CheckTemplateIdType(Func.getAsTemplate(), TemplateLoc,
+                                         SyntheticTemplateArgs);
+    };
+    CXXRecordDecl *NewRec = cast<CXXRecordDecl>(Context.buildImplicitRecord(
+        ("SmartInterface<" + Rec->getName() + ">").str(), TTK_Interface));
+    NewRec->startDefinition();
+    for (auto *Meth : Rec->methods()) {
+      if (Meth->isImplicit())
+        continue;
+      auto Rv = ApplySingleMetafunc(BuiltValueT, Meth->getReturnType());
+      SmallVector<QualType, 8> Args;
+      for (auto *Arg : Meth->parameters()) {
+        auto ArgT = ApplySingleMetafunc(ParsedValueT, Arg->getType());
+        Args.push_back(ArgT);
+      }
+
+      auto MethodType = Context.getFunctionType(
+          Rv, Args, FunctionProtoType::ExtProtoInfo());
+      auto *NewMeth = CXXMethodDecl::Create(
+          Context, NewRec, SourceLocation(), Meth->getNameInfo(), MethodType,
+          /*TInfo=*/nullptr, SC_None, true, ConstexprSpecKind::Unspecified,
+          SourceLocation());
+      NewMeth->setVirtualAsWritten(true);
+
+      SmallVector<ParmVarDecl *, 8> Params;
+      for (unsigned i = 0, e = NewMeth->getNumParams(); i != e; ++i) {
+        ParmVarDecl *parm = ParmVarDecl::Create(
+            Context, NewMeth, SourceLocation(), SourceLocation(), nullptr,
+            Args[i], /*TInfo=*/nullptr, SC_None, nullptr);
+        parm->setScopeInfo(0, i);
+        Params.push_back(parm);
+      }
+      NewMeth->setParams(Params);
+      NewMeth->setAccess(AS_public);
+      NewMeth->setVirtualAsWritten(true);
+      NewMeth->setTVMFuncId(Meth->getTVMFuncId());
+      NewMeth->setPure(true);
+      NewRec->addDecl(NewMeth);
+    }
+    TypeSourceInfo *TInfo =
+        Context.getTrivialTypeSourceInfo(Context.getRecordType(NewRec));
+    TypedefDecl *Typedef = TypedefDecl::Create(
+        Context, NewRec, SourceLocation(), SourceLocation(),
+        &Context.Idents.get("base"), TInfo);
+    Typedef->setImplicit();
+    Typedef->setAccess(AS_public);
+    NewRec->addDecl(Typedef);
+
+    NewRec->completeDefinition();
+    return Context.getRecordType(NewRec);
+  }
+  case BTK__reflect_proxy: {
+    // __reflect_proxy<Interface, Impl, Type> - proxy for Interface
+    assert(Converted.size() == 3 && "__reflect_proxy<Interface, Impl, Type>");
+    TemplateArgument InterfaceArg = Converted[0], ImplArg = Converted[1],
+                     TypeIdx = Converted[2];
+
+    QualType InterfaceTy = InterfaceArg.getAsType();
+    QualType ImplTy = ImplArg.getAsType();
+    auto *InterfaceRec = InterfaceTy->getAsCXXRecordDecl();
+    auto *ImplRec = ImplTy->getAsCXXRecordDecl();
+    if (!InterfaceRec || !ImplRec) {
+      SemaRef.Diag(TemplateArgs[0].getLocation(), CustomDiagID)
+          << "Arguments should be {Interface, Impl}";
+      return QualType();
+    }
+    CXXRecordDecl *NewRec = cast<CXXRecordDecl>(Context.buildImplicitRecord(
+        ("__reflect_proxy<" + InterfaceRec->getName() + "," +
+         ImplRec->getName() + ">")
+            .str(),
+        TTK_Class));
+    NewRec->startDefinition();
+    NewRec->addAttr(new (Context) FinalAttr(Context, TemplateLoc));
+    SmallVector<CXXBaseSpecifier *, 2> BaseInfo;
+    BaseInfo.push_back(SemaRef.CheckBaseSpecifier(
+        ImplRec, TemplateLoc, false, AS_public,
+        Context.getTrivialTypeSourceInfo(ImplTy), SourceLocation()));
+    NewRec->setBases(BaseInfo.data(), 1);
+    auto RecTy = Context.getRecordType(NewRec);
+    auto ThisTy = Context.getPointerType(RecTy);
+    auto ImplPtrTy = Context.getPointerType(ImplTy);
+    QualType AutoType = Context.getAutoDeductType();
+
+    {
+      NestedNameSpecifier *NNS = NestedNameSpecifier::Create(
+          Context, nullptr, false, ImplTy.getTypePtr());
+
+      Sema::ContextRAII SavedContext(SemaRef, NewRec);
+      CXXScopeSpec SS;
+      SS.MakeTrivial(Context, NNS, SourceRange(TemplateLoc));
+
+      // Generating "using Impl::Impl;"
+      DeclarationName ConstrName =
+          Context.DeclarationNames.getCXXConstructorName(
+              Context.getCanonicalType(ImplTy));
+      DeclarationNameInfo UsingNameInfo(ConstrName, ImplRec->getLocation());
+      SemaRef.BuildUsingDeclaration(
+          /*Scope*/ nullptr, AS_public, TemplateLoc,
+          /*HasTypename*/ false, {}, SS, UsingNameInfo, {},
+          ParsedAttributesView(),
+          /*IsInstantiation*/ true,
+          /*IsUsingIfExists*/ true);
+    }
+
+    for (auto *Meth : InterfaceRec->methods()) {
+      if (Meth->isImplicit())
+        continue;
+      if (TypeIdx.getAsIntegral() == 1) {
+        if (!Meth->hasAttr<TVMInternalFuncAttr>())
+          continue;
+      } else if (TypeIdx.getAsIntegral() == 0) {
+        if (!Meth->hasAttr<TVMExternalFuncAttr>())
+          continue;
+      } else if (TypeIdx.getAsIntegral() == 2) {
+        if (!Meth->hasAttr<TVMGetterFuncAttr>())
+          continue;
+      }
+
+      if (Meth->getName() == "constructor")
+        continue;
+
+      SmallVector<QualType, 8> MethArgs;
+      for (auto *Arg : Meth->parameters()) {
+        MethArgs.push_back(Arg->getType());
+      }
+
+      auto MethodType = Context.getFunctionType(
+          AutoType, MethArgs, FunctionProtoType::ExtProtoInfo());
+      auto *NewMeth = CXXMethodDecl::Create(
+          Context, NewRec, SourceLocation(), Meth->getNameInfo(), MethodType,
+          /*TInfo=*/nullptr, SC_None, true,
+          ConstexprSpecKind::Unspecified /* false */, SourceLocation());
+      NewMeth->addAttr(new (Context) FinalAttr(Context, TemplateLoc));
+      NewMeth->addAttr(new (Context)
+                           AlwaysInlineAttr(Context, TemplateLoc));
+
+      SmallVector<ParmVarDecl *, 8> Params;
+      for (unsigned i = 0, e = NewMeth->getNumParams(); i != e; ++i) {
+        ParmVarDecl *parm = ParmVarDecl::Create(
+            Context, NewMeth, SourceLocation(), SourceLocation(), nullptr,
+            Meth->getParamDecl(i)->getType(), /*TInfo=*/nullptr, SC_None,
+            nullptr);
+        parm->setScopeInfo(0, i);
+        Params.push_back(parm);
+      }
+      NewMeth->setParams(Params);
+      NewMeth->setAccess(AS_public);
+      NewMeth->setVirtualAsWritten(false);
+      NewMeth->setPure(false);
+      NewMeth->setTVMFuncId(Meth->getTVMFuncId());
+      TypeSourceInfo *TInfo =
+          Context.getTrivialTypeSourceInfo(NewMeth->getType(), TemplateLoc);
+      NewMeth->setTypeSourceInfo(TInfo);
+      Sema::SynthesizedFunctionScope Scope(SemaRef, NewMeth);
+      Expr *This = new (Context) CXXThisExpr(TemplateLoc, ThisTy, false);
+      CXXCastPath BasePath;
+      if (SemaRef.CheckDerivedToBaseConversion(RecTy, ImplTy, TemplateLoc,
+                                               ImplRec->getSourceRange(),
+                                               &BasePath))
+        return QualType();
+      auto ThisBase =
+          SemaRef
+              .ImpCastExprToType(This, ImplPtrTy, CK_UncheckedDerivedToBase,
+                                 This->getValueKind(), &BasePath)
+              .get();
+      // Generating "return Impl::_call_impl<&Interface::function,
+      // Args...>(args...);"
+      const Type *ClassType =
+          Context.getTypeDeclType(Meth->getParent()).getTypePtr();
+      auto MethPtrTy =
+          Context.getMemberPointerType(Meth->getType(), ClassType);
+      TemplateArgumentListInfo TArgs(TemplateLoc, TemplateLoc);
+      TemplateArgument MethPtrArg(Meth, MethPtrTy);
+      auto TL = SemaRef.getTrivialTemplateArgumentLoc(MethPtrArg, QualType(),
+                                                      TemplateLoc);
+      TArgs.addArgument(TL);
+
+      SmallVector<Expr *, 8> Args;
+      for (unsigned i = 0, e = NewMeth->getNumParams(); i != e; ++i) {
+        ParmVarDecl *Param = NewMeth->getParamDecl(i);
+        QualType ParamType = Param->getType().getNonReferenceType();
+        TemplateArgument CurArgT(ParamType);
+        TArgs.addArgument(SemaRef.getTrivialTemplateArgumentLoc(
+            CurArgT, QualType(), TemplateLoc));
+        Args.push_back(DeclRefExpr::Create(
+            Context, NestedNameSpecifierLoc(), SourceLocation(), Param, false,
+            TemplateLoc, ParamType, VK_LValue, nullptr));
+
+        Param->setReferenced(true);
+        Param->markUsed(Context);
+      }
+
+      ExprResult CallExpr = buildMemberCall(SemaRef, ThisBase, TemplateLoc,
+                                            "_call_impl", Args, &TArgs);
+      if (CallExpr.isInvalid())
+        return QualType();
+
+      Stmt *Return =
+          SemaRef.BuildReturnStmt(TemplateLoc, CallExpr.get()).get();
+      NewMeth->setBody(
+          CompoundStmt::Create(Context, Return, TemplateLoc, TemplateLoc));
+      NewRec->addDecl(NewMeth);
+    }
+    NewRec->completeDefinition();
+    return Context.getRecordType(NewRec);
+  }
+  case BTK__reflect_method_ptr: {
+    // __reflect_method_ptr<Proxy, Contract, Interface, Index> -
+    // Proxy<&Contract::Method> for Interface method number #Index
+    assert(Converted.size() == 4 &&
+           "__reflect_method_ptr<Proxy, Contract, Interface, Index>");
+    TemplateArgument Proxy = Converted[0], ContractArg = Converted[1],
+                     InterfaceArg = Converted[2], IndexArg = Converted[3];
+    llvm::APSInt Index = IndexArg.getAsIntegral();
+    assert(Index >= 0 && "the index used with __reflect_method_ptr "
+                         "should be non-negative");
+    QualType ContractTy = ContractArg.getAsType();
+    QualType InterfaceTy = InterfaceArg.getAsType();
+    const auto *ContractRec = ContractTy->getAsCXXRecordDecl();
+    const auto *BaseRec = InterfaceTy->getAsCXXRecordDecl();
+    if (!ContractRec || !BaseRec) {
+      SemaRef.Diag(TemplateArgs[0].getLocation(),
+                   diag::err_reflect_method_not_struct_arg);
+      return QualType();
+    }
+    if (!ContractRec->isDerivedFrom(BaseRec)) {
+      SemaRef.Diag(TemplateArgs[0].getLocation(), CustomDiagID)
+          << "Class is not derived from interface";
+      return QualType();
+    }
+    auto it = std::next(BaseRec->method_begin(),
+                        static_cast<int64_t>(Index.getZExtValue()));
+    assert(it != BaseRec->method_end() && "method not found by index");
+    auto *MethPtr = *it;
+    MethPtr = MethPtr->getCorrespondingMethodInClass(ContractRec);
+
+    const Type *ClassType =
+        Context.getTypeDeclType(MethPtr->getParent()).getTypePtr();
+    auto MethPtrTy =
+        Context.getMemberPointerType(MethPtr->getType(), ClassType);
+    TemplateArgumentListInfo SyntheticTemplateArgs;
+    auto MethPtrArg = TemplateArgument(MethPtr, MethPtrTy);
+    auto TL = SemaRef.getTrivialTemplateArgumentLoc(MethPtrArg, QualType(),
+                                                    TemplateLoc);
+    SyntheticTemplateArgs.addArgument(TL);
+    return SemaRef.CheckTemplateIdType(Proxy.getAsTemplate(), TemplateLoc,
+                                       SyntheticTemplateArgs);
+  }
+  case BTK__reflect_interface_has_pubkey: {
+    ASTContext &Context = SemaRef.getASTContext();
+    assert(Converted.size() == 3 &&
+           "__reflect_interface_has_pubkey'<T, IntType, Interface>");
+    TemplateArgument IntType = Converted[1], InterfaceArg = Converted[2];
+    QualType InterfaceTy = InterfaceArg.getAsType();
+    QualType IntTy = IntType.getAsType();
+    llvm::APSInt Rv(static_cast<uint32_t>(Context.getTypeSize(IntTy)));
+    Rv = !InterfaceTy.getTypePtr()->isTVMNoPubkeyInterfaceType();
+
+    TemplateArgumentListInfo SyntheticTemplateArgs;
+    SyntheticTemplateArgs.addArgument(TemplateArgs[1]);
+    TemplateArgument RvArg(Context, Rv, IntTy);
+    SyntheticTemplateArgs.addArgument(SemaRef.getTrivialTemplateArgumentLoc(
+        RvArg, IntTy, TemplateArgs[0].getLocation()));
+    return SemaRef.CheckTemplateIdType(Converted[0].getAsTemplate(),
+                                       TemplateLoc, SyntheticTemplateArgs);
+  }
+  case BTK__reflect_interface_has_timestamp: {
+    ASTContext &Context = SemaRef.getASTContext();
+    assert(Converted.size() == 3 &&
+           "__reflect_interface_has_timestamp'<T, IntType, Interface>");
+    TemplateArgument IntType = Converted[1], InterfaceArg = Converted[2];
+    QualType InterfaceTy = InterfaceArg.getAsType();
+    QualType IntTy = IntType.getAsType();
+    llvm::APSInt Rv(static_cast<uint32_t>(Context.getTypeSize(IntTy)));
+    Rv = !InterfaceTy.getTypePtr()->isTVMNoTimestampInterfaceType();
+
+    TemplateArgumentListInfo SyntheticTemplateArgs;
+    SyntheticTemplateArgs.addArgument(TemplateArgs[1]);
+    TemplateArgument RvArg(Context, Rv, IntTy);
+    SyntheticTemplateArgs.addArgument(SemaRef.getTrivialTemplateArgumentLoc(
+        RvArg, IntTy, TemplateArgs[0].getLocation()));
+    return SemaRef.CheckTemplateIdType(Converted[0].getAsTemplate(),
+                                       TemplateLoc, SyntheticTemplateArgs);
+  }
+  case BTK__reflect_interface_has_expire: {
+    ASTContext &Context = SemaRef.getASTContext();
+    assert(Converted.size() == 3 &&
+           "__reflect_interface_has_expire'<T, IntType, Interface>");
+    TemplateArgument IntType = Converted[1], InterfaceArg = Converted[2];
+    QualType InterfaceTy = InterfaceArg.getAsType();
+    QualType IntTy = IntType.getAsType();
+    llvm::APSInt Rv(static_cast<uint32_t>(Context.getTypeSize(IntTy)));
+    Rv = !InterfaceTy.getTypePtr()->isTVMNoExpireInterfaceType();
+
+    TemplateArgumentListInfo SyntheticTemplateArgs;
+    SyntheticTemplateArgs.addArgument(TemplateArgs[1]);
+    TemplateArgument RvArg(Context, Rv, IntTy);
+    SyntheticTemplateArgs.addArgument(SemaRef.getTrivialTemplateArgumentLoc(
+        RvArg, IntTy, TemplateArgs[0].getLocation()));
+    return SemaRef.CheckTemplateIdType(Converted[0].getAsTemplate(),
+                                       TemplateLoc, SyntheticTemplateArgs);
+  }
+  case BTK__reflect_signature_func_id: {
+    ASTContext &Context = SemaRef.getASTContext();
+    assert(Converted.size() == 3 &&
+           "__reflect_signature_func_id'<T, IntType, Str>");
+    TemplateArgument IntType = Converted[1], Str = Converted[2];
+    QualType IntTy = IntType.getAsType();
+    llvm::APSInt FuncIdC(static_cast<uint32_t>(Context.getTypeSize(IntTy)));
+    FuncIdC = 0;
+    if (auto *StrDecl = dyn_cast<VarDecl>(Str.getAsDecl())) {
+      if (auto *Init = StrDecl->getInit()) {
+        SmallVector<unsigned char, 32> Signature;
+        if (auto *SL = dyn_cast<StringLiteral>(Init->IgnoreParens())) {
+          unsigned StrLen = SL->getLength();
+          for (unsigned i = 0, e = StrLen; i != e; ++i) {
+            auto Ch = SL->getCodeUnit(i);
+            if (!Ch)
+              break;
+            Signature.push_back(static_cast<unsigned char>(Ch));
+          }
+        } else {
+          Expr::EvalResult Eval;
+          if (Init->EvaluateAsConstantExpr(
+                  Eval, Context,
+                  /* Expr::EvaluateForCodeGen */ ConstantExprKind::Normal)) {
+            unsigned NumInitElts = Eval.Val.getArrayInitializedElts();
+            for (unsigned I = 0; I < NumInitElts; ++I) {
+              auto Elem = Eval.Val.getArrayInitializedElt(I);
+              uint64_t Ch = Elem.getInt().getZExtValue();
+              if (!Ch)
+                break;
+              Signature.push_back(static_cast<unsigned char>(Ch));
+            }
+          }
+        }
+        auto hash = picosha2::hash256(Signature);
+        uint32_t funcID = 0;
+        for (size_t i = 0; i < 4; i++) {
+          funcID <<= 8u;
+          funcID += hash[i];
+        }
+        funcID = funcID & ((1u << 31) - 1);
+        FuncIdC = funcID;
+      }
+    }
+
+    TemplateArgumentListInfo SyntheticTemplateArgs;
+    SyntheticTemplateArgs.addArgument(TemplateArgs[1]);
+    TemplateArgument FuncIdArg(Context, FuncIdC, IntTy);
+    SyntheticTemplateArgs.addArgument(SemaRef.getTrivialTemplateArgumentLoc(
+        FuncIdArg, IntTy, TemplateArgs[0].getLocation()));
+    return SemaRef.CheckTemplateIdType(Converted[0].getAsTemplate(),
+                                       TemplateLoc, SyntheticTemplateArgs);
+  }
+  case BTK__reflect_echo: {
+    ASTContext &Context = SemaRef.getASTContext();
+    assert(Converted.size() == 1 && "__reflect_echo'<Str>");
+    TemplateArgument Str = Converted[0];
+    if (auto *StrDecl = dyn_cast<VarDecl>(Str.getAsDecl())) {
+      if (auto *Init = StrDecl->getInit()) {
+        SmallVector<unsigned char, 32> Signature;
+        if (auto *SL = dyn_cast<StringLiteral>(Init->IgnoreParens())) {
+          unsigned StrLen = SL->getLength();
+          for (unsigned i = 0, e = StrLen; i != e; ++i) {
+            auto Ch = SL->getCodeUnit(i);
+            if (!Ch)
+              break;
+            Signature.push_back(static_cast<unsigned char>(Ch));
+          }
+        } else {
+          Expr::EvalResult Eval;
+          if (Init->EvaluateAsConstantExpr(
+                  Eval, Context,
+                  /* Expr::EvaluateForCodeGen */ ConstantExprKind::Normal)) {
+            unsigned NumInitElts = Eval.Val.getArrayInitializedElts();
+            for (unsigned I = 0; I < NumInitElts; ++I) {
+              auto Elem = Eval.Val.getArrayInitializedElt(I);
+              uint64_t Ch = Elem.getInt().getZExtValue();
+              if (!Ch)
+                break;
+              Signature.push_back(static_cast<unsigned char>(Ch));
+            }
+          }
+        }
+        unsigned CustomRemarkID = SemaRef.getDiagnostics().getCustomDiagID(
+            DiagnosticsEngine::Remark, "%0");
+        SemaRef.Diag(SourceLocation(), CustomRemarkID)
+            << std::string(Signature.begin(), Signature.end());
+      }
+    }
+    return Context.CharTy;
+  }
+  // TVM local end
+  }
+
   llvm_unreachable("unexpected BuiltinTemplateDecl!");
 }
 

@@ -107,7 +107,10 @@ public:
     renderscript32, // 32-bit RenderScript
     renderscript64, // 64-bit RenderScript
     ve,             // NEC SX-Aurora Vector Engine
-    LastArchType = ve
+    // TVM local begin
+    tvm,            // TVM
+    LastArchType = tvm
+    // TVM local end
   };
   enum SubArchType {
     NoSubArch,
@@ -866,6 +869,13 @@ public:
   bool isMIPS() const {
     return isMIPS32() || isMIPS64();
   }
+
+  // TVM local begin
+  /// Tests whether the target is TVM
+  bool isTVM() const {
+    return getArch() == Triple::tvm;
+  }
+  // TVM local end
 
   /// Tests whether the target is PowerPC (32- or 64-bit LE or BE).
   bool isPPC() const {

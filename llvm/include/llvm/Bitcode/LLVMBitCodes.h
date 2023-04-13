@@ -180,6 +180,13 @@ enum TypeCodes {
 
   TYPE_CODE_GALOIS_FIELD = 27, // GALOIS_FIELD: [kind]
   TYPE_CODE_ELLIPTIC_CURVE = 28, // ELLIPTIC_CURVE: [kind]
+
+ // TVM local begin
+  TYPE_CODE_TVMSLICE = 29,   // TVM Slice
+  TYPE_CODE_TVMBUILDER = 30, // TVM Builder
+  TYPE_CODE_TVMCELL = 31,    // TVM Cell
+  TYPE_CODE_TVMTUPLE = 32,   // TVM Tuple
+  // TVM local end
 };
 
 enum OperandBundleTagCode {

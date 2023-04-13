@@ -41,6 +41,9 @@ enum class Language : uint8_t {
   RenderScript,
   HIP,
   HLSL,
+  // TVM local begin
+  JsonAbi
+  // TVM local end
   ///@}
 };
 

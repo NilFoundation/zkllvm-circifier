@@ -956,6 +956,34 @@ void TargetLoweringBase::setJumpIsExpensive(bool isExpensive) {
     JumpIsExpensive = isExpensive;
 }
 
+// TVM local begin
+static EVT findIntPromoteType(LLVMContext &Context,
+                              const TargetLoweringBase &TL, unsigned BitSize,
+                              bool &ReadyToExpand) {
+  ReadyToExpand = false;
+  MVT LastLegalInt = MVT::i1;
+  for (MVT VT : MVT::integer_valuetypes()) {
+    if (!TL.isTypeLegal(VT))
+      continue;
+    LastLegalInt = VT;
+    if (BitSize <= VT.getSizeInBits())
+      return VT;
+  }
+  // If we have enumerated all legal integers and no suitable type found,
+  //  promote to large legal type, multiplied by power-of-2
+  //  (to do later expands)
+  unsigned LegalBitWidth = LastLegalInt.getSizeInBits();
+  unsigned Mult = BitSize / LegalBitWidth;
+  if (BitSize % LegalBitWidth)
+    ++Mult;
+
+  unsigned Pow2Mult = 1 << Log2_32_Ceil(Mult);
+  unsigned PromotedBitWidth = LegalBitWidth * Pow2Mult;
+  ReadyToExpand = (PromotedBitWidth == BitSize);
+  return EVT::getIntegerVT(Context, PromotedBitWidth);
+}
+// TVM local end
+
 TargetLoweringBase::LegalizeKind
 TargetLoweringBase::getTypeConversion(LLVMContext &Context, EVT VT) const {
   // If this is a simple type, use the ComputeRegisterProp mechanism.
@@ -983,8 +1011,14 @@ TargetLoweringBase::getTypeConversion(LLVMContext &Context, EVT VT) const {
     assert(VT.isInteger() && "Float types must be simple");
     unsigned BitSize = VT.getSizeInBits();
     // First promote to a power-of-two size, then expand if necessary.
-    if (BitSize < 8 || !isPowerOf2_32(BitSize)) {
-      EVT NVT = VT.getRoundIntegerType(Context);
+//    if (BitSize < 8 || !isPowerOf2_32(BitSize)) {
+    // TVM local begin
+    // TVM - we need promoted type, which can be later expanded into two legals
+    bool ReadyToExpand = false;
+    EVT NVT = findIntPromoteType(Context, *this, BitSize, ReadyToExpand);
+    if (!ReadyToExpand) {
+    // TVM local end
+    //  EVT NVT = VT.getRoundIntegerType(Context);
       assert(NVT != VT && "Unable to round integer VT");
       LegalizeKind NextStep = getTypeConversion(Context, NVT);
       // Avoid multi-step promotion.
@@ -1873,7 +1907,10 @@ TargetLoweringBase::getDefaultSafeStackPointerLocation(IRBuilderBase &IRB,
   auto UnsafeStackPtr =
       dyn_cast_or_null<GlobalVariable>(M->getNamedValue(UnsafeStackPtrVar));
 
-  Type *StackPtrTy = Type::getInt8PtrTy(M->getContext());
+  // Type *StackPtrTy = Type::getInt8PtrTy(M->getContext());
+  // TVM local begin
+  Type *StackPtrTy = Type::getIntBytePtrTy(M->getContext());
+  // TVM local end
 
   if (!UnsafeStackPtr) {
     auto TLSModel = UseTLS ?
@@ -1904,7 +1941,10 @@ TargetLoweringBase::getSafeStackPointerLocation(IRBuilderBase &IRB) const {
   // Android provides a libc function to retrieve the address of the current
   // thread's unsafe stack pointer.
   Module *M = IRB.GetInsertBlock()->getParent()->getParent();
-  Type *StackPtrTy = Type::getInt8PtrTy(M->getContext());
+  // Type *StackPtrTy = Type::getInt8PtrTy(M->getContext());
+  // TVM local begin
+  Type *StackPtrTy = Type::getIntBytePtrTy(M->getContext());
+  // TVM local end
   FunctionCallee Fn = M->getOrInsertFunction("__safestack_pointer_address",
                                              StackPtrTy->getPointerTo(0));
   return IRB.CreateCall(Fn);
@@ -1960,7 +2000,11 @@ bool TargetLoweringBase::isLegalAddressingMode(const DataLayout &DL,
 Value *TargetLoweringBase::getIRStackGuard(IRBuilderBase &IRB) const {
   if (getTargetMachine().getTargetTriple().isOSOpenBSD()) {
     Module &M = *IRB.GetInsertBlock()->getParent()->getParent();
-    PointerType *PtrTy = Type::getInt8PtrTy(M.getContext());
+    // PointerType *PtrTy = Type::getInt8PtrTy(M.getContext());
+    // TVM local begin
+    PointerType *PtrTy = Type::getIntBytePtrTy(M.getContext());
+    // TVM local end
+
     Constant *C = M.getOrInsertGlobal("__guard_local", PtrTy);
     if (GlobalVariable *G = dyn_cast_or_null<GlobalVariable>(C))
       G->setVisibility(GlobalValue::HiddenVisibility);
@@ -1973,7 +2017,11 @@ Value *TargetLoweringBase::getIRStackGuard(IRBuilderBase &IRB) const {
 // TODO: add LOAD_STACK_GUARD support.
 void TargetLoweringBase::insertSSPDeclarations(Module &M) const {
   if (!M.getNamedValue("__stack_chk_guard")) {
-    auto *GV = new GlobalVariable(M, Type::getInt8PtrTy(M.getContext()), false,
+    auto *GV =
+        // new GlobalVariable(M, Type::getInt8PtrTy(M.getContext()), false,
+    // TVM local begin
+    new GlobalVariable(M, Type::getIntBytePtrTy(M.getContext()), false,
+    // TVM local end
                                   GlobalVariable::ExternalLinkage, nullptr,
                                   "__stack_chk_guard");
 

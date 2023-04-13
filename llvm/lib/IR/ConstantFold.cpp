@@ -362,9 +362,14 @@ Constant *llvm::ConstantFoldCastInstruction(unsigned opc, Constant *V,
     return UndefValue::get(DestTy);
   }
 
-  if (V->isNullValue() && !DestTy->isX86_MMXTy() && !DestTy->isX86_AMXTy() &&
+  //if (V->isNullValue() && !DestTy->isX86_MMXTy() && !DestTy->isX86_AMXTy() &&
+  //    opc != Instruction::AddrSpaceCast)
+  //  return Constant::getNullValue(DestTy);
+  // TVM local begin
+  if (V->isNullValue() && !DestTy->isX86_MMXTy() && !DestTy->isTVMBuiltinTy() &&
       opc != Instruction::AddrSpaceCast)
     return Constant::getNullValue(DestTy);
+  // TVM local end
 
   // If the cast operand is a constant expression, there's a few things we can
   // do to try to simplify it.

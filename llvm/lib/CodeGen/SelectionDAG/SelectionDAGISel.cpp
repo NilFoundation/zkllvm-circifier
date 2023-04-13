@@ -478,6 +478,7 @@ bool SelectionDAGISel::runOnMachineFunction(MachineFunction &mf) {
     TLI->initializeSplitCSR(EntryMBB);
 
   SelectAllBasicBlocks(Fn);
+
   if (FastISelFailed && EnableFastISelFallbackReport) {
     DiagnosticInfoISelFallback DiagFallback(Fn);
     Fn.getContext().diagnose(DiagFallback);
@@ -685,8 +686,9 @@ void SelectionDAGISel::SelectBasicBlock(BasicBlock::const_iterator Begin,
   // Lower the instructions. If a call is emitted as a tail call, cease emitting
   // nodes for this block.
   for (BasicBlock::const_iterator I = Begin; I != End && !SDB->HasTailCall; ++I) {
-    if (!ElidedArgCopyInstrs.count(&*I))
+    if (!ElidedArgCopyInstrs.count(&*I)) {
       SDB->visit(*I);
+    }
   }
 
   // Make sure the root of the DAG is up-to-date.
@@ -2654,7 +2656,10 @@ CheckInteger(const unsigned char *MatcherTable, unsigned &MatcherIndex,
   Val = decodeSignRotatedValue(Val);
 
   ConstantSDNode *C = dyn_cast<ConstantSDNode>(N);
-  return C && C->getSExtValue() == Val;
+  //return C && C->getSExtValue() == Val;
+  // TVM local begin: 64-bit check
+  return C && C->getAPIntValue().isSignedIntN(64) && C->getSExtValue() == Val;
+  // TVM local end
 }
 
 LLVM_ATTRIBUTE_ALWAYS_INLINE static bool

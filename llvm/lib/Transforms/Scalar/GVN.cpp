@@ -1868,7 +1868,10 @@ bool GVNPass::processAssumeIntrinsic(AssumeInst *IntrinsicI) {
 
   if (ConstantInt *Cond = dyn_cast<ConstantInt>(V)) {
     if (Cond->isZero()) {
-      Type *Int8Ty = Type::getInt8Ty(V->getContext());
+      // TVM local begin
+      Type *Int8Ty = Type::getByteTy(V->getContext());
+      // TVM local end
+
       // Insert a new store to null instruction before the load to indicate that
       // this code is not reachable.  FIXME: We could insert unreachable
       // instruction directly because we can modify the CFG.
@@ -2647,6 +2650,7 @@ bool GVNPass::processBlock(BasicBlock *BB) {
 
   for (BasicBlock::iterator BI = BB->begin(), BE = BB->end();
        BI != BE;) {
+
     if (!ReplaceOperandsWithMap.empty())
       ChangedFunction |= replaceOperandsForInBlockEquality(&*BI);
     ChangedFunction |= processInstruction(&*BI);
@@ -2667,6 +2671,7 @@ bool GVNPass::processBlock(BasicBlock *BB) {
     for (auto *I : InstrsToErase) {
       assert(I->getParent() == BB && "Removing instruction from wrong block?");
       LLVM_DEBUG(dbgs() << "GVN removed: " << *I << '\n');
+
       salvageKnowledge(I, AC);
       salvageDebugInfo(*I);
       if (MD) MD->removeInstruction(I);

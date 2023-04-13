@@ -224,7 +224,30 @@ protected:
   bool HasFPReturn;
   bool HasStrictFP;
 
-  unsigned char MaxAtomicPromoteWidth, MaxAtomicInlineWidth;
+  // TVM local begin
+  unsigned short PointerWidth, PointerAlign;
+  unsigned short BoolWidth, BoolAlign;
+  unsigned short CharWidth, CharAlign;
+  unsigned short ShortWidth, ShortAlign;
+  unsigned short IntWidth, IntAlign;
+  unsigned char HalfWidth, HalfAlign;
+  unsigned short FloatWidth, FloatAlign;
+  unsigned short DoubleWidth, DoubleAlign;
+  unsigned short LongDoubleWidth, LongDoubleAlign, Float128Align;
+  unsigned short LargeArrayMinWidth, LargeArrayAlign;
+  unsigned short LongWidth, LongAlign;
+  unsigned short LongLongWidth, LongLongAlign;
+  // TVM local end
+
+  // TVM local begin
+  unsigned short SuitableAlign;
+  // TVM local end
+
+  // TVM local begin
+  unsigned short MaxAtomicPromoteWidth, MaxAtomicInlineWidth;
+  // TVM local end
+
+  //  unsigned char MaxAtomicPromoteWidth, MaxAtomicInlineWidth;
   unsigned short SimdDefaultAlign;
   std::string DataLayoutString;
   const char *UserLabelPrefix;
@@ -462,16 +485,29 @@ public:
   /// Return the alignment of '_Bool' and C++ 'bool' for this target.
   unsigned getBoolAlign() const { return BoolAlign; }
 
-  unsigned getCharWidth() const { return 8; } // FIXME
-  unsigned getCharAlign() const { return 8; } // FIXME
+  // TVM local begin
+  unsigned getCharWidth() const { return CharWidth; }
+  unsigned getCharAlign() const { return CharAlign; }
 
   /// Return the size of 'signed short' and 'unsigned short' for this
   /// target, in bits.
-  unsigned getShortWidth() const { return 16; } // FIXME
+  unsigned getShortWidth() const { return ShortWidth; }
 
   /// Return the alignment of 'signed short' and 'unsigned short' for
   /// this target.
-  unsigned getShortAlign() const { return 16; } // FIXME
+  unsigned getShortAlign() const { return ShortAlign; }
+  // TVM local end
+
+//  unsigned getCharWidth() const { return 8; } // FIXME
+//  unsigned getCharAlign() const { return 8; } // FIXME
+
+  /// Return the size of 'signed short' and 'unsigned short' for this
+  /// target, in bits.
+//  unsigned getShortWidth() const { return 16; } // FIXME
+
+  /// Return the alignment of 'signed short' and 'unsigned short' for
+  /// this target.
+//  unsigned getShortAlign() const { return 16; } // FIXME
 
   /// getIntWidth/Align - Return the size of 'signed int' and 'unsigned int' for
   /// this target, in bits.

@@ -67,6 +67,14 @@ enum ActionKind {
   /// Emit a .ll file.
   EmitLLVM,
 
+  // TVM local begin
+  /// Emit text global constant.
+  EmitTextConst,
+
+  /// Import TVM Json Abi.
+  ImportJsonAbi,
+  // TVM local end
+
   /// Generate LLVM IR, but do not emit anything.
   EmitLLVMOnly,
 
@@ -500,6 +508,11 @@ public:
 
   /// Filename to write statistics to.
   std::string StatsFile;
+
+  // TVM local begin
+  /// Name for imported interface structure
+  std::string TVMJsonAbiStructName;
+  // TVM local end
 
   /// Minimum time granularity (in microseconds) traced by time profiler.
   unsigned TimeTraceGranularity;

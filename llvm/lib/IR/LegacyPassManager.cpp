@@ -1391,7 +1391,7 @@ void FPPassManager::dumpPassStructure(unsigned Offset) {
 /// runOnFunction method.  Keep track of whether any of the passes modifies
 /// the function, and if so, return true.
 bool FPPassManager::runOnFunction(Function &F) {
-  if (F.isDeclaration())
+   if (F.isDeclaration())
     return false;
 
   bool Changed = false;
@@ -1427,7 +1427,8 @@ bool FPPassManager::runOnFunction(Function &F) {
 #ifdef EXPENSIVE_CHECKS
       uint64_t RefHash = FP->structuralHash(F);
 #endif
-      LocalChanged |= FP->runOnFunction(F);
+      bool Chg = FP->runOnFunction(F);
+      LocalChanged |= Chg;
 
 #if defined(EXPENSIVE_CHECKS) && !defined(NDEBUG)
       if (!LocalChanged && (RefHash != FP->structuralHash(F))) {

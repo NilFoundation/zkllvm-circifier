@@ -1274,7 +1274,7 @@ Value *llvm::emitStrNCmp(Value *Ptr1, Value *Ptr2, Value *Len, IRBuilderBase &B,
       LibFunc_strncmp, B.getInt32Ty(),
       // {B.getInt8PtrTy(), B.getInt8PtrTy(),
       // TVM local begin
-      {B.getIntBytePtrTy(), B.getIntBytePtrTy(),
+      {B.getIntBytePtrTy(), B.getIntBytePtrTy(), DL.getIntPtrType(Context)},
       // TVM local end
       {castToCStr(Ptr1, B), castToCStr(Ptr2, B), Len}, B, TLI);
 }
@@ -1756,7 +1756,7 @@ Value *llvm::emitCalloc(Value *Num, Value *Size, IRBuilderBase &B,
   const DataLayout &DL = M->getDataLayout();
   IntegerType *PtrType = DL.getIntPtrType((B.GetInsertBlock()->getContext()));
   FunctionCallee Calloc = M->getOrInsertFunction(
-    CallocName, Attrs,
+    CallocName,
     //B.getInt8PtrTy(),
     // TVM local begin
     B.getIntBytePtrTy(),

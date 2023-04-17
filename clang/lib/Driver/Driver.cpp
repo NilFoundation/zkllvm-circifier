@@ -13,6 +13,7 @@
 #include "ToolChains/AVR.h"
 #include "ToolChains/Ananas.h"
 #include "ToolChains/Arch/RISCV.h"
+#include "ToolChains/Assigner.h"
 #include "ToolChains/BareMetal.h"
 #include "ToolChains/CSKYToolChain.h"
 #include "ToolChains/Clang.h"
@@ -6336,6 +6337,9 @@ const ToolChain &Driver::getToolChain(const ArgList &Args,
         break;
       case llvm::Triple::csky:
         TC = std::make_unique<toolchains::CSKYToolChain>(*this, Target, Args);
+        break;
+      case llvm::Triple::assigner:
+        TC = std::make_unique<toolchains::Assigner>(*this, Target, Args);
         break;
       default:
         if (Target.getVendor() == llvm::Triple::Myriad)

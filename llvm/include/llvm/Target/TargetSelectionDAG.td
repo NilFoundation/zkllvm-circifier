@@ -1634,20 +1634,20 @@ multiclass ternary_atomic_op<SDNode atomic_op> {
   defm NAME#_64 : ternary_atomic_op_ord;
 }
 
-//defm atomic_load_add  : binary_atomic_op<atomic_load_add>;
-//defm atomic_swap      : binary_atomic_op<atomic_swap>;
-//defm atomic_load_sub  : binary_atomic_op<atomic_load_sub>;
-//defm atomic_load_and  : binary_atomic_op<atomic_load_and>;
-//defm atomic_load_clr  : binary_atomic_op<atomic_load_clr>;
-//defm atomic_load_or   : binary_atomic_op<atomic_load_or>;
-//defm atomic_load_xor  : binary_atomic_op<atomic_load_xor>;
-//defm atomic_load_nand : binary_atomic_op<atomic_load_nand>;
-//defm atomic_load_min  : binary_atomic_op<atomic_load_min>;
-//defm atomic_load_max  : binary_atomic_op<atomic_load_max>;
-//defm atomic_load_umin : binary_atomic_op<atomic_load_umin>;
-//defm atomic_load_umax : binary_atomic_op<atomic_load_umax>;
-//defm atomic_store     : binary_atomic_op<atomic_store>;
-// defm atomic_cmp_swap  : ternary_atomic_op<atomic_cmp_swap>;
+defm atomic_load_add  : binary_atomic_op<atomic_load_add>;
+defm atomic_swap      : binary_atomic_op<atomic_swap>;
+defm atomic_load_sub  : binary_atomic_op<atomic_load_sub>;
+defm atomic_load_and  : binary_atomic_op<atomic_load_and>;
+defm atomic_load_clr  : binary_atomic_op<atomic_load_clr>;
+defm atomic_load_or   : binary_atomic_op<atomic_load_or>;
+defm atomic_load_xor  : binary_atomic_op<atomic_load_xor>;
+defm atomic_load_nand : binary_atomic_op<atomic_load_nand>;
+defm atomic_load_min  : binary_atomic_op<atomic_load_min>;
+defm atomic_load_max  : binary_atomic_op<atomic_load_max>;
+defm atomic_load_umin : binary_atomic_op<atomic_load_umin>;
+defm atomic_load_umax : binary_atomic_op<atomic_load_umax>;
+defm atomic_store     : binary_atomic_op<atomic_store>;
+defm atomic_cmp_swap  : ternary_atomic_op<atomic_cmp_swap>;
 
 
 /// Atomic load which zeroes the excess high bits.

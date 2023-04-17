@@ -4196,8 +4196,9 @@ checkBuiltinTemplateIdType(Sema &SemaRef, BuiltinTemplateDecl *BTD,
           Rv, Args, FunctionProtoType::ExtProtoInfo());
       auto *NewMeth = CXXMethodDecl::Create(
           Context, NewRec, SourceLocation(), Meth->getNameInfo(), MethodType,
-          /*TInfo=*/nullptr, SC_None, true, ConstexprSpecKind::Unspecified,
-          SourceLocation());
+          /*TInfo=*/nullptr, SC_None,
+          SemaRef.getCurFPFeatures().isFPConstrained(), true,
+          ConstexprSpecKind::Unspecified, SourceLocation());
       NewMeth->setVirtualAsWritten(true);
 
       SmallVector<ParmVarDecl *, 8> Params;
@@ -4306,7 +4307,8 @@ checkBuiltinTemplateIdType(Sema &SemaRef, BuiltinTemplateDecl *BTD,
           AutoType, MethArgs, FunctionProtoType::ExtProtoInfo());
       auto *NewMeth = CXXMethodDecl::Create(
           Context, NewRec, SourceLocation(), Meth->getNameInfo(), MethodType,
-          /*TInfo=*/nullptr, SC_None, true,
+          /*TInfo=*/nullptr, SC_None,
+          SemaRef.getCurFPFeatures().isFPConstrained(), true,
           ConstexprSpecKind::Unspecified /* false */, SourceLocation());
       NewMeth->addAttr(new (Context) FinalAttr(Context, TemplateLoc));
       NewMeth->addAttr(new (Context)

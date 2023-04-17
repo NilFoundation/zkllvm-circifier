@@ -2189,7 +2189,7 @@ static bool handleEndBlock(DSEState& State, BasicBlock& BB,
 
         LLVM_DEBUG(dbgs() << "DSE: Dead Store at End of Block:\n  DEAD: "
                           << *Dead << "\n  Objects: ";
-                   for (SmallVectorImpl<Value *>::iterator I = Pointers.begin(),
+                   for (auto I = Pointers.begin(),
                         E = Pointers.end();
                         I != E; ++I) {
                      dbgs() << **I;
@@ -2379,7 +2379,7 @@ static bool eliminateDeadStores(Function &F, AliasAnalysis &AA,
       // TVM local begin
       // If we find something that writes memory, get its memory dependence.
       if (MD) {
-        MemDepResult InstDep = MD->getDependency(NI);
+        MemDepResult InstDep = MD->getDependency(DeadI);
 
         // Ignore any store where we can't find a local dependence.
         // FIXME: cross-block DSE would be fun. :)

@@ -1203,8 +1203,9 @@ static int getDecodedUnaryOpcode(unsigned Val, Type *Ty) {
 
 static int getDecodedBinaryOpcode(unsigned Val, Type *Ty) {
   bool IsFP = Ty->isFPOrFPVectorTy();
-  // BinOps are only valid for int/fp or vector of int/fp types
-  if (!IsFP && !Ty->isIntOrIntVectorTy())
+  bool IsFieldOrCurve = Ty->isFieldTy() || Ty->isCurveTy();
+  // BinOps are only valid for field, curve, int/fp or vector of int/fp types
+  if (!IsFieldOrCurve && !IsFP && !Ty->isIntOrIntVectorTy())
     return -1;
 
   switch (Val) {

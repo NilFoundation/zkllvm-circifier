@@ -11094,6 +11094,21 @@ static QualType FieldIdToType(const ASTContext &Context, unsigned Id) {
   }
 }
 
+static QualType CurveIdToType(const ASTContext &Context, unsigned Id) {
+  switch (Id) {
+  default:
+    llvm_unreachable("Unexpected field id");
+  case 1:
+    return Context.CPallasTy;
+  case 2:
+    return Context.CVestaTy;
+  case 3:
+    return Context.CBLS12381Ty;
+  case 4:
+    return Context.CCurve25519Ty;
+  }
+}
+
 //===----------------------------------------------------------------------===//
 //                          Builtin Type Computation
 //===----------------------------------------------------------------------===//
@@ -11363,6 +11378,16 @@ static QualType DecodeTypeFromStr(const char *&Str, const ASTContext &Context,
     Str = End;
 
     Type = FieldIdToType(Context, FieldId);
+    break;
+  }
+  case 'e': {
+    char *End;
+    unsigned CurveId = strtoul(Str, &End, 10);
+    assert(End != Str && "Missing curve id");
+
+    Str = End;
+
+    Type = CurveIdToType(Context, CurveId);
     break;
   }
   case 'X': {

@@ -19808,9 +19808,9 @@ Value *CodeGenFunction::EmitLoongArchBuiltinExpr(unsigned BuiltinID,
 Value *CodeGenFunction::EmitAssignerBuiltinExpr(unsigned int BuiltinID,
                                                 const CallExpr *E) {
   SmallVector<Value *, 2> Ops;
+  SmallVector<llvm::Type *, 2> OverloadTypes;
 
-  llvm::Type *OverloadTy = nullptr;
-
+  LLVMContext &context = getLLVMContext();
   for (unsigned i = 0, e = E->getNumArgs(); i != e; i++)
     Ops.push_back(EmitScalarExpr(E->getArg(i)));
 
@@ -19820,30 +19820,47 @@ Value *CodeGenFunction::EmitAssignerBuiltinExpr(unsigned int BuiltinID,
     llvm_unreachable("unexpected builtin ID.");
   case assigner::BI__builtin_assigner_malloc:
     ID = Intrinsic::assigner_malloc;
-    OverloadTy = ConvertType(E->getType());
+    OverloadTypes = {ConvertType(E->getType())};
     break;
   case assigner::BI__builtin_assigner_free:
     ID = Intrinsic::assigner_free;
-    OverloadTy = llvm::Type::getInt8PtrTy(getLLVMContext());
+    OverloadTypes = {llvm::Type::getInt8PtrTy(context)};
     break;
   case assigner::BI__builtin_assigner_poseidon_pallas_base: {
     ID = Intrinsic::assigner_poseidon;
-    auto ElemTy = llvm::GaloisFieldType::get(getLLVMContext(),
+    auto ElemTy = llvm::GaloisFieldType::get(context,
                                              llvm::GALOIS_FIELD_PALLAS_BASE);
-    OverloadTy = llvm::FixedVectorType::get(ElemTy, 3);
+    OverloadTypes = {llvm::FixedVectorType::get(ElemTy, 3)};
     break;
   }
   case assigner::BI__builtin_assigner_sha2_256_pallas_base: {
     ID = Intrinsic::assigner_sha2_256;
-    auto ElemTy = llvm::GaloisFieldType::get(getLLVMContext(),
+    auto ElemTy = llvm::GaloisFieldType::get(context,
                                              llvm::GALOIS_FIELD_PALLAS_BASE);
-    OverloadTy = llvm::FixedVectorType::get(ElemTy, 2);
+    OverloadTypes = {llvm::FixedVectorType::get(ElemTy, 2)};
     break;
   }
+  case assigner::BI__builtin_assigner_sha2_512_pallas_base: {
+    ID = Intrinsic::assigner_sha2_512;
+    auto ElemTy = llvm::GaloisFieldType::get(context,
+                                             llvm::GALOIS_FIELD_PALLAS_BASE);
+    OverloadTypes = {llvm::FixedVectorType::get(ElemTy, 4)};
+    break;
+  }
+  case assigner::BI__builtin_assigner_bls12_optimal_ate_pairing: {
+    ID = Intrinsic::assigner_optimal_ate_pairing;
+    auto ElemTy =
+        llvm::GaloisFieldType::get(context, llvm::GALOIS_FIELD_BLS12381_BASE);
+    auto Vec12Ty = llvm::FixedVectorType::get(ElemTy, 12);
+    auto Vec4Ty = llvm::FixedVectorType::get(ElemTy, 4);
+    auto CurveTy =
+        llvm::EllipticCurveType::get(context, llvm::ELLIPTIC_CURVE_BLS12381);
+    OverloadTypes = {Vec12Ty, CurveTy, Vec4Ty};
+  }
   }
 
-  assert(ID != Intrinsic::not_intrinsic && OverloadTy != nullptr);
+  assert(ID != Intrinsic::not_intrinsic && OverloadTypes.size() != 0);
 
-  llvm::Function *F = CGM.getIntrinsic(ID, OverloadTy);
+  llvm::Function *F = CGM.getIntrinsic(ID, OverloadTypes);
   return Builder.CreateCall(F, Ops);
 }

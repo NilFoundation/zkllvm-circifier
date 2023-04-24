@@ -11091,6 +11091,14 @@ static QualType FieldIdToType(const ASTContext &Context, unsigned Id) {
     return Context.FPallasbaseTy;
   case 2:
     return Context.FPallasscalarTy;
+  case 3:
+    return Context.FBLS12381baseTy;
+  case 4:
+    return Context.FBLS12381scalarTy;
+  case 5:
+    return Context.FCurve25519baseTy;
+  case 6:
+    return Context.FCurve25519scalarTy;
   }
 }
 

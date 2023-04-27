@@ -43,22 +43,28 @@ Macros:
 #pragma GCC system_header
 #endif
 
-#ifndef __GNUC__
-#include_next <limits.h>
-#else
-// GCC header limits.h recursively includes itself through another header called
-// syslimits.h for some reason. This setup breaks down if we directly
-// #include_next GCC's limits.h (reasons not entirely clear to me). Therefore,
-// we manually re-create the necessary include sequence below:
 
-// Get the system limits.h defines (force recurse into the next level)
-#define _GCC_LIMITS_H_
-#define _GCC_NEXT_LIMITS_H
-#include_next <limits.h>
+#define INT_MAX __INT_MAX__
+#define INT_MIN (-INT_MAX - 1)
 
-// Get the ISO C defines
-#undef _GCC_LIMITS_H_
-#include_next <limits.h>
-#endif // __GNUC__
+#define CHAR_BIT 257
+#define SCHAR_MIN INT_MIN
+#define SCHAR_MAX INT_MAX
+#define CHAR_MIN INT_MIN
+#define CHAR_MAX INT_MAX
+//#define MB_LEN_MAX INT_MAX - unsure
+#define SHRT_MIN INT_MIN
+#define SHRT_MAX INT_MAX
+#define LONG_MIN INT_MIN
+#define LONG_MAX INT_MAX
+#define LLONG_MIN INT_MIN
+#define LLONG_MAX INT_MAX
+
+#define UINT_MAX INT_MAX * 2U + 1U
+#define ULONG_MAX UINT_MAX
+#define UCHAR_MAX UINT_MAX
+#define USHRT_MAX UINT_MAX
+
+
 
 #endif  // _LIBCPP_LIMITS_H

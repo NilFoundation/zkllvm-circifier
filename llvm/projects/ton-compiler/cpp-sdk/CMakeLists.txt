@@ -1,5 +1,6 @@
 set(TVM_CXX_HEADERS
   boost
+  mask_int
   std
   tvm
   sha256_literal

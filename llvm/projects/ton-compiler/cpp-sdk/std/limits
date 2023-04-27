@@ -104,6 +104,8 @@ template<> class numeric_limits<cv long double>;
 #include <__config>
 #include <type_traits>
 
+#include<limits.h>
+
 #if defined(_LIBCPP_COMPILER_MSVC)
 #include "support/win32/limits_msvc_win32.h"
 #endif // _LIBCPP_MSVCRT

@@ -17,7 +17,9 @@
 
 #define BOOST_STDLIB "libc++ version " BOOST_STRINGIZE(_LIBCPP_VERSION)
 
-#define BOOST_HAS_THREADS
+// TVM local begin
+//#define BOOST_HAS_THREADS
+// TVM local end
 
 #ifdef _LIBCPP_HAS_NO_VARIADICS
 #    define BOOST_NO_CXX11_HDR_TUPLE

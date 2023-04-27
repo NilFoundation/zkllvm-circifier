@@ -68,4 +68,6 @@
 #pragma once
 #endif
 
+#define BOOST_DISABLE_THREADS
+
 #endif  // BOOST_CONFIG_HPP

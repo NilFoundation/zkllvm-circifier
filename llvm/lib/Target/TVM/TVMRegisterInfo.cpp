@@ -50,7 +50,7 @@ TVMRegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
   return CalleeSavedRegs;
 }
 
-void TVMRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
+bool TVMRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
                                           int SPAdj, unsigned FIOperandNum,
                                           RegScavenger *RS) const {
   assert(SPAdj == 0);
@@ -100,4 +100,6 @@ void TVMRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   }
 
   MI.getOperand(FIOperandNum).ChangeToRegister(RegFrameOffset, false);
+  
+  return false;
 }

@@ -6125,7 +6125,8 @@ Address AArch64ABIInfo::EmitAAPCSVAArg(Address VAListAddr, QualType Ty,
   if (AI.isIgnore()) {
     uint64_t PointerSize = getTarget().getPointerWidth(LangAS::Default) / 8;
     CharUnits SlotSize = CharUnits::fromQuantity(PointerSize);
-    VAListAddr = CGF.Builder.CreateElementBitCast(VAListAddr, CGF.Int8PtrTy);
+    // TVM local nextline
+    VAListAddr = CGF.Builder.CreateElementBitCast(VAListAddr, CGF.BytePtrTy);
     auto *Load = CGF.Builder.CreateLoad(VAListAddr);
     Address Addr = Address(Load, CGF.Int8Ty, SlotSize);
     return CGF.Builder.CreateElementBitCast(Addr, CGF.ConvertTypeForMem(Ty));
@@ -7187,7 +7188,8 @@ Address ARMABIInfo::EmitVAArg(CodeGenFunction &CGF, Address VAListAddr,
 
   // Empty records are ignored for parameter passing purposes.
   if (isEmptyRecord(getContext(), Ty, true)) {
-    VAListAddr = CGF.Builder.CreateElementBitCast(VAListAddr, CGF.Int8PtrTy);
+    // TVM local nextline
+    VAListAddr = CGF.Builder.CreateElementBitCast(VAListAddr, CGF.BytePtrTy);
     auto *Load = CGF.Builder.CreateLoad(VAListAddr);
     Address Addr = Address(Load, CGF.Int8Ty, SlotSize);
     return CGF.Builder.CreateElementBitCast(Addr, CGF.ConvertTypeForMem(Ty));

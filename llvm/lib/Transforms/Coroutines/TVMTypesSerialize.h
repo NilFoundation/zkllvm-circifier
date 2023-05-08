@@ -46,7 +46,7 @@ public:
     return os;
   }
   void store(Module &TheModule, IRBuilder<> &Builder, Value *&CellBuilder) {
-    auto *Load = Builder.CreateLoad(ptr_);
+    auto *Load = Builder.CreateLoad(Builder.getIntBytePtrTy(), ptr_);
     auto *Val = Builder.CreateSExt(Load, Builder.getInt257Ty());
     CellBuilder = Builder.CreateCall(TVMINTR(Intrinsic::tvm_sti),
       {Val, CellBuilder, Builder.getInt257(sz_)});
@@ -71,7 +71,7 @@ public:
     return os;
   }
   void store(Module &TheModule, IRBuilder<> &Builder, Value *&CellBuilder) {
-    auto *Load = Builder.CreateLoad(ptr_);
+    auto *Load = Builder.CreateLoad(Builder.getIntBytePtrTy(), ptr_);
     auto *Val = Builder.CreateZExt(Load, Builder.getInt257Ty());
     CellBuilder = Builder.CreateCall(TVMINTR(Intrinsic::tvm_stu),
       {Val, CellBuilder, Builder.getInt257(sz_)});
@@ -96,7 +96,7 @@ public:
     return os;
   }
   void store(Module &TheModule, IRBuilder<> &Builder, Value *&CellBuilder) {
-    auto *Load = Builder.CreateLoad(ptr_);
+    auto *Load = Builder.CreateLoad(Builder.getIntBytePtrTy(), ptr_);
     CellBuilder = Builder.CreateCall(TVMINTR(Intrinsic::tvm_stslice),
       {Load, CellBuilder});
   }
@@ -118,7 +118,7 @@ public:
     return os;
   }
   void store(Module &TheModule, IRBuilder<> &Builder, Value *&CellBuilder) {
-    auto *Load = Builder.CreateLoad(ptr_);
+    auto *Load = Builder.CreateLoad(Builder.getIntBytePtrTy(), ptr_);
     CellBuilder = Builder.CreateCall(TVMINTR(Intrinsic::tvm_stslice),
       {Load, CellBuilder});
   }
@@ -142,7 +142,7 @@ public:
     return os;
   }
   void store(Module &TheModule, IRBuilder<> &Builder, Value *&CellBuilder) {
-    auto *Load = Builder.CreateLoad(ptr_);
+    auto *Load = Builder.CreateLoad(Builder.getIntBytePtrTy(), ptr_);
     auto *NewC = Builder.CreateCall(TVMINTR(Intrinsic::tvm_newc), {});
     NewC = Builder.CreateCall(TVMINTR(Intrinsic::tvm_stslice), {Load, NewC});
     NewC = Builder.CreateCall(TVMINTR(Intrinsic::tvm_endc), {NewC});
@@ -166,7 +166,7 @@ public:
     return os;
   }
   void store(Module &TheModule, IRBuilder<> &Builder, Value *&CellBuilder) {
-    auto *Load = Builder.CreateLoad(ptr_);
+    auto *Load = Builder.CreateLoad(Builder.getIntBytePtrTy(), ptr_);
     CellBuilder = Builder.CreateCall(TVMINTR(Intrinsic::tvm_stdict),
       {Load, CellBuilder});
   }
@@ -189,7 +189,7 @@ public:
     return os;
   }
   void store(Module &TheModule, IRBuilder<> &Builder, Value *&CellBuilder) {
-    auto *Load = Builder.CreateLoad(ptr_);
+    auto *Load = Builder.CreateLoad(Builder.getIntBytePtrTy(), ptr_);
     auto *Cell = Builder.CreateCall(TVMINTR(Intrinsic::tvm_endc), {Load});
     CellBuilder = Builder.CreateCall(TVMINTR(Intrinsic::tvm_stref),
       {Cell, CellBuilder});

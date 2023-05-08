@@ -848,9 +848,6 @@ private:
 
   bool DwarfUsesRelocationsAcrossSections = false;
 
-  /// This method emits the header for the current function.
-  virtual void emitFunctionHeader();
-
   /// This method emits a comment next to header for the current function.
   virtual void emitFunctionHeaderComment();
 

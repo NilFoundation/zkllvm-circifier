@@ -17,6 +17,7 @@
 #include "TVMSubtarget.h"
 #include "llvm/CodeGen/TargetFrameLowering.h"
 #include "llvm/Target/TargetMachine.h"
+#include "llvm/Transforms/IPO/PassManagerBuilder.h"
 
 namespace llvm {
 
@@ -26,7 +27,8 @@ public:
 
   TVMTargetMachine(const Target &T, const Triple &TT, StringRef CPU,
                    StringRef FS, const TargetOptions &Options,
-                   Optional<Reloc::Model> RM, Optional<CodeModel::Model> CM,
+                   std::optional<Reloc::Model> RM,
+                   std::optional<CodeModel::Model> CM,
                    CodeGenOpt::Level OL, bool JIT);
   virtual ~TVMTargetMachine() override = default;
   const TVMSubtarget *getSubtargetImpl(const Function &F) const override {

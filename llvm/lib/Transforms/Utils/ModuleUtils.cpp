@@ -133,7 +133,7 @@ Function *llvm::checkSanitizerInterfaceFunction(Constant *FuncOrBitcast) {
   std::string Err;
   raw_string_ostream Stream(Err);
   Stream << "Sanitizer interface function redefined: " << *FuncOrBitcast;
-  report_fatal_error(Err);
+  report_fatal_error(StringRef(Err));
 }
 // TVM local end
 

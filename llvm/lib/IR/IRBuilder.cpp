@@ -63,16 +63,11 @@ Type *IRBuilderBase::getCurrentFunctionReturnType() const {
 // TVM local begin
 Value *IRBuilderBase::getCastedIntBytePtrValue(Value *Ptr) {
   auto *PT = cast<PointerType>(Ptr->getType());
-  if (PT->getElementType()->isIntegerTy(ByteSizeInBits))
+  if (PT->isOpaqueOrPointeeTypeMatches(getByteTy()))
     return Ptr;
 
   // Otherwise, we need to insert a bitcast.
-  PT = getIntBytePtrTy(PT->getAddressSpace());
-
-  BitCastInst *BCI = new BitCastInst(Ptr, PT, "");
-  BB->getInstList().insert(InsertPt, BCI);
-  SetInstDebugLocation(BCI);
-  return BCI;
+  return CreateBitCast(Ptr, getIntBytePtrTy(PT->getAddressSpace()));
 }
 // TVM local end
 

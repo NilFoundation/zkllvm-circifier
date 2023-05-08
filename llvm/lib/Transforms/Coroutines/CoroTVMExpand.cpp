@@ -25,6 +25,12 @@
 
 using namespace llvm;
 
+namespace llvm {
+// TVM local begin
+void initializeCoroTVMExpandPass(PassRegistry &);
+// TVM local end
+}
+
 #define DEBUG_TYPE "coro-tvm-expand"
 
 namespace {
@@ -54,14 +60,14 @@ CoroIdInst *getFunctionCoroId(Function &F) {
 // Given a resume function @f.resume(%f.frame* %frame), returns %f.frame type.
 Type *getFrameType(Function *Resume) {
   auto *ArgType = Resume->arg_begin()->getType();
-  return cast<PointerType>(ArgType)->getElementType();
+  return cast<PointerType>(ArgType)->getPointerElementType();
 }
 Type *getFrameTypeFromCoroId(const CoroIdInst *CoroId) {
   ConstantArray *Resumers = CoroId->getInfo().Resumers;
   assert(Resumers && "PostSplit coro.id Info argument must refer to an array"
                      "of coroutine subfunctions");
   auto *ResumeAddrConstant =
-      ConstantExpr::getExtractValue(Resumers, CoroSubFnInst::ResumeIndex);
+      ConstantFoldExtractValueInstruction(Resumers, CoroSubFnInst::ResumeIndex);
   return getFrameType(cast<Function>(ResumeAddrConstant));
 }
 Type *getFrameTypeFromCoroutine(Function &Coroutine) {
@@ -169,11 +175,11 @@ void Lowerer::lowerDeserialize(IntrinsicInst *Intrin) {
   assert(Resumers && "PostSplit coro.id Info argument must refer to an array"
                      "of coroutine subfunctions");
   auto *ResumeAddrConstant =
-      ConstantExpr::getExtractValue(Resumers, CoroSubFnInst::ResumeIndex);
+      ConstantFoldExtractValueInstruction(Resumers, CoroSubFnInst::ResumeIndex);
   auto *ResumePtr = Builder.CreateConstInBoundsGEP2_32(FrameTy, Frame, 0, 0);
   Builder.CreateStore(ResumeAddrConstant, ResumePtr);
   auto *DestroyAddrConstant =
-      ConstantExpr::getExtractValue(Resumers, CoroSubFnInst::DestroyIndex);
+      ConstantFoldExtractValueInstruction(Resumers, CoroSubFnInst::DestroyIndex);
   auto *DestroyPtr = Builder.CreateConstInBoundsGEP2_32(FrameTy, Frame, 0, 1);
   Builder.CreateStore(DestroyAddrConstant, DestroyPtr);
 
@@ -266,4 +272,5 @@ INITIALIZE_PASS(CoroTVMExpand, "coro-tvm-expand",
                 "Coroutine TVM intrinsics expansion",
                 false, false)
 
-Pass *llvm::createCoroTVMExpandPass() { return new CoroTVMExpand(); }
+// TODO(msherstennikov): fix coro in TVM
+//Pass *llvm::createCoroTVMExpandPass() { return new CoroTVMExpand(); }

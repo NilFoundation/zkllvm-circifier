@@ -2036,13 +2036,13 @@ struct DSEState {
 // TVM local begin
 
 /// Return the pointer that is being written to.
-static Value *getStoredPointerOperand(Instruction *I,  const TargetLibraryInfo &TLI) {
+static Value *getStoredPointerOperand(Instruction *I,  DSEState& State) {
   // TODO: factor this to reuse getLocForWrite
-  MemoryLocation Loc = getLocForWrite(I, TLI);
-  assert(Loc.Ptr &&
+  auto Loc = State.getLocForWrite(I);
+  assert(Loc &&
          "unable to find pointer written for analyzable instruction?");
   // TODO: most APIs don't expect const Value *
-  return const_cast<Value *>(Loc.Ptr);
+  return const_cast<Value *>(Loc->Ptr);
 }
 
 /// Check to see if the specified location may alias any of the stack objects in
@@ -2170,11 +2170,13 @@ static bool handleEndBlock(DSEState& State, BasicBlock& BB,
   for (BasicBlock::iterator BBI = BB.end(); BBI != BB.begin();) {
     --BBI;
 
+    auto SPO = getStoredPointerOperand(&*BBI, State);
+
     // If we find a store, check to see if it points into a dead stack value.
-    if (hasAnalyzableMemoryWrite(&*BBI, State.TLI) && isRemovable(&*BBI)) {
+    if (SPO && State.isRemovable(&*BBI)) {
       // See through pointer-to-pointer bitcasts
       SmallVector<const Value *, 4> Pointers;
-      getUnderlyingObjects(getStoredPointerOperand(&*BBI, State.TLI), Pointers);
+      getUnderlyingObjects(SPO, Pointers);
 
       // Stores to stack values are valid candidates for removal.
       bool AllDead = true;
@@ -2387,7 +2389,7 @@ static bool eliminateDeadStores(Function &F, AliasAnalysis &AA,
           continue;
         }
         Instruction *DepWrite = InstDep.getInst();
-        if (!hasAnalyzableMemoryWrite(DepWrite, TLI)) {
+        if (!State.getLocForWrite(DepWrite)) {
           continue;
         }
       }

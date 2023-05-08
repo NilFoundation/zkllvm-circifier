@@ -195,7 +195,8 @@ void InstrEmitter::CreateVirtualRegisters(SDNode *Node,
   // TVM local begin
   // Support for variable return values
   unsigned NumDefs =
-      II.isVariadic() ? NumResults - II.getNumImplicitDefs() : II.getNumDefs();
+      II.isVariadic() ? NumResults - II.implicit_defs().size()
+                      : II.getNumDefs();
   // TVM local end
   bool HasVRegVariadicDefs = !MF->getTarget().usesPhysRegsForValues() &&
                              II.isVariadic() && II.variadicOpsAreDefs();

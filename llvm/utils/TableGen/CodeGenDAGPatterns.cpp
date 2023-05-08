@@ -889,6 +889,7 @@ const TypeSetByHwMode &TypeInfer::getLegalTypes() {
 
 #ifndef NDEBUG
 TypeInfer::ValidateOnExit::~ValidateOnExit() {
+  // TVM local begin
 //  if (Infer.Validate && !VTS.validate()) {
 //    dbgs() << "Type set is empty for each HW mode:\n"
 //              "possible type contradiction in the pattern below "
@@ -901,6 +902,7 @@ TypeInfer::ValidateOnExit::~ValidateOnExit() {
 //                    "Type set is empty for each HW mode in '" +
 //                        Infer.TP.getRecord()->getName() + "'");
 //  }
+  // TVM local end
 }
 #endif
 

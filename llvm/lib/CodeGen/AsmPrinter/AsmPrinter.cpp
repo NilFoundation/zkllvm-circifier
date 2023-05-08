@@ -3051,7 +3051,7 @@ static int isRepeatedByteSequence(const Value *V, const DataLayout &DL) {
     assert(Size % ByteSizeInBits == 0);
 
     // Extend the element to take zero padding into account.
-    APInt Value = CI->getValue().zextOrSelf(Size);
+    APInt Value = CI->getValue().zext(Size);
     if (!Value.isSplat(ByteSizeInBits))
       return -1;
 
@@ -3479,8 +3479,6 @@ static void emitGlobalConstantImpl(const DataLayout &DL, const Constant *CV,
       // TVM local end
     } else {
       emitGlobalConstantLargeInt(CI, AP);
-      //return;
-      break;
     }
 
     // Emit tail padding if needed

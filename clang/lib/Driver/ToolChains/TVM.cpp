@@ -243,7 +243,7 @@ bool TVM::UseObjCMixedDispatch() const { return true; }
 
 bool TVM::isPICDefault() const { return false; }
 
-bool TVM::isPIEDefault() const { return false; }
+bool TVM::isPIEDefault(const llvm::opt::ArgList &Args) const { return false; }
 
 bool TVM::isPICDefaultForced() const { return false; }
 

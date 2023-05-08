@@ -131,7 +131,11 @@ function(llvm_expand_pseudo_components out_components)
   endif()
   foreach(c ${link_components})
     # add codegen, asmprinter, asmparser, disassembler
-    if(${c} IN_LIST LLVM_TARGETS_TO_BUILD)
+    # TODO(msherstennikov): For some reason "TVM" IN_LIST "X86;TVM" return false. Need to figure out why.
+    # Return to the old variant of list element check.
+#    if(${c} IN_LIST LLVM_TARGETS_TO_BUILD)
+    list(FIND LLVM_TARGETS_TO_BUILD ${c} idx)
+    if( NOT idx LESS 0 )
       if(LLVM${c}CodeGen IN_LIST LLVM_AVAILABLE_LIBS)
         list(APPEND expanded_components "${c}CodeGen")
       else()

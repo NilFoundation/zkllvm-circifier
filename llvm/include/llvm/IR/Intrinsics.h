@@ -138,7 +138,6 @@ namespace Intrinsic {
       AMX,
       PPCQuad,
       AnyPtrToElt,
-      AMX,
 
       // TVM local begin
       TVMSlice,

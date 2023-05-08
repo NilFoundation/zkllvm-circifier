@@ -6942,7 +6942,8 @@ void CodeGenFunction::EmitOMPInteropDirective(const OMPInteropDirective &S) {
                                                 DC->getBeginLoc());
     NumDependences = DependencePair.first;
     DependenceAddress = Builder.CreatePointerCast(
-        DependencePair.second.getPointer(), CGM.Int8PtrTy);
+        // TVM local nextline
+        DependencePair.second.getPointer(), CGM.BytePtrTy);
   }
 
   assert(!(S.hasClausesOfKind<OMPNowaitClause>() &&

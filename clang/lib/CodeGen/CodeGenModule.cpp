@@ -648,10 +648,12 @@ void CodeGenModule::Release() {
       else
         GD = GlobalDecl(D);
       UsedArray.push_back(llvm::ConstantExpr::getPointerBitCastOrAddrSpaceCast(
-          GetAddrOfGlobal(GD), Int8PtrTy));
+          // TVM local nextline
+          GetAddrOfGlobal(GD), BytePtrTy));
     }
 
-    llvm::ArrayType *ATy = llvm::ArrayType::get(Int8PtrTy, UsedArray.size());
+    // TVM local nextline
+    llvm::ArrayType *ATy = llvm::ArrayType::get(BytePtrTy, UsedArray.size());
 
     auto *GV = new llvm::GlobalVariable(
         getModule(), ATy, false, llvm::GlobalValue::InternalLinkage,
@@ -2584,15 +2586,13 @@ static void emitUsed(CodeGenModule &CGM, StringRef Name,
   for (unsigned i = 0, e = List.size(); i != e; ++i) {
     UsedArray[i] =
         llvm::ConstantExpr::getPointerBitCastOrAddrSpaceCast(
-            // cast<llvm::Constant>(&*List[i]), CGM.Int8PtrTy);
             // TVM local begin
             cast<llvm::Constant>(&*List[i]), CGM.BytePtrTy);
-    // TVM local end
+            // TVM local end
   }
 
   if (UsedArray.empty())
     return;
-  // llvm::ArrayType *ATy = llvm::ArrayType::get(CGM.Int8PtrTy, UsedArray.size());
   // TVM local begin
   llvm::ArrayType *ATy = llvm::ArrayType::get(CGM.BytePtrTy, UsedArray.size());
   // TVM local end
@@ -2948,7 +2948,6 @@ llvm::Constant *CodeGenModule::EmitAnnotationArgs(const AnnotateAttr *Attr) {
                                       ".args");
   GV->setSection(AnnotationSection);
   GV->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
-  // auto *Bitcasted = llvm::ConstantExpr::getBitCast(GV, GlobalsInt8PtrTy);
   // TVM local begin
   auto *Bitcasted = llvm::ConstantExpr::getBitCast(GV, BytePtrTy);
   // TVM local end

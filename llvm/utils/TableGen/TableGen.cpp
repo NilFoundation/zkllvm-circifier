@@ -145,7 +145,7 @@ cl::opt<ActionType> Action(
         clEnumValN(GenDXILOperation, "gen-dxil-operation",
                    "Generate DXIL operation information"),
         clEnumValN(GenRISCVTargetDef, "gen-riscv-target-def",
-                   "Generate the list of CPU for RISCV")),
+                   "Generate the list of CPU for RISCV"),
         clEnumValN(GenTVMInstMappingInfo, "gen-tvm-instr-mapping-info",
                        "Generate TVM tables")));
 

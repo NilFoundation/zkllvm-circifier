@@ -23,6 +23,8 @@ class TVMTargetMachine;
 class FunctionPass;
 class LoopPass;
 class formatted_raw_ostream;
+class ModulePass;
+class PassRegistry;
 
 FunctionPass *createTVMISelDag(TVMTargetMachine &TM,
                                CodeGenOpt::Level OptLevel);

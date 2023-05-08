@@ -13,6 +13,12 @@ if ("${CMAKE_VERSION}" VERSION_LESS "3.20.0")
     "at least 3.20.0 now to avoid issues in the future!")
 endif()
 
+# TODO: Remove before merging to master
+option(TVM "TVM build" ON)
+if (TVM)
+  add_compile_definitions(__TVM__)
+endif()
+
 set(LLVM_COMMON_CMAKE_UTILS ${CMAKE_CURRENT_SOURCE_DIR}/../cmake)
 include(${LLVM_COMMON_CMAKE_UTILS}/Modules/CMakePolicy.cmake
   NO_POLICY_SCOPE)
@@ -444,6 +450,7 @@ set(LLVM_ALL_TARGETS
   RISCV
   Sparc
   SystemZ
+  TVM
   VE
   WebAssembly
   X86

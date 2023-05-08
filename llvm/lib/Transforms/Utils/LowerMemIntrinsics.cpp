@@ -635,6 +635,7 @@ void llvm::expandAtomicMemCpyAsLoop(AtomicMemCpyInst *AtomicMemcpy,
                               /* DestAlign */ Align(Memcpy->getDestAlignment()),
                               /* SrcIsVolatile */ Memcpy->isVolatile(),
                               /* DstIsVolatile */ Memcpy->isVolatile(),
+                              /* CanOverlap */ true,
                               /* TargetTransformInfo */ TTI);
   } else {
     createMemCpyLoopUnknownSize(/* InsertBefore */ Memcpy,
@@ -645,6 +646,7 @@ void llvm::expandAtomicMemCpyAsLoop(AtomicMemCpyInst *AtomicMemcpy,
                                 /* DestAlign */ Align(Memcpy->getDestAlignment()),
                                 /* SrcIsVolatile */ Memcpy->isVolatile(),
                                 /* DstIsVolatile */ Memcpy->isVolatile(),
+                                /* CanOverlap */ true,
                                 /* TargetTransfomrInfo */ TTI);
   }
 }

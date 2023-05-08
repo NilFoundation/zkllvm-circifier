@@ -395,7 +395,7 @@ EVT TVMTargetLowering::getOptimalMemOpType(
 bool TVMTargetLowering::allowsMisalignedMemoryAccesses(EVT /*VT*/,
                                                        unsigned /*AddrSpace*/,
                                                        Align /*Align*/,
-    MachineMemOperand::Flags /* Flags */, bool * /*Fast*/) const {
+    MachineMemOperand::Flags /* Flags */, unsigned * /*Fast*/) const {
   return true;
 }
 

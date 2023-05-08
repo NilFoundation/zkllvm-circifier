@@ -407,7 +407,8 @@ template <class Derived> struct GenFuncBase {
 
     for (unsigned I = 0; I < N; ++I)
       NewAddrs[I] =
-            Address(PHIs[I], CGF.Int8PtrTy,
+          // TVM local nextline
+            Address(PHIs[I], CGF.BytePtrTy,
                     StartAddrs[I].getAlignment().alignmentAtOffset(EltSize));
 
     EltQT = IsVolatile ? EltQT.withVolatile() : EltQT;

@@ -5383,12 +5383,12 @@ RValue CodeGenFunction::EmitBuiltinExpr(const GlobalDecl GD, unsigned BuiltinID,
     //llvm::Type *BPP = Int8PtrPtrTy;
     // TVM local begin
     llvm::Type *BPP = BytePtrPtrTy;
-    // TVM local end
 
     DestAddr = Address(Builder.CreateBitCast(DestAddr.getPointer(), BPP, "cp"),
-                       Int8PtrTy, DestAddr.getAlignment());
+                       BytePtrTy, DestAddr.getAlignment());
     SrcAddr = Address(Builder.CreateBitCast(SrcAddr.getPointer(), BPP, "ap"),
-                      Int8PtrTy, SrcAddr.getAlignment());
+                      BytePtrTy, SrcAddr.getAlignment());
+    // TVM local end
 
     Value *ArgPtr = Builder.CreateLoad(SrcAddr, "ap.val");
     return RValue::get(Builder.CreateStore(ArgPtr, DestAddr));
@@ -5518,7 +5518,7 @@ RValue CodeGenFunction::EmitBuiltinExpr(const GlobalDecl GD, unsigned BuiltinID,
           Address This = LV.getAddress(*this);
           This = Address(Builder.CreateBitCast(This.getPointer(),
                                                llvmTupTy->getPointerTo()),
-                         This.getAlignment());
+                         llvmTupTy->getPointerTo(), This.getAlignment());
           auto *StructVal = Builder.CreateLoad(This);
           auto e = llvmTupTy->getStructNumElements();
           for (unsigned i = 0; i != e; ++i) {
@@ -8276,7 +8276,7 @@ Value *CodeGenFunction::EmitARMBuiltinExpr(unsigned BuiltinID,
   }
 
   if (BuiltinID == ARM::BI__builtin_sponentry) {
-    llvm::Function *F = CGM.getIntrinsic(Intrinsic::sponentry, AllocaInt8PtrTy);
+    llvm::Function *F = CGM.getIntrinsic(Intrinsic::sponentry, AllocaBytePtrTy);
     return Builder.CreateCall(F);
   }
 
@@ -10309,7 +10309,8 @@ Value *CodeGenFunction::EmitAArch64BuiltinExpr(unsigned BuiltinID,
     Value *Dst = EmitScalarExpr(E->getArg(0));
     Value *Val = EmitScalarExpr(E->getArg(1));
     Value *Size = EmitScalarExpr(E->getArg(2));
-    Dst = Builder.CreatePointerCast(Dst, Int8PtrTy);
+    // TVM local nextline
+    Dst = Builder.CreatePointerCast(Dst, BytePtrTy);
     Val = Builder.CreateTrunc(Val, Int8Ty);
     Size = Builder.CreateIntCast(Size, Int64Ty, false);
     return Builder.CreateCall(
@@ -16509,7 +16510,8 @@ Value *CodeGenFunction::EmitPPCBuiltinExpr(unsigned BuiltinID,
   }
   case PPC::BI__builtin_ppc_load2r: {
     Function *F = CGM.getIntrinsic(Intrinsic::ppc_load2r);
-    Value *Op0 = Builder.CreateBitCast(EmitScalarExpr(E->getArg(0)), Int8PtrTy);
+    // TVM local nextline
+    Value *Op0 = Builder.CreateBitCast(EmitScalarExpr(E->getArg(0)), BytePtrTy);
     Value *LoadIntrinsic = Builder.CreateCall(F, {Op0});
     return Builder.CreateTrunc(LoadIntrinsic, Int16Ty);
   }

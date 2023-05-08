@@ -851,10 +851,9 @@ void HWAddressSanitizer::instrumentMemAccessInline(Value *Ptr, bool IsWrite,
                                   IRB.getInt8Ty());
   Value *AddrLong = untagPointer(IRB, PtrLong);
   Value *Shadow = memToShadow(AddrLong, IRB);
-// Value *MemTag = IRB.CreateLoad(Int8Ty, Shadow);
   // TVM local begin
-  Value *MemTag =
-      IRB.CreateLoad(IRB.CreateIntToPtr(Shadow, IRB.getIntBytePtrTy()));
+  Value *MemTag = IRB.CreateLoad(
+      IRB.getIntBytePtrTy(), IRB.CreateIntToPtr(Shadow, IRB.getIntBytePtrTy()));
   // TVM local end
 
   Value *TagMismatch = IRB.CreateICmpNE(PtrTag, MemTag);

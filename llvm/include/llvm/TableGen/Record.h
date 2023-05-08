@@ -836,11 +836,9 @@ class BinOpInit : public OpInit, public FoldingSetNode {
 public:
   enum BinaryOp : uint8_t {
     ADD,
-#ifndef __TVM__
     SUB,
     MUL,
     DIV,
-#endif
     AND,
     OR,
     XOR,

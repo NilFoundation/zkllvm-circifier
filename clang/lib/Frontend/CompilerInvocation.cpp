@@ -1613,7 +1613,8 @@ bool CompilerInvocation::ParseCodeGenArgs(CodeGenOptions &Opts, ArgList &Args,
 #undef CODEGEN_OPTION_WITH_MARSHALLING
 
   // TVM local begin
-  Opts.LegacyPassManager = 1;
+  // TODO(msherstennikov): Fix pass manager
+//  Opts.LegacyPassManager = 1;
   // For compatibility with Clang7, maybe excessive
   Opts.setFiniteLoops(CodeGenOptions::FiniteLoopsKind::Never);
   // TVM local end

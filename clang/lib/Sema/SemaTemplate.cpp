@@ -3597,7 +3597,7 @@ void Sema::NoteAllFoundTemplates(TemplateName Name) {
 // TVM local begin
 template <class AttrT>
 static QualType processFlagAttribute(
-    Sema &SemaRef, const SmallVectorImpl<TemplateArgument> &Converted,
+    Sema &SemaRef, ArrayRef<TemplateArgument> &Converted,
     SourceLocation TemplateLoc, TemplateArgumentListInfo &TemplateArgs) {
   ASTContext &Context = SemaRef.getASTContext();
   assert(Converted.size() == 4 &&
@@ -3633,7 +3633,7 @@ static QualType processFlagAttribute(
 
 template <class AttrT>
 static QualType processByPtrFlagAttribute(
-    Sema &SemaRef, const SmallVectorImpl<TemplateArgument> &Converted,
+    Sema &SemaRef, ArrayRef<TemplateArgument> &Converted,
     SourceLocation TemplateLoc, TemplateArgumentListInfo &TemplateArgs) {
   ASTContext &Context = SemaRef.getASTContext();
   assert(Converted.size() == 3 && "__reflect_method_ptr_'attr_name'<T, "
@@ -4378,7 +4378,8 @@ checkBuiltinTemplateIdType(Sema &SemaRef, BuiltinTemplateDecl *BTD,
       Stmt *Return =
           SemaRef.BuildReturnStmt(TemplateLoc, CallExpr.get()).get();
       NewMeth->setBody(
-          CompoundStmt::Create(Context, Return, TemplateLoc, TemplateLoc));
+          CompoundStmt::Create(Context, Return, FPOptionsOverride{},
+                               TemplateLoc, TemplateLoc));
       NewRec->addDecl(NewMeth);
     }
     NewRec->completeDefinition();

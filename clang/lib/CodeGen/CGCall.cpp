@@ -1106,7 +1106,7 @@ void CodeGenFunction::ExpandTypeFromArgs(QualType Ty, LValue LV,
 
     This = Address(
         Builder.CreateBitCast(This.getPointer(), llvmTupTy->getPointerTo()),
-        This.getAlignment());
+        llvmTupTy->getPointerTo(), This.getAlignment());
 
     LValue SubLV = MakeAddrLValue(This, TupTy);
     ExpandTypeFromArgs(TupTy, SubLV, AI);
@@ -1181,7 +1181,7 @@ void CodeGenFunction::ExpandTypeToArgs(
     auto *llvmTupTy = CGM.getTypes().ConvertType(TupTy)->getPointerTo();
 
     This = Address(Builder.CreateBitCast(This.getPointer(), llvmTupTy),
-                   This.getAlignment());
+                   llvmTupTy->getPointerTo(), This.getAlignment());
 
     CallArg TupleThis = CallArg(RValue::getAggregate(This), TupTy);
     ExpandTypeToArgs(TupTy, TupleThis, IRFuncTy, IRCallArgs, IRCallArgPos);
@@ -1384,17 +1384,13 @@ static llvm::Value *CreateCoercedLoad(Address Src, llvm::Type *Ty,
   // Otherwise do coercion through memory. This is stupid, but simple.
   Address Tmp =
       CreateTempAllocaForCoercion(CGF, Ty, Src.getAlignment(), Src.getName());
-  //CGF.Builder.CreateMemCpy(
-  //    Tmp.getPointer(), Tmp.getAlignment().getAsAlign(), Src.getPointer(),
-  //    Src.getAlignment().getAsAlign(),
-  //    llvm::ConstantInt::get(CGF.IntPtrTy, SrcSize.getKnownMinSize()));
-  //return CGF.Builder.CreateLoad(Tmp);
   // TVM local begin
-  Address Casted = CGF.Builder.CreateBitCast(Tmp, CGF.AllocaBytePtrTy);
-  Address SrcCasted = CGF.Builder.CreateBitCast(Src, CGF.AllocaBytePtrTy);
+  Address Casted = CGF.Builder.CreateElementBitCast(Tmp, CGF.AllocaBytePtrTy);
+  Address SrcCasted = CGF.Builder.CreateElementBitCast(Src, CGF.AllocaBytePtrTy);
   CGF.Builder.CreateMemCpy(
       Casted, SrcCasted, llvm::ConstantInt::get(CGF.IntPtrTy, SrcSize), false);
   // TVM local end
+  return CGF.Builder.CreateLoad(Tmp);
 }
 
 // TVM local begin
@@ -1443,12 +1439,6 @@ void CodeGenFunction::EmitAggregateStore(llvm::Value *Val, Address Dest,
                                          bool DestIsVolatile) {
   // Prefer scalar stores to first-class aggregate stores.
   if (llvm::StructType *STy = dyn_cast<llvm::StructType>(Val->getType())) {
-    //for (unsigned i = 0, e = STy->getNumElements(); i != e; ++i) {
-    //  Address EltPtr = Builder.CreateStructGEP(Dest, i);
-    //  llvm::Value *Elt = Builder.CreateExtractValue(Val, i);
-    //  Builder.CreateStore(Elt, EltPtr, DestIsVolatile);
-    // }
-
     // TVM local begin
     const llvm::StructLayout *Layout =
         CGM.getDataLayout().getStructLayout(STy);
@@ -1457,13 +1447,12 @@ void CodeGenFunction::EmitAggregateStore(llvm::Value *Val, Address Dest,
     if (getTarget().getTriple().getArch() == llvm::Triple::tvm)
       if (STyDst && STy->isLiteral() && STyDst->isLiteral()) {
         Address Ptr =
-            Builder.CreateBitCast(Dest, Val->getType()->getPointerTo());
+            Builder.CreateElementBitCast(Dest, Val->getType()->getPointerTo());
         Builder.CreateStore(Val, Ptr, DestIsVolatile);
         return;
       }
 
     for (unsigned i = 0, e = STy->getNumElements(); i != e; ++i) {
-      auto EltOffset = CharUnits::fromQuantity(Layout->getElementOffset(i));
       Address EltPtr = Builder.CreateStructGEP(Dest, i);
       llvm::Value *Elt = Builder.CreateExtractValue(Val, i);
       Builder.CreateStore(Elt, EltPtr, DestIsVolatile);
@@ -1545,14 +1534,10 @@ static void CreateCoercedStore(llvm::Value *Src,
     // FIXME: Assert that we aren't truncating non-padding bits when have access
     // to that information.
     Address Tmp = CreateTempAllocaForCoercion(CGF, SrcTy, Dst.getAlignment());
-    //CGF.Builder.CreateStore(Src, Tmp);
-    //CGF.Builder.CreateMemCpy(
-    //    Dst.getPointer(), Dst.getAlignment().getAsAlign(), Tmp.getPointer(),
-    //    Tmp.getAlignment().getAsAlign(),
-    //    llvm::ConstantInt::get(CGF.IntPtrTy, DstSize.getFixedValue()));
     // TVM local begin
-    Address Casted = CGF.Builder.CreateBitCast(Tmp, CGF.AllocaBytePtrTy);
-    Address DstCasted = CGF.Builder.CreateBitCast(Dst, CGF.AllocaBytePtrTy);
+    Address Casted = CGF.Builder.CreateElementBitCast(Tmp, CGF.AllocaBytePtrTy);
+    Address DstCasted =
+        CGF.Builder.CreateElementBitCast(Dst, CGF.AllocaBytePtrTy);
     // TVM local end
     CGF.Builder.CreateMemCpy(DstCasted, Casted,
                              llvm::ConstantInt::get(CGF.IntPtrTy, DstSize),
@@ -2971,14 +2956,10 @@ void CodeGenFunction::EmitFunctionProlog(const CGFunctionInfo &FI,
           // FIXME: We should have a common utility for generating an aggregate
           // copy.
           CharUnits Size = getContext().getTypeSizeInChars(Ty);
-          //Builder.CreateMemCpy(
-          //    AlignedTemp.getPointer(), AlignedTemp.getAlignment().getAsAlign(),
-          //    ParamAddr.getPointer(), ParamAddr.getAlignment().getAsAlign(),
-          //    llvm::ConstantInt::get(IntPtrTy, Size.getQuantity()));
           // TVM local begin
           auto SizeVal = llvm::ConstantInt::get(IntPtrTy, Size.getQuantity());
-          Address Dst = Builder.CreateBitCast(AlignedTemp, BytePtrTy);
-          Address Src = Builder.CreateBitCast(ParamAddr, BytePtrTy);
+          Address Dst = Builder.CreateElementBitCast(AlignedTemp, BytePtrTy);
+          Address Src = Builder.CreateElementBitCast(ParamAddr, BytePtrTy);
           // TVM local end
           Builder.CreateMemCpy(Dst, Src, SizeVal, false);
           V = AlignedTemp;

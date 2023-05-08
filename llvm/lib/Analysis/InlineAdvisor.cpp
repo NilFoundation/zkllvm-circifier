@@ -425,7 +425,7 @@ llvm::shouldInline(CallBase &CB,
              << NV("Caller", Caller) << " because it should never be inlined "
              << IC;
     });
-    return None;
+    return std::nullopt;
   }
   // TVM local end
 

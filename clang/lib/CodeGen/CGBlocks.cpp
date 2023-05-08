@@ -2176,7 +2176,8 @@ public:
                 Address srcField) override {
     destField = CGF.Builder.CreateElementBitCast(destField, CGF.Int8Ty);
 
-    srcField = CGF.Builder.CreateElementBitCast(srcField, CGF.Int8PtrTy);
+    // TVM local nextline
+    srcField = CGF.Builder.CreateElementBitCast(srcField, CGF.BytePtrTy);
     llvm::Value *srcValue = CGF.Builder.CreateLoad(srcField);
 
     unsigned flags = (Flags | BLOCK_BYREF_CALLER).getBitMask();

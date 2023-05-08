@@ -1511,9 +1511,12 @@ std::optional<sroa::RewriteableMemOps>
 SROAPass::isSafeSelectToSpeculate(SelectInst &SI, bool PreserveCFG) {
   RewriteableMemOps Ops;
 #ifdef __TVM__
-  Value *TValue = SI.getTrueValue();
-  Value *FValue = SI.getFalseValue();
-  return processSelectUsers(&SI, TValue, FValue, DL);
+  return {};
+  // TODO(msherstennikov): Revive the commented code
+//  Value *TValue = SI.getTrueValue();
+//  Value *FValue = SI.getFalseValue();
+//  const DataLayout &DL = SI.getModule()->getDataLayout();
+//  return processSelectUsers(&SI, TValue, FValue, DL);
 #else
   for (User *U : SI.users()) {
     if (auto *BC = dyn_cast<BitCastInst>(U); BC && BC->hasOneUse())
@@ -1581,9 +1584,11 @@ static void processSelectUsersForSpeculate(Instruction *Val, Value *TV,
     }
     // TVM local end
     LoadInst *TL =
-        IRB.CreateLoad(TV, LI->getName() + ".sroa.speculate.load.true");
+        IRB.CreateLoad(IRB.getIntBytePtrTy(), TV,
+                       LI->getName() + ".sroa.speculate.load.true");
     LoadInst *FL =
-        IRB.CreateLoad(FV, LI->getName() + ".sroa.speculate.load.false");
+        IRB.CreateLoad(IRB.getIntBytePtrTy(), FV,
+                       LI->getName() + ".sroa.speculate.load.false");
     NumLoadsSpeculated += 2;
 
     // Transfer alignment and AA info if present.

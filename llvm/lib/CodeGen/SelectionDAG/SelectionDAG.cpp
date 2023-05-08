@@ -7458,7 +7458,7 @@ SDValue SelectionDAG::getMemcpy(SDValue Chain, const SDLoc &dl, SDValue Dst,
     if (ConstantSize->isZero())
       return Chain;
 
-#if 1 //def __TVM__
+#ifdef __TVM__
     // TVM local begin: 64-bit check
     if (ConstantSize->getAPIntValue().isIntN(64)) {
       SDValue Result = getMemcpyLoadsAndStores(
@@ -7474,8 +7474,8 @@ SDValue SelectionDAG::getMemcpy(SDValue Chain, const SDLoc &dl, SDValue Dst,
         isVol, false, DstPtrInfo, SrcPtrInfo, AAInfo, AA);
     if (Result.getNode())
       return Result;
-  }
 #endif
+  }
 
   // Then check to see if we should lower the memcpy with target-specific
   // code. If the target chooses to do this, this is the next best.
@@ -7692,13 +7692,12 @@ SDValue SelectionDAG::getMemset(SDValue Chain, const SDLoc &dl, SDValue Dst,
     if (ConstantSize->isZero())
       return Chain;
 
-#if 1 //def __TVM__
+#ifdef __TVM__
     // TVM local begin: 64-bit check
     if (ConstantSize->getAPIntValue().isIntN(64)) {
       SDValue Result = getMemsetStores(*this, dl, Chain, Dst, Src,
                                        ConstantSize->getZExtValue(), Alignment,
-                                       isVol, DstPtrInfo, AAInfo);
-
+                                       isVol, false, DstPtrInfo, AAInfo);
       if (Result.getNode())
         return Result;
     }
@@ -11630,7 +11629,7 @@ MaybeAlign SelectionDAG::InferPtrAlign(SDValue Ptr) const {
     FrameIdx = cast<FrameIndexSDNode>(Ptr.getOperand(0))->getIndex();
     // TVM local begin: 64-bit check
     if (!cast<ConstantSDNode>(Ptr.getOperand(1))->getAPIntValue().isIntN(64))
-      return None /*0 */;
+      return std::nullopt;
     // TVM local end
     FrameOffset = Ptr.getConstantOperandVal(1);
   }

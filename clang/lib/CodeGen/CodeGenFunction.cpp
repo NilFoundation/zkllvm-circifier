@@ -574,14 +574,13 @@ CodeGenFunction::DecodeAddrUsedInPrologue(llvm::Value *F,
   auto *PCRelAsInt = Builder.CreateSExt(EncodedAddr, IntPtrTy);
   auto *FuncAsInt = Builder.CreatePtrToInt(F, IntPtrTy, "func_addr.int");
   auto *GOTAsInt = Builder.CreateAdd(PCRelAsInt, FuncAsInt, "global_addr.int");
-  // auto *GOTAddr = Builder.CreateIntToPtr(GOTAsInt, Int8PtrPtrTy, "global_addr");
   // TVM local begin
   auto *GOTAddr = Builder.CreateIntToPtr(GOTAsInt, BytePtrPtrTy, "global_addr");
-  // TVM local end
 
   // Load the original pointer through the global.
-  return Builder.CreateLoad(Address(GOTAddr, Int8PtrTy, getPointerAlign()),
+  return Builder.CreateLoad(Address(GOTAddr, BytePtrTy, getPointerAlign()),
                             "decoded_addr");
+  // TVM local end
 }
 
 void CodeGenFunction::EmitKernelMetadata(const FunctionDecl *FD,
@@ -2512,8 +2511,7 @@ void CodeGenFunction::EmitVarAnnotations(const VarDecl *D, llvm::Value *V) {
   // FIXME We create a new bitcast for every annotation because that's what
   // llvm-gcc was doing.
   unsigned AS = V->getType()->getPointerAddressSpace();
-  // TVM local nextline
-  llvm::Type *I8PtrTy = Builder.getBytePtrTy(AS);
+  llvm::Type *I8PtrTy = Builder.getInt8PtrTy(AS);
   for (const auto *I : D->specific_attrs<AnnotateAttr>())
     EmitAnnotationCall(CGM.getIntrinsic(llvm::Intrinsic::var_annotation,
                                         {I8PtrTy, CGM.ConstGlobalsPtrTy}),

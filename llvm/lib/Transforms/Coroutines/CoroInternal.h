@@ -19,7 +19,7 @@ namespace llvm {
 class CallGraph;
 
 // TVM local begin
-void initializeCoroTVMExpandPass(PassRegistry &);
+//void initializeCoroTVMExpandPass(PassRegistry &);
 // TVM local end
 
 namespace coro {

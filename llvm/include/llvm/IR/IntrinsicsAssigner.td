@@ -16,3 +16,4 @@ def int_assigner_poseidon:  Intrinsic<[llvm_anyvector_ty], [LLVMMatchType<0>]>;
 def int_assigner_sha2_256:  Intrinsic<[llvm_anyvector_ty], [LLVMMatchType<0>, LLVMMatchType<0>]>;
 def int_assigner_sha2_512:  Intrinsic<[llvm_anyvector_ty], [LLVMMatchType<0>, LLVMMatchType<0>]>;
 def int_assigner_optimal_ate_pairing: Intrinsic<[llvm_anyvector_ty], [llvm_any_ty, llvm_anyvector_ty]>;
+def int_assigner_zkml_convolution:      Intrinsic<[llvm_ptrptr_ty], [llvm_ptrptr_ty, llvm_ptrptr_ty]>;

@@ -19861,6 +19861,18 @@ Value *CodeGenFunction::EmitAssignerBuiltinExpr(unsigned int BuiltinID,
     ID = Intrinsic::assigner_zkml_convolution;
     break;
   }
+  case assigner::BI__builtin_assigner_zkml_pooling: {
+    ID = Intrinsic::assigner_zkml_pooling;
+    break;
+  }
+  case assigner::BI__builtin_assigner_zkml_ReLU: {
+    ID = Intrinsic::assigner_zkml_ReLU;
+    break;
+  }
+  case assigner::BI__builtin_assigner_zkml_batch_norm: {
+    ID = Intrinsic::assigner_zkml_batch_norm;
+    break;
+  }
   }
 
   // assert(ID != Intrinsic::not_intrinsic && OverloadTypes.size() != 0);

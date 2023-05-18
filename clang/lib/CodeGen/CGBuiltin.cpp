@@ -19873,7 +19873,6 @@ Value *CodeGenFunction::EmitAssignerBuiltinExpr(unsigned int BuiltinID,
   }
   }
 
-  // assert(ID != Intrinsic::not_intrinsic && OverloadTypes.size() != 0);
   assert(ID != Intrinsic::not_intrinsic);
 
   llvm::Function *F = CGM.getIntrinsic(ID, OverloadTypes);

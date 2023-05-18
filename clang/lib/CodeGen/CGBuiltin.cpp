@@ -19820,11 +19820,9 @@ Value *CodeGenFunction::EmitAssignerBuiltinExpr(unsigned int BuiltinID,
     llvm_unreachable("unexpected builtin ID.");
   case assigner::BI__builtin_assigner_malloc:
     ID = Intrinsic::assigner_malloc;
-    OverloadTypes = {ConvertType(E->getType())};
     break;
   case assigner::BI__builtin_assigner_free:
     ID = Intrinsic::assigner_free;
-    OverloadTypes = {llvm::Type::getInt8PtrTy(context)};
     break;
   case assigner::BI__builtin_assigner_poseidon_pallas_base: {
     ID = Intrinsic::assigner_poseidon;

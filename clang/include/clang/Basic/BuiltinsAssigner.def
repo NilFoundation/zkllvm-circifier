@@ -24,7 +24,10 @@ BUILTIN(__builtin_assigner_poseidon_pallas_base, "E3g1E3g1", "n")
 BUILTIN(__builtin_assigner_sha2_256_pallas_base, "E2g1E2g1E2g1", "n")
 BUILTIN(__builtin_assigner_sha2_512_pallas_base, "E4g1E4g1E4g1", "n")
 BUILTIN(__builtin_assigner_bls12_optimal_ate_pairing, "E12g3e3E4g3", "n")
-BUILTIN(__builtin_assigner_zkml_convolution, "v**v**v**", "n")
+BUILTIN(__builtin_assigner_zkml_convolution, "v**v**v**z", "n")
+BUILTIN(__builtin_assigner_zkml_pooling, "v**v**z", "n")
+BUILTIN(__builtin_assigner_zkml_ReLU, "ff", "n")
+BUILTIN(__builtin_assigner_zkml_batch_norm, "v**v**", "n")
 
 #undef BUILTIN
 #undef TARGET_BUILTIN

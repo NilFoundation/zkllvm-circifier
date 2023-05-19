@@ -19840,11 +19840,43 @@ Value *CodeGenFunction::EmitAssignerBuiltinExpr(unsigned int BuiltinID,
     OverloadTypes = {llvm::FixedVectorType::get(ElemTy, 2)};
     break;
   }
-  case assigner::BI__builtin_assigner_sha2_512_pallas_base: {
+  case assigner::BI__builtin_assigner_sha2_512_curve25519: {
     ID = Intrinsic::assigner_sha2_512;
-    auto ElemTy = llvm::GaloisFieldType::get(context,
-                                             llvm::GALOIS_FIELD_PALLAS_BASE);
-    OverloadTypes = {llvm::FixedVectorType::get(ElemTy, 4)};
+    auto Curve25519ElemTy = llvm::FixedVectorType::get(
+        llvm::GaloisFieldType::get(context, llvm::GALOIS_FIELD_CURVE25519_BASE), 2);
+    auto Curve25519ScalarFieldElemTy = llvm::GaloisFieldType::get(context,
+                                             llvm::GALOIS_FIELD_CURVE25519_SCALAR);
+    OverloadTypes = {Curve25519ScalarFieldElemTy, Curve25519ElemTy};
+    break;
+  }
+  case assigner::BI__builtin_assigner_curve25519_affine_addition: {
+    ID = Intrinsic::assigner_curve25519_affine_addition;
+    auto Curve25519ElemTy = llvm::FixedVectorType::get(
+        llvm::GaloisFieldType::get(context, llvm::GALOIS_FIELD_CURVE25519_BASE), 2);
+    OverloadTypes = {Curve25519ElemTy};
+    break;
+  }
+  case assigner::BI__builtin_assigner_curve25519_affine_subtraction: {
+    ID = Intrinsic::assigner_curve25519_affine_subtraction;
+    auto Curve25519ElemTy = llvm::FixedVectorType::get(
+        llvm::GaloisFieldType::get(context, llvm::GALOIS_FIELD_CURVE25519_BASE), 2);
+    OverloadTypes = {Curve25519ElemTy};
+    break;
+  }
+  case assigner::BI__builtin_assigner_curve25519_affine_double: {
+    ID = Intrinsic::assigner_curve25519_affine_double;
+    auto Curve25519ElemTy = llvm::FixedVectorType::get(
+        llvm::GaloisFieldType::get(context, llvm::GALOIS_FIELD_CURVE25519_BASE), 2);
+    OverloadTypes = {Curve25519ElemTy};
+    break;
+  }
+  case assigner::BI__builtin_assigner_curve25519_affine_scalar_mul: {
+    ID = Intrinsic::assigner_curve25519_affine_scalar_mul;
+    auto Curve25519ElemTy = llvm::FixedVectorType::get(
+        llvm::GaloisFieldType::get(context, llvm::GALOIS_FIELD_CURVE25519_BASE), 2);
+    auto Curve25519ScalarFieldElemTy = llvm::GaloisFieldType::get(context,
+                                             llvm::GALOIS_FIELD_CURVE25519_SCALAR);
+    OverloadTypes = {Curve25519ElemTy, Curve25519ScalarFieldElemTy};
     break;
   }
   case assigner::BI__builtin_assigner_bls12_optimal_ate_pairing: {

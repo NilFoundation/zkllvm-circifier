@@ -22,7 +22,7 @@ BUILTIN(__builtin_assigner_malloc, "v*z", "n")
 BUILTIN(__builtin_assigner_free, "vv*", "n")
 BUILTIN(__builtin_assigner_poseidon_pallas_base, "E3g1E3g1", "n")
 BUILTIN(__builtin_assigner_sha2_256_pallas_base, "E2g1E2g1E2g1", "n")
-BUILTIN(__builtin_assigner_sha2_512_curve25519, "g6E2g5E2g5E2g5", "n")
+BUILTIN(__builtin_assigner_sha2_512_curve25519, "g6E2g5E2g5E4g1", "n")
 BUILTIN(__builtin_assigner_bls12_optimal_ate_pairing, "E12g3e3E4g3", "n")
 
 BUILTIN(__builtin_assigner_curve25519_affine_addition, "E2g5E2g5E2g5", "n")

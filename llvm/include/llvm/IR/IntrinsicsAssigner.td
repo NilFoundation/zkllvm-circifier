@@ -14,7 +14,7 @@ def int_assigner_malloc:    Intrinsic<[llvm_anyptr_ty], [llvm_i64_ty]>;
 def int_assigner_free:      Intrinsic<[], [llvm_anyptr_ty]>;
 def int_assigner_poseidon:  Intrinsic<[llvm_anyvector_ty], [LLVMMatchType<0>]>;
 def int_assigner_sha2_256:  Intrinsic<[llvm_anyvector_ty], [LLVMMatchType<0>, LLVMMatchType<0>]>;
-def int_assigner_sha2_512:  Intrinsic<[llvm_any_ty], [llvm_anyvector_ty, LLVMMatchType<1>, LLVMMatchType<1>]>;
+def int_assigner_sha2_512:  Intrinsic<[llvm_any_ty], [llvm_anyvector_ty, LLVMMatchType<1>, llvm_anyvector_ty]>;
 def int_assigner_curve25519_affine_addition:  Intrinsic<[llvm_anyvector_ty], [LLVMMatchType<0>, LLVMMatchType<0>]>;
 def int_assigner_curve25519_affine_subtraction:  Intrinsic<[llvm_anyvector_ty], [LLVMMatchType<0>, LLVMMatchType<0>]>;
 def int_assigner_curve25519_affine_double:  Intrinsic<[llvm_anyvector_ty], [LLVMMatchType<0>]>;

@@ -19846,7 +19846,10 @@ Value *CodeGenFunction::EmitAssignerBuiltinExpr(unsigned int BuiltinID,
         llvm::GaloisFieldType::get(context, llvm::GALOIS_FIELD_CURVE25519_BASE), 2);
     auto Curve25519ScalarFieldElemTy = llvm::GaloisFieldType::get(context,
                                              llvm::GALOIS_FIELD_CURVE25519_SCALAR);
-    OverloadTypes = {Curve25519ScalarFieldElemTy, Curve25519ElemTy};
+    auto PallasBaseFieldElemTy = llvm::GaloisFieldType::get(context,
+                                             llvm::GALOIS_FIELD_PALLAS_BASE);
+    OverloadTypes = {Curve25519ScalarFieldElemTy, Curve25519ElemTy,
+      llvm::FixedVectorType::get(PallasBaseFieldElemTy, 4)};
     break;
   }
   case assigner::BI__builtin_assigner_curve25519_affine_addition: {

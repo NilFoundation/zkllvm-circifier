@@ -19840,9 +19840,15 @@ Value *CodeGenFunction::EmitAssignerBuiltinExpr(unsigned int BuiltinID,
   }
   case assigner::BI__builtin_assigner_sha2_512_pallas_base: {
     ID = Intrinsic::assigner_sha2_512;
-    auto ElemTy = llvm::GaloisFieldType::get(context,
+    auto Curve25519ElemTy = llvm::FixedVectorType::get(
+        llvm::GaloisFieldType::get(context, llvm::GALOIS_FIELD_CURVE25519_BASE), 2);
+    auto Curve25519ScalarFieldElemTy = llvm::GaloisFieldType::get(context,
+                                             llvm::GALOIS_FIELD_CURVE25519_SCALAR);
+    auto PallasBaseFieldElemTy = llvm::GaloisFieldType::get(context,
                                              llvm::GALOIS_FIELD_PALLAS_BASE);
-    OverloadTypes = {llvm::FixedVectorType::get(ElemTy, 4)};
+    OverloadTypes = {Curve25519ScalarFieldElemTy, Curve25519ElemTy,
+      llvm::FixedVectorType::get(PallasBaseFieldElemTy, 4)};
+>>>>>>> b050616f4156 (SHA512 builtin last parameter updated.)
     break;
   }
   case assigner::BI__builtin_assigner_bls12_optimal_ate_pairing: {
@@ -19872,7 +19878,6 @@ Value *CodeGenFunction::EmitAssignerBuiltinExpr(unsigned int BuiltinID,
     break;
   }
   }
-
   assert(ID != Intrinsic::not_intrinsic);
 
   llvm::Function *F = CGM.getIntrinsic(ID, OverloadTypes);

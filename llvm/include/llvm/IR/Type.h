@@ -225,10 +225,6 @@ public:
   /// True if this is an instance of IntegerType.
   bool isIntegerTy() const { return getTypeID() == IntegerTyID; }
 
-  bool isFieldTy() const { return getTypeID() == GaloisFieldTyID; }
-
-  bool isCurveTy() const { return getTypeID() == EllipticCurveTyID; }
-
   /// Return true if this is an IntegerType of the given width.
   bool isIntegerTy(unsigned Bitwidth) const;
 
@@ -246,6 +242,17 @@ public:
 
   /// Return true if this is an integer type or a pointer type.
   bool isIntOrPtrTy() const { return isIntegerTy() || isPointerTy(); }
+
+  /// True if this is an instance of GaloisFieldType.
+  bool isFieldTy() const { return getTypeID() == GaloisFieldTyID; }
+
+  /// True if this is an instance of EllipticCurveType.
+  bool isCurveTy() const { return getTypeID() == EllipticCurveTyID; }
+
+  /// Return true if this is an field type or a vector of field types.
+  bool isFieldOrFieldVectorTy() const {
+    return getScalarType()->isFieldTy();
+  }
 
   /// True if this is an instance of FunctionType.
   bool isFunctionTy() const { return getTypeID() == FunctionTyID; }

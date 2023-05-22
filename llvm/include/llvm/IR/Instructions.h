@@ -1202,7 +1202,7 @@ class ICmpInst: public CmpInst {
           "Both operands to ICmp instruction are not of the same type!");
     // Check that the operands are the right type
     assert((getOperand(0)->getType()->isIntOrIntVectorTy() ||
-            getOperand(0)->getType()->isFieldTy() ||
+            getOperand(0)->getType()->isFieldOrFieldVectorTy() ||
             getOperand(0)->getType()->isCurveTy() ||
             getOperand(0)->getType()->isPtrOrPtrVectorTy()) &&
            "Invalid operand types for ICmp instruction");

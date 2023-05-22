@@ -7147,7 +7147,7 @@ bool LLParser::parseCompare(Instruction *&Inst, PerFunctionState &PFS,
   } else {
     assert(Opc == Instruction::ICmp && "Unknown opcode for CmpInst!");
     if (!LHS->getType()->isIntOrIntVectorTy() &&
-        !LHS->getType()->isFieldTy() &&
+        !LHS->getType()->isFieldOrFieldVectorTy() &&
         !LHS->getType()->isCurveTy() &&
         !LHS->getType()->isPtrOrPtrVectorTy())
       return error(Loc, "icmp requires integer operands");

@@ -19820,11 +19820,9 @@ Value *CodeGenFunction::EmitAssignerBuiltinExpr(unsigned int BuiltinID,
     llvm_unreachable("unexpected builtin ID.");
   case assigner::BI__builtin_assigner_malloc:
     ID = Intrinsic::assigner_malloc;
-    OverloadTypes = {ConvertType(E->getType())};
     break;
   case assigner::BI__builtin_assigner_free:
     ID = Intrinsic::assigner_free;
-    OverloadTypes = {llvm::Type::getInt8PtrTy(context)};
     break;
   case assigner::BI__builtin_assigner_poseidon_pallas_base: {
     ID = Intrinsic::assigner_poseidon;
@@ -19892,9 +19890,25 @@ Value *CodeGenFunction::EmitAssignerBuiltinExpr(unsigned int BuiltinID,
         llvm::EllipticCurveType::get(context, llvm::ELLIPTIC_CURVE_BLS12381);
     OverloadTypes = {Vec12Ty, CurveTy, Vec4Ty};
   }
+  case assigner::BI__builtin_assigner_zkml_convolution: {
+    ID = Intrinsic::assigner_zkml_convolution;
+    break;
+  }
+  case assigner::BI__builtin_assigner_zkml_pooling: {
+    ID = Intrinsic::assigner_zkml_pooling;
+    break;
+  }
+  case assigner::BI__builtin_assigner_zkml_ReLU: {
+    ID = Intrinsic::assigner_zkml_ReLU;
+    break;
+  }
+  case assigner::BI__builtin_assigner_zkml_batch_norm: {
+    ID = Intrinsic::assigner_zkml_batch_norm;
+    break;
+  }
   }
 
-  assert(ID != Intrinsic::not_intrinsic && OverloadTypes.size() != 0);
+  assert(ID != Intrinsic::not_intrinsic);
 
   llvm::Function *F = CGM.getIntrinsic(ID, OverloadTypes);
   return Builder.CreateCall(F, Ops);

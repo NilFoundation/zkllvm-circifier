@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-def int_assigner_malloc:    Intrinsic<[llvm_anyptr_ty], [llvm_i64_ty]>;
-def int_assigner_free:      Intrinsic<[], [llvm_anyptr_ty]>;
+def int_assigner_malloc:    Intrinsic<[llvm_ptr_ty], [llvm_i64_ty]>;
+def int_assigner_free:      Intrinsic<[], [llvm_ptr_ty]>;
 def int_assigner_poseidon:  Intrinsic<[llvm_anyvector_ty], [LLVMMatchType<0>]>;
 def int_assigner_sha2_256:  Intrinsic<[llvm_anyvector_ty], [LLVMMatchType<0>, LLVMMatchType<0>]>;
 def int_assigner_sha2_512:  Intrinsic<[llvm_any_ty], [llvm_anyvector_ty, LLVMMatchType<1>, llvm_anyvector_ty]>;
@@ -20,3 +20,7 @@ def int_assigner_curve25519_affine_subtraction:  Intrinsic<[llvm_anyvector_ty], 
 def int_assigner_curve25519_affine_double:  Intrinsic<[llvm_anyvector_ty], [LLVMMatchType<0>]>;
 def int_assigner_curve25519_affine_scalar_mul:  Intrinsic<[llvm_anyvector_ty], [LLVMMatchType<0>, llvm_any_ty]>;
 def int_assigner_optimal_ate_pairing: Intrinsic<[llvm_anyvector_ty], [llvm_any_ty, llvm_anyvector_ty]>;
+def int_assigner_zkml_convolution:    Intrinsic<[llvm_ptrptr_ty], [llvm_ptrptr_ty, llvm_ptrptr_ty, llvm_i64_ty]>;
+def int_assigner_zkml_pooling:        Intrinsic<[llvm_ptrptr_ty], [llvm_ptrptr_ty, llvm_i64_ty]>;
+def int_assigner_zkml_ReLU:           Intrinsic<[llvm_float_ty], [llvm_float_ty]>;
+def int_assigner_zkml_batch_norm:     Intrinsic<[llvm_ptrptr_ty], [llvm_ptrptr_ty]>;

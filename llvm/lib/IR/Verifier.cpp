@@ -3756,7 +3756,7 @@ void Verifier::visitICmpInst(ICmpInst &IC) {
         "Both operands to ICmp instruction are not of the same type!", &IC);
   // Check that the operands are the right type
   Check(Op0Ty->isIntOrIntVectorTy() ||
-        Op0Ty->isFieldTy() ||
+        Op0Ty->isFieldOrFieldVectorTy() ||
         Op0Ty->isCurveTy() ||
         Op0Ty->isPtrOrPtrVectorTy(),
         "Invalid operand types for ICmp instruction", &IC);

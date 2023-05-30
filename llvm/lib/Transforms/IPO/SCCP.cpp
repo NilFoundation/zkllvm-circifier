@@ -378,8 +378,6 @@ static bool runIPSCCP(
 }
 
 PreservedAnalyses IPSCCPPass::run(Module &M, ModuleAnalysisManager &AM) {
-  // TODO(maksenov): temporarily disabled, fix it
-  return PreservedAnalyses::all();
   const DataLayout &DL = M.getDataLayout();
   auto &FAM = AM.getResult<FunctionAnalysisManagerModuleProxy>(M).getManager();
   auto GetTLI = [&FAM](Function &F) -> const TargetLibraryInfo & {
@@ -478,4 +476,3 @@ INITIALIZE_PASS_END(IPSCCPLegacyPass, "ipsccp",
 
 // createIPSCCPPass - This is the public interface to this file.
 ModulePass *llvm::createIPSCCPPass() { return new IPSCCPLegacyPass(); }
-

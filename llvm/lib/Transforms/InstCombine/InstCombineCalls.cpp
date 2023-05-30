@@ -161,7 +161,8 @@ Instruction *InstCombinerImpl::SimplifyAnyMemTransfer(AnyMemTransferInst *MI) {
   uint64_t Size = MemOpLength->getLimitedValue();
   assert(Size && "0-sized memory transferring should be removed already.");
 
-  if (Size > 8 || (Size&(Size-1)))
+  // TODO(maksenov): resolve a problem with sizes of the custom types properly
+  if (Size > 8 || (Size&(Size-1)) || MI->getModule()->getTargetTriple() == "assigner")
     return nullptr;  // If not 1/2/4/8 bytes, exit.
 
   // If it is an atomic and alignment is less than the size then we will

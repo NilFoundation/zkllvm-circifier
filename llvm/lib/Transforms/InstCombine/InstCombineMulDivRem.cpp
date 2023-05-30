@@ -190,6 +190,10 @@ static Value *takeLog2(IRBuilderBase &Builder, Value *Op, unsigned Depth,
 
 Instruction *InstCombinerImpl::visitMul(BinaryOperator &I) {
   Value *Op0 = I.getOperand(0), *Op1 = I.getOperand(1);
+  if (Op0->getType()->isFieldOrFieldVectorTy()) {
+    // TODO(maksenov): support InstCombine for field types
+    return nullptr;
+  }
   if (Value *V =
           simplifyMulInst(Op0, Op1, I.hasNoSignedWrap(), I.hasNoUnsignedWrap(),
                           SQ.getWithInstruction(&I)))
@@ -237,7 +241,9 @@ Instruction *InstCombinerImpl::visitMul(BinaryOperator &I) {
       return BO;
     }
 
-    if (match(&I, m_Mul(m_Value(NewOp), m_Constant(C1)))) {
+    // Shl is not desirable instruction for assigner target
+    std::string TargetTriple = I.getModule()->getTargetTriple();
+    if (match(&I, m_Mul(m_Value(NewOp), m_Constant(C1))) && TargetTriple != "assigner") {
       // Replace X*(2^C) with X << C, where C is either a scalar or a vector.
       if (Constant *NewCst = ConstantExpr::getExactLogBase2(C1)) {
         BinaryOperator *Shl = BinaryOperator::CreateShl(NewOp, NewCst);

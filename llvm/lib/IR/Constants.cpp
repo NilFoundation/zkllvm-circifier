@@ -2273,8 +2273,10 @@ Constant *ConstantExpr::get(unsigned Opcode, Constant *C1, Constant *C2,
   case Instruction::Add:
   case Instruction::Sub:
   case Instruction::Mul:
-    assert(C1->getType()->isIntOrIntVectorTy() &&
-           "Tried to create an integer operation on a non-integer type!");
+    assert((C1->getType()->isIntOrIntVectorTy() ||
+            C1->getType()->isFieldOrFieldVectorTy() ||
+            C1->getType()->isCurveTy()) &&
+           "Tried to create an arithmetic operation on a non-arithmetic type!");
     break;
   case Instruction::And:
   case Instruction::Or:

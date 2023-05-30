@@ -1687,8 +1687,6 @@ bool EarlyCSE::run() {
 
 PreservedAnalyses EarlyCSEPass::run(Function &F,
                                     FunctionAnalysisManager &AM) {
-  // TODO(maksenov): temporarily disabled, fix it
-  return PreservedAnalyses::all();
   auto &TLI = AM.getResult<TargetLibraryAnalysis>(F);
   auto &TTI = AM.getResult<TargetIRAnalysis>(F);
   auto &DT = AM.getResult<DominatorTreeAnalysis>(F);

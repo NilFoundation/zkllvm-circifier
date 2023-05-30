@@ -1368,11 +1368,17 @@ Instruction *InstCombinerImpl::visitAdd(BinaryOperator &I) {
 
   Value *LHS = I.getOperand(0), *RHS = I.getOperand(1);
   Type *Ty = I.getType();
+  if (Ty->isFieldOrFieldVectorTy() || Ty->isCurveTy()) {
+    // TODO(maksenov): support InstCombine for field and curve types
+    return nullptr;
+  }
   if (Ty->isIntOrIntVectorTy(1))
     return BinaryOperator::CreateXor(LHS, RHS);
 
   // X + X --> X << 1
-  if (LHS == RHS) {
+  // Shl is not desirable instruction for assigner target
+  std::string TargetTriple = I.getModule()->getTargetTriple();
+  if (LHS == RHS && TargetTriple != "assigner") {
     auto *Shl = BinaryOperator::CreateShl(LHS, ConstantInt::get(Ty, 1));
     Shl->setHasNoSignedWrap(I.hasNoSignedWrap());
     Shl->setHasNoUnsignedWrap(I.hasNoUnsignedWrap());
@@ -1452,7 +1458,8 @@ Instruction *InstCombinerImpl::visitAdd(BinaryOperator &I) {
     return new ZExtInst(B, LHS->getType());
 
   // A+B --> A|B iff A and B have no bits set in common.
-  if (haveNoCommonBitsSet(LHS, RHS, DL, &AC, &I, &DT))
+  // Or is not desirable instruction for assigner target
+  if (haveNoCommonBitsSet(LHS, RHS, DL, &AC, &I, &DT) && TargetTriple != "assigner")
     return BinaryOperator::CreateOr(LHS, RHS);
 
   if (Instruction *Ext = narrowMathIfNoOverflow(I))
@@ -1927,6 +1934,11 @@ Instruction *InstCombinerImpl::visitSub(BinaryOperator &I) {
     return Phi;
 
   Value *Op0 = I.getOperand(0), *Op1 = I.getOperand(1);
+
+  if (Op0->getType()->isFieldOrFieldVectorTy()) {
+    // TODO(maksenov): support InstCombine for field types
+    return nullptr;
+  }
 
   // If this is a 'B = x-(-A)', change to B = x+A.
   // We deal with this without involving Negator to preserve NSW flag.

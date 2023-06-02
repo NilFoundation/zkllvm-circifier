@@ -2890,7 +2890,7 @@ void BinaryOperator::AssertOK() {
   case Mul:
     assert(getType() == LHS->getType() &&
            "Arithmetic operation should return same type as operands!");
-    assert((getType()->isIntOrIntVectorTy() || getType()->isFieldTy() || getType()->isCurveTy()) &&
+    assert((getType()->isIntOrIntVectorTy() || getType()->isFieldOrFieldVectorTy() || getType()->isCurveTy()) &&
            "Tried to create an arithmetic operation on a non-arithmetic type!");
     break;
   case FAdd: case FSub:

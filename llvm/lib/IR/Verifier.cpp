@@ -3700,7 +3700,7 @@ void Verifier::visitBinaryOperator(BinaryOperator &B) {
   case Instruction::SRem:
   case Instruction::URem:
     Check(B.getType()->isIntOrIntVectorTy() ||
-          B.getType()->isFieldTy() ||
+          B.getType()->isFieldOrFieldVectorTy() ||
           B.getType()->isCurveTy(),
           "Integer arithmetic operators only work with integral types!", &B);
     Check(B.getType() == B.getOperand(0)->getType(),

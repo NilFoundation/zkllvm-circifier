@@ -35,6 +35,9 @@ struct error_code {
   static constexpr int non_single_refs_at_cell_wrap  = 67;
   static constexpr int no_pubkey                     = 68;
   static constexpr int unexpected_refs_count_in_code = 69;
+
+  static constexpr int key_error                   = 70;
+  static constexpr int assertion                   = 100;
 };
 
 } // namespace tvm

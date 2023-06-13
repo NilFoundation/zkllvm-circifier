@@ -994,6 +994,8 @@ private:
   }
 };
 
+#define DISABLE_NOINLINE 0
+
 class TVMTargetCodeGenInfo final : public TargetCodeGenInfo {
 public:
   explicit TVMTargetCodeGenInfo(CodeGen::CodeGenTypes &CGT)
@@ -1009,6 +1011,7 @@ public:
       if (llvm::any_of(FD->parameters(), [](ParmVarDecl *P) {
             return P->getType()->isPointerType();
           })) {
+#if DISABLE_NOINLINE
         if (FD->hasAttr<NoInlineAttr>()) {
           auto &Diag = CGM.getContext().getDiagnostics();
           unsigned CustomDiagID =
@@ -1019,8 +1022,10 @@ public:
         }
         llvm::Function *Fn = cast<llvm::Function>(GV);
         Fn->addFnAttr(llvm::Attribute::AlwaysInline);
+#endif
       }
     }
+#if DISABLE_NOINLINE
     if (auto *MD = dyn_cast_or_null<CXXMethodDecl>(D)) {
       if (!MD->isStatic()) {
         if (MD->hasAttr<NoInlineAttr>()) {
@@ -1034,6 +1039,7 @@ public:
         Fn->addFnAttr(llvm::Attribute::AlwaysInline);
       }
     }
+#endif
   }
 };
 

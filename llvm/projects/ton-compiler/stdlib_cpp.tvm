@@ -12,6 +12,58 @@
     ; s0 - func_id
     ; s1.. - other data
     SETCP0
+
+    ; Global 5 variable: frame pointer
+    PUSHINT 1000000000
+    SETGLOB 5
+
+    ; Global 14 variable: function, that emulates store into the memory by storing into the dictionary
+    PUSHCONT {
+        ;CALL $store_macro$
+        NEWC
+        PUSHINT 257 STIX
+        SWAP          ; (val-b addr)
+        DUP           ; (val-b addr addr)
+        PUSHINT 100000
+        LESS          ; (val-b addr persistent?)
+        PUSHCONT {
+            PUSH c4
+            CTOS      ; (val-b addr dict-slice)
+            PLDDICT   ; (val-b addr dict)
+            PUSHINT 64
+            DICTISETB ; (val-b addr dict key-width -- dict')
+            NEWC STDICT ENDC
+            POP c4
+        }
+        PUSHCONT {
+            GETGLOB 1   ; ( val-b addr -- val-b addr dict )
+            PUSHINT 64  ; ( val-b addr dict key-width )
+            DICTISETB   ; ( val-b addr dict key-width -- c7 dict')
+            SETGLOB 1
+        }
+        IFELSE
+    }
+    SETGLOB 14
+
+    ; Global 13 variable: function, that emulates load from the memory by loading from the dictionary
+    PUSHCONT {
+        DUP
+        PUSHINT 100000
+        LESS
+        PUSHCONT { PUSH c4 CTOS PLDDICT }
+        PUSHCONT { GETGLOB 1 }
+        IFELSE
+
+        PUSHINT 64
+        DICTIGET ; (addr dict key-width -- value-slice flag)
+
+        ; Throw exception if key doesn't exist
+        THROWIFNOT 70
+        PUSHINT 257 LDIX
+        ENDS
+    }
+    SETGLOB 13
+
     DUP
     ISNPOS
     DICTPUSHCONST 32

@@ -50,6 +50,8 @@ parser.add_argument('inputs', metavar='file', nargs='+',
 
 parser.add_argument('-v', '--verbose', action='store_true', default=False,
                     help='print command lines of child processes')
+parser.add_argument('--save-temps', action='store_true', default=False,
+                    help='store intermediate files in the working directory and don\'t delete them')
 parser.add_argument('-o', '--output', help='bag-of-cells output file name')
 parser.add_argument('--cflags', help='flags and options for C frontend')
 parser.add_argument('--cxxflags', help='flags and options for C++ frontend')
@@ -104,8 +106,13 @@ cxxflags = ['-O3']
 if args.cxxflags:
   cxxflags += args.cxxflags.split()
 
+pwd = os.path.abspath(os.getcwd()) + '/'
+
 for filename in input_cpp:
-  _, tmp_file = tempfile.mkstemp()
+  if args.save_temps:
+    tmp_file = pwd + '1-clang.ll'
+  else:
+    _, tmp_file = tempfile.mkstemp()
   execute([os.path.join(tvm_llvm_bin, 'clang++'), '-target', 'tvm'] +
     cxxflags + ['-S', '-emit-llvm', filename, '-o', tmp_file, '--sysroot=' + tvm_sysroot], args.verbose)
   input_bc += [tmp_file]
@@ -126,9 +133,12 @@ for filename in input_ll:
     tmp_file], args.verbose)
   input_bc += [tmp_file]
 
-_, bitcode = tempfile.mkstemp()
+if args.save_temps:
+  bitcode = pwd + '2-llvm-link.ll'
+else:
+  _, bitcode = tempfile.mkstemp()
 execute([os.path.join(tvm_llvm_bin, 'llvm-link')] + input_bc +
-  ['-o', bitcode], args.verbose)
+  ['-S', '-o', bitcode], args.verbose)
 
 entry_points = [ "main_external", "main_internal", "main_ticktock", "main_split", "main_merge" ]
 
@@ -136,8 +146,11 @@ replace_loads_stores = []
 if args.inline_loads_stores:
   replace_loads_stores = ['-tvm-load-store-replace']
 
-_, bitcode_int = tempfile.mkstemp()
-execute([os.path.join(tvm_llvm_bin, 'opt'), bitcode, '-o', bitcode_int] +
+if args.save_temps:
+  bitcode_int = pwd + '3-opt.ll'
+else:
+  _, bitcode_int = tempfile.mkstemp()
+execute([os.path.join(tvm_llvm_bin, 'opt'), bitcode, '-S', '-o', bitcode_int] +
   replace_loads_stores + ['-internalize', '-internalize-public-api-list=' +
   ','.join(entry_points)], args.verbose)
 
@@ -146,11 +159,17 @@ if args.opt_flags:
 else:
   opt_flags = ['-O3']
 
-_, bitcode_opt = tempfile.mkstemp()
-execute([os.path.join(tvm_llvm_bin, 'opt')] + opt_flags + [bitcode_int, '-o',
+if args.save_temps:
+  bitcode_opt = pwd + '4-opt_O3.ll'
+else:
+  _, bitcode_opt = tempfile.mkstemp()
+execute([os.path.join(tvm_llvm_bin, 'opt')] + opt_flags + ['-S', bitcode_int, '-o',
   bitcode_opt], args.verbose)
 
-_, asm = tempfile.mkstemp()
+if args.save_temps:
+  asm = '5-llc.asm'
+else:
+  _, asm = tempfile.mkstemp()
 execute([os.path.join(tvm_llvm_bin, 'llc'), '-march', 'tvm', bitcode_opt,
   '-o', asm], args.verbose)
 
@@ -183,9 +202,12 @@ else:
   output = os.path.join(os.getcwd(), args.output)
 abi_path = os.path.abspath(args.abi)
 
-tmpdir = tempfile.mkdtemp()
-if args.verbose:
-  print('cd ' + tmpdir)
+if args.save_temps:
+  tmpdir = './'
+else:
+  tmpdir = tempfile.mkdtemp()
+  if args.verbose:
+    print('cd ' + tmpdir)
 
 with cd(tmpdir):
   linkerflags = []
@@ -196,6 +218,7 @@ with cd(tmpdir):
   for filename in glob.glob('*'):
     if args.verbose:
       print('cp ' + filename + ' ' + output)
-    shutil.copy2(filename, output)
+    if not args.save_temps:
+      shutil.copy2(filename, output)
 
 print('Build succeeded.')

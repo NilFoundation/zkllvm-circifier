@@ -4313,6 +4313,8 @@ void InstCombinePass::printPipeline(
 
 PreservedAnalyses InstCombinePass::run(Function &F,
                                        FunctionAnalysisManager &AM) {
+  // TODO(maksenov): temporarily disabled, fix it
+  return PreservedAnalyses::all();
   auto &AC = AM.getResult<AssumptionAnalysis>(F);
   auto &DT = AM.getResult<DominatorTreeAnalysis>(F);
   auto &TLI = AM.getResult<TargetLibraryAnalysis>(F);

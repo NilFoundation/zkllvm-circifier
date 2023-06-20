@@ -148,13 +148,21 @@ public:
     return static_cast<EllipticCurveKind>(getSubclassData());
   }
 
-  GaloisFieldKind GetBaseFieldKind() const {
+  GaloisFieldKind GetScalarFieldKind() const {
     switch (getCurveKind()) {
-#define CURVE_FIELD_MAPPING(CurveKind, CurveFrontendId, FieldKind, FieldFrontendId) \
+#define CURVE_SCALAR_FIELD_MAPPING(CurveKind, CurveFrontendId, FieldKind, FieldFrontendId) \
     case CurveKind: return FieldKind;
 #include "llvm/IR/EllipticCurveTypes.def"
     }
     llvm_unreachable("Base field type for curve is not defined");
+  }
+
+  GaloisFieldKind GetFieldFromCurve() const {
+    switch (getCurveKind()) {
+#define CURVE_BASE_FIELD_MAPPING(CurveKind, CurveFrontendId, FieldKind, FieldFrontendId) \
+    case CurveKind: return FieldKind;
+#include "llvm/IR/EllipticCurveTypes.def"
+    }
   }
 
   /// Methods for support type inquiry through isa, cast, and dyn_cast.

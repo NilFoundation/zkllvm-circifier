@@ -7394,9 +7394,9 @@ bool LLParser::parseCMul(Instruction *&Inst, PerFunctionState &PFS) {
     return error(CurveLoc, "cmul first argument must be elliptic curve");
   if (!Field->getType()->isFieldTy())
     return error(CurveLoc, "cmul second argument must be galois field");
-  if (cast<EllipticCurveType>(Curve->getType())->GetBaseFieldKind() !=
+  if (cast<EllipticCurveType>(Curve->getType())->GetScalarFieldKind() !=
       cast<GaloisFieldType>(Field->getType())->getFieldKind())
-    return error(FieldLoc, "curve can be multiplied only by its base field");
+    return error(FieldLoc, "curve can be multiplied only by its scalar field");
   Inst = CMulInst::Create(Curve, Field);
   return false;
 }

@@ -11073,9 +11073,9 @@ static void DiagnoseBadDivideOrRemainderValues(Sema& S, ExprResult &LHS,
                             << IsDiv << RHS.get()->getSourceRange());
 }
 
-static BuiltinType::Kind getBaseFieldKind(BuiltinType::Kind CurveKind) {
+static BuiltinType::Kind getScalarFieldKind(BuiltinType::Kind CurveKind) {
   switch (CurveKind) {
-#define CURVE_FIELD_MAPPING(CurveId, CurveFrontendId, FieldId, FieldFrontendId) \
+#define CURVE_SCALAR_FIELD_MAPPING(CurveId, CurveFrontendId, FieldId, FieldFrontendId) \
   case BuiltinType::CurveFrontendId: return BuiltinType::FieldFrontendId;
 #include "llvm/IR/EllipticCurveTypes.def"
   default: llvm_unreachable("Curve type is expected");
@@ -11112,7 +11112,7 @@ QualType Sema::CheckMultiplyDivideOperands(ExprResult &LHS, ExprResult &RHS,
       if (RHSTy->isCurveType()) {
         std::swap(CurveKind, FieldKind);
       }
-      if (FieldKind == getBaseFieldKind(CurveKind))
+      if (FieldKind == getScalarFieldKind(CurveKind))
         return LHSTy->isCurveType() ? LHSTy : RHSTy;
     }
     return InvalidOperands(Loc, LHS, RHS);

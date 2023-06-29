@@ -836,6 +836,10 @@ static bool processUDivOrURem(BinaryOperator *Instr, LazyValueInfo *LVI) {
          Instr->getOpcode() == Instruction::URem);
   if (Instr->getType()->isVectorTy())
     return false;
+  // We don't want any optimizations on field division,
+  // it's gonna be interpreted as it is.
+  if (Instr->getType()->isFieldTy())
+    return false;
 
   ConstantRange XCR = LVI->getConstantRangeAtUse(Instr->getOperandUse(0));
   ConstantRange YCR = LVI->getConstantRangeAtUse(Instr->getOperandUse(1));
@@ -956,6 +960,10 @@ static bool processSDivOrSRem(BinaryOperator *Instr, LazyValueInfo *LVI) {
          Instr->getOpcode() == Instruction::SRem);
   if (Instr->getType()->isVectorTy())
     return false;
+  // We don't want any optimizations on field division,
+  // it's gonna be interpreted as it is.
+  if (Instr->getType()->isFieldTy())
+    return false;
 
   ConstantRange LCR = LVI->getConstantRangeAtUse(Instr->getOperandUse(0));
   ConstantRange RCR = LVI->getConstantRangeAtUse(Instr->getOperandUse(1));
@@ -974,6 +982,8 @@ static bool processSDivOrSRem(BinaryOperator *Instr, LazyValueInfo *LVI) {
 static bool processAShr(BinaryOperator *SDI, LazyValueInfo *LVI) {
   if (SDI->getType()->isVectorTy())
     return false;
+
+  // TODO: handle field types.
 
   ConstantRange LRange =
       LVI->getConstantRangeAtUse(SDI->getOperandUse(0), /*UndefAllowed*/ false);
@@ -1007,6 +1017,8 @@ static bool processSExt(SExtInst *SDI, LazyValueInfo *LVI) {
   if (SDI->getType()->isVectorTy())
     return false;
 
+  // TODO: handle field types.
+
   const Use &Base = SDI->getOperandUse(0);
   if (!LVI->getConstantRangeAtUse(Base, /*UndefAllowed*/ false)
            .isAllNonNegative())
@@ -1037,6 +1049,12 @@ static bool processBinOp(BinaryOperator *BinOp, LazyValueInfo *LVI) {
   Value *LHS = BinOp->getOperand(0);
   Value *RHS = BinOp->getOperand(1);
 
+  // Since we have no overflow for fields, we can set flags without checking ranges.
+  if (BinOp->getType()->isFieldTy()) {
+    setDeducedOverflowingFlags(BinOp, Opcode, true, true);
+    return true;
+  }
+
   ConstantRange LRange = LVI->getConstantRange(LHS, BinOp);
   ConstantRange RRange = LVI->getConstantRange(RHS, BinOp);
 
@@ -1063,6 +1081,8 @@ static bool processBinOp(BinaryOperator *BinOp, LazyValueInfo *LVI) {
 static bool processAnd(BinaryOperator *BinOp, LazyValueInfo *LVI) {
   if (BinOp->getType()->isVectorTy())
     return false;
+
+  // TODO: handle field types.
 
   // Pattern match (and lhs, C) where C includes a superset of bits which might
   // be set in lhs.  This is a common truncation idiom created by instcombine.

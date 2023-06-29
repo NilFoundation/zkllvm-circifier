@@ -312,6 +312,11 @@ int FunctionComparator::cmpConstants(const Constant *L,
     const APFloat &RAPF = cast<ConstantFP>(R)->getValueAPF();
     return cmpAPFloats(LAPF, RAPF);
   }
+  case Value::ConstantFieldVal: {
+    const FieldElem &LField = cast<ConstantField>(L)->getValue();
+    const FieldElem &RField = cast<ConstantField>(R)->getValue();
+    return cmpAPInts(LField, RField);
+  }
   case Value::ConstantArrayVal: {
     const ConstantArray *LA = cast<ConstantArray>(L);
     const ConstantArray *RA = cast<ConstantArray>(R);
@@ -453,6 +458,8 @@ int FunctionComparator::cmpTypes(Type *TyL, Type *TyR) const {
   case Type::VoidTyID:
   case Type::FloatTyID:
   case Type::DoubleTyID:
+  case Type::GaloisFieldTyID:
+  case Type::EllipticCurveTyID:
   case Type::X86_FP80TyID:
   case Type::FP128TyID:
   case Type::PPC_FP128TyID:

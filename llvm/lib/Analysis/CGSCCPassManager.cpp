@@ -136,6 +136,7 @@ PassManager<LazyCallGraph::SCC, CGSCCAnalysisManager, LazyCallGraph &,
 
 PreservedAnalyses
 ModuleToPostOrderCGSCCPassAdaptor::run(Module &M, ModuleAnalysisManager &AM) {
+  return PreservedAnalyses::all(); // FIXME: temporarily disabled.
   // Setup the CGSCC analysis manager from its proxy.
   CGSCCAnalysisManager &CGAM =
       AM.getResult<CGSCCAnalysisManagerModuleProxy>(M).getManager();

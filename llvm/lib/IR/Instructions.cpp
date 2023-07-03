@@ -4827,7 +4827,7 @@ bool CMulInst::isValidOperands(const Value *Curve, const Value *Field) {
   if (!Curve->getType()->isCurveTy() || !Field->getType()->isFieldTy())
     return false;
 
-  // Curve can be multiplied only by corresponding base field type
+  // Curve can be multiplied only by corresponding scalar field type
   auto *CurveTy = cast<EllipticCurveType>(Curve->getType());
   auto *FieldTy = cast<GaloisFieldType>(Field->getType());
   return CurveTy->GetScalarFieldKind() == FieldTy->getFieldKind();

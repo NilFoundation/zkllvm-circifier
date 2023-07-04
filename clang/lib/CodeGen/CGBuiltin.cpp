@@ -19840,10 +19840,13 @@ Value *CodeGenFunction::EmitAssignerBuiltinExpr(unsigned int BuiltinID,
   }
   case assigner::BI__builtin_assigner_sha2_512_curve25519: {
     ID = Intrinsic::assigner_sha2_512;
+    auto Curve25519ScalarFildElemTy = llvm::GaloisFieldType::get(context,
+                                             llvm::GALOIS_FIELD_CURVE25519_SCALAR);
     auto Curve25519CurveElemTy = llvm::EllipticCurveType::get(context, llvm::ELLIPTIC_CURVE_CURVE25519);
     auto PallasBaseFieldElemTy = llvm::GaloisFieldType::get(context,
                                              llvm::GALOIS_FIELD_PALLAS_BASE);
-    OverloadTypes = {Curve25519CurveElemTy, llvm::FixedVectorType::get(PallasBaseFieldElemTy, 4)};
+    OverloadTypes = {Curve25519ScalarFildElemTy, Curve25519CurveElemTy, 
+                                            llvm::FixedVectorType::get(PallasBaseFieldElemTy, 4)};
     break;
   }
   case assigner::BI__builtin_assigner_bls12_optimal_ate_pairing: {

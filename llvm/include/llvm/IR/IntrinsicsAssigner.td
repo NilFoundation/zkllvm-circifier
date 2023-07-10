@@ -20,3 +20,4 @@ def int_assigner_zkml_convolution:    Intrinsic<[llvm_ptrptr_ty], [llvm_ptrptr_t
 def int_assigner_zkml_pooling:        Intrinsic<[llvm_ptrptr_ty], [llvm_ptrptr_ty, llvm_i64_ty]>;
 def int_assigner_zkml_ReLU:           Intrinsic<[llvm_float_ty], [llvm_float_ty]>;
 def int_assigner_zkml_batch_norm:     Intrinsic<[llvm_ptrptr_ty], [llvm_ptrptr_ty]>;
+def int_assigner_curve_init: Intrinsic<[llvm_any_ty], [llvm_any_ty, LLVMMatchType<1>]>;

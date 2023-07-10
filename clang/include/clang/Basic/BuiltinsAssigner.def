@@ -13,6 +13,23 @@
 
 // The format of this database matches clang/Basic/Builtins.def.
 
+// Possible field types in the signature:
+
+// g1 -> __zkllvm_field_pallas_base
+// g2 -> __zkllvm_field_pallas_scalar
+// g3 -> __zkllvm_field_bls12381_base
+// g4 -> __zkllvm_field_bls12381_scalar
+// g5 -> __zkllvm_field_curve25519_base
+// g6 -> __zkllvm_field_curve25519_scalar
+// g7 -> __zkllvm_field_vesta_base
+// g8 -> __zkllvm_field_vesta_scalar
+
+// Possible curve types in the signature:
+
+// e1 -> __zkllvm_curve_pallas
+// e2 -> __zkllvm_curve_vesta
+// e3 -> __zkllvm_curve_bls12381
+// e4 -> __zkllvm_curve_curve25519
 
 #if defined(BUILTIN) && !defined(TARGET_BUILTIN)
 #   define TARGET_BUILTIN(ID, TYPE, ATTRS, FEATURE) BUILTIN(ID, TYPE, ATTRS)
@@ -28,6 +45,10 @@ BUILTIN(__builtin_assigner_zkml_convolution, "v**v**v**z", "n")
 BUILTIN(__builtin_assigner_zkml_pooling, "v**v**z", "n")
 BUILTIN(__builtin_assigner_zkml_ReLU, "ff", "n")
 BUILTIN(__builtin_assigner_zkml_batch_norm, "v**v**", "n")
+BUILTIN(__builtin_assigner_pallas_curve_init, "e1g1g1", "n")
+BUILTIN(__builtin_assigner_vesta_curve_init, "e2g7g7", "n")
+BUILTIN(__builtin_assigner_bls12381_curve_init, "e3g3g3", "n")
+BUILTIN(__builtin_assigner_curve25519_curve_init, "e4g5g5", "n")
 
 #undef BUILTIN
 #undef TARGET_BUILTIN

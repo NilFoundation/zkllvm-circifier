@@ -2129,7 +2129,11 @@ llvm::Constant *ConstantEmitter::tryEmitPrivate(const APValue &Value,
         Inits[I] = llvm::ConstantInt::get(CGM.getLLVMContext(), Elt.getInt());
       else if (Elt.isFloat())
         Inits[I] = llvm::ConstantFP::get(CGM.getLLVMContext(), Elt.getFloat());
-      else
+      else if (Elt.isField()) {
+        const llvm::FieldElem &Field = Elt.getField();
+        auto FieldType = llvm::GaloisFieldType::get(CGM.getLLVMContext(), Field.getKind());
+        Inits[I] = llvm::ConstantField::get(FieldType, Field);
+      } else
         llvm_unreachable("unsupported vector element type");
     }
     return llvm::ConstantVector::get(Inits);

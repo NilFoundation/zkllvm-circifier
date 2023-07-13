@@ -19858,6 +19858,7 @@ Value *CodeGenFunction::EmitAssignerBuiltinExpr(unsigned int BuiltinID,
     auto CurveTy =
         llvm::EllipticCurveType::get(context, llvm::ELLIPTIC_CURVE_BLS12381);
     OverloadTypes = {Vec12Ty, CurveTy, Vec4Ty};
+    break;
   }
   case assigner::BI__builtin_assigner_zkml_convolution: {
     ID = Intrinsic::assigner_zkml_convolution;
@@ -19873,6 +19874,42 @@ Value *CodeGenFunction::EmitAssignerBuiltinExpr(unsigned int BuiltinID,
   }
   case assigner::BI__builtin_assigner_zkml_batch_norm: {
     ID = Intrinsic::assigner_zkml_batch_norm;
+    break;
+  }
+  case assigner::BI__builtin_assigner_pallas_curve_init: {
+    ID = Intrinsic::assigner_curve_init;
+    auto Curve =
+        llvm::EllipticCurveType::get(context, llvm::ELLIPTIC_CURVE_PALLAS);
+    auto BaseField =
+        llvm::GaloisFieldType::get(context, llvm::GALOIS_FIELD_PALLAS_BASE);
+    OverloadTypes = {Curve, BaseField};
+    break;
+  }
+  case assigner::BI__builtin_assigner_vesta_curve_init: {
+    ID = Intrinsic::assigner_curve_init;
+    auto Curve =
+        llvm::EllipticCurveType::get(context, llvm::ELLIPTIC_CURVE_VESTA);
+    auto BaseField =
+        llvm::GaloisFieldType::get(context, llvm::GALOIS_FIELD_VESTA_BASE);
+    OverloadTypes = {Curve, BaseField};
+    break;
+  }
+  case assigner::BI__builtin_assigner_bls12381_curve_init: {
+    ID = Intrinsic::assigner_curve_init;
+    auto Curve =
+        llvm::EllipticCurveType::get(context, llvm::ELLIPTIC_CURVE_BLS12381);
+    auto BaseField =
+        llvm::GaloisFieldType::get(context, llvm::GALOIS_FIELD_BLS12381_BASE);
+    OverloadTypes = {Curve, BaseField};
+    break;
+  }
+  case assigner::BI__builtin_assigner_curve25519_curve_init: {
+    ID = Intrinsic::assigner_curve_init;
+    auto Curve =
+        llvm::EllipticCurveType::get(context, llvm::ELLIPTIC_CURVE_CURVE25519);
+    auto BaseField =
+        llvm::GaloisFieldType::get(context, llvm::GALOIS_FIELD_CURVE25519_BASE);
+    OverloadTypes = {Curve, BaseField};
     break;
   }
   }

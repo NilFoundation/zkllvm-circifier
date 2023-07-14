@@ -21,3 +21,6 @@ def int_assigner_zkml_pooling:        Intrinsic<[llvm_ptrptr_ty], [llvm_ptrptr_t
 def int_assigner_zkml_ReLU:           Intrinsic<[llvm_float_ty], [llvm_float_ty]>;
 def int_assigner_zkml_batch_norm:     Intrinsic<[llvm_ptrptr_ty], [llvm_ptrptr_ty]>;
 def int_assigner_curve_init: Intrinsic<[llvm_any_ty], [llvm_any_ty, LLVMMatchType<1>]>;
+
+def int_assigner_bit_decomposition64: Intrinsic<[llvm_anyvector_ty], [llvm_any_ty]>;
+def int_assigner_bit_composition128: Intrinsic<[llvm_any_ty], [llvm_anyvector_ty, LLVMMatchType<1>]>;

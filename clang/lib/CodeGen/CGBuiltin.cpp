@@ -20662,7 +20662,8 @@ Value *CodeGenFunction::EmitAssignerBuiltinExpr(unsigned int BuiltinID,
     ID = Intrinsic::assigner_bit_decomposition64;
     auto ElemTy = llvm::GaloisFieldType::get(context,
                                              llvm::GALOIS_FIELD_PALLAS_BASE);
-    OverloadTypes = {llvm::FixedVectorType::get(ElemTy, 64), ElemTy};
+    auto IntType = llvm::IntegerType::get(context, 64);
+    OverloadTypes = {llvm::FixedVectorType::get(ElemTy, 64), IntType};
     break;
   }
   }

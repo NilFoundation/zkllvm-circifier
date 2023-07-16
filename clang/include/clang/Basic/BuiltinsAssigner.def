@@ -50,7 +50,7 @@ BUILTIN(__builtin_assigner_vesta_curve_init, "e2g7g7", "n")
 BUILTIN(__builtin_assigner_bls12381_curve_init, "e3g3g3", "n")
 BUILTIN(__builtin_assigner_curve25519_curve_init, "e4g5g5", "n")
 
-BUILTIN(__builtin_assigner_bit_decomposition64, "E64g1g1", "n")
+BUILTIN(__builtin_assigner_bit_decomposition64, "E64g1ULLi", "n")
 BUILTIN(__builtin_assigner_bit_composition128, "g1E64g1E64g1", "n")
 
 #undef BUILTIN

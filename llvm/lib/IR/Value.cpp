@@ -442,7 +442,6 @@ void Value::takeName(Value *V) {
     ST->reinsertValue(this);
 }
 
-#ifndef NDEBUG
 std::string Value::getNameOrAsOperand() const {
   if (!getName().empty())
     return std::string(getName());
@@ -452,7 +451,6 @@ std::string Value::getNameOrAsOperand() const {
   printAsOperand(OS, false);
   return OS.str();
 }
-#endif
 
 void Value::assertModuleIsMaterializedImpl() const {
 #ifndef NDEBUG
@@ -821,7 +819,7 @@ bool Value::canBeFreed() const {
   // which is why we need the explicit opt in on a per collector basis.
   if (!F->hasGC())
     return true;
-  
+
   const auto &GCName = F->getGC();
   if (GCName == "statepoint-example") {
     auto *PT = cast<PointerType>(this->getType());

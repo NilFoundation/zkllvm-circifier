@@ -19845,7 +19845,7 @@ Value *CodeGenFunction::EmitAssignerBuiltinExpr(unsigned int BuiltinID,
     auto Curve25519CurveElemTy = llvm::EllipticCurveType::get(context, llvm::ELLIPTIC_CURVE_CURVE25519);
     auto PallasBaseFieldElemTy = llvm::GaloisFieldType::get(context,
                                              llvm::GALOIS_FIELD_PALLAS_BASE);
-    OverloadTypes = {Curve25519ScalarFildElemTy, Curve25519CurveElemTy, 
+    OverloadTypes = {Curve25519ScalarFildElemTy, Curve25519CurveElemTy,
                                             llvm::FixedVectorType::get(PallasBaseFieldElemTy, 4)};
     break;
   }
@@ -19914,16 +19914,13 @@ Value *CodeGenFunction::EmitAssignerBuiltinExpr(unsigned int BuiltinID,
   }
   case assigner::BI__builtin_assigner_bit_composition128: {
     ID = Intrinsic::assigner_bit_composition128;
-    auto ElemTy = llvm::GaloisFieldType::get(context,
-                                             llvm::GALOIS_FIELD_PALLAS_BASE);
-
-    OverloadTypes = {ElemTy, llvm::FixedVectorType::get(ElemTy, 64)};
+    auto ElemTy = llvm::GaloisFieldType::get(context, llvm::GALOIS_FIELD_PALLAS_BASE);
+    OverloadTypes = {ElemTy, llvm::FixedVectorType::get(ElemTy, 128)};
     break;
   }
   case assigner::BI__builtin_assigner_bit_decomposition64: {
     ID = Intrinsic::assigner_bit_decomposition64;
-    auto ElemTy = llvm::GaloisFieldType::get(context,
-                                             llvm::GALOIS_FIELD_PALLAS_BASE);
+    auto ElemTy = llvm::GaloisFieldType::get(context, llvm::GALOIS_FIELD_PALLAS_BASE);
     auto IntType = llvm::IntegerType::get(context, 64);
     OverloadTypes = {llvm::FixedVectorType::get(ElemTy, 64), IntType};
     break;

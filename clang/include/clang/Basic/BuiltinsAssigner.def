@@ -41,7 +41,7 @@ BUILTIN(__builtin_assigner_malloc, "v*z", "n")
 BUILTIN(__builtin_assigner_free, "vv*", "n")
 BUILTIN(__builtin_assigner_poseidon_pallas_base, "E3g1E3g1", "n")
 BUILTIN(__builtin_assigner_sha2_256_pallas_base, "E2g1E2g1E2g1", "n")
-BUILTIN(__builtin_assigner_sha2_512_curve25519, "g6e4e4E4g1", "n") 
+BUILTIN(__builtin_assigner_sha2_512_curve25519, "g6e4e4E4g1", "n")
 BUILTIN(__builtin_assigner_bls12_optimal_ate_pairing, "E12g3e3E4g3", "n")
 BUILTIN(__builtin_assigner_zkml_convolution, "v**v**v**z", "n")
 BUILTIN(__builtin_assigner_zkml_pooling, "v**v**z", "n")
@@ -53,7 +53,7 @@ BUILTIN(__builtin_assigner_bls12381_curve_init, "e3g3g3", "n")
 BUILTIN(__builtin_assigner_curve25519_curve_init, "e4g5g5", "n")
 
 BUILTIN(__builtin_assigner_bit_decomposition64, "E64g1ULLi", "n")
-BUILTIN(__builtin_assigner_bit_composition128, "g1E64g1E64g1", "n")
+BUILTIN(__builtin_assigner_bit_composition128, "g1E128g1", "n")
 
 #undef BUILTIN
 #undef TARGET_BUILTIN

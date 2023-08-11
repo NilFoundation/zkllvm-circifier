@@ -54,7 +54,6 @@ BUILTIN(__builtin_assigner_curve25519_curve_init, "e4g5g5", "n")
 
 BUILTIN(__builtin_assigner_bit_decomposition64, "E64g1ULLib", "n")
 BUILTIN(__builtin_assigner_bit_composition128, "g1E64g1E64g1b", "n")
-// BUILTIN(__builtin_assigner_bit_composition128, "g1E128g1b", "n")
 
 #undef BUILTIN
 #undef TARGET_BUILTIN

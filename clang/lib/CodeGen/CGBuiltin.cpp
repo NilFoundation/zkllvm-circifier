@@ -19920,13 +19920,6 @@ Value *CodeGenFunction::EmitAssignerBuiltinExpr(unsigned int BuiltinID,
     OverloadTypes = {ElemTy, llvm::FixedVectorType::get(ElemTy, 64)};
     break;
   }
-  // case assigner::BI__builtin_assigner_bit_composition128: {
-  //   ID = Intrinsic::assigner_bit_composition128;
-  //   auto ElemTy = llvm::GaloisFieldType::get(context,
-  //                                             llvm::GALOIS_FIELD_PALLAS_BASE);
-  //   OverloadTypes = {ElemTy, llvm::FixedVectorType::get(ElemTy, 128)};
-  //   break;
-  // }
   case assigner::BI__builtin_assigner_bit_decomposition64: {
     ID = Intrinsic::assigner_bit_decomposition64;
     auto ElemTy = llvm::GaloisFieldType::get(context,

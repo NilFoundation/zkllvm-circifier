@@ -964,23 +964,17 @@ static std::string getMangledTypeStr(Type *Ty, bool &HasUnnamedType) {
       break;
     case Type::GaloisFieldTyID: {
       switch (cast<GaloisFieldType>(Ty)->getFieldKind()) {
-        case GaloisFieldKind::GALOIS_FIELD_BLS12381_BASE:     Result += "field_bls12381_base";     break;
-        case GaloisFieldKind::GALOIS_FIELD_BLS12381_SCALAR:   Result += "field_bls12381_scalar";   break;
-        case GaloisFieldKind::GALOIS_FIELD_CURVE25519_BASE:   Result += "field_curve25519_base";   break;
-        case GaloisFieldKind::GALOIS_FIELD_CURVE25519_SCALAR: Result += "field_curve25519_scalar"; break;
-        case GaloisFieldKind::GALOIS_FIELD_PALLAS_BASE:       Result += "field_pallas_base";       break;
-        case GaloisFieldKind::GALOIS_FIELD_PALLAS_SCALAR:     Result += "field_pallas_scalar";     break;
-        case GaloisFieldKind::GALOIS_FIELD_VESTA_BASE:        Result += "field_vesta_base";        break;
-        case GaloisFieldKind::GALOIS_FIELD_VESTA_SCALAR:      Result += "field_vesta_scalar";      break;
+    #define GALOIS_FIELD_TYPE(Name, EnumId, SingletonId, FrontendId) \
+      case GaloisFieldKind::EnumId: Result += Name; break;
+    #include "llvm/IR/GaloisFieldTypes.def"
       }
       break;
     }
     case Type::EllipticCurveTyID: {
         switch (cast<EllipticCurveType>(Ty)->getCurveKind()) {
-          case EllipticCurveKind::ELLIPTIC_CURVE_BLS12381:   Result += "curve_bls12381";   break;
-          case EllipticCurveKind::ELLIPTIC_CURVE_CURVE25519: Result += "curve_curve25519"; break;
-          case EllipticCurveKind::ELLIPTIC_CURVE_PALLAS:     Result += "curve_pallas";     break;
-          case EllipticCurveKind::ELLIPTIC_CURVE_VESTA:      Result += "curve_vesta";      break;
+      #define ELLIPTIC_CURVE_TYPE(Name, EnumId, SingletonId, FrontendId) \
+          case EllipticCurveKind::EnumId: Result += Name; break;
+      #include "llvm/IR/EllipticCurveTypes.def"
         }
         break;
       }

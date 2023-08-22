@@ -57,6 +57,8 @@ public:
                                      const Instruction *I = nullptr) {
     return InstructionCost();
   }
+
+  unsigned getNumberOfParts(Type *Tp) { return 1; }
 };
 } // namespace llvm
 

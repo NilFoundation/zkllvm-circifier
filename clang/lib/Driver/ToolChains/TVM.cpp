@@ -112,7 +112,7 @@ const char *tvm::Linker::constructOptCommand(
 
   if (Internalize) {
     std::vector EntryPoints{"main_external", "main_internal", "main_ticktock",
-                            "main_split", "main_merge"};
+                            "main_split", "main_merge", "get_method"};
     std::string InternalizeVal = EntryPoints[0];
     for (auto EP : llvm::make_range(std::next(std::begin(EntryPoints)),
                                     std::end(EntryPoints))) {

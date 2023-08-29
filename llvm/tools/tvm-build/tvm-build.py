@@ -119,7 +119,7 @@ for filename in input_c:
 _, bitcode = tempfile.mkstemp()
 execute(['llvm-link'] + input_bc + input_ll + ['-o', bitcode], args.verbose)
 
-entry_points = [ "main_external", "main_internal", "main_ticktock", "main_split", "main_merge" ]
+entry_points = [ "main_external", "main_internal", "main_ticktock", "main_split", "main_merge", "get_method" ]
 with open(args.abi) as abi_file:
   abi_data = json.load(abi_file)
   for func in abi_data['functions']:

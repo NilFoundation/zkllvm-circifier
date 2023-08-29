@@ -3,6 +3,7 @@
     .internal-alias :main_ticktock,     -2
     .internal-alias :main_external,     -1
     .internal-alias :main_internal,     0
+    .internal-alias :get_method,     1
 
 ; ======================================================
 ; Part 1. Initialization and termination of the contract
@@ -74,8 +75,6 @@
     IFJMP
     BLKDROP 2
     PUSHREFCONT
-    DUP
-    POPCTR c3
     JMPX
 
 ; ==========================================

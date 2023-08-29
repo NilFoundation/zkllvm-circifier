@@ -140,7 +140,7 @@ else:
 execute([os.path.join(tvm_llvm_bin, 'llvm-link')] + input_bc +
   ['-S', '-o', bitcode], args.verbose)
 
-entry_points = [ "main_external", "main_internal", "main_ticktock", "main_split", "main_merge" ]
+entry_points = [ "main_external", "main_internal", "main_ticktock", "main_split", "main_merge", "get_method" ]
 
 replace_loads_stores = []
 if args.inline_loads_stores:
@@ -167,7 +167,7 @@ execute([os.path.join(tvm_llvm_bin, 'opt')] + opt_flags + ['-S', bitcode_int, '-
   bitcode_opt], args.verbose)
 
 if args.save_temps:
-  asm = '5-llc.asm'
+  asm = pwd + '5-llc.asm'
 else:
   _, asm = tempfile.mkstemp()
 execute([os.path.join(tvm_llvm_bin, 'llc'), '-march', 'tvm', bitcode_opt,
@@ -213,12 +213,14 @@ with cd(tmpdir):
   linkerflags = []
   if args.linkerflags:
     linkerflags = args.linkerflags.split()
+  if args.output:
+    linkerflags.extend(['-o', args.output])
   execute([tvm_linker, 'compile', asm, '--lib', os.path.join(tvm_stdlib,
     'stdlib_cpp.tvm'), '--abi-json', abi_path] + linkerflags, args.verbose)
   for filename in glob.glob('*'):
-    if args.verbose:
-      print('cp ' + filename + ' ' + output)
     if not args.save_temps:
+      if args.verbose:
+        print('cp ' + filename + ' ' + output)
       shutil.copy2(filename, output)
 
 print('Build succeeded.')

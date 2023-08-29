@@ -190,6 +190,19 @@ __attribute__((tvm_raw_func)) int main_internal(__tvm_cell msg, __tvm_slice msg_
     msg, msg_body);                                                                        \
 }
 
+#define MAIN_ENTRY_FUNCTIONS_SIMPLE(Contract, IContract, DContract)                        \
+__attribute__((tvm_raw_func)) int main_external(__tvm_cell msg, __tvm_slice msg_body) {    \
+  return simple_selector</*Internal=*/false, Contract, IContract, DContract>(              \
+    msg, msg_body);                                                                        \
+}                                                                                          \
+__attribute__((tvm_raw_func)) int main_internal(__tvm_cell msg, __tvm_slice msg_body) {    \
+  return simple_selector</*Internal=*/true, Contract, IContract, DContract>(               \
+    msg, msg_body);                                                                        \
+}                                                                                          \
+__attribute__((tvm_raw_func)) int get_method(int func_id) {                                \
+    return getter_invoke_impl<Contract, IContract, DContract>(func_id);                    \
+}
+
 // Contract class may be simple class, or template with parameter: `bool Internal`.
 // Template contract will instantiated with Internal=true for internal message pipeline,
 //  and with Internal=false for external message pipeline.

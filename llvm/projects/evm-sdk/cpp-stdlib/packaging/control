@@ -1,0 +1,7 @@
+Package: zkllvm-stdlib
+Version: 0.0-1
+Section: misc
+Architecture: all
+Maintainer: =nil; Foundation
+Description: zkLLVM stdlib
+ C++ standard library headers for compiling zkLLVM circuits.

@@ -1281,6 +1281,30 @@ LLVMTypeRef LLVMGaloisFieldCurve25519baseType(void);
 LLVMTypeRef LLVMGaloisFieldCurve25519scalarType(void);
 
 /**
+ * @defgroup LLVMCCoreTypeEllipticCurve Elliptic Curve Types
+ *
+ * Functions in this section operate on elliptic curve types.
+ *
+ * @{
+ */
+
+/**
+ * Obtain an elliptic curve type from a context.
+ */
+LLVMTypeRef LLVMEllipticCurveBLS12381TypeInContext(LLVMContextRef C);
+LLVMTypeRef LLVMEllipticCurveCurve25519TypeInContext(LLVMContextRef C);
+LLVMTypeRef LLVMEllipticCurvePallasTypeInContext(LLVMContextRef C);
+LLVMTypeRef LLVMEllipticCurveVestaTypeInContext(LLVMContextRef C);
+
+/**
+ * Obtain an elliptic curve type from the global context.
+ */
+LLVMTypeRef LLVMEllipticCurveBLS12381(void);
+LLVMTypeRef LLVMEllipticCurveCurve25519(void);
+LLVMTypeRef LLVMEllipticCurvePallas(void);
+LLVMTypeRef LLVMEllipticCurveVesta(void);
+
+/**
  * @}
  */
 

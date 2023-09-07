@@ -731,6 +731,34 @@ LLVMTypeRef LLVMGaloisFieldCurve25519scalarType(void) {
   return LLVMGaloisFieldCurve25519scalarTypeInContext(LLVMGetGlobalContext());
 }
 
+/*--.. Operations on curve types ............................................--*/
+
+LLVMTypeRef LLVMEllipticCurveBLS12381TypeInContext(LLVMContextRef C) {
+  return (LLVMTypeRef) EllipticCurveType::get(*unwrap(C), EllipticCurveKind::ELLIPTIC_CURVE_BLS12381);
+}
+LLVMTypeRef LLVMEllipticCurveCurve25519TypeInContext(LLVMContextRef C) {
+  return (LLVMTypeRef) EllipticCurveType::get(*unwrap(C), EllipticCurveKind::ELLIPTIC_CURVE_CURVE25519);
+}
+LLVMTypeRef LLVMEllipticCurvePallasTypeInContext(LLVMContextRef C) {
+  return (LLVMTypeRef) EllipticCurveType::get(*unwrap(C), EllipticCurveKind::ELLIPTIC_CURVE_PALLAS);
+}
+LLVMTypeRef LLVMEllipticCurveVestaTypeInContext(LLVMContextRef C) {
+  return (LLVMTypeRef) EllipticCurveType::get(*unwrap(C), EllipticCurveKind::ELLIPTIC_CURVE_VESTA);
+}
+
+LLVMTypeRef LLVMEllipticCurveBLS12381(void) {
+  return LLVMEllipticCurveBLS12381TypeInContext(LLVMGetGlobalContext());
+}
+LLVMTypeRef LLVMEllipticCurveCurve25519(void) {
+  return LLVMEllipticCurveCurve25519TypeInContext(LLVMGetGlobalContext());
+}
+LLVMTypeRef LLVMEllipticCurvePallas(void) {
+  return LLVMEllipticCurvePallasTypeInContext(LLVMGetGlobalContext());
+}
+LLVMTypeRef LLVMEllipticCurveVesta(void) {
+  return LLVMEllipticCurveVestaTypeInContext(LLVMGetGlobalContext());
+}
+
 /*--.. Operations on function types ........................................--*/
 
 LLVMTypeRef LLVMFunctionType(LLVMTypeRef ReturnType,

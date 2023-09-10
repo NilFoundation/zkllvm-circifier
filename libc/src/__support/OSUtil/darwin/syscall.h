@@ -1,4 +1,4 @@
-//===----------------------- Linux syscalls ---------------------*- C++ -*-===//
+//===---------------------- Darwin syscalls ---------------------*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,21 +6,17 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_LIBC_SRC_SUPPORT_OSUTIL_LINUX_SYSCALL_H
-#define LLVM_LIBC_SRC_SUPPORT_OSUTIL_LINUX_SYSCALL_H
+#ifndef LLVM_LIBC_SRC_SUPPORT_OSUTIL_DARWIN_SYSCALL_H
+#define LLVM_LIBC_SRC_SUPPORT_OSUTIL_DARWIN_SYSCALL_H
 
 #include "src/__support/CPP/bit.h"
 #include "src/__support/common.h"
 #include "src/__support/macros/properties/architectures.h"
 
-#ifdef LIBC_TARGET_ARCH_IS_X86_64
-#include "x86_64/syscall.h"
-#elif defined(LIBC_TARGET_ARCH_IS_AARCH64)
-#include "aarch64/syscall.h"
-#elif defined(LIBC_TARGET_ARCH_IS_ARM)
+#ifdef LIBC_TARGET_ARCH_IS_ANY_ARM
 #include "arm/syscall.h"
-#elif defined(LIBC_TARGET_ARCH_IS_RISCV64)
-#include "riscv64/syscall.h"
+#else
+#error "Unsupported architecture"
 #endif
 
 namespace __llvm_libc {
@@ -33,4 +29,4 @@ LIBC_INLINE R syscall_impl(long __number, Ts... ts) {
 
 } // namespace __llvm_libc
 
-#endif // LLVM_LIBC_SRC_SUPPORT_OSUTIL_LINUX_SYSCALL_H
+#endif // LLVM_LIBC_SRC_SUPPORT_OSUTIL_DARWIN_SYSCALL_H

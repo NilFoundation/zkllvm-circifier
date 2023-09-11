@@ -349,6 +349,10 @@ GaloisFieldType *GaloisFieldType::get(LLVMContext &C, GaloisFieldKind Kind) {
   }
 }
 
+unsigned GaloisFieldType::getBitWidth() const {
+  return GetNumberBits(getFieldKind());
+}
+
 //===----------------------------------------------------------------------===//
 //                       EllipticCurveType Implementation
 //===----------------------------------------------------------------------===//

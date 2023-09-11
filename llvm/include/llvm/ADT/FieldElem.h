@@ -17,7 +17,7 @@
 
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/Hashing.h"
-#include "llvm/ZK/FieldKinds.h"
+#include "llvm/ZK/ZKEnums.h"
 
 namespace llvm {
 

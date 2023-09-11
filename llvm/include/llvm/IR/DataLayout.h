@@ -682,9 +682,17 @@ inline TypeSize DataLayout::getTypeSizeInBits(Type *Ty) const {
     return getStructLayout(cast<StructType>(Ty))->getSizeInBits();
   case Type::IntegerTyID:
     return TypeSize::Fixed(Ty->getIntegerBitWidth());
-  case Type::GaloisFieldTyID:
-  case Type::EllipticCurveTyID:
-    return TypeSize::Fixed(32);
+  case Type::GaloisFieldTyID: {
+    unsigned ByteSize = (cast<GaloisFieldType>(Ty)->getBitWidth() + 7) / 8;
+    return TypeSize::Fixed(ByteSize * 8);
+  }
+  case Type::EllipticCurveTyID: {
+    unsigned BaseBitWidth =
+        GaloisFieldType::get(Ty->getContext(),
+                             cast<EllipticCurveType>(Ty)->GetBaseFieldKind())->getBitWidth();
+    unsigned BaseByteSize = (BaseBitWidth + 7) / 8;
+    return TypeSize::Fixed(BaseByteSize * 8 * 2);
+  }
   case Type::HalfTyID:
   case Type::BFloatTyID:
     return TypeSize::Fixed(16);

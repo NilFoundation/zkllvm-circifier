@@ -2999,7 +2999,7 @@ void BinaryOperator::AssertOK() {
   case SDiv:
     assert(getType() == LHS->getType() &&
            "Arithmetic operation should return same type as operands!");
-    assert((getType()->isIntOrIntVectorTy() || getType()->isFieldTy()) &&
+    assert((getType()->isIntOrIntVectorTy() || getType()->isFieldOrFieldVectorTy()) &&
            "Incorrect operand type (not integer or field) for S/UDIV");
     break;
   case FDiv:
@@ -3012,8 +3012,8 @@ void BinaryOperator::AssertOK() {
   case SRem:
     assert(getType() == LHS->getType() &&
            "Arithmetic operation should return same type as operands!");
-    assert(getType()->isIntOrIntVectorTy() &&
-           "Incorrect operand type (not integer) for S/UREM");
+    assert((getType()->isIntOrIntVectorTy() || getType()->isFieldOrFieldVectorTy()) &&
+           "Incorrect operand type (not integer or field) for S/UREM");
     break;
   case FRem:
     assert(getType() == LHS->getType() &&
@@ -3026,7 +3026,7 @@ void BinaryOperator::AssertOK() {
   case AShr:
     assert(getType() == LHS->getType() &&
            "Shift operation should return same type as operands!");
-    assert(getType()->isIntOrIntVectorTy() &&
+    assert((getType()->isIntOrIntVectorTy() || getType()->isFieldOrFieldVectorTy()) &&
            "Tried to create a shift operation on a non-integral type!");
     break;
   case And: case Or:

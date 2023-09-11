@@ -21,7 +21,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/IR/Type.h"
-#include "llvm/ZK/FieldKinds.h"
+#include "llvm/ZK/ZKEnums.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/TypeSize.h"
@@ -115,18 +115,12 @@ public:
   /// Get the kind of field type
   GaloisFieldKind getFieldKind() const { return static_cast<GaloisFieldKind>(getSubclassData()); }
 
-  unsigned getBitWidth() const { return GetNumberBits(getFieldKind()); }
+  unsigned getBitWidth() const;
 
   /// Methods for support type inquiry through isa, cast, and dyn_cast.
   static bool classof(const Type *T) {
     return T->getTypeID() == GaloisFieldTyID;
   }
-};
-
-enum EllipticCurveKind : unsigned {
-#define ELLIPTIC_CURVE_TYPE(Name, EnumId, SingletonId, FrontendId)  \
-  EnumId,
-#include "llvm/IR/EllipticCurveTypes.def"
 };
 
 /// Class to represent elliptic curve types.

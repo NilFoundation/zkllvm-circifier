@@ -83,4 +83,5 @@ add_llvm_component_library(LLVMCore
   Remarks
   Support
   TargetParser
+  ZK
   )

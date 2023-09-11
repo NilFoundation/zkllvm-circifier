@@ -86,6 +86,7 @@
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/TargetParser/Triple.h"
+#include "llvm/ZK/ZKEnums.h"
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
@@ -2256,15 +2257,20 @@ TypeInfo ASTContext::getTypeInfoImpl(const Type *T) const {
     Align = 8;                                                                 \
     break;
 #include "clang/Basic/WebAssemblyReferenceTypes.def"
-#define FIELD_TYPE(Name, Id, SingletonId) \
-  case BuiltinType::Id:
-#include "clang/Basic/FieldTypes.def"
-#define ELLIPTIC_CURVE_TYPE(Name, EnumId, SingletonId, FrontendId) \
-  case BuiltinType::FrontendId:
+#define GALOIS_FIELD_TYPE(Name, EnumId, SingletonId, FrontendId)               \
+  case BuiltinType::FrontendId: {                                              \
+    uint64_t ByteWidth = (llvm::GetNumberBits(llvm::EnumId) + 7) / 8;          \
+    Width = Align = ByteWidth * 8;                                             \
+    break;                                                                     \
+  }
+#include "llvm/IR/GaloisFieldTypes.def"
+#define ELLIPTIC_CURVE_TYPE(Name, EnumId, SingletonId, FrontendId)             \
+  case BuiltinType::FrontendId: {                                              \
+    uint64_t ByteWidth = (llvm::GetNumberBits(llvm::EnumId) + 7) / 8;          \
+    Width = Align = ByteWidth * 8;                                             \
+    break;                                                                     \
+  }
 #include "llvm/IR/EllipticCurveTypes.def"
-    Width = 32;
-    Align = 8;
-    break;
     }
     break;
   case Type::ObjCObjectPointer:

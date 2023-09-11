@@ -13,6 +13,32 @@
 
 namespace llvm {
 
+unsigned GetNumberBits(GaloisFieldKind Kind) {
+  switch (Kind) {
+  case GALOIS_FIELD_BLS12381_BASE:
+    return nil::crypto3::algebra::curves::bls12_381::base_field_type::number_bits;
+  case GALOIS_FIELD_BLS12381_SCALAR:
+    return nil::crypto3::algebra::curves::bls12_381::scalar_field_type::number_bits;
+  case GALOIS_FIELD_PALLAS_BASE:
+    return nil::crypto3::algebra::curves::pallas::base_field_type::number_bits;
+  case GALOIS_FIELD_PALLAS_SCALAR:
+    return nil::crypto3::algebra::curves::pallas::scalar_field_type::number_bits;
+  case GALOIS_FIELD_VESTA_BASE:
+    return nil::crypto3::algebra::curves::vesta::base_field_type::number_bits;
+  case GALOIS_FIELD_VESTA_SCALAR:
+    return nil::crypto3::algebra::curves::vesta::scalar_field_type::number_bits;
+  case GALOIS_FIELD_CURVE25519_BASE:
+    return nil::crypto3::algebra::curves::curve25519::base_field_type::number_bits;
+  case GALOIS_FIELD_CURVE25519_SCALAR:
+    return nil::crypto3::algebra::curves::curve25519::scalar_field_type::number_bits;
+  }
+  llvm_unreachable("Unspecified field kind");
+}
+
+unsigned GetNumberBits(EllipticCurveKind Kind) {
+  return 2 * GetNumberBits(GetBaseFieldKind(Kind));
+}
+
 template <typename FieldType>
 static FieldElem FieldBinOpImpl(FieldOperation Op, const FieldElem &LHS,
                                 const FieldElem &RHS) {
@@ -53,7 +79,7 @@ static FieldElem FieldBinOpImpl(FieldOperation Op, const FieldElem &LHS,
     res_bytes.push_back(0);
   APInt res =
       APInt(FieldType::number_bits,
-            makeArrayRef(reinterpret_cast<const uint64_t *>(res_bytes.data()),
+            ArrayRef(reinterpret_cast<const uint64_t *>(res_bytes.data()),
                          res_bytes.size() / 8));
   return FieldElem(LHS.getKind(), res);
 }

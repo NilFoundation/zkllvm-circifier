@@ -4839,7 +4839,7 @@ bool CMulInst::isValidOperands(const Value *Curve, const Value *Field) {
 
 CDivInst::CDivInst(Value *Curve, Value *Field, const Twine &NameStr,
                    Instruction *InsertBefore)
-    : Instruction(Curve->getType(), CMul,
+    : Instruction(Curve->getType(), CDiv,
                   OperandTraits<CDivInst>::op_begin(this), 2, InsertBefore) {
   assert(isValidOperands(Curve, Field));
   Op<0>() = Curve;
@@ -4849,7 +4849,7 @@ CDivInst::CDivInst(Value *Curve, Value *Field, const Twine &NameStr,
 
 CDivInst::CDivInst(Value *Curve, Value *Field, const Twine &NameStr,
                    BasicBlock *InsertAtEnd)
-    : Instruction(Curve->getType(), CMul,
+    : Instruction(Curve->getType(), CDiv,
                   OperandTraits<CDivInst>::op_begin(this), 2, InsertAtEnd) {
   assert(isValidOperands(Curve, Field));
   Op<0>() = Curve;

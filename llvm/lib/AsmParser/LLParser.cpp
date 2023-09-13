@@ -7405,7 +7405,7 @@ bool LLParser::parseCMul(Instruction *&Inst, PerFunctionState &PFS) {
 
 /// parseCDiv
 ///   ::= 'cdiv' Type Value Type Value
-bool LLParser::parseCMul(Instruction *&Inst, PerFunctionState &PFS) {
+bool LLParser::parseCDiv(Instruction *&Inst, PerFunctionState &PFS) {
   LocTy CurveLoc, FieldLoc;
   Value *Curve, *Field;
   if (parseTypeAndValue(Curve, CurveLoc, PFS) ||

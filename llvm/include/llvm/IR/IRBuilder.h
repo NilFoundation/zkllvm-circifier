@@ -1367,7 +1367,7 @@ public:
   Value *CreateCDiv(Value *LHS, Value *RHS, const Twine &Name = "") {
     assert(LHS->getType()->isCurveTy());
     assert(RHS->getType()->isFieldTy());
-    return Insert(CDivInst::Create(RHS, LHS, Name));
+    return Insert(CDivInst::Create(LHS, RHS, Name));
   }
 
   Value *CreateURem(Value *LHS, Value *RHS, const Twine &Name = "") {

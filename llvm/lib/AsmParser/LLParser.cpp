@@ -6518,6 +6518,8 @@ int LLParser::parseInstruction(Instruction *&Inst, BasicBlock *BB,
   // Curve
   case lltok::kw_cmul:
     return parseCMul(Inst, PFS);
+  case lltok::kw_cdiv:
+    return parseCDiv(Inst, PFS);
   }
 }
 
@@ -7455,6 +7457,26 @@ bool LLParser::parseCMul(Instruction *&Inst, PerFunctionState &PFS) {
       cast<GaloisFieldType>(Field->getType())->getFieldKind())
     return error(FieldLoc, "curve can be multiplied only by its scalar field");
   Inst = CMulInst::Create(Curve, Field);
+  return false;
+}
+
+/// parseCDiv
+///   ::= 'cdiv' Type Value Type Value
+bool LLParser::parseCMul(Instruction *&Inst, PerFunctionState &PFS) {
+  LocTy CurveLoc, FieldLoc;
+  Value *Curve, *Field;
+  if (parseTypeAndValue(Curve, CurveLoc, PFS) ||
+      parseToken(lltok::comma, "expected ',' in cdiv instruction") ||
+      parseTypeAndValue(Field, FieldLoc, PFS))
+    return true;
+  if (!Curve->getType()->isCurveTy())
+    return error(CurveLoc, "cdiv first argument must be elliptic curve");
+  if (!Field->getType()->isFieldTy())
+    return error(CurveLoc, "cdiv second argument must be galois field");
+  if (cast<EllipticCurveType>(Curve->getType())->GetScalarFieldKind() !=
+      cast<GaloisFieldType>(Field->getType())->getFieldKind())
+    return error(FieldLoc, "curve can be divided only by its scalar field");
+  Inst = CDivInst::Create(Curve, Field);
   return false;
 }
 

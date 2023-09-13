@@ -1364,6 +1364,12 @@ public:
     return CreateSDiv(LHS, RHS, Name, true);
   }
 
+  Value *CreateCDiv(Value *LHS, Value *RHS, const Twine &Name = "") {
+    assert(LHS->getType()->isCurveTy());
+    assert(RHS->getType()->isFieldTy());
+    return Insert(CDivInst::Create(RHS, LHS, Name));
+  }
+
   Value *CreateURem(Value *LHS, Value *RHS, const Twine &Name = "") {
     if (Value *V = Folder.FoldBinOp(Instruction::URem, LHS, RHS))
       return V;

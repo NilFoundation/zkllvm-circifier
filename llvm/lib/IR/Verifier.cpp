@@ -582,6 +582,7 @@ private:
   void visitCatchSwitchInst(CatchSwitchInst &CatchSwitch);
   void visitCleanupReturnInst(CleanupReturnInst &CRI);
   void visitCMulInst(CMulInst &CMI);
+  void visitCDivInst(CDivInst &CMI);
 
   void verifySwiftErrorCall(CallBase &Call, const Value *SwiftErrorVal);
   void verifySwiftErrorValue(const Value *SwiftErrorVal);
@@ -4707,6 +4708,12 @@ void Verifier::visitCleanupReturnInst(CleanupReturnInst &CRI) {
 void Verifier::visitCMulInst(CMulInst &CMI) {
   Check(CMI.getType()->isCurveTy(), "CMul result must be  elliptic curve", &CMI);
   Check(CMI.isValidOperands(CMI.getOperand(0), CMI.getOperand(1)), "CMul operands are invalid", &CMI);
+  visitInstruction(CMI);
+}
+
+void Verifier::visitCDivInst(CDivInst &CMI) {
+  Check(CMI.getType()->isCurveTy(), "CDiv result must be  elliptic curve", &CMI);
+  Check(CMI.isValidOperands(CMI.getOperand(0), CMI.getOperand(1)), "CDiv operands are invalid", &CMI);
   visitInstruction(CMI);
 }
 

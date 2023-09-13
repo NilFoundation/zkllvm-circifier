@@ -626,6 +626,9 @@ private:
   void visitCMul(const CMulInst &I) {
     llvm_unreachable("Lowering for CMul inst is not implemented");
   }
+  void visitCDiv(const CDivInst &I) {
+    llvm_unreachable("Lowering for CDiv inst is not implemented");
+  }
 
   void visitInlineAsm(const CallBase &Call,
                       const BasicBlock *EHPadBB = nullptr);

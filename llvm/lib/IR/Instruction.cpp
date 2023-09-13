@@ -488,6 +488,7 @@ const char *Instruction::getOpcodeName(unsigned OpCode) {
   case CleanupPad:     return "cleanuppad";
   case Freeze:         return "freeze";
   case CMul:           return "cmul";
+  case CDiv:           return "cdiv";
 
   default: return "<Invalid operator> ";
   }

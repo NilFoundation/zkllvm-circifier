@@ -3501,6 +3501,8 @@ Value *ScalarExprEmitter::EmitDiv(const BinOpInfo &Ops) {
   }
   else if (Ops.isFixedPointOp())
     return EmitFixedPointBinOp(Ops);
+  else if (Ops.Ty.isCurveType())
+    return Builder.CreateCDiv(Ops.LHS, Ops.RHS, "cdiv");
   else if (Ops.Ty->hasUnsignedIntegerRepresentation())
     return Builder.CreateUDiv(Ops.LHS, Ops.RHS, "div");
   else

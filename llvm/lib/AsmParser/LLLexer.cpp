@@ -905,6 +905,7 @@ lltok::Kind LLLexer::LexIdentifier() {
 
   INSTKEYWORD(freeze,       Freeze);
   INSTKEYWORD(cmul,         CMul);
+  INSTKEYWORD(cdiv,         CDiv);
 
 #undef INSTKEYWORD
 

@@ -11100,8 +11100,17 @@ QualType Sema::CheckMultiplyDivideOperands(ExprResult &LHS, ExprResult &RHS,
                                        ACK_Arithmetic);
 
   if (LHSTy->isCurveType() || RHSTy->isCurveType()) {
-    if (IsDiv)
+    if (IsDiv) {
+      if (LHSTy->isCurveType() && RHSTy->isFieldType()) {
+        BuiltinType::Kind CurveKind =
+            cast<BuiltinType>(LHSTy.getCanonicalType())->getKind();
+        BuiltinType::Kind FieldKind =
+            cast<BuiltinType>(RHSTy.getCanonicalType())->getKind();
+        if (FieldKind == getScalarFieldKind(CurveKind))
+          return LHSTy;
+      }
       return InvalidOperands(Loc, LHS, RHS);
+    }
 
     if (((LHSTy->isCurveType() && RHSTy->isFieldType()) ||
          (RHSTy->isCurveType() && LHSTy->isFieldType()))) {

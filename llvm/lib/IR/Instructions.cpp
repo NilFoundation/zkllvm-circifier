@@ -4834,6 +4834,40 @@ bool CMulInst::isValidOperands(const Value *Curve, const Value *Field) {
 }
 
 //===----------------------------------------------------------------------===//
+//                            CDivInst Implementation
+//===----------------------------------------------------------------------===//
+
+CDivInst::CDivInst(Value *Curve, Value *Field, const Twine &NameStr,
+                   Instruction *InsertBefore)
+    : Instruction(Curve->getType(), CMul,
+                  OperandTraits<CDivInst>::op_begin(this), 2, InsertBefore) {
+  assert(isValidOperands(Curve, Field));
+  Op<0>() = Curve;
+  Op<1>() = Field;
+  setName(NameStr);
+}
+
+CDivInst::CDivInst(Value *Curve, Value *Field, const Twine &NameStr,
+                   BasicBlock *InsertAtEnd)
+    : Instruction(Curve->getType(), CMul,
+                  OperandTraits<CDivInst>::op_begin(this), 2, InsertAtEnd) {
+  assert(isValidOperands(Curve, Field));
+  Op<0>() = Curve;
+  Op<1>() = Field;
+  setName(NameStr);
+}
+
+bool CDivInst::isValidOperands(const Value *Curve, const Value *Field) {
+  if (!Curve->getType()->isCurveTy() || !Field->getType()->isFieldTy())
+    return false;
+
+  // Curve can be divided only by corresponding scalar field type
+  auto *CurveTy = cast<EllipticCurveType>(Curve->getType());
+  auto *FieldTy = cast<GaloisFieldType>(Field->getType());
+  return CurveTy->GetScalarFieldKind() == FieldTy->getFieldKind();
+}
+
+//===----------------------------------------------------------------------===//
 //                           cloneImpl() implementations
 //===----------------------------------------------------------------------===//
 
@@ -5056,4 +5090,8 @@ FreezeInst *FreezeInst::cloneImpl() const {
 
 CMulInst *CMulInst::cloneImpl() const {
   return CMulInst::Create(getOperand(0), getOperand(1));
+}
+
+CDivInst *CDivInst::cloneImpl() const {
+  return CDivInst::Create(getOperand(0), getOperand(1));
 }

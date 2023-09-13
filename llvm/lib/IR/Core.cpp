@@ -3426,6 +3426,11 @@ LLVMValueRef LLVMBuildFMul(LLVMBuilderRef B, LLVMValueRef LHS, LLVMValueRef RHS,
   return wrap(unwrap(B)->CreateFMul(unwrap(LHS), unwrap(RHS), Name));
 }
 
+LLVMValueRef LLVMBuildCMul(LLVMBuilderRef B, LLVMValueRef LHS, LLVMValueRef RHS,
+                          const char *Name) {
+  return wrap(unwrap(B)->CreateCMul(unwrap(LHS), unwrap(RHS), Name));
+}
+
 LLVMValueRef LLVMBuildUDiv(LLVMBuilderRef B, LLVMValueRef LHS, LLVMValueRef RHS,
                            const char *Name) {
   return wrap(unwrap(B)->CreateUDiv(unwrap(LHS), unwrap(RHS), Name));

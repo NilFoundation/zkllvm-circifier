@@ -3295,6 +3295,11 @@ void ModuleBitcodeWriter::writeInstruction(const Instruction &I,
     pushValueAndType(I.getOperand(0), InstID, Vals);
     pushValueAndType(I.getOperand(1), InstID, Vals);
     break;
+  case Instruction::CDiv:
+    Code = bitc::FUNC_CODE_INST_CDIV;
+    pushValueAndType(I.getOperand(0), InstID, Vals);
+    pushValueAndType(I.getOperand(1), InstID, Vals);
+    break;
   }
 
   Stream.EmitRecord(Code, Vals, AbbrevToUse);

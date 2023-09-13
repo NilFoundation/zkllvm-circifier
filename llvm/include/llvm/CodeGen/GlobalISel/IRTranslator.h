@@ -517,6 +517,9 @@ private:
   bool translateCMul(const User &U, MachineIRBuilder &MIRBuilder) {
     llvm_unreachable("Translation of CMul instruction is not implemented");
   }
+  bool translateCDiv(const User &U, MachineIRBuilder &MIRBuilder) {
+    llvm_unreachable("Translation of CDiv instruction is not implemented");
+  }
 
   // Stubs to keep the compiler happy while we implement the rest of the
   // translation.

@@ -6510,6 +6510,19 @@ Error BitcodeReader::parseFunctionBody(Function *F) {
       InstructionList.push_back(I);
       break;
     }
+    case bitc::FUNC_CODE_INST_CDIV: {
+      unsigned OpNum = 0;
+      Value *Curve = nullptr, *Field = nullptr;
+      unsigned CurveTyID = 0, FieldTyID = 0;
+      if (getValueTypePair(Record, OpNum, NextValueNo, Curve, CurveTyID, CurBB))
+        return error("Invalid record");
+      if (getValueTypePair(Record, OpNum, NextValueNo, Field, FieldTyID, CurBB))
+        return error("Invalid record");
+      I = CDivInst::Create(Curve, Field);
+      ResTypeID = CurveTyID;
+      InstructionList.push_back(I);
+      break;
+    }
     }
 
     // Add instruction to end of current BB.  If there is no current BB, reject

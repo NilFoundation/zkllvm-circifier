@@ -131,6 +131,7 @@ typedef enum {
   LLVMInsertValue    = 54,
   LLVMFreeze         = 68,
   LLVMCMul           = 71,
+  LLVMCDiv           = 72,
 
   /* Atomic operators */
   LLVMFence          = 55,

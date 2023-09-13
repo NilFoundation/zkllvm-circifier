@@ -5592,7 +5592,7 @@ public:
     return new(2) CDivInst(Curve, Field, NameStr, InsertAtEnd);
   }
 
-  /// Return true if an cmul instruction can be
+  /// Return true if an cdiv instruction can be
   /// formed with the specified operands.
   static bool isValidOperands(const Value *Curve, const Value *Field);
 
@@ -5601,7 +5601,7 @@ public:
 
   // Methods for support type inquiry through isa, cast, and dyn_cast:
   static bool classof(const Instruction *I) {
-    return I->getOpcode() == Instruction::CMul;
+    return I->getOpcode() == Instruction::CDiv;
   }
   static bool classof(const Value *V) {
     return isa<Instruction>(V) && classof(cast<Instruction>(V));

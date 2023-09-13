@@ -3466,6 +3466,11 @@ LLVMValueRef LLVMBuildFDiv(LLVMBuilderRef B, LLVMValueRef LHS, LLVMValueRef RHS,
   return wrap(unwrap(B)->CreateFDiv(unwrap(LHS), unwrap(RHS), Name));
 }
 
+LLVMValueRef LLVMBuildCDiv(LLVMBuilderRef B, LLVMValueRef LHS, LLVMValueRef RHS,
+                           const char *Name) {
+  return wrap(unwrap(B)->CreateCDiv(unwrap(LHS), unwrap(RHS), Name));
+}
+
 LLVMValueRef LLVMBuildURem(LLVMBuilderRef B, LLVMValueRef LHS, LLVMValueRef RHS,
                            const char *Name) {
   return wrap(unwrap(B)->CreateURem(unwrap(LHS), unwrap(RHS), Name));

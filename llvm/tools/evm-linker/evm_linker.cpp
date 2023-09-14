@@ -92,7 +92,7 @@ private:
   evm::Builder Constructor;
   std::vector<std::unique_ptr<EvmFile>> Files;
   std::vector<uint8_t> InitData;
-  SymbolMap SymbolMap;
+  SymbolMap SymMap;
   SymbolManager SymManager;
   unsigned GlobalsSectionSize{0};
   unsigned CodeSize{0};
@@ -137,16 +137,16 @@ int EvmLinker::run() {
     buildConstructor();
   }
 
-  SymbolMap.clear();
+  SymMap.clear();
   for (auto& File : Files) {
     for (auto& Func: File->getFunctions()) {
-      auto InsRes = SymbolMap.insert(std::make_pair(Func->Name, Func.get()));
+      auto InsRes = SymMap.insert(std::make_pair(Func->Name, Func.get()));
       if (!InsRes.second) {
         report_fatal_error(Twine("Duplicated symbol(function): ") + Func->Name);
       }
     }
     for (auto& G: File->getGlobals()) {
-      auto InsRes = SymbolMap.insert(std::make_pair(G->Name, G.get()));
+      auto InsRes = SymMap.insert(std::make_pair(G->Name, G.get()));
       if (!InsRes.second) {
         report_fatal_error(Twine("Duplicated symbol(global): ") + G->Name);
       }
@@ -349,7 +349,7 @@ void EvmLinker::resolve(bool CheckReachable) {
   GlobalsSectionSize = DataOffset;
 
   for (auto& File : Files) {
-    File->resolve(SymbolMap);
+    File->resolve(SymMap);
   }
 
   for (auto &File : Files) {
@@ -382,7 +382,7 @@ void EvmLinker::removeUnreachable() {
     }
     return;
   }
-  DependencyGraph DepGraph(SymbolMap);
+  DependencyGraph DepGraph(SymMap);
   for (auto& File : Files) {
     File->buildDepGraph(DepGraph);
   }
@@ -516,7 +516,7 @@ void EvmLinker::emit() {
     }
     JsonInfo.attributeObject("relocations", [&] {
       for (auto Relocation: CollectedRelocations) {
-        if (Relocation.first == "fix4" || !SymbolMap[Relocation.first]->Reachable) {
+        if (Relocation.first == "fix4" || !SymMap[Relocation.first]->Reachable) {
           continue;
         }
         JsonInfo.attributeArray(Relocation.first, [&]() {

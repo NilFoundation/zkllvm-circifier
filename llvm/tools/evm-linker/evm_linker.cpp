@@ -207,6 +207,29 @@ void EvmLinker::readArchive(std::unique_ptr<object::Archive> Archive,
   }
 }
 
+static uint32_t getFuncHash(Function* Func) {
+  // Calculate function hash from its signature.
+  // Example of signature: some_function(uint256,uint32[],bytes10,bytes)
+  accumulator_set<hashes::keccak_1600<256>> Acc;
+  auto addHash = [&Acc](const std::string& S) {
+    hash<hashes::keccak_1600<256>>(S.begin(), S.end(), Acc);
+  };
+  addHash(Func->DemangledName);
+  addHash("(");
+  bool IsFirst = true;
+  for (auto Input : Func->Inputs) {
+    if (!IsFirst) {
+      addHash(",");
+    }
+    addHash(EVM::ValTypeToString(Input));
+    IsFirst = false;
+  }
+  addHash(")");
+  auto sha3 = accumulators::extract::hash<hashes::keccak_1600<256>>(Acc);
+  auto Hash = (sha3[0] << 24) | (sha3[1] << 16) | (sha3[2] << 8) | sha3[3];
+  return Hash;
+}
+
 void EvmLinker::buildDispatcher() {
   Dispatcher.push("stack_start");
   Dispatcher.inst(opcodes::PUSH1, 0x00);
@@ -235,25 +258,7 @@ void EvmLinker::buildDispatcher() {
         continue;
       }
 
-      // Calculate function hash form its signature.
-      // Example of signature: some_function(uint256,uint32[],bytes10,bytes)
-      accumulator_set<hashes::keccak_1600<256>> Acc;
-      auto addHash = [&Acc](const std::string& S) {
-        hash<hashes::keccak_1600<256>>(S.begin(), S.end(), Acc);
-      };
-      addHash(Func->DemangledName);
-      addHash("(");
-      bool IsFirst = true;
-      for (auto Input : Func->Inputs) {
-        if (!IsFirst) {
-          addHash(",");
-        }
-        addHash(EVM::ValTypeToString(Input));
-        IsFirst = false;
-      }
-      addHash(")");
-      auto sha3 = accumulators::extract::hash<hashes::keccak_1600<256>>(Acc);
-      auto Hash = (sha3[0] << 24) | (sha3[1] << 16) | (sha3[2] << 8) | sha3[3];
+      auto Hash = getFuncHash(Func.get());
       Dispatcher.inst(opcodes::DUP1);
       Dispatcher.inst(opcodes::PUSH4, Hash);
       Dispatcher.inst(opcodes::EQ);
@@ -468,6 +473,7 @@ void EvmLinker::emit() {
             JsonInfo.attribute("name", Func->DemangledName);
             JsonInfo.attribute("offset", Func->Offset);
             JsonInfo.attribute("size", Func->Size);
+            JsonInfo.attribute("hash", getFuncHash(Func.get()));
           });
         }
       }

@@ -57,7 +57,7 @@ def get_func_keccak(name, abifile)
   raise "More than one function found with name: #{name}" if dscr.size > 1
   dscr = dscr[0]
   inputs = dscr['inputs'].map { |x| x['type'] }
-  signature = "#{dscr['name']}(#{inputs.join(',')})"
+  signature = "#{name}(#{inputs.join(',')})"
   function_sha3 = Digest::Keccak256.new.hexdigest(signature)
   function_sha3
 end

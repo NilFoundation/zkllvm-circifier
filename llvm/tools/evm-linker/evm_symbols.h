@@ -58,6 +58,11 @@ struct EvmSymbol {
     return Offset != INVALID_OFFSET;
   }
 
+  std::string_view getBareName() const {
+    std::string_view name = DemangledName;
+    return name.substr(0, name.find('('));
+  }
+
   std::string Name;
   std::string DemangledName;
   unsigned Offset{INVALID_OFFSET};

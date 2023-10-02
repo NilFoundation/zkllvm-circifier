@@ -211,10 +211,10 @@ static uint32_t getFuncHash(Function* Func) {
   // Calculate function hash from its signature.
   // Example of signature: some_function(uint256,uint32[],bytes10,bytes)
   accumulator_set<hashes::keccak_1600<256>> Acc;
-  auto addHash = [&Acc](const std::string& S) {
+  auto addHash = [&Acc](std::string_view S) {
     hash<hashes::keccak_1600<256>>(S.begin(), S.end(), Acc);
   };
-  addHash(Func->DemangledName);
+  addHash(Func->getBareName());
   addHash("(");
   bool IsFirst = true;
   for (auto Input : Func->Inputs) {

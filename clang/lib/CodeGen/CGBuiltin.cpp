@@ -19928,6 +19928,10 @@ Value *CodeGenFunction::EmitAssignerBuiltinExpr(unsigned int BuiltinID,
     OverloadTypes = {llvm::FixedVectorType::get(ElemTy, 64), IntType};
     break;
   }
+  case assigner::BI__builtin_assigner_exit_check: {
+    ID = Intrinsic::assigner_exit_check;
+    break;
+  }
   }
   assert(ID != Intrinsic::not_intrinsic);
 

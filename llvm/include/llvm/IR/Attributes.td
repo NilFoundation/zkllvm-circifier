@@ -83,6 +83,9 @@ def NoUndef : EnumAttr<"noundef", [ParamAttr, RetAttr]>;
 /// Entry point for circuit generation
 def Circuit : EnumAttr<"circuit", [FnAttr]>;
 
+/// Private input of circuit function
+def PrivateInput : EnumAttr<"private_input", [ParamAttr]>;
+
 /// Marks function as being in a cold path.
 def Cold : EnumAttr<"cold", [FnAttr]>;
 

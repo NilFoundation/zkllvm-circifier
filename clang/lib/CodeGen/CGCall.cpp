@@ -2620,12 +2620,24 @@ void CodeGenModule::ConstructAttributeList(StringRef Name,
   }
 
   unsigned ArgNo = 0;
+  const FunctionDecl *CircuitFD = nullptr;
+  const Decl *CalleeDecl = CalleeInfo.getCalleeDecl().getDecl();
+  if (CalleeDecl->hasAttr<CircuitAttr>()) {
+    CircuitFD = cast<FunctionDecl>(CalleeDecl);
+  }
   for (CGFunctionInfo::const_arg_iterator I = FI.arg_begin(),
                                           E = FI.arg_end();
        I != E; ++I, ++ArgNo) {
     QualType ParamType = I->type;
     const ABIArgInfo &AI = I->info;
     llvm::AttrBuilder Attrs(getLLVMContext());
+
+    if (CircuitFD) {
+      auto Param = CircuitFD->getParamDecl(ArgNo);
+      if (Param && Param->hasAttr<PrivateInputAttr>()) {
+        Attrs.addAttribute(llvm::Attribute::PrivateInput);
+      }
+    }
 
     // Add attribute for padding argument, if necessary.
     if (IRFunctionArgs.hasPaddingArg(ArgNo)) {

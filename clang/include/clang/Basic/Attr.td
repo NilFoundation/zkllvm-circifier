@@ -4205,3 +4205,10 @@ def Circuit : Attr {
   let Subjects = SubjectList<[Function]>;
   let Documentation = [Undocumented];
 }
+
+def PrivateInput : Attr {
+  let Spellings = [CXX11<"", "private_input", 201907>,
+                   GCC<"private_input">];
+  let Subjects = SubjectList<[ParmVar]>;
+  let Documentation = [Undocumented];
+}

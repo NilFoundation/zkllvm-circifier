@@ -722,6 +722,7 @@ enum AttributeKindCodes {
   ATTR_KIND_MEMORY = 86,
   ATTR_KIND_NOFPCLASS = 87,
   ATTR_KIND_CIRCUIT = 88,
+  ATTR_KIND_PRIVATE_INPUT = 89,
 };
 
 enum ComdatSelectionKindCodes {

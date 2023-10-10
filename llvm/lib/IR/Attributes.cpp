@@ -547,6 +547,10 @@ std::string Attribute::getAsString(bool InAttrGrp) const {
     return "circuit";
   }
 
+  if (hasAttribute(Attribute::PrivateInput)) {
+    return "private_input";
+  }
+
   // Convert target-dependent attributes to strings of the form:
   //
   //   "kind"

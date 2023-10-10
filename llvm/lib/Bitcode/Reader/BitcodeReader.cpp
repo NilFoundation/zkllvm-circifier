@@ -1914,6 +1914,8 @@ static Attribute::AttrKind getAttrFromCode(uint64_t Code) {
     return Attribute::InAlloca;
   case bitc::ATTR_KIND_CIRCUIT:
     return Attribute::Circuit;
+  case bitc::ATTR_KIND_PRIVATE_INPUT:
+    return Attribute::PrivateInput;
   case bitc::ATTR_KIND_COLD:
     return Attribute::Cold;
   case bitc::ATTR_KIND_CONVERGENT:

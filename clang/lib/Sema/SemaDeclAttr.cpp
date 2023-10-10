@@ -8256,6 +8256,10 @@ static void handleCircuitAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
   D->addAttr(::new (S.Context) CircuitAttr(S.Context, AL));
 }
 
+static void handlePrivateInputAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
+  D->addAttr(::new (S.Context) PrivateInputAttr(S.Context, AL));
+}
+
 static void handleSYCLKernelAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
   // The 'sycl_kernel' attribute applies only to function templates.
   const auto *FD = cast<FunctionDecl>(D);
@@ -9136,6 +9140,9 @@ ProcessDeclAttribute(Sema &S, Scope *scope, Decl *D, const ParsedAttr &AL,
     break;
   case ParsedAttr::AT_Circuit:
     handleCircuitAttr(S, D, AL);
+    break;
+  case ParsedAttr::AT_PrivateInput:
+    handlePrivateInputAttr(S, D, AL);
     break;
 
   // Microsoft attributes:

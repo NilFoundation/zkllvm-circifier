@@ -53,6 +53,28 @@ void CodeGenFunction::EmitStopPoint(const Stmt *S) {
   }
 }
 
+void CodeGenFunction::AddMultiProverMetadata(llvm::Instruction *instr) {
+  if (!MultiProverAttrPtr || !instr) {
+    return;
+  }
+
+  ASTContext& AC = CGM.getContext();
+  llvm::LLVMContext &C = instr->getContext();
+  const auto s = MultiProverAttrPtr->getIndexes();
+  llvm::MDNode *N = llvm::MDNode::get(C, llvm::MDString::get(C, s));
+  instr->setMetadata("zk_multi_prover", N);
+}
+
+void CodeGenFunction::AddMultiProverMetadata(llvm::BasicBlock *block) {
+  if (!MultiProverAttrPtr || !block) {
+      return;
+  }
+
+  for(auto it = block->begin(); it != block->end(); it++) {
+    AddMultiProverMetadata(&(*it));
+  }
+}
+
 void CodeGenFunction::EmitStmt(const Stmt *S, ArrayRef<const Attr *> Attrs) {
   assert(S && "Null statement?");
   PGO.setCurrentStmt(S);
@@ -705,6 +727,7 @@ void CodeGenFunction::EmitAttributedStmt(const AttributedStmt &S) {
   bool noinline = false;
   bool alwaysinline = false;
   const CallExpr *musttail = nullptr;
+  const MultiProverAttr *multiProverAttrPtr = nullptr;
 
   for (const auto *A : S.getAttrs()) {
     switch (A->getKind()) {
@@ -719,6 +742,9 @@ void CodeGenFunction::EmitAttributedStmt(const AttributedStmt &S) {
     case attr::AlwaysInline:
       alwaysinline = true;
       break;
+    case attr::MultiProver:
+      multiProverAttrPtr = ((const MultiProverAttr*)A);
+      break;
     case attr::MustTail:
       const Stmt *Sub = S.getSubStmt();
       const ReturnStmt *R = cast<ReturnStmt>(Sub);
@@ -730,7 +756,15 @@ void CodeGenFunction::EmitAttributedStmt(const AttributedStmt &S) {
   SaveAndRestore save_noinline(InNoInlineAttributedStmt, noinline);
   SaveAndRestore save_alwaysinline(InAlwaysInlineAttributedStmt, alwaysinline);
   SaveAndRestore save_musttail(MustTailCall, musttail);
-  EmitStmt(S.getSubStmt(), S.getAttrs());
+  SaveAndRestore save_multiProverAttr(MultiProverAttrPtr, multiProverAttrPtr);
+  if (MultiProverAttrPtr) {
+    llvm::BasicBlock *newBB = createBasicBlock("zk.multi_prover");
+    EmitBlock(newBB);
+    EmitStmt(S.getSubStmt(), S.getAttrs());
+    AddMultiProverMetadata(newBB);
+  } else {
+    EmitStmt(S.getSubStmt(), S.getAttrs());
+  }
 }
 
 void CodeGenFunction::EmitGotoStmt(const GotoStmt &S) {

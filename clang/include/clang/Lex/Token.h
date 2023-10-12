@@ -342,6 +342,12 @@ struct PragmaLoopHintInfo {
   Token Option;
   ArrayRef<Token> Toks;
 };
+
+// Extra information needed for annonation tokens.
+struct ZkMultiProveHintInfo {
+    Token PragmaName;
+    ArrayRef<Token> Toks;
+};
 } // end namespace clang
 
 #endif // LLVM_CLANG_LEX_TOKEN_H

@@ -941,6 +941,11 @@ ANNOTATION(attr_openmp)
 PRAGMA_ANNOTATION(pragma_openmp)
 PRAGMA_ANNOTATION(pragma_openmp_end)
 
+// Annotations pragma directives #pragma zk_multi_prover
+// The lexer produces these so that they only take effect when the parser
+// handles #pragma zk_multi_prover directive.
+PRAGMA_ANNOTATION(pragma_zk_multi_prover)
+
 // Annotations for loop pragma directives #pragma clang loop ...
 // The lexer produces these so that they only take effect when the parser
 // handles #pragma loop ... directives.

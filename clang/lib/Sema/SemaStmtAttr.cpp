@@ -174,6 +174,21 @@ static Attr *handleLoopHintAttr(Sema &S, Stmt *St, const ParsedAttr &A,
   return LoopHintAttr::CreateImplicit(S.Context, Option, State, ValueExpr, A);
 }
 
+static Attr *handleMultiProverAttr(Sema &S, Stmt *St, const ParsedAttr &A,
+                                SourceRange) {
+  assert(A.getNumArgs() == 1);
+
+  StringRef IdxStr;
+
+  if (!S.checkStringLiteralArgumentAttr(A, 0, IdxStr, nullptr)) {
+    S.Diag(St->getBeginLoc(), diag::warn_attribute_ignored_no_calls_in_stmt)
+            << A;
+    return nullptr;
+  }
+
+  return MultiProverAttr::CreateImplicit(S.Context, IdxStr, A.getRange());
+}
+
 namespace {
 class CallExprFinder : public ConstEvaluatedExprVisitor<CallExprFinder> {
   bool FoundAsmStmt = false;
@@ -455,6 +470,7 @@ static Attr *ProcessStmtAttribute(Sema &S, Stmt *St, const ParsedAttr &A,
   // which do not apply to the current target architecture are treated as
   // though they were unknown attributes.
   const TargetInfo *Aux = S.Context.getAuxTargetInfo();
+
   if (A.getKind() == ParsedAttr::UnknownAttribute ||
       !(A.existsInTarget(S.Context.getTargetInfo()) ||
         (S.Context.getLangOpts().SYCLIsDevice && Aux &&
@@ -476,6 +492,8 @@ static Attr *ProcessStmtAttribute(Sema &S, Stmt *St, const ParsedAttr &A,
     return handleFallThroughAttr(S, St, A, Range);
   case ParsedAttr::AT_LoopHint:
     return handleLoopHintAttr(S, St, A, Range);
+  case ParsedAttr::AT_MultiProver:
+      return handleMultiProverAttr(S, St, A, Range);
   case ParsedAttr::AT_OpenCLUnrollHint:
     return handleOpenCLUnrollHint(S, St, A, Range);
   case ParsedAttr::AT_Suppress:

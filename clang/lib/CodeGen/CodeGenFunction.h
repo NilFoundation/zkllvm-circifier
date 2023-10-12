@@ -563,6 +563,9 @@ public:
   // applies to.  nullptr if there is no 'musttail' on the current statement.
   const CallExpr *MustTailCall = nullptr;
 
+  /// Pointer to the multi prover attribute for current statement.
+  const MultiProverAttr* MultiProverAttrPtr = nullptr;
+
   /// Returns true if a function must make progress, which means the
   /// mustprogress attribute can be added.
   bool checkIfFunctionMustProgress() {
@@ -1976,6 +1979,9 @@ private:
   /// Add OpenCL kernel arg metadata and the kernel attribute metadata to
   /// the function metadata.
   void EmitKernelMetadata(const FunctionDecl *FD, llvm::Function *Fn);
+
+  void AddMultiProverMetadata(llvm::Instruction *instr);
+  void AddMultiProverMetadata(llvm::BasicBlock *block);
 
 public:
   CodeGenFunction(CodeGenModule &cgm, bool suppressNewContext=false);

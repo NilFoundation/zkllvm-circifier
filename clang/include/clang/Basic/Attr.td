@@ -4142,3 +4142,14 @@ def PrivateInput : Attr {
   let Subjects = SubjectList<[ParmVar]>;
   let Documentation = [Undocumented];
 }
+
+def MultiProver : Attr {
+  let Spellings = [Pragma<"", "zk_multi_prover">];
+  let Args = [StringArgument<"Indexes">];
+  let Documentation = [Undocumented];
+  let AdditionalMembers = [{
+      void printPrettyPragma(raw_ostream &OS, const PrintingPolicy &Policy) const {
+        OS << " (" << 0 << ')';
+      }
+  }];
+}

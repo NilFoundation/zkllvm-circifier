@@ -240,6 +240,12 @@ struct PragmaLoopHintHandler : public PragmaHandler {
                     Token &FirstToken) override;
 };
 
+struct PragmaZkMultiProverHandler : public PragmaHandler {
+    PragmaZkMultiProverHandler() : PragmaHandler("zk_multi_prover") {}
+    void HandlePragma(Preprocessor &PP, PragmaIntroducer Introducer,
+                      Token &FirstToken) override;
+};
+
 struct PragmaUnrollHintHandler : public PragmaHandler {
   PragmaUnrollHintHandler(const char *name) : PragmaHandler(name) {}
   void HandlePragma(Preprocessor &PP, PragmaIntroducer Introducer,
@@ -479,6 +485,9 @@ void Parser::initializePragmaHandlers() {
   LoopHintHandler = std::make_unique<PragmaLoopHintHandler>();
   PP.AddPragmaHandler("clang", LoopHintHandler.get());
 
+  ZkMultiProverHandler = std::make_unique<PragmaZkMultiProverHandler>();
+  PP.AddPragmaHandler(ZkMultiProverHandler.get());
+
   UnrollHintHandler = std::make_unique<PragmaUnrollHintHandler>("unroll");
   PP.AddPragmaHandler(UnrollHintHandler.get());
   PP.AddPragmaHandler("GCC", UnrollHintHandler.get());
@@ -612,6 +621,9 @@ void Parser::resetPragmaHandlers() {
 
   PP.RemovePragmaHandler("clang", LoopHintHandler.get());
   LoopHintHandler.reset();
+
+  PP.RemovePragmaHandler(ZkMultiProverHandler.get());
+  ZkMultiProverHandler.reset();
 
   PP.RemovePragmaHandler(UnrollHintHandler.get());
   PP.RemovePragmaHandler("GCC", UnrollHintHandler.get());
@@ -3551,6 +3563,57 @@ void PragmaLoopHintHandler::HandlePragma(Preprocessor &PP,
 
   PP.EnterTokenStream(std::move(TokenArray), TokenList.size(),
                       /*DisableMacroExpansion=*/false, /*IsReinject=*/false);
+}
+
+// #pragma zk_multi_prover
+void PragmaZkMultiProverHandler::HandlePragma(Preprocessor &PP,
+                                           PragmaIntroducer Introducer,
+                                           Token &Tok) {
+  Token PragmaName = Tok;
+  PP.Lex(Tok);
+  if (PragmaName.isNot(tok::identifier)) {
+    PP.Diag(PragmaName.getLocation(), diag::warn_pragma_expected_identifier)
+            << "zk_multi_prover pragma";
+    return;
+  }
+
+  SmallVector<Token, 1> ValueList;
+  while (Tok.isNot(tok::eod)) {
+    if (ValueList.size() >= 1) {
+      PP.Diag(Tok.getLocation(), diag::warn_pragma_extra_tokens_at_eol)
+              << "zk_multi_prover pragma supports only one prover index, will be used first";
+      PP.Lex(Tok);
+      while (Tok.isNot(tok::eod)) {
+        PP.Lex(Tok);
+      }
+      break;
+    }
+    if (Tok.isNot(tok::numeric_constant)) {
+      PP.Diag(Tok.getLocation(), diag::warn_pragma_expected_integer)
+              << "zk_multi_prover pragma";
+      return;
+    }
+    ValueList.push_back(Tok);
+    PP.Lex(Tok);
+  }
+
+  auto *Info = new (PP.getPreprocessorAllocator()) ZkMultiProveHintInfo;
+  Info->PragmaName = PragmaName;
+  Info->Toks = llvm::ArrayRef(ValueList).copy(PP.getPreprocessorAllocator());
+  auto Toks = std::make_unique<Token[]>(1);
+  Toks[0].startToken();
+  Toks[0].setKind(tok::annot_pragma_zk_multi_prover);
+  Toks[0].setLocation(Introducer.Loc);
+  Toks[0].setAnnotationEndLoc(PragmaName.getLocation());
+  Toks[0].setAnnotationValue(static_cast<void *>(Info));
+
+  if (Tok.isNot(tok::eod)) {
+    PP.Diag(Tok.getLocation(), diag::warn_pragma_extra_tokens_at_eol)
+            << "zk_multi_prover pragma";
+    return;
+  }
+
+  PP.EnterTokenStream(std::move(Toks), 1, /*DisableMacroExpansion=*/false, /*IsReinject=*/false);
 }
 
 /// Handle the loop unroll optimization pragmas.

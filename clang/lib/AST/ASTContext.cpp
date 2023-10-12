@@ -2266,14 +2266,16 @@ TypeInfo ASTContext::getTypeInfoImpl(const Type *T) const {
 #define GALOIS_FIELD_TYPE(Name, EnumId, SingletonId, FrontendId)               \
   case BuiltinType::FrontendId: {                                              \
     uint64_t ByteWidth = (llvm::GetNumberBits(llvm::EnumId) + 7) / 8;          \
-    Width = Align = ByteWidth * 8;                                             \
+    Width = ByteWidth * 8;                                                     \
+    Align = 8;                                                                 \
     break;                                                                     \
   }
 #include "llvm/IR/GaloisFieldTypes.def"
 #define ELLIPTIC_CURVE_TYPE(Name, EnumId, SingletonId, FrontendId)             \
   case BuiltinType::FrontendId: {                                              \
     uint64_t ByteWidth = (llvm::GetNumberBits(llvm::EnumId) + 7) / 8;          \
-    Width = Align = ByteWidth * 8;                                             \
+    Width = ByteWidth * 8;                                                     \
+    Align = 8;                                                                 \
     break;                                                                     \
   }
 #include "llvm/IR/EllipticCurveTypes.def"

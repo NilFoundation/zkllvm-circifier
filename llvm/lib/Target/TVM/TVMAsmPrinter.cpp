@@ -210,8 +210,7 @@ void TVMAsmPrinter::EmitSubBlockForPushcont(const TVMMCInstLower &lower,
         }
       }
       OutStreamer->GetOS() << "\t";
-      static_cast<formatted_raw_ostream &>(OutStreamer->GetOS()).
-          PadToColumn(10 + depth);
+      OutStreamer->GetOS() << std::string(depth + 2, ' ');
       EmitToStreamer(*OutStreamer, curInst);
       if (curInst.getOpcode() == TVM::PUSHCONT_MBB_S)
         EmitSubBlockForPushcont(lower, curInst, depth + 2);

@@ -28,3 +28,5 @@ def int_assigner_bit_composition: Intrinsic<[llvm_any_ty], [llvm_ptr_ty, llvm_i3
 def int_assigner_exit_check: Intrinsic<[], [llvm_i1_ty]>;
 
 def int_assigner_print_native_pallas_field: Intrinsic<[], [llvm_any_ty]>;
+
+def int_assigner_fri_lin_inter: Intrinsic<[llvm_any_ty], [LLVMMatchType<0>, LLVMMatchType<0>, LLVMMatchType<0>, LLVMMatchType<0>]>;

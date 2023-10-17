@@ -2316,7 +2316,7 @@ def int_tvm_plddictq :
 // CHKSIGNS  (d s k - ?) checks whether	s is a valid Ed25519-signature of the data portion of Slice	d using public key k, similarly to CHKSIGNU
   def int_tvm_chksigns :
       GCCBuiltin<"__builtin_tvm_chksigns">,
-      Intrinsic<[llvm_i257_ty], [llvm_TVMSlice_ty, llvm_i257_ty, llvm_i257_ty], [IntrNoMem]>;
+      Intrinsic<[llvm_i257_ty], [llvm_TVMSlice_ty, llvm_TVMSlice_ty, llvm_i257_ty], [IntrNoMem]>;
 
 // *******************************************
 //

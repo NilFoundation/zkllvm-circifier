@@ -175,9 +175,9 @@ defm SHA256U : I<(outs I257:$x), (ins Slice:$s),
                      "SHA256U\t$x, $s", "SHA256U", 0xf902>;
 
 // F911	- CHKSIGNS  (d s k - ?) checks whether	s is a valid Ed25519-signature of the data portion of Slice	d using public key k, similarly to CHKSIGNU
-defm CHKSIGNS : I<(outs I257:$result), (ins Slice:$d, I257:$s, I257:$k),
+defm CHKSIGNS : I<(outs I257:$result), (ins Slice:$d, Slice:$s, I257:$k),
                   (outs), (ins),
-                  [(set I257:$result, (int_tvm_chksigns Slice:$d, I257:$s, I257:$k))],
+                  [(set I257:$result, (int_tvm_chksigns Slice:$d, Slice:$s, I257:$k))],
                      "CHKSIGNS\t$result, $d, $s, $k", "CHKSIGNS", 0xf911>;
 
 // *******************************************

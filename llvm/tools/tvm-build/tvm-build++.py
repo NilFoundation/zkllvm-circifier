@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import os
+import re
 import glob
 import shutil
 import argparse
@@ -22,7 +23,7 @@ def execute(cmdline, verbose=False):
   if verbose:
     print(' '.join(cmdline))
   try:
-    subprocess.check_output(cmdline)
+    return subprocess.check_output(cmdline)
   except subprocess.CalledProcessError as e:
     print(e.output)
     os.sys.exit(1)
@@ -217,10 +218,20 @@ with cd(tmpdir):
     linkerflags.extend(['-o', args.output])
   execute([tvm_linker, 'compile', asm, '--lib', os.path.join(tvm_stdlib,
     'stdlib_cpp.tvm'), '--abi-json', abi_path] + linkerflags, args.verbose)
-  for filename in glob.glob('*'):
-    if not args.save_temps:
+  if not args.save_temps:
+    for filename in glob.glob('*'):
       if args.verbose:
         print('cp ' + filename + ' ' + output)
       shutil.copy2(filename, output)
+
+  if args.output:
+    out = execute([tvm_linker, 'decode', args.output, '--tvc'])
+    for line in out.decode("utf-8").split("\n"):
+      if match := re.match(" code: (.*)$", line):
+        code = match[1]
+        break
+    # Save code in separate file
+    with open(f"{args.output}.code", "w") as f:
+      f.write(code)
 
 print('Build succeeded.')

@@ -44,6 +44,10 @@ public:
     auto hash = __builtin_tvm_hashsu(msg_sl.get());
     return __builtin_tvm_chksignu(hash, signature, pubkey.get());
   }
+
+  inline static bool checks(slice msg_sl, slice signature, schema::uint256 pubkey) {
+    return __builtin_tvm_chksigns(msg_sl.get(), signature, pubkey.get());
+  }
 };
 
 } // namespace tvm

@@ -384,6 +384,10 @@ template<unsigned Offset, class ReturnName, class T>
 struct make_struct_json<resumable<T>, Offset, ReturnName> {
   static constexpr auto value = make_struct_json<T, Offset, ReturnName>::value;
 };
+template<unsigned Offset, class ReturnName>
+struct make_struct_json<__tvm_tuple, Offset, ReturnName> {
+  static constexpr auto value = make_field_impl<uint_t<256>, 1, Offset>(make_return_name<ReturnName>());
+};
 
 template<class T, unsigned Offset, class ReturnName>
 constexpr auto make_struct_components() {

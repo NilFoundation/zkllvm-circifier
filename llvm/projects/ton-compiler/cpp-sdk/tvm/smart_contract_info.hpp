@@ -44,6 +44,9 @@ public:
   static inline auto /*{ __tvm_cell, int keylen }*/ configdict() {
     return __builtin_tvm_configdict();
   }
+  static inline auto /*{ __tvm_cell, bool success }*/ configparam(unsigned i) {
+    return __builtin_tvm_configparam(i);
+  }
   inline auto get_magic() const { return magic_; }
   inline auto get_actions() const { return actions_; }
   inline auto get_msgs_sent() const { return msgs_sent_; }

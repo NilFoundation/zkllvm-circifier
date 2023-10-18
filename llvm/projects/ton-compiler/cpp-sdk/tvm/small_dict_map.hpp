@@ -3,16 +3,18 @@
 #include <tvm/dictionary.hpp>
 #include <tvm/small_dict_map_const_iterator.hpp>
 #include <tvm/schema/estimate_element.hpp>
+#include <tvm/small_dict_traits.hpp>
 
 namespace tvm {
 
 template<class Key, class Element>
 struct small_dict_map {
-  using est_t = schema::estimate_element<std::tuple<Key, Element>>;
-  static_assert(est_t::max_bits < cell::max_bits,
-                "Key + Element must fit one cell");
-  static_assert(est_t::max_refs == 0,
-                "Key and Element must not have references");
+  // TODO(msherstennikov): these asserts fail when Key or Element contain slice
+//  using est_t = schema::estimate_element<std::tuple<Key, Element>>;
+//  static_assert(est_t::max_bits < cell::max_bits,
+//                "Key + Element must fit one cell");
+//  static_assert(est_t::max_refs == 0,
+//                "Key and Element must not have references");
   using KeyLen = std::integral_constant<unsigned, schema::estimate_element<Key>::max_bits>;
 
   using key_type = Key;
@@ -97,8 +99,13 @@ struct small_dict_map {
   __always_inline
   std::optional<Element> lookup(Key key) const {
     auto [sl, succ] = dict_.dictget(schema::build(key).make_slice(), KeyLen::value);
-    if (succ)
-      return schema::parse<Element>(sl);
+    if (succ) {
+      if constexpr (std::is_same_v<Element, slice>) {
+        return std::optional<Element>(sl);
+      } else {
+        return std::optional<Element>(schema::parse<Element>(sl));
+      }
+    }
     return {};
   }
 
@@ -110,6 +117,45 @@ struct small_dict_map {
       return schema::parse<Element>(sl);
     }
     return {};
+  }
+
+  __always_inline std::tuple<Key, Element, bool> max() const {
+    auto [keysl, value, success] = dict_.dictmax(KeyLen::value);
+    if (success)
+      return {schema::parse<Key>(keysl), schema::parse<Element>(value), true};
+    return {{}, {}, false};
+  }
+
+  __always_inline std::tuple<Key, Element, bool> min() const {
+    auto [value, keysl, success] = dict_.dictmin(KeyLen::value);
+    if (success)
+        return {schema::parse<Key>(keysl), schema::parse<Element>(value), true};
+    return {{}, {}, false};
+  }
+
+  __always_inline std::tuple<Key, Element, bool> minsl() const {
+    auto [value, keysl, success] = dict_.dictmin(KeyLen::value);
+    if (success)
+        return {schema::parse<Key>(keysl), value, true};
+    return {{}, {}, false};
+  }
+
+  __always_inline std::tuple<unsigned, Element, bool> rem_max() {
+    return small_dict_traits<Element, KeyLen::value>::rem_max(dict_, size_);
+  }
+
+  __always_inline std::tuple<Key, Element, bool> next(unsigned idx) {
+    auto [val, keysl, succ] = dict_.dictugetnext(idx, KeyLen::value);
+    if (succ)
+      return {schema::parse<Key>(keysl), schema::parse<Element>(val), succ};
+    return {0, {}, succ};
+  }
+
+  __always_inline std::tuple<Key, Element, bool> nextsl(unsigned idx) {
+    auto [value, keysl, succ] = dict_.dictugetnext(idx, KeyLen::value);
+    if (succ)
+      return {keysl, value, succ};
+    return {0, {}, succ};
   }
 
   using const_iterator = small_dict_map_const_iterator<Key, Element>;

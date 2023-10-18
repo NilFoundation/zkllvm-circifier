@@ -11,7 +11,7 @@ __always_inline void require(bool cond, unsigned exc_code) {
   if (!cond)
     __builtin_tvm_throw(exc_code);
 }
-__always_inline void tvm_throw(unsigned exc_code) {
+[[noreturn]] __always_inline void tvm_throw(unsigned exc_code) {
   __builtin_tvm_throw(exc_code);
 }
 

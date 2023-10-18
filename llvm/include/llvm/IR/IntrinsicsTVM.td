@@ -826,7 +826,7 @@ let TargetPrefix = "tvm" in {
   // PAIR or CONS (x y - t), creates pair t := (x, y)
   def int_tvm_pair :
     GCCBuiltin<"__builtin_tvm_pair">,
-    Intrinsic<[llvm_TVMTuple_ty], [llvm_i257_ty, llvm_i257_ty], [IntrNoMem]>;
+    Intrinsic<[llvm_TVMTuple_ty], [llvm_TVMTuple_ty, llvm_TVMTuple_ty], [IntrNoMem]>;
 
   // TRIPLE (x y z - t), creates triple t := (x, y, z)
   def int_tvm_triple :

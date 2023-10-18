@@ -757,7 +757,7 @@ BUILTIN(__builtin_tvm_nil, "Tt", "nc")
 BUILTIN(__builtin_tvm_single, "TtWi", "nc")
 
 // PAIR or CONS (x y - t), creates pair t := (x, y)
-BUILTIN(__builtin_tvm_pair, "TtWiWi", "nc")
+BUILTIN(__builtin_tvm_pair, "TtTtTt", "nc")
 
 // TRIPLE (x y z - t), creates triple t := (x, y, z)
 BUILTIN(__builtin_tvm_triple, "TtWiWiWi", "nc")

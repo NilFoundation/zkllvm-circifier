@@ -209,8 +209,8 @@ defm SIGNLE : I<(outs Tuple:$t), (ins I257:$x), (outs), (ins),
              "SINGLE\t$t, $x",
              "SIGNLE", 0x6f01>;
 // 6F02 - PAIR or CONS (x y - t), creates pair t := (x, y)
-defm PAIR : I<(outs Tuple:$t), (ins I257:$x, I257:$y), (outs), (ins),
-             [(set Tuple:$t, (int_tvm_pair I257:$x, I257:$y))],
+defm PAIR : I<(outs Tuple:$t), (ins Tuple:$x, Tuple:$y), (outs), (ins),
+             [(set Tuple:$t, (int_tvm_pair Tuple:$x, Tuple:$y))],
              "PAIR\t$t, $x, $y",
              "PAIR", 0x6f02>;
 

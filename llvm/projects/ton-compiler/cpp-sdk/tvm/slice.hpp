@@ -28,7 +28,7 @@ public:
     return __builtin_tvm_sdeq(sl_, v);
   }
   operator __tvm_slice() const { return get(); }
-private:
+
   __tvm_slice sl_;
 };
 

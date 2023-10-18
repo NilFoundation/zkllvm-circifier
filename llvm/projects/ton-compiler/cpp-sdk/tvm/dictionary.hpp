@@ -137,6 +137,11 @@ public:
     return std::tuple(sl, idx, succ);
   }
   __always_inline
+  std::tuple<slice, slice, bool> dictmax(unsigned key_len) const {
+    auto [sl, idx, succ] = __builtin_tvm_dictmax(get(), key_len);
+    return std::tuple(sl, idx, succ);
+  }
+  __always_inline
   std::tuple<slice, unsigned, bool> dictumax(unsigned key_len) const {
     auto [sl, idx, succ] = __builtin_tvm_dictumax(get(), key_len);
     return std::tuple(sl, idx, succ);

@@ -3,7 +3,7 @@
     .internal-alias :main_ticktock,     -2
     .internal-alias :main_external,     -1
     .internal-alias :main_internal,     0
-    .internal-alias :get_method,     1
+    .internal-alias :get_method,        1
 
 ; ======================================================
 ; Part 1. Initialization and termination of the contract
@@ -66,16 +66,28 @@
     SETGLOB 13
 
     DUP
-    ISNPOS
-    DICTPUSHCONST 32
+    ISNPOS           ; Check if func_id less than 0
+    DICTPUSHCONST 32 ; Push dict with functions: {func_id: func_cont}
     ROT
     PUSHCONT {
-      DICTIGETJMP
+      DICTIGETJMP    ; Get func_cont by func id and jump to it
     }
-    IFJMP
+    IFJMP            ; jump to previous continuation if func id is less than 0
     BLKDROP 2
-    PUSHREFCONT
-    JMPX
+
+    ;; Pack arguments into a cell, that will be passed to the get method
+    NEWC            ; args, func_id, builder
+    DEPTH           ; args, func_id, builder, depth
+    ADDCONST -2     ; args, func_id, builder, count(args)
+    PUSHCONT {      ; args, func_id, builder
+        XCHG s1, s2 ; args, func_id, arg, builder
+        STU 256     ; args, func_id, builder
+    }
+    REPEAT          ; func_id, builder
+    ENDC            ; func_id, packed_args
+
+    PUSHREFCONT     ; Push getter continuation (real code will be added by Linker)
+    JMPX            ; Jump to getter continuation
 
 ; ==========================================
 ; Part 2. C-specific functionality (runtime)

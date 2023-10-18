@@ -190,17 +190,20 @@ __attribute__((tvm_raw_func)) int main_internal(__tvm_cell msg, __tvm_slice msg_
     msg, msg_body);                                                                        \
 }
 
-#define MAIN_ENTRY_FUNCTIONS_SIMPLE(Contract, IContract, DContract)                        \
-__attribute__((tvm_raw_func)) int main_external(__tvm_cell msg, __tvm_slice msg_body) {    \
-  return simple_selector</*Internal=*/false, Contract, IContract, DContract>(              \
-    msg, msg_body);                                                                        \
-}                                                                                          \
-__attribute__((tvm_raw_func)) int main_internal(__tvm_cell msg, __tvm_slice msg_body) {    \
-  return simple_selector</*Internal=*/true, Contract, IContract, DContract>(               \
-    msg, msg_body);                                                                        \
-}                                                                                          \
-__attribute__((tvm_raw_func)) int get_method(int func_id) {                                \
-    return getter_invoke_impl<Contract, IContract, DContract>(func_id);                    \
+#define MAIN_ENTRY_FUNCTIONS_TON(Contract, IContract, DContract)                                      \
+__attribute__((tvm_raw_func)) int main_external(__tvm_cell msg, __tvm_slice msg_body) {               \
+  return ton_switcher</*Internal=*/false, Contract, IContract, DContract>(                            \
+    msg, msg_body);                                                                                   \
+}                                                                                                     \
+__attribute__((tvm_raw_func)) int main_internal(__tvm_cell msg, __tvm_slice msg_body) {               \
+  return ton_switcher</*Internal=*/true, Contract, IContract, DContract>(                             \
+    msg, msg_body);                                                                                   \
+}                                                                                                     \
+__attribute__((tvm_raw_func)) GetterResult get_method(int func_id, cell args_pack) {                  \
+    return getter_invoke<Contract, IContract, DContract>(func_id, args_pack);                         \
+}                                                                                                     \
+__attribute__((tvm_raw_func)) void main_ticktock(bool is_tock, uint256 address, uint256 balance) {    \
+    main_ticktock_impl<Contract, IContract, DContract>(is_tock, address, balance);                    \
 }
 
 // Contract class may be simple class, or template with parameter: `bool Internal`.

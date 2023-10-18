@@ -684,7 +684,7 @@ void MachineBasicBlock::updateTerminator(
       // Finally update the unconditional successor to be reached via a branch
       // if it would not be reached by fallthrough.
       // TVM local begin
-      if (!isFallthroughSuccessor(TBB))
+      if (TBB && !isFallthroughSuccessor(TBB))
         TII->insertBranch(*this, TBB, nullptr, Cond, DL);
       // TVM local end
     }

@@ -122,6 +122,13 @@ struct make_builder_impl<cell> {
   }
 };
 template<>
+struct make_builder_impl<__tvm_slice> {
+  using value_type = __tvm_slice;
+  __always_inline static builder build(builder b, value_type v) {
+    return b.stslice(v);
+  }
+};
+template<>
 struct make_builder_impl<anyval> {
   using value_type = anyval;
   inline static builder build(builder b, value_type v) {

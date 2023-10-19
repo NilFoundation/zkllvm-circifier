@@ -20654,20 +20654,19 @@ Value *CodeGenFunction::EmitAssignerBuiltinExpr(unsigned int BuiltinID,
     OverloadTypes = {Curve, BaseField};
     break;
   }
-  case assigner::BI__builtin_assigner_bit_composition128: {
-    ID = Intrinsic::assigner_bit_composition128;
+  case assigner::BI__builtin_assigner_bit_composition: {
+    ID = Intrinsic::assigner_bit_composition;
     auto ElemTy = llvm::GaloisFieldType::get(context,
                                              llvm::GALOIS_FIELD_PALLAS_BASE);
 
-    OverloadTypes = {ElemTy, llvm::FixedVectorType::get(ElemTy, 64)};
+    OverloadTypes = {ElemTy};
     break;
   }
-  case assigner::BI__builtin_assigner_bit_decomposition64: {
-    ID = Intrinsic::assigner_bit_decomposition64;
-    auto ElemTy = llvm::GaloisFieldType::get(context,
-                                              llvm::GALOIS_FIELD_PALLAS_BASE);
-    auto IntType = llvm::IntegerType::get(context, 64);
-    OverloadTypes = {llvm::FixedVectorType::get(ElemTy, 64), IntType};
+  case assigner::BI__builtin_assigner_bit_decomposition: {
+    ID = Intrinsic::assigner_bit_decomposition;
+    // auto ElemTy = llvm::GaloisFieldType::get(context,
+    //                                           llvm::GALOIS_FIELD_PALLAS_BASE);
+    // OverloadTypes = {ElemTy};
     break;
   }
   case assigner::BI__builtin_assigner_exit_check: {

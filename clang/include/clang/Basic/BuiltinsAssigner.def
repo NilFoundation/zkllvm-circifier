@@ -60,6 +60,8 @@ BUILTIN(__builtin_assigner_exit_check, "vb", "n")
 BUILTIN(__builtin_assigner_print_native_pallas_field, "vg1", "n")
 
 BUILTIN(__builtin_assigner_fri_lin_inter, "g1g1g1g1g1", "n")
+BUILTIN(__builtin_assigner_fri_cosets, "vv*Uig1Uig1", "n")
+BUILTIN(__builtin_assigner_fri_array_swap, "vv*Uiv*Uib", "n")
 
 #undef BUILTIN
 #undef TARGET_BUILTIN

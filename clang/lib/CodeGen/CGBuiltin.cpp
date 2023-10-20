@@ -19944,6 +19944,17 @@ Value *CodeGenFunction::EmitAssignerBuiltinExpr(unsigned int BuiltinID,
     OverloadTypes = {BaseField};
     break;
   }
+  case assigner::BI__builtin_assigner_fri_cosets: {
+    ID = Intrinsic::assigner_fri_cosets;
+    auto BaseField =
+        llvm::GaloisFieldType::get(context, llvm::GALOIS_FIELD_PALLAS_BASE);
+    OverloadTypes = {BaseField};
+    break;
+  }
+  case assigner::BI__builtin_assigner_fri_array_swap: {
+    ID = Intrinsic::assigner_fri_array_swap;
+    break;
+  }
   }
   assert(ID != Intrinsic::not_intrinsic);
 

@@ -62,6 +62,7 @@ BUILTIN(__builtin_assigner_print_native_pallas_field, "vg1", "n")
 BUILTIN(__builtin_assigner_fri_lin_inter, "g1g1g1g1g1", "n")
 BUILTIN(__builtin_assigner_fri_cosets, "vv*Uig1Uig1", "n")
 BUILTIN(__builtin_assigner_fri_array_swap, "vv*Uiv*Uib", "n")
+BUILTIN(__builtin_assigner_gate_arg_verifier, "g1v*Ci*Uiv*Uig1", "n") // selectors, gates_sizes, gates_amouts, constraints, constraints_amount, theta
 
 #undef BUILTIN
 #undef TARGET_BUILTIN

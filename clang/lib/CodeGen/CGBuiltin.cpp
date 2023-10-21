@@ -20697,6 +20697,13 @@ Value *CodeGenFunction::EmitAssignerBuiltinExpr(unsigned int BuiltinID,
     ID = Intrinsic::assigner_fri_array_swap;
     break;
   }
+  case assigner::BI__builtin_assigner_gate_arg_verifier: {
+    ID = Intrinsic::assigner_gate_arg_verifier;
+    auto BaseField =
+        llvm::GaloisFieldType::get(context, llvm::GALOIS_FIELD_PALLAS_BASE);
+    OverloadTypes = {BaseField};
+    break;
+  }
   }
   assert(ID != Intrinsic::not_intrinsic);
 

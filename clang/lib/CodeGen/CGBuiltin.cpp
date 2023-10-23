@@ -20704,6 +20704,15 @@ Value *CodeGenFunction::EmitAssignerBuiltinExpr(unsigned int BuiltinID,
     OverloadTypes = {BaseField};
     break;
   }
+  case assigner::BI__builtin_assigner_permutation_arg_verifier: {
+    ID = Intrinsic::assigner_permutation_arg_verifier;
+    auto BaseField =
+        llvm::GaloisFieldType::get(context, llvm::GALOIS_FIELD_PALLAS_BASE);
+    auto Vec2Ty = llvm::FixedVectorType::get(BaseField, 2);
+    auto Vec3Ty = llvm::FixedVectorType::get(BaseField, 3);
+    OverloadTypes = {Vec3Ty, BaseField, Vec2Ty};
+    break;
+  }
   }
   assert(ID != Intrinsic::not_intrinsic);
 

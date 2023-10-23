@@ -63,6 +63,7 @@ BUILTIN(__builtin_assigner_fri_lin_inter, "g1g1g1g1g1", "n")
 BUILTIN(__builtin_assigner_fri_cosets, "vv*Uig1Uig1", "n")
 BUILTIN(__builtin_assigner_fri_array_swap, "vv*Uiv*Uib", "n")
 BUILTIN(__builtin_assigner_gate_arg_verifier, "g1v*Ci*Uiv*Uig1", "n") // selectors, gates_sizes, gates_amouts, constraints, constraints_amount, theta
+BUILTIN(__builtin_assigner_permutation_arg_verifier, "E3g1v*v*v*Uig1g1g1g1g1E2g1", "n") // f, se, sigma, length of vectors, L0, V, V_zeta, q_last, q_pad, thetas
 
 #undef BUILTIN
 #undef TARGET_BUILTIN

@@ -57,5 +57,7 @@ BUILTIN(__builtin_assigner_bit_composition, "g1v*Uib", "n")
 
 BUILTIN(__builtin_assigner_exit_check, "vb", "n")
 
+BUILTIN(__builtin_assigner_print_native_pallas_field, "vg1", "n")
+
 #undef BUILTIN
 #undef TARGET_BUILTIN

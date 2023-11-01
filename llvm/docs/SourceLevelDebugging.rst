@@ -267,7 +267,7 @@ the complex expression derives the direct value.
                         Value *Address,
                         DIExpression *AddressExpression)
 
-This intrinsic marks the position in IR where a source assignment occured. It
+This intrinsic marks the position in IR where a source assignment occurred. It
 encodes the value of the variable. It references the store, if any, that
 performs the assignment, and the destination address.
 

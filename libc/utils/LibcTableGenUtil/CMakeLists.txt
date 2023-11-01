@@ -4,4 +4,4 @@ add_llvm_library(
   APIIndexer.h
   LINK_COMPONENTS Support TableGen
 )
-target_include_directories(LibcTableGenUtil PUBLIC ${LLVM_LIBC_INCLUDE_DIRS})
+target_include_directories(LibcTableGenUtil PUBLIC ${LLVM_LIBC_INCLUDE_DIRS} ${LIBC_SOURCE_DIR})

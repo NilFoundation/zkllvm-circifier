@@ -2443,7 +2443,7 @@ StmtResult Parser::ParsePragmaZkMultiProver(StmtVector &Stmts,
     std::optional <llvm::APSInt> ArgVal;
 
     int Val = 0;
-    if (ArgVal = ValueExpr->getIntegerConstantExpr(Actions.getASTContext())) {
+    if (ValueExpr && (ArgVal = ValueExpr->getIntegerConstantExpr(Actions.getASTContext()))) {
       Val = ArgVal->getSExtValue();
     } else {
       Diag(Info->PragmaName.getLocation(), diag::warn_pragma_expected_integer)
@@ -2469,7 +2469,7 @@ StmtResult Parser::ParsePragmaZkMultiProver(StmtVector &Stmts,
 
   ArgsUnion Args[] = {ArgsUnion(SL)};
 
-  TempAttrs.addNew(PragmaNameLoc->Ident, Range, nullptr, PragmaNameLoc->Loc, Args, 1, ParsedAttr::AS_Pragma);
+  TempAttrs.addNew(PragmaNameLoc->Ident, Range, nullptr, PragmaNameLoc->Loc, Args, 1, ParsedAttr::Form::Pragma());
 
   // Get the next statement.
   MaybeParseCXX11Attributes(Attrs);

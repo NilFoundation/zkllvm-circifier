@@ -107,7 +107,7 @@ bool SCCPSolver::tryToReplaceWithConstant(Value *V) {
 static bool refineInstruction(SCCPSolver &Solver,
                               const SmallPtrSetImpl<Value *> &InsertedValues,
                               Instruction &Inst) {
-  if (!isa<OverflowingBinaryOperator>(Inst))
+  if (!isa<OverflowingBinaryOperator>(Inst) || !Inst.getOperand(0)->getType()->isIntOrIntVectorTy())
     return false;
 
   auto GetRange = [&Solver, &InsertedValues](Value *Op) {

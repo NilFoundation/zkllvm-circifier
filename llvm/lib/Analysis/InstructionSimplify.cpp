@@ -1183,6 +1183,11 @@ static Value *simplifyDivRem(Instruction::BinaryOps Opcode, Value *Op0,
 static Value *simplifyDiv(Instruction::BinaryOps Opcode, Value *Op0, Value *Op1,
                           bool IsExact, const SimplifyQuery &Q,
                           unsigned MaxRecurse) {
+  if (Op0->getType()->isFieldOrFieldVectorTy() || Op0->getType()->isCurveTy()) {
+    // Simplification for these types is not supported yet
+    return nullptr;
+  }
+
   if (Constant *C = foldOrCommuteConstant(Opcode, Op0, Op1, Q))
     return C;
 

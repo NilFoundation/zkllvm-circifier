@@ -20580,6 +20580,13 @@ Value *CodeGenFunction::EmitAssignerBuiltinExpr(unsigned int BuiltinID,
     OverloadTypes = {llvm::FixedVectorType::get(ElemTy, 2)};
     break;
   }
+  case assigner::BI__builtin_assigner_sha2_256_bls12381_base: {
+    ID = Intrinsic::assigner_sha2_256_bls12381;
+    auto ElemTy = llvm::GaloisFieldType::get(context,
+                                             llvm::GALOIS_FIELD_BLS12381_BASE);
+    OverloadTypes = {ElemTy};
+    break;
+  }
   case assigner::BI__builtin_assigner_sha2_512_curve25519: {
     ID = Intrinsic::assigner_sha2_512;
     auto Curve25519ScalarFildElemTy = llvm::GaloisFieldType::get(context,
@@ -20600,6 +20607,38 @@ Value *CodeGenFunction::EmitAssignerBuiltinExpr(unsigned int BuiltinID,
     auto CurveTy =
         llvm::EllipticCurveType::get(context, llvm::ELLIPTIC_CURVE_BLS12381);
     OverloadTypes = {Vec12Ty, CurveTy, Vec4Ty};
+    break;
+  }
+  case assigner::BI__builtin_assigner_hash_to_curve: {
+    ID = Intrinsic::assigner_hash_to_curve;
+    auto ElemTy =
+        llvm::GaloisFieldType::get(context, llvm::GALOIS_FIELD_BLS12381_BASE);
+    auto CurveTy =
+        llvm::EllipticCurveType::get(context, llvm::ELLIPTIC_CURVE_BLS12381);
+    OverloadTypes = {CurveTy, ElemTy};
+    break;
+  }
+  case assigner::BI__builtin_assigner_is_in_g1_check: {
+    ID = Intrinsic::assigner_is_in_g1_check;
+    auto CurveTy =
+        llvm::EllipticCurveType::get(context, llvm::ELLIPTIC_CURVE_BLS12381);
+    OverloadTypes = {CurveTy};
+    break;
+  }
+  case assigner::BI__builtin_assigner_is_in_g2_check: {
+    ID = Intrinsic::assigner_is_in_g2_check;
+    auto ElemTy =
+        llvm::GaloisFieldType::get(context, llvm::GALOIS_FIELD_BLS12381_BASE);
+    auto Vec4Ty = llvm::FixedVectorType::get(ElemTy, 4);
+    OverloadTypes = {Vec4Ty};
+    break;
+  }
+  case assigner::BI__builtin_assigner_gt_multiplication: {
+    ID = Intrinsic::assigner_gt_multiplication;
+    auto ElemTy =
+        llvm::GaloisFieldType::get(context, llvm::GALOIS_FIELD_BLS12381_BASE);
+    auto Vec12Ty = llvm::FixedVectorType::get(ElemTy, 12);
+    OverloadTypes = {Vec12Ty};
     break;
   }
   case assigner::BI__builtin_assigner_zkml_convolution: {

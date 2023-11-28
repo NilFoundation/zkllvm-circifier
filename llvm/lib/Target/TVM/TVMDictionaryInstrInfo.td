@@ -43,8 +43,8 @@ let mayLoad = 1 in {
       (ins I257:$key, Cell:$dict, I257:$precision), (outs), (ins),
       [(set Cell:$result, I257:$status,
         (int_tvm_dictigetref I257:$key, Cell:$dict, I257:$precision))],
-      "DICTIGET\t$result, $status, $key, $dict, $precision",
-      "DICTIGET NULLSWAPIFNOT", 0xf40d>;
+      "DICTIGETREF\t$result, $status, $key, $dict, $precision",
+      "DICTIGETREF NULLSWAPIFNOT", 0xf40d>;
   defm DICTUGET :
     I<(outs Slice:$result, I257:$status),
       (ins I257:$key, Cell:$dict, I257:$precision), (outs), (ins),

@@ -202,8 +202,8 @@ __attribute__((tvm_raw_func)) int main_internal(__tvm_cell msg, __tvm_slice msg_
 __attribute__((tvm_raw_func)) GetterResult get_method(int func_id, cell args_pack) {                  \
     return getter_invoke<Contract, IContract, DContract>(func_id, args_pack);                         \
 }                                                                                                     \
-__attribute__((tvm_raw_func)) void main_ticktock(bool is_tock, uint256 address, uint256 balance) {    \
-    main_ticktock_impl<Contract, IContract, DContract>(is_tock, address, balance);                    \
+__attribute__((tvm_raw_func)) void main_ticktock(uint256 balance, uint256 address, bool is_tock) {    \
+    main_ticktock_impl<Contract, IContract, DContract>(balance, address, is_tock);                    \
 }
 
 // Contract class may be simple class, or template with parameter: `bool Internal`.

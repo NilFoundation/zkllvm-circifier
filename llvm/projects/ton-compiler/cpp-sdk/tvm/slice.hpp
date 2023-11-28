@@ -13,14 +13,24 @@ public:
     return __builtin_tvm_pushslice_empty();
   }
 
+  static slice null() {
+    return slice();
+  }
+
   unsigned sbits() const { return __builtin_tvm_sbits(sl_); }
   unsigned srefs() const { return __builtin_tvm_srefs(sl_); }
   std::tuple<unsigned, unsigned> sbitrefs() const {
     return to_std_tuple(__builtin_tvm_sbitrefs(sl_));
   }
+  unsigned depth() const { return __builtin_tvm_sdepth(sl_); }
 
   bool empty() const { return __builtin_tvm_sdempty(sl_); }
   bool srempty() const { return __builtin_tvm_srempty(sl_); }
+
+  operator bool() const { return !isnull(); }
+  bool isnull() const { return __builtin_tvm_isnull_slice(sl_); }
+
+  unsigned hash() { return __builtin_tvm_hashsu(sl_); }
 
   __tvm_slice get() const { return sl_; }
 

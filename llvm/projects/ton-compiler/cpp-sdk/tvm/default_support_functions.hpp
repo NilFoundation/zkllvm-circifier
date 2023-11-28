@@ -15,6 +15,9 @@
       msg_slice_ = std::get_known<cell>(msg_slice_).ctos();                                                \
     return std::get_known<slice>(msg_slice_);                                                              \
   }                                                                                                        \
+  slice msg_body_;                                                                                         \
+  slice msg_body() { return msg_body_; }                                                                   \
+  void set_msg_body(slice s) { msg_body_ = s; }                                                            \
   std::optional<address> int_sender_;                                                                      \
   Evers int_value_;                                                                                        \
   std::pair<address, Grams> int_sender_and_value() {                                                       \

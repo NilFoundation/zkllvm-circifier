@@ -160,6 +160,15 @@ struct make_parser_impl<cell> {
     return std::tuple(rv, p, ctx);
   }
 };
+template<>
+struct make_parser_impl<slice> {
+  using value_type = slice;
+  template<class _Ctx>
+  __always_inline static std::tuple<optional<value_type>, parser, _Ctx> parse(parser p, _Ctx ctx) {
+    auto rv = value_type{ p.ldrefrtos() };
+    return std::tuple(rv, p, ctx);
+  }
+};
 
 template<>
 struct make_parser_impl<anyval> {
@@ -280,7 +289,13 @@ __always_inline auto parse(parser p, unsigned err_code = error_code::custom_data
 template<class _Tp>
 __always_inline auto parse(slice sl, unsigned err_code = error_code::custom_data_parse_error,
     bool full = false) {
-  return parse<_Tp>(parser(sl));
+  return parse<_Tp>(parser(sl), err_code, full);
+}
+
+template<class _Tp>
+__always_inline auto parse(cell c, unsigned err_code = error_code::custom_data_parse_error,
+                           bool full = false) {
+  return parse<_Tp>(parser(c.ctos()), err_code, full);
 }
 
 template<typename _Tp>

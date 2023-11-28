@@ -58,15 +58,20 @@ public:
 
   void set_at(unsigned idx, Element val) {
     // increase size if adding new key
-    if constexpr (small_elem) {
-      auto [sl, existing] = base::dict_.dictusetget(build(val).make_slice(), idx, KeyLen);
-      if (!existing)
-        ++base::size_;
+    slice sl;
+    bool existing;
+    if constexpr (std::is_same_v<Element, slice>) {
+      std::tie(sl, existing) = base::dict_.dictusetget(val, idx, KeyLen);
+    } else if constexpr (std::is_same_v<Element, cell>) {
+      std::tie(sl, existing) = base::dict_.dictusetget(val.ctos(), idx, KeyLen);
+    } else if constexpr (small_elem) {
+      std::tie(sl, existing) = base::dict_.dictusetget(build(val).make_slice(), idx, KeyLen);
     } else {
-      auto [sl, existing] = base::dict_.dictusetgetref(build_chain_static(val), idx, KeyLen);
-      if (!existing)
-        ++base::size_;
+      cell c;
+      std::tie(c, existing) = base::dict_.dictusetgetref(build_chain_static(val), idx, KeyLen);
     }
+    if (!existing)
+      ++base::size_;
   }
 
   Element get_at(unsigned idx) const {

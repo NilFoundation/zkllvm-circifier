@@ -12,9 +12,15 @@ public:
   cell() : cl_((__tvm_cell)__builtin_tvm_pushnull()) {}
   cell(__tvm_cell cl) : cl_(cl) {}
   slice ctos() const { return __builtin_tvm_ctos(cl_); }
+
+  operator bool() const { return !__builtin_tvm_isnull_cell(cl_); }
   bool isnull() const { return __builtin_tvm_isnull_cell(cl_); }
 
   unsigned cdepth() const { return __builtin_tvm_cdepth(cl_); }
+
+  unsigned hash() {
+    return __builtin_tvm_hashcu(cl_);
+  }
 
   __tvm_cell get() const { return cl_; }
 

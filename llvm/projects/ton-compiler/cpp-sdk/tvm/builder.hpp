@@ -2,6 +2,7 @@
 
 #include <tvm/cell.hpp>
 #include <tvm/slice.hpp>
+#include <tvm/schema/basics.hpp>
 
 namespace tvm {
 
@@ -16,6 +17,11 @@ public:
   }
   builder& stu(unsigned val, unsigned len) {
     bldr_ = __builtin_tvm_stu(val, bldr_, len);
+    return *this;
+  }
+  template<unsigned bits>
+  builder& stu(uint_t<bits> val) {
+    bldr_ = __builtin_tvm_stu(val.get(), bldr_, uint_t<bits>::bitlen);
     return *this;
   }
   builder& stb(bool val) {

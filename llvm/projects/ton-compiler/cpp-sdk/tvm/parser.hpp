@@ -10,6 +10,7 @@ class parser {
 public:
   parser(){}
   explicit parser(slice sl) : sl_(sl.get()) {}
+  explicit parser(cell cl) : sl_(cl.ctos()) {}
   explicit parser(__tvm_slice sl) : sl_(sl) {}
   explicit parser(__tvm_cell cell) : sl_(__builtin_tvm_ctos(cell)) {}
 

@@ -2622,7 +2622,7 @@ void CodeGenModule::ConstructAttributeList(StringRef Name,
   unsigned ArgNo = 0;
   const FunctionDecl *CircuitFD = nullptr;
   const Decl *CalleeDecl = CalleeInfo.getCalleeDecl().getDecl();
-  if (CalleeDecl->hasAttr<CircuitAttr>()) {
+  if (CalleeDecl && CalleeDecl->hasAttr<CircuitAttr>()) {
     CircuitFD = cast<FunctionDecl>(CalleeDecl);
   }
   for (CGFunctionInfo::const_arg_iterator I = FI.arg_begin(),

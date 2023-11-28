@@ -816,7 +816,7 @@ void TVMStackModel::rewriteToSForm(MachineInstr &MI,
     if (MI.isTerminator())
       MFI->addStackModelComment(MIB.getInstr(), PreTermStackString + " => " +
                                                     TheStack.toString());
-    else
+    else if constexpr (PrintStackInAsm)
       MFI->addStackModelComment(MIB.getInstr(), TheStack.toString());
   }
 

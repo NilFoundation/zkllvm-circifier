@@ -805,7 +805,9 @@ operator()(const std::pair<Change, std::string> &pair) const {
 
   assert(MI && "MI is not generated");
 
-  MFI->addStackModelComment(MI, pair.second);
+  if constexpr (PrintStackInAsm) {
+    MFI->addStackModelComment(MI, pair.second);
+  }
   return MI;
 }
 

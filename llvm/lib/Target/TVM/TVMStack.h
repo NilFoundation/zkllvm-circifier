@@ -29,6 +29,8 @@
 
 namespace llvm {
 
+static constexpr bool PrintStackInAsm = false;
+
 /// Hold arguments of a machine instruction.
 struct MIArg {
   MIArg(StackVreg Vreg, bool IsKilled) : Vreg(Vreg), IsKilled(IsKilled) {}

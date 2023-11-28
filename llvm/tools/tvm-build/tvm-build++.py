@@ -107,11 +107,12 @@ cxxflags = ['-O3']
 if args.cxxflags:
   cxxflags += args.cxxflags.split()
 
-pwd = os.path.abspath(os.getcwd()) + '/'
+ir_dump = os.path.join(os.getcwd(), "ir_dump")
+os.makedirs(ir_dump, exist_ok=True)
 
 for filename in input_cpp:
   if args.save_temps:
-    tmp_file = pwd + '1-clang.ll'
+    tmp_file = os.path.join(ir_dump, '1-clang.ll')
   else:
     _, tmp_file = tempfile.mkstemp()
   execute([os.path.join(tvm_llvm_bin, 'clang++'), '-target', 'tvm'] +
@@ -135,7 +136,7 @@ for filename in input_ll:
   input_bc += [tmp_file]
 
 if args.save_temps:
-  bitcode = pwd + '2-llvm-link.ll'
+  bitcode = os.path.join(ir_dump, '2-llvm-link.ll')
 else:
   _, bitcode = tempfile.mkstemp()
 execute([os.path.join(tvm_llvm_bin, 'llvm-link')] + input_bc +
@@ -148,7 +149,7 @@ if args.inline_loads_stores:
   replace_loads_stores = ['-tvm-load-store-replace']
 
 if args.save_temps:
-  bitcode_int = pwd + '3-opt.ll'
+  bitcode_int = os.path.join(ir_dump, '3-opt.ll')
 else:
   _, bitcode_int = tempfile.mkstemp()
 execute([os.path.join(tvm_llvm_bin, 'opt'), bitcode, '-S', '-o', bitcode_int] +
@@ -161,14 +162,14 @@ else:
   opt_flags = ['-O3']
 
 if args.save_temps:
-  bitcode_opt = pwd + '4-opt_O3.ll'
+  bitcode_opt = os.path.join(ir_dump, '4-opt_O3.ll')
 else:
   _, bitcode_opt = tempfile.mkstemp()
 execute([os.path.join(tvm_llvm_bin, 'opt')] + opt_flags + ['-S', bitcode_int, '-o',
   bitcode_opt], args.verbose)
 
 if args.save_temps:
-  asm = pwd + '5-llc.asm'
+  asm = os.path.join(ir_dump, '5-llc.asm')
 else:
   _, asm = tempfile.mkstemp()
 execute([os.path.join(tvm_llvm_bin, 'llc'), '-march', 'tvm', bitcode_opt,

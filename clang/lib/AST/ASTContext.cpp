@@ -11122,10 +11122,6 @@ static QualType CurveIdToType(const ASTContext &Context, unsigned Id) {
     return Context.CBLS12381Ty;
   case 4:
     return Context.CCurve25519Ty;
-  case 5:
-    return Context.CBLS12381G2Ty;
-  case 6:
-    return Context.CBLS12381GTTy;
   }
 }
 

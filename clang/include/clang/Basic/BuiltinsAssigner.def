@@ -21,6 +21,8 @@
 // g4 -> __zkllvm_field_bls12381_scalar
 // g5 -> __zkllvm_field_curve25519_base
 // g6 -> __zkllvm_field_curve25519_scalar
+// g7 -> __zkllvm_field_vesta_base
+// g8 -> __zkllvm_field_vesta_scalar
 
 // Possible curve types in the signature:
 
@@ -28,8 +30,6 @@
 // e2 -> __zkllvm_curve_vesta
 // e3 -> __zkllvm_curve_bls12381
 // e4 -> __zkllvm_curve_curve25519
-// e5 -> __zkllvm_curve_bls12381_g2
-// e6 -> __zkllvm_curve_bls12381_gt
 
 #if defined(BUILTIN) && !defined(TARGET_BUILTIN)
 #   define TARGET_BUILTIN(ID, TYPE, ATTRS, FEATURE) BUILTIN(ID, TYPE, ATTRS)
@@ -43,11 +43,11 @@ BUILTIN(__builtin_assigner_poseidon_pallas_base, "E3g1E3g1", "n")
 BUILTIN(__builtin_assigner_sha2_256_pallas_base, "E2g1E2g1E2g1", "n")
 BUILTIN(__builtin_assigner_sha2_256_bls12381_base, "g3g3", "n")
 BUILTIN(__builtin_assigner_sha2_512_curve25519, "g6e4e4E4g1", "n")
-BUILTIN(__builtin_assigner_bls12_optimal_ate_pairing, "e6e3e5", "n")
+BUILTIN(__builtin_assigner_bls12_optimal_ate_pairing, "E12g3e3E4g3", "n")
 BUILTIN(__builtin_assigner_hash_to_curve, "e3g3", "n")
 BUILTIN(__builtin_assigner_is_in_g1_check, "ve3", "n")
-BUILTIN(__builtin_assigner_is_in_g2_check, "ve5", "n")
-BUILTIN(__builtin_assigner_gt_multiplication, "e6e6e6", "n")
+BUILTIN(__builtin_assigner_is_in_g2_check, "vE4g3", "n")
+BUILTIN(__builtin_assigner_gt_multiplication, "E12g3E12g3E12g3", "n")
 BUILTIN(__builtin_assigner_zkml_convolution, "v**v**v**z", "n")
 BUILTIN(__builtin_assigner_zkml_pooling, "v**v**z", "n")
 BUILTIN(__builtin_assigner_zkml_ReLU, "ff", "n")
@@ -56,8 +56,6 @@ BUILTIN(__builtin_assigner_pallas_curve_init, "e1g1g1", "n")
 BUILTIN(__builtin_assigner_vesta_curve_init, "e2g7g7", "n")
 BUILTIN(__builtin_assigner_bls12381_curve_init, "e3g3g3", "n")
 BUILTIN(__builtin_assigner_curve25519_curve_init, "e4g5g5", "n")
-BUILTIN(__builtin_assigner_bls12381_g2_curve_init, "e5g3g3g3g3", "n")
-BUILTIN(__builtin_assigner_bls12381_gt_curve_init, "e6g3g3g3g3g3g3g3g3g3g3g3g3", "n")
 
 BUILTIN(__builtin_assigner_bit_decomposition, "vv*UiULLib", "n")
 BUILTIN(__builtin_assigner_bit_composition, "g1v*Uib", "n")

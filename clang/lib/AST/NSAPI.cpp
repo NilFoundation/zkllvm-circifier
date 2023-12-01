@@ -454,6 +454,10 @@ NSAPI::getNSNumberFactoryMethodKind(QualType T) const {
   case BuiltinType::SatUFract:
   case BuiltinType::SatULongFract:
   case BuiltinType::UInt128:
+  // EVM_BEGIN
+  case BuiltinType::Int256:
+  case BuiltinType::UInt256:
+  // EVM_END
   case BuiltinType::Float16:
   case BuiltinType::Float128:
   case BuiltinType::Ibm128:

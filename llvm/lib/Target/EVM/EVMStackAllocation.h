@@ -162,11 +162,8 @@ private:
   LOCATION_PATTERNS_LIST(DEF_HANDLER)
 #undef DEF_HANDLER
 
-  template<unsigned Pattern>
-  void handleInst(MachineInstr& MI, Register Reg0, Register Reg1);
-
 #define DEF_HANDLER(NAME, VALUE) \
-      template<> void handleInst<NAME>(MachineInstr& MI, Register Reg0, Register Reg1);
+      void handleInst_ ## NAME(MachineInstr& MI, Register Reg0, Register Reg1);
   LOCATION_PATTERNS_LIST(DEF_HANDLER)
 #undef DEF_HANDLER
 
@@ -182,15 +179,6 @@ private:
   }
 
   using OperandsHandler = void (EVMStackAllocation::*)(MachineInstr&, Register, Register);
-
-  static IndexedMap<OperandsHandler> createMap() {
-    IndexedMap<OperandsHandler> Map{nullptr};
-#define DEF_HANDLER(NAME, VALUE) \
-      Map[VALUE] = &EVMStackAllocation::handleInst<NAME>;
-    LOCATION_PATTERNS_LIST(DEF_HANDLER)
-#undef DEF_HANDLER
-    return Map;
-  }
 
   static Register getDefRegister(const MachineInstr &MI);
 

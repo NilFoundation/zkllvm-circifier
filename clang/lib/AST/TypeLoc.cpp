@@ -392,6 +392,10 @@ TypeSpecifierType BuiltinTypeLoc::getWrittenTypeSpec() const {
   case BuiltinType::SatUFract:
   case BuiltinType::SatULongFract:
   case BuiltinType::BFloat16:
+  // EVM_BEGIN
+  case BuiltinType::Int256:
+  case BuiltinType::UInt256:
+  // EVM_END
     llvm_unreachable("Builtin type needs extra local data!");
     // Fall through, if the impossible happens.
 

@@ -33,16 +33,18 @@
 
 #define DEBUG_TYPE "evm-stackalloc"
 
-namespace llvm {
+using namespace llvm;
 
 INITIALIZE_PASS(EVMStackAllocation, "evm-stack-allocation",
                 "EVM Stack Allocation", false, false)
+
+namespace llvm {
 
 EVMStackAllocation::EVMStackAllocation() : MachineFunctionPass(ID) {
   initializeEVMStackAllocationPass(*PassRegistry::getPassRegistry());
   OperandsPatternMap.resize(OperandsPatternEnum::SIZE);
 #define DEF_HANDLER(NAME, VALUE) \
-      OperandsPatternMap[VALUE] = &EVMStackAllocation::handleInst<NAME>;
+      OperandsPatternMap[VALUE] = &EVMStackAllocation::handleInst_ ## NAME;
   LOCATION_PATTERNS_LIST(DEF_HANDLER)
 #undef DEF_HANDLER
 }
@@ -294,7 +296,7 @@ void EVMStackAllocation::ensureSpaceInStack(MachineInstr &MI) {
   if (TheStack.size() >= (MAX_STACK_DEPTH - 1)) {
     unsigned MinUsers = 1000;
     unsigned MinUsersIndex = -1;
-    for (int i = 0; i < TheStack.size(); i++) {
+    for (unsigned i = 0; i < TheStack.size(); i++) {
       auto& Item = TheStack[i];
       auto& Slot = MemorySlotsMap[Item.getReg()];
       if (Slot != INVALID_SLOT) {
@@ -304,7 +306,7 @@ void EVMStackAllocation::ensureSpaceInStack(MachineInstr &MI) {
         }
       }
     }
-    assert(MinUsersIndex != -1);
+    assert(MinUsersIndex != unsigned(-1));
     LLVM_DEBUG(errs() << "Free up stack: " << TheStack[MinUsersIndex].getValue()
                       << '\n');
     insertSwap<BEFORE>(MI, MinUsersIndex);
@@ -417,27 +419,23 @@ Register EVMStackAllocation::insertFill(MachineInstr &MI, Register Reg) {
   return Reg;
 }
 
-template<>
-void EVMStackAllocation::handleInst<EVMStackAllocation::U_1U_IS>(
+void EVMStackAllocation::handleInst_U_1U_IS(
     MachineInstr& MI, Register Reg0, Register Reg1) {
   insertSwap<BEFORE>(MI, Reg0);
 }
 
-template<>
-void EVMStackAllocation::handleInst<EVMStackAllocation::U_MU_IS>(
+void EVMStackAllocation::handleInst_U_MU_IS(
     MachineInstr& MI, Register Reg0, Register Reg1) {
   insertDup<BEFORE>(MI, Reg0);
 }
 
-template<>
-void EVMStackAllocation::handleInst<EVMStackAllocation::U_1U_IM>(
+void EVMStackAllocation::handleInst_U_1U_IM(
     MachineInstr& MI, Register Reg0, Register Reg1) {
   auto TmpReg = insertFill(MI, Reg0);
   TheStack.push(TmpReg, 1);
 }
 
-template<>
-void EVMStackAllocation::handleInst<EVMStackAllocation::U_MU_IM>(
+void EVMStackAllocation::handleInst_U_MU_IM(
     MachineInstr& MI, Register Reg0, Register Reg1) {
   auto NumUsers = getUsersCountInSameBB(Reg0, MI);
   auto TmpReg = insertFill(MI, Reg0);
@@ -445,8 +443,7 @@ void EVMStackAllocation::handleInst<EVMStackAllocation::U_MU_IM>(
   insertDup<BEFORE>(MI, Reg0);
 }
 
-template<>
-void EVMStackAllocation::handleInst<EVMStackAllocation::B_1U_IS_1U_IS>(
+void EVMStackAllocation::handleInst_B_1U_IS_1U_IS(
     MachineInstr& MI, Register Reg0, Register Reg1) {
   auto Index0 = TheStack.find(Reg0);
   auto Index1 = TheStack.find(Reg1);
@@ -480,8 +477,7 @@ void EVMStackAllocation::handleInst<EVMStackAllocation::B_1U_IS_1U_IS>(
   }
 }
 
-template<>
-void EVMStackAllocation::handleInst<EVMStackAllocation::B_1U_IS_MU_IS>(
+void EVMStackAllocation::handleInst_B_1U_IS_MU_IS(
     MachineInstr& MI, Register Reg0, Register Reg1) {
   auto Index0 = TheStack.find(Reg0);
   auto Index1 = TheStack.find(Reg1);
@@ -495,8 +491,7 @@ void EVMStackAllocation::handleInst<EVMStackAllocation::B_1U_IS_MU_IS>(
   }
 }
 
-template<>
-void EVMStackAllocation::handleInst<EVMStackAllocation::B_1U_IS_1U_IM>(
+void EVMStackAllocation::handleInst_B_1U_IS_1U_IM(
     MachineInstr& MI, Register Reg0, Register Reg1) {
   auto TmpReg = insertFill(MI, Reg1);
   TheStack.push(TmpReg, 1);
@@ -505,8 +500,7 @@ void EVMStackAllocation::handleInst<EVMStackAllocation::B_1U_IS_1U_IM>(
   insertSwap<BEFORE>(MI, Reg0);
 }
 
-template<>
-void EVMStackAllocation::handleInst<EVMStackAllocation::B_1U_IS_MU_IM>(
+void EVMStackAllocation::handleInst_B_1U_IS_MU_IM(
     MachineInstr& MI, Register Reg0, Register Reg1) {
   auto NumUsers = getUsersCountInSameBB(Reg1, MI);
   insertFill(MI, Reg1);
@@ -517,15 +511,13 @@ void EVMStackAllocation::handleInst<EVMStackAllocation::B_1U_IS_MU_IM>(
   insertSwap<BEFORE>(MI, Reg0);
 }
 
-template<>
-void EVMStackAllocation::handleInst<EVMStackAllocation::B_MU_IS_1U_IS>(
+void EVMStackAllocation::handleInst_B_MU_IS_1U_IS(
     MachineInstr& MI, Register Reg0, Register Reg1) {
   insertSwap<BEFORE>(MI, Reg1);
   insertDup<BEFORE>(MI, Reg0);
 }
 
-template<>
-void EVMStackAllocation::handleInst<EVMStackAllocation::B_MU_IS_MU_IS>(
+void EVMStackAllocation::handleInst_B_MU_IS_MU_IS(
     MachineInstr& MI, Register Reg0, Register Reg1) {
   if (Reg0 == Reg1) {
     auto Index = TheStack.find(Reg0);
@@ -540,8 +532,7 @@ void EVMStackAllocation::handleInst<EVMStackAllocation::B_MU_IS_MU_IS>(
   }
 }
 
-template<>
-void EVMStackAllocation::handleInst<EVMStackAllocation::B_MU_IS_1U_IM>(
+void EVMStackAllocation::handleInst_B_MU_IS_1U_IM(
     MachineInstr& MI, Register Reg0, Register Reg1) {
   auto TmpReg = insertFill(MI, Reg1);
   TheStack.push(TmpReg, 1);
@@ -549,8 +540,7 @@ void EVMStackAllocation::handleInst<EVMStackAllocation::B_MU_IS_1U_IM>(
   insertDup<BEFORE>(MI, Reg0);
 }
 
-template<>
-void EVMStackAllocation::handleInst<EVMStackAllocation::B_MU_IS_MU_IM>(
+void EVMStackAllocation::handleInst_B_MU_IS_MU_IM(
     MachineInstr& MI, Register Reg0, Register Reg1) {
   auto NumUsers = getUsersCountInSameBB(Reg1, MI);
   auto TmpReg = insertFill(MI, Reg1);
@@ -560,8 +550,7 @@ void EVMStackAllocation::handleInst<EVMStackAllocation::B_MU_IS_MU_IM>(
   insertDup<BEFORE>(MI, Reg0);
 }
 
-template<>
-void EVMStackAllocation::handleInst<EVMStackAllocation::B_1U_IM_1U_IS>(
+void EVMStackAllocation::handleInst_B_1U_IM_1U_IS(
     MachineInstr& MI, Register Reg0, Register Reg1) {
   insertSwap<BEFORE>(MI, Reg1);
 
@@ -569,8 +558,7 @@ void EVMStackAllocation::handleInst<EVMStackAllocation::B_1U_IM_1U_IS>(
   TheStack.push(TmpReg, 1);
 }
 
-template<>
-void EVMStackAllocation::handleInst<EVMStackAllocation::B_1U_IM_MU_IS>(
+void EVMStackAllocation::handleInst_B_1U_IM_MU_IS(
     MachineInstr& MI, Register Reg0, Register Reg1) {
   insertDup<BEFORE>(MI, Reg1);
 
@@ -578,8 +566,7 @@ void EVMStackAllocation::handleInst<EVMStackAllocation::B_1U_IM_MU_IS>(
   TheStack.push(TmpReg, 1);
 }
 
-template<>
-void EVMStackAllocation::handleInst<EVMStackAllocation::B_1U_IM_1U_IM>(
+void EVMStackAllocation::handleInst_B_1U_IM_1U_IM(
     MachineInstr& MI, Register Reg0, Register Reg1) {
   auto TmpReg = insertFill(MI, Reg1);
   TheStack.push(TmpReg, 1);
@@ -588,8 +575,7 @@ void EVMStackAllocation::handleInst<EVMStackAllocation::B_1U_IM_1U_IM>(
   TheStack.push(TmpReg, 1);
 }
 
-template<>
-void EVMStackAllocation::handleInst<EVMStackAllocation::B_1U_IM_MU_IM>(
+void EVMStackAllocation::handleInst_B_1U_IM_MU_IM(
     MachineInstr& MI, Register Reg0, Register Reg1) {
   auto NumUsers = getUsersCountInSameBB(Reg1, MI);
   auto TmpReg = insertFill(MI, Reg1);
@@ -600,8 +586,7 @@ void EVMStackAllocation::handleInst<EVMStackAllocation::B_1U_IM_MU_IM>(
   TheStack.push(TmpReg, 1);
 }
 
-template<>
-void EVMStackAllocation::handleInst<EVMStackAllocation::B_MU_IM_1U_IS>(
+void EVMStackAllocation::handleInst_B_MU_IM_1U_IS(
     MachineInstr& MI, Register Reg0, Register Reg1) {
   auto NumUsers = getUsersCountInSameBB(Reg0, MI);
   insertFill(MI, Reg0);
@@ -612,8 +597,7 @@ void EVMStackAllocation::handleInst<EVMStackAllocation::B_MU_IM_1U_IS>(
   insertDup<BEFORE>(MI, Reg0);
 }
 
-template<>
-void EVMStackAllocation::handleInst<EVMStackAllocation::B_MU_IM_MU_IS>(
+void EVMStackAllocation::handleInst_B_MU_IM_MU_IS(
     MachineInstr& MI, Register Reg0, Register Reg1) {
   insertDup<BEFORE>(MI, Reg1);
 
@@ -626,8 +610,7 @@ void EVMStackAllocation::handleInst<EVMStackAllocation::B_MU_IM_MU_IS>(
   insertDup<BEFORE>(MI, Reg0);
 }
 
-template<>
-void EVMStackAllocation::handleInst<EVMStackAllocation::B_MU_IM_1U_IM>(
+void EVMStackAllocation::handleInst_B_MU_IM_1U_IM(
     MachineInstr& MI, Register Reg0, Register Reg1) {
   auto NumUsers = getUsersCountInSameBB(Reg0, MI);
   insertFill(MI, Reg0);
@@ -639,8 +622,7 @@ void EVMStackAllocation::handleInst<EVMStackAllocation::B_MU_IM_1U_IM>(
   insertDup<BEFORE>(MI, 1);
 }
 
-template<>
-void EVMStackAllocation::handleInst<EVMStackAllocation::B_MU_IM_MU_IM>(
+void EVMStackAllocation::handleInst_B_MU_IM_MU_IM(
     MachineInstr& MI, Register Reg0, Register Reg1) {
   if (Reg0 == Reg1) {
     auto NumUsers = getUsersCountInSameBB(Reg0, MI);

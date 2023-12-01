@@ -29,7 +29,9 @@
 
 #define DEBUG_TYPE "evm-stackalloc"
 
-namespace llvm {
+using namespace llvm;
+
+namespace {
 
 class EVMOptimizePush : public MachineFunctionPass {
 public:
@@ -47,6 +49,11 @@ private:
   const EVMInstrInfo *TII{nullptr};
   MachineRegisterInfo *MRI{nullptr};
 };
+
+} // anonymous llvm
+
+INITIALIZE_PASS(EVMOptimizePush, "evm-optimize-push",
+                "EVM Optimize push", false, false)
 
 static Register getDefRegister(const MachineInstr &MI) {
   assert(MI.getNumExplicitDefs() == 1 &&
@@ -110,7 +117,6 @@ bool EVMOptimizePush::runOnMachineFunction(MachineFunction &MF) {
         continue;
       }
       auto Reg = getDefRegister(MI);
-      auto MBB = MI.getParent();
 
       bool is_first = true;
       for (auto& Use : MRI->use_nodbg_instructions(Reg)) {
@@ -142,11 +148,6 @@ bool EVMOptimizePush::runOnMachineFunction(MachineFunction &MF) {
   return true;
 }
 
-INITIALIZE_PASS(EVMOptimizePush, "evm-optimize-push",
-                "EVM Optimize push", false, false)
-
-FunctionPass *createEVMOptimizePushPass() {
+FunctionPass *llvm::createEVMOptimizePushPass() {
   return new EVMOptimizePush();
 }
-
-} // namespace llvm

@@ -783,6 +783,10 @@ bool PrintfSpecifier::fixType(QualType QT, const LangOptions &LangOpt,
   case BuiltinType::SatUShortFract:
   case BuiltinType::SatUFract:
   case BuiltinType::SatULongFract:
+  // EVM_BEGIN
+  case BuiltinType::Int256:
+  case BuiltinType::UInt256:
+  // EVM_END
     // Various types which are non-trivial to correct.
     return false;
 

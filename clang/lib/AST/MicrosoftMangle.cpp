@@ -2333,6 +2333,8 @@ void MicrosoftCXXNameMangler::mangleType(const BuiltinType *T, Qualifiers,
   //                 ::= _U # char32_t
   //                 ::= _W # wchar_t
   //                 ::= _Z # __float80 (Digital Mars)
+  //                 ::= _A # int256
+  //                 ::= _B # uint256
   switch (T->getKind()) {
   case BuiltinType::Void:
     Out << 'X';
@@ -2403,7 +2405,14 @@ void MicrosoftCXXNameMangler::mangleType(const BuiltinType *T, Qualifiers,
   case BuiltinType::WChar_U:
     Out << "_W";
     break;
-
+  // EVM_BEGIN
+  case BuiltinType::Int256:
+    Out << "_A";
+    break;
+  case BuiltinType::UInt256:
+    Out << "_B";
+    break;
+  // EVM_END
 #define BUILTIN_TYPE(Id, SingletonId)
 #define PLACEHOLDER_TYPE(Id, SingletonId) \
   case BuiltinType::Id:

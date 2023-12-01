@@ -166,6 +166,8 @@ void EVMMCCodeEmitter::encodeInstruction(const MCInst &MI, raw_ostream &OS,
         case MCSymbolRefExpr::VK_GOTOFF:  // Global variable
           Kind = MCFixupKind(FK_Data_1);
           break;
+        default:
+          break;
         }
       }
 

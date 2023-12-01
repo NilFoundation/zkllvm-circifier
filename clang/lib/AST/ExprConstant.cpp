@@ -11261,6 +11261,9 @@ EvaluateBuiltinClassifyType(QualType T, const LangOptions &LangOpts) {
     case BuiltinType::ULong:
     case BuiltinType::ULongLong:
     case BuiltinType::UInt128:
+    // EVM_BEGIN
+    case BuiltinType::UInt256:
+    // EVM_END
       return GCCTypeClass::Integer;
 
     case BuiltinType::UShortAccum:

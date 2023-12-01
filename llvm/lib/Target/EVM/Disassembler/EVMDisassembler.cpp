@@ -100,13 +100,13 @@ static unsigned getPushSize(unsigned int opcode) {
     CASE(30);
     CASE(31);
     CASE(32);
-#undef CASE(x)
+#undef CASE
   default:
     llvm_unreachable("Invalid PUSH opcode.");
   }
 }
 
-static DecodeStatus addOperandToPush(MCInst &Instr, ArrayRef<uint8_t> Bytes, uint64_t Address, unsigned opnd_length) {
+static void addOperandToPush(MCInst &Instr, ArrayRef<uint8_t> Bytes, uint64_t Address, unsigned opnd_length) {
   int64_t Val = 0;
   for (unsigned i = 0; i < opnd_length; i++) {
     Val |= Bytes[i + 1] << ((opnd_length - i - 1) * 8);
@@ -161,10 +161,7 @@ DecodeStatus EVMDisassembler::getInstruction(MCInst &Instr, uint64_t &Size,
       unsigned push_size = getPushSize(Instr.getOpcode());
       // plus the length of operand;
       Size += push_size;
-      DecodeStatus operandResult = addOperandToPush(Instr, Bytes, Address, push_size);
-      if (operandResult == MCDisassembler::Fail) {
-        return operandResult;
-      }
+      addOperandToPush(Instr, Bytes, Address, push_size);
       break;
     }
     default:

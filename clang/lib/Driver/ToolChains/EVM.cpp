@@ -69,6 +69,11 @@ void evm::Linker::ConstructJob(Compilation &C, const JobAction &JA,
   CmdArgs.push_back("-o");
   CmdArgs.push_back(Output.getFilename());
 
+  auto &D = C.getDriver();
+  if (!Args.hasArg(clang::driver::options::OPT_nostdlib)) {
+    CmdArgs.push_back(Args.MakeArgString(D.SysRoot + "/lib/libevm.a"));
+  }
+
   C.addCommand(std::make_unique<Command>(JA, *this,
                                          ResponseFileSupport::AtFileCurCP(),
                                          Linker, CmdArgs, Inputs, Output));
@@ -291,7 +296,10 @@ void EVM::AddClangSystemIncludeArgs(const ArgList &DriverArgs,
         getMultiarchTriple(D, getTriple(), D.SysRoot);
     addSystemInclude(DriverArgs, CC1Args, D.SysRoot + "/include/" + MultiarchTriple);
   }
-  addSystemInclude(DriverArgs, CC1Args, D.SysRoot + "/include");
+
+  addSystemInclude(DriverArgs, CC1Args, D.SysRoot + "/include/evm/evm-sdk");
+  addSystemInclude(DriverArgs, CC1Args, D.SysRoot + "/include/evm/c++/v1");
+  addSystemInclude(DriverArgs, CC1Args, D.SysRoot + "/include/evm/libc");
 }
 
 void EVM::AddClangCXXStdlibIncludeArgs(const ArgList &DriverArgs,

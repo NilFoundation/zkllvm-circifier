@@ -34,6 +34,10 @@ add_clang_tool(clang
   GENERATE_DRIVER
   )
 
+# EVM_BEGIN
+set_target_properties(clang PROPERTIES OUTPUT_NAME "ecc")
+# EVM_END
+
 clang_target_link_libraries(clang
   PRIVATE
   clangBasic

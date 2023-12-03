@@ -18,13 +18,23 @@ add_custom_command(OUTPUT ${STDLIB_OUPTUT}
   COMMENT "Build stdlib: stdlib.s"
 )
 
-set(LINKER_OUPTUT evmlib.a)
+set(LINKER_OUPTUT ${CMAKE_BINARY_DIR}/lib/libevm.a)
 add_custom_command(OUTPUT ${LINKER_OUPTUT}
   COMMAND $<TARGET_FILE:evm-linker> ${STDLIB_OUPTUT} ${BUILTINS_OUPTUT} --no-ctor --make-archive -o ${LINKER_OUPTUT}
   DEPENDS ${STDLIB_OUPTUT} ${BUILTINS_OUPTUT} evm-linker
   COMMENT "Build stdlib: linking"
-  )
+)
 
-add_custom_target(evm-stdlib
+add_custom_target(evm-stdlib ALL
   DEPENDS ${BUILTINS_OUPTUT} ${STDLIB_OUPTUT} ${LINKER_OUPTUT}
+)
+
+install(DIRECTORY include/
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${STDLIB_NAME}/evm-sdk
+  COMPONENT ${STDLIB}
+)
+
+install(FILES ${LINKER_OUPTUT}
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  COMPONENT ${STDLIB}
 )

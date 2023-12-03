@@ -13,3 +13,5 @@ add_llvm_tool(evm-linker
 )
 target_include_directories(evm-linker PRIVATE ${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}
   ${CMAKE_SOURCE_DIR}/utils/crypto/hash/include)
+
+install(TARGETS evm-linker RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")

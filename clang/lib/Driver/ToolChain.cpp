@@ -169,6 +169,9 @@ static const DriverSuffix *FindDriverSuffix(StringRef ProgName, size_t &Pos) {
   // program name in order. If there is a match, the frontend type is updated as
   // necessary by applying the ModeFlag.
   static const DriverSuffix DriverSuffixes[] = {
+      // EVM begin
+      {"ecc", nullptr},
+      // EVM end
       {"clang", nullptr},
       {"clang++", "--driver-mode=g++"},
       {"clang-c++", "--driver-mode=g++"},

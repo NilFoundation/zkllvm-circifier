@@ -75,23 +75,17 @@ def run_test(source)
   codefile = "#{basename}.evm_h"
 
   unless options.no_compile
-    clang_cmd = "#{bindir}/clang -target evm #{source} -o #{codefile} "
+    clang_cmd = "#{bindir}/ecc #{source} -o #{codefile} "
     clang_cmd += ' -v ' if options.verbose
     # Uncomment to disable llvm optimizations
     #clang_cmd += ' -Xclang -disable-llvm-passes '
-    clang_cmd += ' -fno-exceptions '
     clang_cmd += ' -std=c++17 '
     clang_cmd += ' -O3 '
-    clang_cmd += ' -fno-rtti '
     clang_cmd += ' -DNDEBUG '
     clang_cmd += ' -Xlinker --no-ctor ' if options.no_ctor
     clang_cmd += " -Xlinker #{options.linker_args}" if options.linker_args
     clang_cmd += ' ' + options.clang_args if options.clang_args
-    unless options.no_stdlib
-      clang_cmd += " #{options.stdlib} "
-      clang_cmd += "-I#{options.src_dir}/llvm/projects/evm-sdk/cpp-stdlib/libcpp " \
-                   "-I#{options.src_dir}/llvm/projects/evm-sdk/cpp-stdlib/libc/include "
-    end
+
     command(clang_cmd)
   end
 

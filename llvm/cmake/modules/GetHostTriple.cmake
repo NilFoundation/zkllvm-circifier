@@ -41,6 +41,10 @@ function( get_host_triple var )
     else()
       set( value "powerpc-ibm-aix" )
     endif()
+  # EVM_BEGIN
+  elseif( EVM_HOST )
+    set( value "evm" )
+  # EVM_END
   else( MSVC )
     if(CMAKE_HOST_SYSTEM_NAME STREQUAL Windows AND NOT MSYS)
       message(WARNING "unable to determine host target triple")

@@ -500,6 +500,10 @@ elseif (LLVM_NATIVE_ARCH STREQUAL "m68k")
   set(LLVM_NATIVE_ARCH M68k)
 elseif (LLVM_NATIVE_ARCH MATCHES "loongarch")
   set(LLVM_NATIVE_ARCH LoongArch)
+# EVM_BEGIN
+elseif (LLVM_NATIVE_ARCH MATCHES "evm")
+  set(LLVM_NATIVE_ARCH evm)
+# EVM_END
 else ()
   message(FATAL_ERROR "Unknown architecture ${LLVM_NATIVE_ARCH}")
 endif ()

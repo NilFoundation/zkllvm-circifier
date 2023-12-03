@@ -124,19 +124,12 @@ void EVMPassConfig::addPreEmitPass() {
 
   addPass(createEVMOptimizePushPass());
 
-  if (getOptLevel() != CodeGenOpt::None) {
-    // addPass(createEVMPrepareStackification());
-    //  This is the major pass we will use to stackify registers
+  //  This is the major pass we will use to stackify registers
 #if USE_NEW_STACK_ALLOC
-     addPass(createEVMStackAllocationPass());
+  addPass(createEVMStackAllocationPass());
 #else
-    addPass(createEVMStackAllocPass());
+  addPass(createEVMStackAllocPass());
 #endif
-  } else {
-    // In this pass we assign un-stackified registers
-    // with an explicit memory location for storage.
-    addPass(createEVMVRegToMem());
-  }
 
   // We use a custom pass to expand pseudos at a later pahse
   addPass(createEVMExpandPseudos());

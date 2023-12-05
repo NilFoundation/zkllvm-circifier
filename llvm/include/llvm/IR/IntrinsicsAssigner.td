@@ -29,16 +29,18 @@ def int_assigner_exit_check: Intrinsic<[], [llvm_i1_ty]>;
 
 def int_assigner_print_native_pallas_field: Intrinsic<[], [llvm_any_ty]>;
 
+// builtins related to placeholder prover
 def int_assigner_fri_lin_inter: Intrinsic<[llvm_any_ty], [LLVMMatchType<0>, LLVMMatchType<0>, LLVMMatchType<0>, LLVMMatchType<0>]>;
 def int_assigner_fri_cosets: Intrinsic<[], [llvm_ptr_ty, llvm_i32_ty, llvm_any_ty, LLVMMatchType<0>]>;
 def int_assigner_fri_array_swap: Intrinsic<[], [llvm_ptr_ty, llvm_i32_ty, llvm_ptr_ty, llvm_i1_ty]>;
 def int_assigner_gate_arg_verifier: Intrinsic<[llvm_any_ty], [llvm_ptr_ty, llvm_ptr_ty, llvm_i32_ty, llvm_ptr_ty, llvm_i32_ty, LLVMMatchType<0>]>;
-def int_assigner_permutation_arg_verifier: Intrinsic<[llvm_any_ty], [llvm_ptr_ty, llvm_ptr_ty, llvm_ptr_ty, llvm_i32_ty, llvm_any_ty, LLVMMatchType<1>, LLVMMatchType<1>, LLVMMatchType<1>, LLVMMatchType<1>, llvm_any_ty]>;
-def int_assigner_lookup_arg_verifier: Intrinsic<[llvm_any_ty], [
+def int_assigner_permutation_arg_verifier: Intrinsic<[llvm_anyvector_ty], [llvm_ptr_ty, llvm_ptr_ty, llvm_ptr_ty, llvm_i32_ty, llvm_any_ty, LLVMMatchType<1>, LLVMMatchType<1>, LLVMMatchType<1>, LLVMMatchType<1>, llvm_anyvector_ty]>;
+def int_assigner_lookup_arg_verifier: Intrinsic<[llvm_anyvector_ty], [
     llvm_ptr_ty,llvm_i32_ty, llvm_ptr_ty,llvm_i32_ty, llvm_ptr_ty,llvm_i32_ty, llvm_ptr_ty,llvm_i32_ty,
     llvm_ptr_ty,llvm_i32_ty, llvm_ptr_ty,llvm_i32_ty, llvm_ptr_ty,llvm_i32_ty,
     llvm_ptr_ty,llvm_i32_ty, llvm_ptr_ty,llvm_i32_ty, llvm_ptr_ty,llvm_i32_ty,
     llvm_ptr_ty,llvm_i32_ty, llvm_ptr_ty,llvm_i32_ty, llvm_ptr_ty,llvm_i32_ty,
     llvm_any_ty, LLVMMatchType<1>, LLVMMatchType<1>, LLVMMatchType<1>,
-    llvm_any_ty, LLVMMatchType<2>, LLVMMatchType<2>
+    llvm_anyvector_ty, LLVMMatchType<2>, LLVMMatchType<2>
 ]>;
+// builtins related to placeholder prover

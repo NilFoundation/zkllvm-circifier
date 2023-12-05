@@ -59,6 +59,7 @@ BUILTIN(__builtin_assigner_exit_check, "vb", "n")
 
 BUILTIN(__builtin_assigner_print_native_pallas_field, "vg1", "n")
 
+// builtins related to placeholder prover
 BUILTIN(__builtin_assigner_fri_lin_inter, "g1g1g1g1g1", "n")
 BUILTIN(__builtin_assigner_fri_cosets, "vv*Uig1g1", "n")
 BUILTIN(__builtin_assigner_fri_array_swap, "vv*Uiv*b", "n")
@@ -69,6 +70,7 @@ BUILTIN(__builtin_assigner_lookup_arg_verifier, "E4g1i*Uii*Uii*Uii*Uiv*Uiv*Uiv*U
 // alphas, lookup_gate_selectors, lookup_gate_constraints_table_ids, lookup_gate_constraints_lookup_inputs, lookup_table_selectors, lookup_table_lookup_options, shifted_lookup_table_selectors, shifted_lookup_table_lookup_options, sorted, + length of every vector,
 // theta, beta, gamma, L0,
 // V_L_values, q_last, q_blind
+// builtins related to placeholder prover
 
 #undef BUILTIN
 #undef TARGET_BUILTIN

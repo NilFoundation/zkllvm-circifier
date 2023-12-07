@@ -30,11 +30,19 @@ add_custom_target(evm-stdlib ALL
 )
 
 install(DIRECTORY include/
-  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${STDLIB_NAME}/evm-sdk
-  COMPONENT ${STDLIB}
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${EVM_STDLIB_DIR}/evm-sdk
+  COMPONENT evm-stdlib
 )
 
 install(FILES ${LINKER_OUPTUT}
   DESTINATION ${CMAKE_INSTALL_LIBDIR}
-  COMPONENT ${STDLIB}
+  COMPONENT evm-stdlib
 )
+
+add_custom_target(install-evm-stdlib
+  DEPENDS evm-stdlib
+  COMMAND "${CMAKE_COMMAND}"
+          -DCMAKE_INSTALL_COMPONENT=evm-stdlib
+          -P "${CMAKE_BINARY_DIR}/cmake_install.cmake"
+)
+add_custom_target(install-evm-stdlib-stripped DEPENDS install-evm-stdlib)

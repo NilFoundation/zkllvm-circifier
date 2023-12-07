@@ -1680,6 +1680,9 @@ static uint64_t getRawAttributeMask(Attribute::AttrKind Val) {
   case Attribute::StackProtect:    return 1 << 14;
   case Attribute::StackProtectReq: return 1 << 15;
   case Attribute::Alignment:       return 31 << 16;
+  // EVM_BEGIN
+  case Attribute::EvmFunc:         return 1 << 17;
+  // EVM_END
   case Attribute::NoCapture:       return 1 << 21;
   case Attribute::NoRedZone:       return 1 << 22;
   case Attribute::NoImplicitFloat: return 1 << 23;
@@ -1725,10 +1728,6 @@ static uint64_t getRawAttributeMask(Attribute::AttrKind Val) {
     return 1ULL << 62;
   case Attribute::NoFree:
     return 1ULL << 63;
-  // EVM_BEGIN
-  case Attribute::EvmFunc:
-    return 1ULL << 64;
-  // EVM_END
   default:
     // Other attributes are not supported in the raw format,
     // as we ran out of space.

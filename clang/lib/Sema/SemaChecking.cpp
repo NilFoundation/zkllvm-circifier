@@ -1959,8 +1959,6 @@ bool Sema::CheckTSBuiltinFunctionCall(const TargetInfo &TI, unsigned BuiltinID,
   case llvm::Triple::bpfeb:
   case llvm::Triple::bpfel:
     return CheckBPFBuiltinFunctionCall(BuiltinID, TheCall);
-  case llvm::Triple::evm:
-    return CheckEVMBuiltinFunctionCall(BuiltinID, TheCall);
   case llvm::Triple::hexagon:
     return CheckHexagonBuiltinFunctionCall(BuiltinID, TheCall);
   case llvm::Triple::mips:

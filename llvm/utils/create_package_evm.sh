@@ -14,7 +14,7 @@ cmake $SOURCE_DIR -G Ninja \
   -DCMAKE_INSTALL_PREFIX=./install \
   -DLLVM_INSTALL_TOOLCHAIN_ONLY=ON \
   -DDEFAULT_SYSROOT=/usr \
-  -DLLVM_DISTRIBUTION_COMPONENTS="clang;evm-stdlib;evm-linker;evm-cxx-headers;evm-c-headers"
+  -DLLVM_DISTRIBUTION_COMPONENTS="clang;evm-stdlib;evm-linker;zkllvm-cxx-headers;zkllvm-c-headers"
 
 ninja install-distribution
 

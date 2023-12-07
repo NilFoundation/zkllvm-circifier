@@ -11030,7 +11030,7 @@ static QualType DecodeTypeFromStr(const char *&Str, const ASTContext &Context,
       break;
     case 'L':
       assert(!IsSpecial && "Can't use 'L' with 'W', 'N', 'Z' or 'O' modifiers");
-      assert(HowLong <= 2 && "Can't have LLLL modifier");
+      assert(HowLong <= 3 && "Can't have LLLLL modifier");
       ++HowLong;
       break;
     case 'N':
@@ -11144,7 +11144,9 @@ static QualType DecodeTypeFromStr(const char *&Str, const ASTContext &Context,
       Type = Context.ShortTy;
     break;
   case 'i':
-    if (HowLong == 3)
+    if (HowLong == 4)
+      Type = Unsigned ? Context.UnsignedInt256Ty : Context.Int256Ty;
+    else if (HowLong == 3)
       Type = Unsigned ? Context.UnsignedInt128Ty : Context.Int128Ty;
     else if (HowLong == 2)
       Type = Unsigned ? Context.UnsignedLongLongTy : Context.LongLongTy;

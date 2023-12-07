@@ -30,7 +30,7 @@ add_custom_target(evm-stdlib ALL
 )
 
 install(DIRECTORY include/
-  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${EVM_STDLIB_DIR}/evm-sdk
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${ZKLLVM_STDLIB_DIR}/evm-sdk
   COMPONENT evm-stdlib
 )
 

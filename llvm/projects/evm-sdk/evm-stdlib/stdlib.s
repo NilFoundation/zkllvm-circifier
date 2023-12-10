@@ -153,24 +153,6 @@ STDLIB_FUNC exit
     PUSH1 0
     RETURN
 
-######################## __evm_builtin_modmul ########################
-# INPUT STACK: 1: first, 2: second, 3: mod
-#
-STDLIB_FUNC __evm_builtin_modmul
-    JUMPDEST
-    MULMOD
-    SWAP1
-    JUMP
-
-######################## __evm_builtin_modmul ########################
-# INPUT STACK: 1: first, 2: second, 3: mod
-#
-STDLIB_FUNC __evm_builtin_modadd
-    JUMPDEST
-    ADDMOD
-    SWAP1
-    JUMP
-
 ######################## __evm_builtin_modpow ########################
 # INPUT STACK: 1: base, 2: exp, 3: mod
 #

@@ -51,14 +51,14 @@ struct Foo {
 // EVM_RUN: function: modadd, input: [10, 5, 5], result: 0
 // EVM_RUN: function: modadd, input: [123456781234567812345678, 12345678, 1000], result: 356
 [[evm]] int modadd(__uint256_t a, __uint256_t b, __uint256_t mod) {
-  return __evm_builtin_modadd(a, b, mod);
+  return __builtin_evm_addmod(a, b, mod);
 }
 
-// EVM_RUN: function: modmul, input: [10, 5, 4], result: 2
-// EVM_RUN: function: modmul, input: [10, 5, 5], result: 0
-// EVM_RUN: function: modmul, input: [123456781234567812345678, 12345678, 1000], result: 684
-[[evm]] int modmul(__uint256_t a, __uint256_t b, __uint256_t mod) {
-  return __evm_builtin_modmul(a, b, mod);
+// EVM_RUN: function: mulmod, input: [10, 5, 4], result: 2
+// EVM_RUN: function: mulmod, input: [10, 5, 5], result: 0
+// EVM_RUN: function: mulmod, input: [123456781234567812345678, 12345678, 1000], result: 684
+[[evm]] int mulmod(__uint256_t a, __uint256_t b, __uint256_t mod) {
+  return __builtin_evm_mulmod(a, b, mod);
 }
 
 // Modulus is from bn128 field

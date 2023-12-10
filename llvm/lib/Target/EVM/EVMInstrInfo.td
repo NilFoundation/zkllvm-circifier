@@ -681,6 +681,11 @@ def : Pat<(i256 (int_evm_shr GPR:$opnd1, GPR:$opnd2)),
 def : Pat<(i256 (int_evm_sar GPR:$opnd1, GPR:$opnd2)),
           (SAR_r GPR:$opnd1, GPR:$opnd2)>;
 
+def : Pat<(int_evm_addmod GPR:$a, GPR:$b, GPR:$N),
+          (ADDMOD_r GPR:$a, GPR:$b, GPR:$N)>;
+def : Pat<(int_evm_mulmod GPR:$a, GPR:$b, GPR:$N),
+          (MULMOD_r GPR:$a, GPR:$b, GPR:$N)>;
+
 // Global address
 /*
 def : Pat<(i256 (EVMWrapper tglobaladdr:$dst)),

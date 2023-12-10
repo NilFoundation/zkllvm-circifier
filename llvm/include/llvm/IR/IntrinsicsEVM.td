@@ -162,4 +162,9 @@ let TargetPrefix = "evm" in {  // All intrinsics start with "llvm.evm."
               Intrinsic<[], [], [IntrNoMem]>;
   def int_evm_selfdestruct : ClangBuiltin<"__builtin_evm_selfdestruct">,
               Intrinsic<[], [llvm_i256_ty], [IntrWriteMem, IntrHasSideEffects]>;
+
+  def int_evm_addmod : ClangBuiltin<"__builtin_evm_addmod">,
+              Intrinsic<[llvm_i256_ty], [llvm_i256_ty, llvm_i256_ty, llvm_i256_ty], [IntrNoMem]>;
+  def int_evm_mulmod : ClangBuiltin<"__builtin_evm_mulmod">,
+              Intrinsic<[llvm_i256_ty], [llvm_i256_ty, llvm_i256_ty, llvm_i256_ty], [IntrNoMem]>;
 }

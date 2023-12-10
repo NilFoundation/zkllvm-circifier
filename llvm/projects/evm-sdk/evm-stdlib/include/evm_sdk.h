@@ -24,8 +24,6 @@
 #ifndef LLVM_EVM_SDK_H
 #define LLVM_EVM_SDK_H
 
-extern "C" __uint256_t __evm_builtin_modadd(__uint256_t, __uint256_t, __uint256_t);
-extern "C" __uint256_t __evm_builtin_modmul(__uint256_t, __uint256_t, __uint256_t);
 extern "C" __uint256_t __evm_builtin_modpow(__uint256_t, __uint256_t, __uint256_t);
 
 #endif // LLVM_EVM_SDK_H

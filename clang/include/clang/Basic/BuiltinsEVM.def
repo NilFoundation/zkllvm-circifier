@@ -481,5 +481,31 @@ BUILTIN(__builtin_evm_revert, "vLLLLiLLLLi", "nc")
 //   - SELFDESTRUCT opcode: `0xff`
 BUILTIN(__builtin_evm_selfdestruct, "LLLLi", "nc")
 
+// @brief AddMod
+//
+//- **Name:** `llvm.evm_builtin_addmod`
+//- **Arguments:**
+//   - a: first integer value to add
+//   - b: second integer value to add
+//   - N: integer denominator
+//- **Return:**
+//    - (a + b) % N: integer result of the addition followed by a modulo
+//- **Codegen details:**
+//    - ADDMOD opcode: `0x08`
+BUILTIN(__builtin_evm_addmod, "LLLLiLLLLiLLLLiLLLLi", "nc")
+
+// @brief MulMod
+//
+//- **Name:** `llvm.evm_builtin_mulmod`
+//- **Arguments:**
+//   - a: first integer value to add
+//   - b: second integer value to add
+//   - N: integer denominator
+//- **Return:**
+//    - (a + b) % N: integer result of the addition followed by a modulo
+//- **Codegen details:**
+//    - MULMOD opcode: `0x08`
+BUILTIN(__builtin_evm_mulmod, "LLLLiLLLLiLLLLiLLLLi", "nc")
+
 #undef BUILTIN
 #undef TARGET_BUILTIN

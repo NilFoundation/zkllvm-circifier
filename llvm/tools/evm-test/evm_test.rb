@@ -75,7 +75,7 @@ def run_test(source)
   codefile = "#{basename}.evm_h"
 
   unless options.no_compile
-    clang_cmd = "#{bindir}/ecc #{source} -o #{codefile} "
+    clang_cmd = "#{bindir}/ecc -target evm #{source} -o #{codefile} "
     clang_cmd += ' -v ' if options.verbose
     # Uncomment to disable llvm optimizations
     #clang_cmd += ' -Xclang -disable-llvm-passes '

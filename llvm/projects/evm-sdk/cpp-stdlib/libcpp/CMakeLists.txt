@@ -240,35 +240,23 @@ else()
 endif()
 set_target_properties(${CXX_HEADER_TARGET} PROPERTIES FOLDER "Misc")
 
+add_custom_target(zkllvm-cxx-headers ALL DEPENDS ${files})
+
 if (LIBCXX_INSTALL_HEADERS)
   foreach(file ${files})
     get_filename_component(dir ${file} DIRECTORY)
     install(FILES ${file}
-      DESTINATION ${LIBCXX_INSTALL_HEADER_PREFIX}include/c++/v1/${dir}
-      COMPONENT ${CXX_HEADER_TARGET}
+      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${ZKLLVM_STDLIB_DIR}/c++/v1/${dir}
+      COMPONENT zkllvm-cxx-headers
       PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
     )
   endforeach()
 
-  if (LIBCXX_NEEDS_SITE_CONFIG)
-    # Install the generated header as __config.
-    install(FILES ${LIBCXX_BINARY_DIR}/__generated_config
-      DESTINATION ${LIBCXX_INSTALL_HEADER_PREFIX}include/c++/v1
-      PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
-      RENAME __config
-      COMPONENT ${CXX_HEADER_TARGET})
-  endif()
-
-  if (NOT CMAKE_CONFIGURATION_TYPES)
-    add_custom_target(install-${CXX_HEADER_TARGET}
-                      DEPENDS ${CXX_HEADER_TARGET} ${generated_config_deps}
-                      COMMAND "${CMAKE_COMMAND}"
-                              -DCMAKE_INSTALL_COMPONENT=${CXX_HEADER_TARGET}
-                              -P "${CMAKE_BINARY_DIR}/cmake_install.cmake")
-    # Stripping is a no-op for headers
-    add_custom_target(install-${CXX_HEADER_TARGET}-stripped DEPENDS install-${CXX_HEADER_TARGET})
-
-    add_custom_target(install-libcxx-headers DEPENDS install-${CXX_HEADER_TARGET})
-    add_custom_target(install-libcxx-headers-stripped DEPENDS install-${CXX_HEADER_TARGET}-stripped)
-  endif()
+  add_custom_target(install-zkllvm-cxx-headers
+    DEPENDS zkllvm-cxx-headers
+    COMMAND "${CMAKE_COMMAND}"
+            -DCMAKE_INSTALL_COMPONENT=zkllvm-cxx-headers
+            -P "${CMAKE_BINARY_DIR}/cmake_install.cmake"
+  )
+  add_custom_target(install-zkllvm-cxx-headers-stripped DEPENDS install-zkllvm-cxx-headers)
 endif()

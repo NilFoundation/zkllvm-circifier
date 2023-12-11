@@ -1,5 +1,5 @@
 Package: zkllvm-stdlib
-Version: 0.0-1
+Version: 0.0-2
 Section: misc
 Architecture: all
 Maintainer: =nil; Foundation

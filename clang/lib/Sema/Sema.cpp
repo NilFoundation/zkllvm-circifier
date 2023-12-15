@@ -665,6 +665,7 @@ ExprResult Sema::ImpCastExprToType(Expr *E, QualType Ty,
     case CK_ToVoid:
     case CK_NonAtomicToAtomic:
     case CK_StringToGaloisField:
+    case CK_IntToGaloisField:
       break;
     }
   }

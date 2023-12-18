@@ -28,6 +28,7 @@ def int_assigner_zkml_batch_norm:     Intrinsic<[llvm_ptr_ty], [llvm_ptr_ty]>;
 def int_assigner_curve_init: Intrinsic<[llvm_any_ty], [llvm_any_ty, LLVMMatchType<1>]>;
 
 def int_assigner_bit_decomposition: Intrinsic<[], [llvm_ptr_ty, llvm_i32_ty, llvm_i64_ty, llvm_i1_ty]>;
+def int_assigner_bit_decomposition_field: Intrinsic<[], [llvm_ptr_ty, llvm_i32_ty, llvm_any_ty, llvm_i1_ty]>;
 def int_assigner_bit_composition: Intrinsic<[llvm_any_ty], [llvm_ptr_ty, llvm_i32_ty, llvm_i1_ty]>;
 
 def int_assigner_exit_check: Intrinsic<[], [llvm_i1_ty]>;

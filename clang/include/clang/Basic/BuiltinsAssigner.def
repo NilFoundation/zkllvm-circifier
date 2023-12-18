@@ -58,6 +58,8 @@ BUILTIN(__builtin_assigner_bls12381_curve_init, "e3g3g3", "n")
 BUILTIN(__builtin_assigner_curve25519_curve_init, "e4g5g5", "n")
 
 BUILTIN(__builtin_assigner_bit_decomposition, "vv*UiULLib", "n")
+BUILTIN(__builtin_assigner_bit_decomposition_pallas, "vv*Uig1b", "n")
+BUILTIN(__builtin_assigner_bit_decomposition_bls12381, "vv*Uig3b", "n")
 BUILTIN(__builtin_assigner_bit_composition, "g1v*Uib", "n")
 
 BUILTIN(__builtin_assigner_exit_check, "vb", "n")

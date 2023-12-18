@@ -20703,9 +20703,20 @@ Value *CodeGenFunction::EmitAssignerBuiltinExpr(unsigned int BuiltinID,
   }
   case assigner::BI__builtin_assigner_bit_decomposition: {
     ID = Intrinsic::assigner_bit_decomposition;
-    // auto ElemTy = llvm::GaloisFieldType::get(context,
-    //                                           llvm::GALOIS_FIELD_PALLAS_BASE);
-    // OverloadTypes = {ElemTy};
+    break;
+  }
+  case assigner::BI__builtin_assigner_bit_decomposition_pallas: {
+    ID = Intrinsic::assigner_bit_decomposition_field;
+    auto ElemTy = llvm::GaloisFieldType::get(context,
+                                              llvm::GALOIS_FIELD_PALLAS_BASE);
+    OverloadTypes = {ElemTy};
+    break;
+  }
+  case assigner::BI__builtin_assigner_bit_decomposition_bls12381: {
+    ID = Intrinsic::assigner_bit_decomposition_field;
+    auto ElemTy = llvm::GaloisFieldType::get(context,
+                                              llvm::GALOIS_FIELD_BLS12381_BASE);
+    OverloadTypes = {ElemTy};
     break;
   }
   case assigner::BI__builtin_assigner_exit_check: {

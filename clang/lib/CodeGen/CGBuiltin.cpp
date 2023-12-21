@@ -20563,6 +20563,15 @@ Value *CodeGenFunction::EmitAssignerBuiltinExpr(unsigned int BuiltinID,
   case assigner::BI__builtin_assigner_malloc:
     ID = Intrinsic::assigner_malloc;
     break;
+  case assigner::BI__builtin_assigner_aligned_alloc:
+    ID = Intrinsic::assigner_aligned_alloc;
+    break;
+  case assigner::BI__builtin_assigner_calloc:
+    ID = Intrinsic::assigner_calloc;
+    break;
+  case assigner::BI__builtin_assigner_realloc:
+    ID = Intrinsic::assigner_realloc;
+    break;
   case assigner::BI__builtin_assigner_free:
     ID = Intrinsic::assigner_free;
     break;

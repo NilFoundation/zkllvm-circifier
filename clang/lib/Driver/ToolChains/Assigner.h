@@ -12,6 +12,7 @@
 #include "Gnu.h"
 #include "clang/Driver/Tool.h"
 #include "clang/Driver/ToolChain.h"
+#include "llvm/Support/Path.h"
 
 namespace clang {
 namespace driver {
@@ -55,6 +56,9 @@ private:
       const llvm::opt::ArgList &DriverArgs,
       llvm::opt::ArgStringList &CC1Args) const override {
     addSystemInclude(DriverArgs, CC1Args, "/usr/include/zkllvm/c++");
+    SmallString<128> ResourceDirInclude(getDriver().ResourceDir);
+    llvm::sys::path::append(ResourceDirInclude, "include");
+    addSystemInclude(DriverArgs, CC1Args, ResourceDirInclude);
   }
 
 };

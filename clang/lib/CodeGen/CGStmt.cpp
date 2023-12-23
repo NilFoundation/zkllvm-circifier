@@ -58,6 +58,10 @@ void CodeGenFunction::AddMultiProverMetadata(llvm::Instruction *instr) {
     return;
   }
 
+  if (instr->hasMetadata("zk_multi_prover")) {
+    return;
+  }
+
   ASTContext& AC = CGM.getContext();
   llvm::LLVMContext &C = instr->getContext();
   const auto s = MultiProverAttrPtr->getIndexes();
@@ -164,6 +168,9 @@ void CodeGenFunction::EmitStmt(const Stmt *S, ArrayRef<const Attr *> Attrs) {
       outgoing->eraseFromParent();
       Builder.ClearInsertionPoint();
     }
+
+    AddMultiProverMetadata(outgoing);
+
     break;
   }
 
@@ -757,6 +764,7 @@ void CodeGenFunction::EmitAttributedStmt(const AttributedStmt &S) {
   SaveAndRestore save_alwaysinline(InAlwaysInlineAttributedStmt, alwaysinline);
   SaveAndRestore save_musttail(MustTailCall, musttail);
   SaveAndRestore save_multiProverAttr(MultiProverAttrPtr, multiProverAttrPtr);
+
   if (MultiProverAttrPtr) {
     llvm::BasicBlock *newBB = createBasicBlock("zk.multi_prover");
     EmitBlock(newBB);

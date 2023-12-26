@@ -2006,9 +2006,12 @@ TypeInfo ASTContext::getTypeInfoImpl(const Type *T) const {
 
     // If the alignment is not a power of 2, round up to the next power of 2.
     // This happens for non-power-of-2 length vectors.
-    if (Align & (Align-1)) {
-      Align = llvm::bit_ceil(Align);
-      Width = llvm::alignTo(Width, Align);
+    // (except of assigner target, we do not use alignment for it)
+    if (Target->getTriple().getArch() != llvm::Triple::assigner) {
+      if (Align & (Align-1)) {
+        Align = llvm::bit_ceil(Align);
+        Width = llvm::alignTo(Width, Align);
+      }
     }
     // Adjust the alignment based on the target max.
     uint64_t TargetVectorAlign = Target->getMaxVectorAlign();

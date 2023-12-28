@@ -116,6 +116,10 @@ public:
   PerformDAGCombine(SDNode *N,
                     TargetLowering::DAGCombinerInfo &DCI) const override;
 
+  MVT getScalarShiftAmountTy(const DataLayout &, EVT) const override {
+    return MVT::i256;
+  }
+
 private:
   // Lower incoming arguments, copy physregs into vregs
   SDValue LowerFormalArguments(

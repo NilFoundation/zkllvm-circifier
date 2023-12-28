@@ -135,54 +135,44 @@ bool EVMDAGToDAGISel::SelectLOAD(SDNode *Node) {
   const LoadSDNode *LD = cast<LoadSDNode>(Node);
 
   switch (LD->getExtensionType()) {
-    case ISD::SEXTLOAD: {
-      auto Op0 = LD->getOperand(0);
-      SDValue Src = LD->getBasePtr();
-      auto ExtSizeInBytes = LD->getMemoryVT().getSizeInBits() / 8;
-      if (ExtSizeInBytes == 0) {
-        llvm_unreachable("Not supported!");
-      }
-      SDValue sval = CurDAG->getConstant(ExtSizeInBytes - 1, SDLoc(Node), MVT::i256);
-
-      SDNode* mload = CurDAG->getMachineNode(EVM::MLOAD_r,
-                       SDLoc(Node), MVT::i256, MVT::Other, Src, Op0);
-
-      SDValue shift = SDValue(CurDAG->getMachineNode(EVM::PUSH32_r, SDLoc(Node), MVT::i256, sval), 0);
-
-      MachineSDNode * signextend = CurDAG->getMachineNode(EVM::SIGNEXTEND_r,
-                  SDLoc(Node), MVT::i256, {shift, SDValue(mload, 0)});
-
-      ReplaceUses(SDValue(Node, 0), SDValue(signextend, 0));
-      ReplaceNode(Node, mload);
-
-      return true;
-    }
+    case ISD::EXTLOAD:
+    case ISD::SEXTLOAD:
     case ISD::ZEXTLOAD: {
       auto Op0 = LD->getOperand(0);
       SDValue Src = LD->getBasePtr();
       auto ExtSizeInBits = LD->getMemoryVT().getSizeInBits();
       assert(ExtSizeInBits <= 128);
-      SDNode* Load = CurDAG->getMachineNode(EVM::MLOAD_r,
-                                             SDLoc(Node), MVT::i256, MVT::Other, Src, Op0);
-      if (ExtSizeInBits <= 128) {
-        constexpr std::array<uint64_t, 2> MaskData = {uint64_t(-1), uint64_t(-1)};
-        APInt Mask(256, MaskData);
-        SDValue MaskConst = CurDAG->getConstant(Mask, SDLoc(Node), MVT::i256);
 
-        SDValue MaskNode =
-            SDValue(CurDAG->getMachineNode(EVM::PUSH32_r, SDLoc(Node),
-                                           MVT::i256, MaskConst), 0);
-        MachineSDNode *And = CurDAG->getMachineNode(
-            EVM::AND_r, SDLoc(Node), MVT::i256, {SDValue(Load, 0), MaskNode});
+      constexpr uint16_t LoadOpcodes[] = {
+          EVM::MLOAD8_r, EVM::MLOAD16_r, EVM::MLOAD32_r, EVM::MLOAD64_r,
+          EVM::INVALID, EVM::MLOAD_r};
+      int index = Log2_64(ExtSizeInBits) - 3;
+      assert(index >= 0);
+      assert(unsigned(index) < sizeof(LoadOpcodes)/sizeof(LoadOpcodes[0]));
+      unsigned Opcode = LoadOpcodes[index];
+      if (Opcode == EVM::INVALID) {
+        Node->dump();
+        report_fatal_error("Invalid LOAD size");
+      }
+      SDNode* Load = CurDAG->getMachineNode(Opcode, SDLoc(Node), MVT::i256,
+                                            MVT::Other, Src, Op0);
+      if (LD->getExtensionType() == ISD::SEXTLOAD) {
+        auto ExtSizeInBytes = ExtSizeInBits / 8;
+        SDValue Bytes = CurDAG->getConstant(ExtSizeInBytes - 1, SDLoc(Node),
+                                           MVT::i256);
+        SDValue Size = SDValue(CurDAG->getMachineNode(EVM::PUSH32_r,
+                                                      SDLoc(Node),
+                                                      MVT::i256, Bytes), 0);
+        MachineSDNode * signextend = CurDAG->getMachineNode(
+            EVM::SIGNEXTEND_r, SDLoc(Node), MVT::i256,
+            {Size, SDValue(Load, 0)});
 
-        ReplaceUses(SDValue(Node, 0), SDValue(And, 0));
+        ReplaceUses(SDValue(Node, 0), SDValue(signextend, 0));
       }
       ReplaceNode(Node, Load);
-
       return true;
     }
-    case ISD::NON_EXTLOAD:
-    case ISD::EXTLOAD: {
+    case ISD::NON_EXTLOAD: {
       //llvm_unreachable("unimplemented");
       return false;
     }
@@ -197,41 +187,30 @@ bool EVMDAGToDAGISel::SelectSTORE(SDNode *Node) {
   auto StoreVT = ST->getMemoryVT();
   if (StoreVT != MVT::i256) {
     auto Op = ST->getOperand(1);
-
-    constexpr std::array<uint64_t, 2> MaskData = {uint64_t(-1), uint64_t(-1)};
-    APInt Mask(256, MaskData);
+    unsigned Opcode = EVM::MSTORE_r;
 
     switch (StoreVT.getFixedSizeInBits()) {
     case 128:
-        // 128 mask is already set by default
-        break;
+        llvm_unreachable("128 store is not supported!");
     case 64:
-        Mask = 0xffffffffffffffff;
+        Opcode = EVM::MSTORE64_r;
         break;
     case 32:
-        Mask = 0xffffffff;
+        Opcode = EVM::MSTORE32_r;
         break;
     case 16:
-        Mask = 0xffff;
+        Opcode = EVM::MSTORE16_r;
         break;
     case 8:
-        Mask = 0xff;
+        Opcode = EVM::MSTORE8_r;
         break;
     default:
         llvm_unreachable("Unsupported type!");
     }
 
-    SDValue MaskConst = CurDAG->getConstant(Mask, SDLoc(Node), MVT::i256);
-
-    SDValue MaskNode =
-        SDValue(CurDAG->getMachineNode(EVM::PUSH32_r, SDLoc(Node),
-                                       MVT::i256, MaskConst), 0);
-    MachineSDNode *And = CurDAG->getMachineNode(
-        EVM::AND_r, SDLoc(Node), MVT::i256, {Op, MaskNode});
-
     MachineSDNode *Store =
-        CurDAG->getMachineNode(EVM::MSTORE_r, SDLoc(Node), MVT::Other,
-                               Node->getOperand(2), SDValue(And, 0), Node->getOperand(0));
+        CurDAG->getMachineNode(Opcode, SDLoc(Node), MVT::Other,
+                               Node->getOperand(2), Op, Node->getOperand(0));
 
     ReplaceNode(Node, Store);
     return true;

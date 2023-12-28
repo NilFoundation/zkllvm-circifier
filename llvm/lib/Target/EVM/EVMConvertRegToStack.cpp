@@ -11,7 +11,6 @@
 /// instructions to stack based instruction. It considers the order of the
 /// instructions in a basicblock is correct, and it does not change the order.
 /// Some stack manipulation instructions are inserted into the code.
-/// It has a prerequiste pass: EVMVRegToMem.
 ///
 //===----------------------------------------------------------------------===//
 
@@ -52,6 +51,7 @@ private:
 
   bool runOnMachineFunction(MachineFunction &MF) override;
 
+  int convertCall(MachineInstr &MI, MachineBasicBlock &MBB) const;
   void convertSWAP(MachineInstr* MI) const;
   void convertDUP(MachineInstr* MI) const;
   void convertMOVE(MachineInstr* MI) const;
@@ -137,6 +137,102 @@ void EVMConvertRegToStack::convertDUP(MachineInstr* MI) const {
   MI->removeFromParent();
 }
 
+static unsigned getSlotMemOpcode(bool IsStore) {
+  switch (EVMMachineFunctionInfo::getStackSlotSizeInBytes()) {
+  case 4: return IsStore ? EVM::MSTORE32_r : EVM::MLOAD32_r;
+  case 8: return IsStore ? EVM::MSTORE64_r : EVM::MLOAD64_r;
+  case 32: return IsStore ? EVM::MSTORE_r : EVM::MLOAD_r;
+  default:
+    report_fatal_error("Unsupported slot size");
+  }
+}
+
+int EVMConvertRegToStack::convertCall(MachineInstr &MI, MachineBasicBlock &MBB) const {
+  int StackOpcode = -1;
+
+  auto& MF = *MBB.getParent();
+  EVMMachineFunctionInfo *MFI = MF.getInfo<EVMMachineFunctionInfo>();
+
+  unsigned FrameSize = MFI->getFrameSizeInBytes();
+  assert(FrameSize % MFI->getStackSlotSizeInBytes() == 0);
+
+  auto* InsertBefore = &MI;
+  auto MakeInst = [&]<class... Imms>(unsigned Opcode, Imms... imms) {
+    auto B = BuildMI(*MI.getParent(), *InsertBefore, MI.getDebugLoc(),
+                     TII->get(Opcode));
+    (B.addImm(imms), ...);
+    return B;
+  };
+
+  unsigned FpAddress = MF.getSubtarget<EVMSubtarget>().getFramePointer();
+
+  using namespace EVM;
+  auto LoadOpc = getSlotMemOpcode(false);
+  auto StoreOpc = getSlotMemOpcode(true);
+
+  // Save current FP in the slot after current frame
+  MakeInst(PUSH32, FpAddress).addComment(MF, "Call start");
+                                // fpaddr
+  MakeInst(MLOAD);              // fp
+  MakeInst(DUP1);               // fp, fp
+  MakeInst(PUSH32, FrameSize);  // fp, fp, frame_size
+  MakeInst(ADD);                // fp, fp + frame_size
+  MakeInst(StoreOpc);           // -
+
+  // Update FP to the callee frame
+  MakeInst(PUSH32, FpAddress);  // fpaddr
+  MakeInst(MLOAD);              // fp
+  MakeInst(PUSH32, FrameSize + MFI->getStackSlotSizeInBytes());
+                                // fp, frame_size
+  MakeInst(ADD);                // new_fp
+  MakeInst(DUP1);               // new_fp, new_fp
+  MakeInst(PUSH32, FpAddress);  // new_fp, new_fp, fpaddr
+  MakeInst(MSTORE);             // new_fp
+
+  // Also update SP to the new FP
+  unsigned SpAddress = MF.getSubtarget<EVMSubtarget>().getStackPointer();
+  MakeInst(PUSH32, SpAddress);  // new_fp, spaddr
+  MakeInst(MSTORE);             // -
+
+  if (MF.getSubtarget<EVMSubtarget>().hasSubroutine()) {
+      // With subroutine support we do not push return address on to stack
+      StackOpcode = EVM::JUMPSUB;
+  } else {
+      // Here we build the return address, and insert it as the first
+      // argument of the function.
+      MakeInst(PUSH1, 4);       // 4
+      MakeInst(GETPC);          // 4, pc
+      MakeInst(ADD);            // pc + 4
+
+      // Swap the callee address with the return address
+      unsigned Uses = std::distance(MI.uses().begin(), MI.uses().end());
+      MakeInst(getSWAPOpcode(Uses))->setAsmPrinterFlag(
+          EVM::BuildCommentFlags(EVM::SUBROUTINE_BEGIN, 0));
+      StackOpcode = EVM::JUMP;
+  }
+
+  MachineBasicBlock::iterator MIT(MI);
+
+  // Insert last Store instruction after the JUMP instruction, so all following
+  // instructions will be inserted before this Store.
+  InsertBefore = BuildMI(MF, MI.getDebugLoc(), TII->get(MSTORE)).addComment(MF, "Call end");
+  MBB.insertAfter(MIT, InsertBefore);
+
+  MakeInst(JUMPDEST).addComment(MF, "Call continuation");
+  MakeInst(PUSH32, FpAddress);  // fpaddr
+  MakeInst(MLOAD);              // fp
+  MakeInst(PUSH32, MFI->getStackSlotSizeInBytes());
+                                // fp, slot_size
+  MakeInst(SWAP1);              // slot_size, fp
+  MakeInst(SUB);                // fp - slot_size
+  MakeInst(LoadOpc);            // caller_fp
+  MakeInst(PUSH32, FpAddress);  // caller_fp, fpaddr
+  // Last instruction is `InsertBefore`, which is a store, that restore
+  // caller_fp into FP.
+
+  return StackOpcode;
+}
+
 bool EVMConvertRegToStack::runOnMachineFunction(MachineFunction &MF) {
   LLVM_DEBUG({
     dbgs() << "********** Convert register to stack **********\n"
@@ -204,135 +300,25 @@ bool EVMConvertRegToStack::runOnMachineFunction(MachineFunction &MF) {
         if (StackOpcode == -1) {
           // special handling for return pseudo, as we will expand
           // it at the finalization pass.
-          if (RegOpcode == EVM::pRETURNSUB_r ||
-              RegOpcode == EVM::pRETURNSUBVOID_r) {
+          switch (RegOpcode) {
+          case EVM::pRETURNSUB_r:
+          case EVM::pRETURNSUBVOID_r:
             if (MF.getSubtarget<EVMSubtarget>().hasSubroutine()) {
               StackOpcode = EVM::JUMPSUB;
             } else {
               StackOpcode = EVM::JUMP;
             }
-          }
-
-          else if (RegOpcode == EVM::pJUMPSUB_r || RegOpcode == EVM::pJUMPSUBVOID_r) {
-            // store FreeMemory Pointer to latest location:
-
-            EVMMachineFunctionInfo *MFI = MF.getInfo<EVMMachineFunctionInfo>();
-
-            // we implicitly allocate a slot at FP[lastIndex+1]:
-            unsigned index = MFI->getNumAllocatedIndexInFunction() + 1;
-
-            // store current FP to fp[index]:
-            // TODO can optimize this sequence
-
-            // PUSH fpaddr
-            // MLOAD  (fp)
-            // DUP1 (fp, fp)
-            // PUSH index (index, fp, fp)
-            // ADD   (fp+index, fp)
-            // MSTORE                 
-
-            // update FP to FP[index + 1]
-
-            // PUSH fpaddr (fpaddr)
-            // MLOAD (fp)
-            // PUSH (index + 1) * 32     (index+1, fp)
-            // ADD   (fp[index+1])
-            // DUP1
-            // PUSH fpaddr   (fpaddr, fp[index+1])
-            // MSTORE
-            // PUSH spaddr
-            // MSTORE
-
-            unsigned fpaddr = MF.getSubtarget<EVMSubtarget>().getFramePointer();
-            BuildMI(*MI.getParent(), MI, MI.getDebugLoc(),
-                    TII->get(EVM::PUSH32))
-                .addImm(fpaddr);
-            BuildMI(*MI.getParent(), MI, MI.getDebugLoc(), TII->get(EVM::MLOAD));
-            BuildMI(*MI.getParent(), MI, MI.getDebugLoc(), TII->get(EVM::DUP1));
-            BuildMI(*MI.getParent(), MI, MI.getDebugLoc(),
-                    TII->get(EVM::PUSH32))
-                .addImm(index * 32);
-            BuildMI(*MI.getParent(), MI, MI.getDebugLoc(), TII->get(EVM::ADD));
-            BuildMI(*MI.getParent(), MI, MI.getDebugLoc(), TII->get(EVM::MSTORE));
-
-
-            BuildMI(*MI.getParent(), MI, MI.getDebugLoc(),
-                    TII->get(EVM::PUSH32))
-                .addImm(fpaddr);
-            BuildMI(*MI.getParent(), MI, MI.getDebugLoc(), TII->get(EVM::MLOAD));
-            BuildMI(*MI.getParent(), MI, MI.getDebugLoc(),
-                    TII->get(EVM::PUSH32))
-                .addImm((index + 1) * 32);
-            BuildMI(*MI.getParent(), MI, MI.getDebugLoc(), TII->get(EVM::ADD));
-
-            // Duplicate the new fp to initialize SP
-            BuildMI(*MI.getParent(), MI, MI.getDebugLoc(), TII->get(EVM::DUP1));
-
-            BuildMI(*MI.getParent(), MI, MI.getDebugLoc(),
-                    TII->get(EVM::PUSH32))
-                .addImm(fpaddr);
-            BuildMI(*MI.getParent(), MI, MI.getDebugLoc(), TII->get(EVM::MSTORE));
-
-            // Also update stack pointer
-            unsigned spaddr = MF.getSubtarget<EVMSubtarget>().getStackPointer();
-            BuildMI(*MI.getParent(), MI, MI.getDebugLoc(),
-                    TII->get(EVM::PUSH32))
-                .addImm(spaddr);
-            BuildMI(*MI.getParent(), MI, MI.getDebugLoc(), TII->get(EVM::MSTORE));
-            
-            if (MF.getSubtarget<EVMSubtarget>().hasSubroutine()) {
-              // With subroutine support we do not push return address on to stack
-              StackOpcode = EVM::JUMPSUB;
-            } else {
-              // here we build the return address, and insert it as the first
-              // argument of the function.
-              BuildMI(*MI.getParent(), MI, MI.getDebugLoc(),
-                      TII->get(EVM::PUSH1))
-                  .addImm(4);
-              BuildMI(*MI.getParent(), MI, MI.getDebugLoc(),
-                      TII->get(EVM::GETPC));
-              BuildMI(*MI.getParent(), MI, MI.getDebugLoc(),
-                      TII->get(EVM::ADD));
-
-              // swap the callee address with the return address
-              unsigned uses = std::distance(MI.uses().begin(), MI.uses().end());
-              BuildMI(*MI.getParent(), MI, MI.getDebugLoc(),
-                      TII->get(getSWAPOpcode(uses)))
-                  ->setAsmPrinterFlag(
-                      EVM::BuildCommentFlags(EVM::SUBROUTINE_BEGIN, 0));
-              StackOpcode = EVM::JUMP;
-            }
-
-            MachineBasicBlock::iterator MIT(MI);
-
-            // insert JUMPDEST after MI
-            const DebugLoc &DL = MI.getDebugLoc();
-            MIT = MBB.insertAfter(MIT, BuildMI(MF, DL, TII->get(EVM::JUMPDEST)));
-
-            // restore free pointer from index
-            // PUSH FPAddr  (fpaddr)
-            // MLOAD        (fp)
-            // PUSH 32      (32, fp)
-            // SWAP1        (fp, 32)
-            // SUB          (fp-32)
-            // MLOAD        (oldFP)
-            // PUSH FPAddr  (fpaddr, oldFP)
-            // MSTORE
-
-            // PUSH FPAddr  (fpadd,r fp-32)
-            // MSTORE     
-
-            MIT = MBB.insertAfter(MIT, BuildMI(MF, DL, TII->get(EVM::PUSH32)).addImm(fpaddr));
-            MIT = MBB.insertAfter(MIT, BuildMI(MF, DL, TII->get(EVM::MLOAD)));
-            MIT = MBB.insertAfter(MIT, BuildMI(MF, DL, TII->get(EVM::PUSH32)).addImm(32));
-            MIT = MBB.insertAfter(MIT, BuildMI(MF, DL, TII->get(EVM::SWAP1)));
-            MIT = MBB.insertAfter(MIT, BuildMI(MF, DL, TII->get(EVM::SUB)));
-            MIT = MBB.insertAfter(MIT, BuildMI(MF, DL, TII->get(EVM::MLOAD)));
-            MIT = MBB.insertAfter(MIT, BuildMI(MF, DL, TII->get(EVM::PUSH32)).addImm(fpaddr));
-            MIT = MBB.insertAfter(MIT, BuildMI(MF, DL, TII->get(EVM::MSTORE)));
+            break;
+          case EVM::pJUMPSUB_r:
+          case EVM::pJUMPSUBVOID_r:
+            StackOpcode = convertCall(MI, MBB);
+            break;
           }
         }
-        assert(StackOpcode != -1 && "Failed to convert instruction to stack mode.");
+        if (StackOpcode == -1) {
+          MI.dump();
+          report_fatal_error("Failed to convert instruction to stack version.");
+        }
 
         MI.setDesc(TII->get(StackOpcode));
 

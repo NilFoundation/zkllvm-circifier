@@ -27,9 +27,8 @@
 #include "llvm/ADT/Twine.h"
 #include <iostream>
 
-static constexpr unsigned BytesInEvmWord = 32;
-static constexpr unsigned BitsInEvmWord = BytesInEvmWord * 8;
-static constexpr unsigned InitDataOffset = BytesInEvmWord * 2;
+static constexpr unsigned InitDataOffset = 32 * 2;
+static constexpr unsigned SymbolRelocSizeInBytes = 4;
 
 class Logger {
 public:

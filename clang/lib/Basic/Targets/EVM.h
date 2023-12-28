@@ -27,19 +27,6 @@ class LLVM_LIBRARY_VISIBILITY EVMTargetInfo : public TargetInfo {
 public:
   EVMTargetInfo(const llvm::Triple &Triple, const TargetOptions &)
       : TargetInfo(Triple) {
-    SuitableAlign = 256;
-    FloatAlign = 256;
-    DoubleAlign = 256;
-    LongDoubleAlign = 256;
-    LargeArrayAlign = 256;
-    SimdDefaultAlign = 256;
-    PointerAlign = 256;
-    BoolAlign = 256;
-    CharAlign = 256;
-    IntAlign = 256;
-    LongAlign = 256;
-    LongLongAlign = 256;
-    Int128Align = 256;
 
     PointerWidth = 64;
     BoolWidth = 8;
@@ -48,10 +35,8 @@ public:
     LongWidth = 64;
     LongLongWidth = 64;
     MaxBitIntWidth = 64;
-
-    resetDataLayout("e-a:256:256-p:256:256-i1:256:256-i8:256:256-i16:256:256-i32"
-                    ":256:256-i64:256:256-i128:256:256-i256:256:256-S256");
-
+    resetDataLayout("E-S64-a:0:64-p:64:64-i1:8:8-i8:8:8-i16:16:16-i32"
+                    ":32:64-i64:64:64-i128:128:128-i256:256:256");
   }
 
   void getTargetDefines(const LangOptions &Opts,
@@ -111,10 +96,6 @@ public:
   bool setCPU(const std::string &Name) override {
     StringRef CPUName(Name);
     return isValidCPUName(CPUName);
-  }
-
-  unsigned getExnObjectAlignment() const override {
-    return 32;
   }
 };
 } // namespace targets

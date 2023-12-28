@@ -4756,12 +4756,6 @@ void CodeGenModule::EmitGlobalVarDefinition(const VarDecl *D,
 #ifndef NDEBUG
       CharUnits VarSize = getContext().getTypeSizeInChars(ASTTy) +
                           InitDecl->getFlexibleArrayInitChars(getContext());
-      // EVM_BEGIN
-      if (getContext().getCXXABIKind() == TargetCXXABI::EVM) {
-        auto A = Context.toCharUnitsFromBits(getTarget().getPointerAlign(0));
-        VarSize = VarSize.alignTo(A);
-      }
-      // EVM_END
       CharUnits CstSize = CharUnits::fromQuantity(
           getDataLayout().getTypeAllocSize(Init->getType()));
       assert(VarSize == CstSize && "Emitted constant has unexpected size");

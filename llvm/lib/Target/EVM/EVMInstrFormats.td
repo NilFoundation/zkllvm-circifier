@@ -26,6 +26,7 @@ class EVMInst<dag oops, dag iops, list<dag> pattern, string stack,
   string BaseName    = NAME;
   dag OutOperandList = oops;
   dag InOperandList  = iops;
+  int Cost           = cost;
 
   let Namespace      = "EVM";
   let AsmString      = asmstr;

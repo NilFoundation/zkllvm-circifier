@@ -315,16 +315,36 @@ let mayLoad = 1 in {
 defm MLOAD : RSInst<(outs GPR:$dst), (ins GPR:$src),
                     [(set GPR:$dst, (load GPR:$src))],
                    "MLOAD_r\t$dst, $src", "MLOAD", 0x51, 3>;
+defm MLOAD8 : RSInst<(outs GPR:$dst), (ins GPR:$src),
+                    [(set GPR:$dst, (zextload GPR:$src))],
+                   "MLOAD8\t$dst, $src", "MLOAD8", 0xc0, 3>;
+defm MLOAD16 : RSInst<(outs GPR:$dst), (ins GPR:$src),
+                    [(set GPR:$dst, (zextload GPR:$src))],
+                   "MLOAD16\t$dst, $src", "MLOAD16", 0xc1, 3>;
+defm MLOAD32 : RSInst<(outs GPR:$dst), (ins GPR:$src),
+                    [(set GPR:$dst, (zextload GPR:$src))],
+                   "MLOAD32\t$dst, $src", "MLOAD32", 0xc2, 3>;
+defm MLOAD64 : RSInst<(outs GPR:$dst), (ins GPR:$src),
+                    [(set GPR:$dst, (load GPR:$src))],
+                   "MLOAD64_r\t$dst, $src", "MLOAD64", 0xc3, 3>;
 }
 
 let mayStore = 1 in {
 // MSTORE_r offset value
 defm MSTORE : Inst_2_0<"MSTORE",
                        [(store GPR:$src2, GPR:$src1)], 0x52, 3>;
-
 defm MSTORE8 : Inst_2_0<"MSTORE8",
                         [(int_evm_mstore8 GPR:$src1, GPR:$src2)],
                         0x53, 3>;
+defm MSTORE16 : Inst_2_0<"MSTORE16",
+                        [],
+                        0xb0, 3>;
+defm MSTORE32 : Inst_2_0<"MSTORE32",
+                        [],
+                        0xb1, 3>;
+defm MSTORE64 : Inst_2_0<"MSTORE64",
+                        [],
+                        0xb2, 3>;
 }
 
 let hasSideEffects = 1 in {

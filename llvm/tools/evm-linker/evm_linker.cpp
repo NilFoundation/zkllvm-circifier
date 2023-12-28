@@ -61,6 +61,9 @@ static cl::opt<bool> MakeArchive("make-archive",
                                  cl::desc("Compose input files into an archive,"
                                           " without linking"),
                                  llvm::cl::init(false));
+static cl::opt<unsigned> StackAlignment("stack-align",
+                                cl::desc("Stack alignment in bytes"),
+                                llvm::cl::init(8));
 
 static std::unique_ptr<ToolOutputFile> OpenOutputFile(std::string_view Path);
 static void WriteDataToStream(raw_fd_ostream& OS, const void* Data, size_t Size);
@@ -112,7 +115,7 @@ int EvmLinker::run() {
               object::Archive::create(Buf.get()->getMemBufferRef());
           if (!ArchiveOrError) {
             std::string Message;
-            handleAllErrors(std::move(ArchiveOrError.takeError()),
+            handleAllErrors(ArchiveOrError.takeError(),
                             [&](ErrorInfoBase &EIB) {
               Message = EIB.message();
             });
@@ -351,7 +354,7 @@ void EvmLinker::resolve(bool CheckReachable) {
   for (auto &File : Files) {
     DataOffset = File->resolveGlobalsWithoutInitData(DataOffset);
   }
-  GlobalsSectionSize = DataOffset;
+  GlobalsSectionSize = alignTo(DataOffset, StackAlignment.getValue());
 
   for (auto& File : Files) {
     File->resolve(SymMap);
@@ -496,15 +499,7 @@ void EvmLinker::emit() {
             JsonInfo.attribute("size", G->Size);
             if (!G->InitData.empty()) {
               JsonInfo.attributeArray("data", [&]() {
-                for (auto V : G->InitData) {
-                  if (V.isSingleWord())
-                    JsonInfo.value(V.getZExtValue());
-                  else {
-                    SmallString<80> Str;
-                    V.toStringUnsigned(Str, 16);
-                    JsonInfo.value(Str);
-                  }
-                }
+                JsonInfo.value(toHex(G->InitData, true));
               });
             }
           });

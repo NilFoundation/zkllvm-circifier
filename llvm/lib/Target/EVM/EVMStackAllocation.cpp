@@ -98,7 +98,8 @@ bool EVMStackAllocation::runOnMachineFunction(MachineFunction &F) {
     }
   }
 
-  MFI->updateMemoryFrameSize(AllocatedSlotNumber);
+  unsigned SpillBytes = AllocatedSlotNumber * 32;
+  MFI->setSpillSlots(SpillBytes / MFI->getStackSlotSizeInBytes());
 
   return true;
 }

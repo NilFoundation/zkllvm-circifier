@@ -20,9 +20,11 @@ OptionParser.new do |opts|
   opts.on('--linker-args=ARGS', 'Command line arguments for linker') { |x| $options.linker_args = x }
   opts.on('--stdlib=PATH', 'Path to EVM stdlib') { |x| $options.stdlib = x }
   opts.on('--debug', 'Produce debug information')
+  opts.on('--save-temps', 'Pass compiler option `-save-temps`') { $options.save_temps = _1 }
   opts.on('--no-compile', 'Don\'t compile anything, assume it is already compiled') { $options.no_compile = true }
   opts.on('--no-ctor', 'Do not generate EVM constructor') { $options.no_ctor = true }
   opts.on('--no-stdlib', 'Do not use stdlib') { $options.no_stdlib = true }
+  opts.on('--evmone=PATH', 'Path to evmone install directory, which contains `bin/evmc` and `lib/libevmone.so`')
   opts.on('-v', '--verbose', 'Verbose logging')
 end.parse!(into: $options)
 
@@ -62,6 +64,18 @@ def get_func_keccak(name, abifile)
   function_sha3
 end
 
+def run_vm(codefile, input)
+  if options.evmone
+    result = command("#{options.evmone}/bin/evmc run @#{codefile} --vm #{options.evmone}/lib/libevmone.so,trace-bin --input #{input}").strip
+    m = result.match /Output: +([0-9a-f]+)/
+    raise "Invalid evmc output: #{result}" unless m
+    return m[1].to_i(16)
+  end
+  result = command("evm --input #{input} --codefile #{codefile} run").strip
+  result = result.to_i(16) if result.start_with? '0x'
+  result
+end
+
 def run_test(source)
   puts "Run tests for: #{source}" if options.verbose
   runs = collect_runs(source)
@@ -75,7 +89,7 @@ def run_test(source)
   codefile = "#{basename}.evm_h"
 
   unless options.no_compile
-    clang_cmd = "#{bindir}/ecc -target evm #{source} -o #{codefile} "
+    clang_cmd = "#{bindir}/ecc #{source} -o #{codefile} "
     clang_cmd += ' -v ' if options.verbose
     # Uncomment to disable llvm optimizations
     #clang_cmd += ' -Xclang -disable-llvm-passes '
@@ -84,7 +98,9 @@ def run_test(source)
     clang_cmd += ' -DNDEBUG '
     clang_cmd += ' -Xlinker --no-ctor ' if options.no_ctor
     clang_cmd += " -Xlinker #{options.linker_args}" if options.linker_args
-    clang_cmd += ' ' + options.clang_args if options.clang_args
+    clang_cmd += " #{options.clang_args}" if options.clang_args
+    clang_cmd += " -nostdlib" if options.no_stdlib
+    clang_cmd += " -save-temps" if options.save_temps
 
     command(clang_cmd)
   end
@@ -108,8 +124,7 @@ def run_test(source)
     mask = (1 << 256) - 1
     input += test_run.input.map{|x| "%064x" % (x & mask) }.join if test_run.input
 
-    result = command("evm --input #{input} --codefile #{codefile} run").strip
-    result = result.to_i(16) if result.start_with? '0x'
+    result = run_vm(codefile, input)
     if test_run.result && test_run.result != result
       if options.debug
         result = command("evm -debug --gas 1000000 --input #{input} --codefile #{codefile} run")

@@ -55,8 +55,6 @@ exit1:
     JUMPDEST
     POP
     POP
-    # TODO: We should return proper value, i.e. mem address
-    #POP
     SWAP1
     JUMP
 
@@ -77,29 +75,8 @@ head2:
     PUSH4   exit2
     JUMPI
 
-    # Exit if count is not mod of 32
-    PUSH1 32
-    DUP4
-    MOD
-    PUSH1 0
-    EQ
-    PUSH4   skip_align
-    JUMPI
-
-    # Align size to 32
-    DUP3
-    PUSH1 32
-    ADD
-    PUSH8 0xffffffffffffffe0
-    AND
-    SWAP3
-    POP
-
-skip_align:
-    JUMPDEST
-
     # Decrease count variable
-    PUSH1 32
+    PUSH1 1
     DUP4
     SUB
     SWAP3
@@ -107,20 +84,20 @@ skip_align:
 
     # Copy memory
     DUP2     # src
-    MLOAD
+    MLOAD8
     DUP2     # dst
-    MSTORE
+    MSTORE8
 
     # Increase dst memory variable
     DUP1
-    PUSH1 32
+    PUSH1 1
     ADD
     SWAP1
     POP
 
     # Increase src memory variable
     DUP2
-    PUSH1 32
+    PUSH1 1
     ADD
     SWAP2
     POP

@@ -30,6 +30,7 @@
 #include <unordered_set>
 #include <vector>
 #include <set>
+#include "llvm/ADT/APInt.h"
 
 struct EvmSymbol;
 
@@ -155,7 +156,13 @@ struct Global : public EvmSymbol {
   Kind getKind() const override {
     return Kind::Global;
   }
-  std::vector<llvm::APInt> InitData;
+  void addInt(const llvm::APInt& V) {
+    for (int i = V.getBitWidth() / CHAR_BIT - 1; i >= 0; i--) {
+      InitData.push_back(reinterpret_cast<const uint8_t*>(V.getRawData())[i]);
+    }
+  }
+
+  std::vector<uint8_t> InitData;
 };
 
 class SymbolManager {
@@ -180,5 +187,11 @@ public:
 private:
   std::vector<std::unique_ptr<EvmSymbol>> Symbols;
 };
+
+inline std::ostream& operator<<(std::ostream& os, const Relocation& rel) {
+  os << "Relocation " << (rel.Space == Relocation::SpaceKind::Code ? "[code]: " : "[data]: ");
+  os << "target=" << rel.TargetSymbol->Name << ", offset=" << rel.Offset << ", size=" << rel.Size;
+  return os;
+}
 
 #endif // LLVM_EVM_SYMBOLS_H

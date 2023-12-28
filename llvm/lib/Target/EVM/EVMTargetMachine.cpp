@@ -31,7 +31,6 @@ extern "C" void LLVMInitializeEVMTarget() {
   auto PR = PassRegistry::getPassRegistry();
 
   initializeEVMConvertRegToStackPass(*PR);
-  initializeEVMVRegToMemPass(*PR);
   initializeEVMShrinkpushPass(*PR);
   initializeEVMArgumentMovePass(*PR);
   initializeEVMExpandPseudosPass(*PR);
@@ -125,11 +124,7 @@ void EVMPassConfig::addPreEmitPass() {
   addPass(createEVMOptimizePushPass());
 
   //  This is the major pass we will use to stackify registers
-#if USE_NEW_STACK_ALLOC
   addPass(createEVMStackAllocationPass());
-#else
-  addPass(createEVMStackAllocPass());
-#endif
 
   // We use a custom pass to expand pseudos at a later pahse
   addPass(createEVMExpandPseudos());

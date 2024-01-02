@@ -1644,6 +1644,11 @@ Constant *llvm::ConstantFoldCompareInstruction(CmpInst::Predicate Predicate,
     const APFloat &C1V = cast<ConstantFP>(C1)->getValueAPF();
     const APFloat &C2V = cast<ConstantFP>(C2)->getValueAPF();
     return ConstantInt::get(ResultTy, FCmpInst::compare(C1V, C2V, Predicate));
+  } else if (isa<ConstantField>(C1) && isa<ConstantField>(C2)) {
+    const APInt &V1 = cast<ConstantField>(C1)->getValue();
+    const APInt &V2 = cast<ConstantField>(C2)->getValue();
+    // TODO(maksenov): maybe add field-specific logic to comparison
+    return ConstantInt::get(ResultTy, ICmpInst::compare(V1, V2, Predicate));
   } else if (auto *C1VTy = dyn_cast<VectorType>(C1->getType())) {
 
     // Fast path for splatted constants.

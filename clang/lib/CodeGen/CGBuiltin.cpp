@@ -18840,8 +18840,16 @@ Value *CodeGenFunction::EmitWebAssemblyBuiltinExpr(unsigned BuiltinID,
 
 Value *CodeGenFunction::EmitEVMBuiltinExpr(unsigned BuiltinID,
                                                    const CallExpr *E) {
-  llvm_unreachable("unexpected builtin ID");
   switch (BuiltinID) {
+  case EVM::BI__builtin_evm_printf: {
+    Function *Callee = CGM.getIntrinsic(Intrinsic::evm_printf);
+    SmallVector<llvm::Value*, 5> Ops;
+    for (auto arg : E->arguments()) {
+      Ops.push_back(EmitScalarExpr(arg));
+    }
+    auto Call = Builder.CreateCall(Callee, Ops);
+    return Call;
+  }
   default:
     return nullptr;
   }

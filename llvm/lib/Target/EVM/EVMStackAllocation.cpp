@@ -198,7 +198,7 @@ void EVMStackAllocation::handleOperands(MachineInstr &MI) {
 
 void EVMStackAllocation::handleArbitraryOperands(MachineInstr &MI,
                                                  unsigned NumOperands) {
-  LLVM_DEBUG(errs() << "Multiple arguments pattern");
+  LLVM_DEBUG(errs() << "Multiple arguments pattern\n");
   SeenRegisters.clear();
   SmallVector<unsigned, 8> Indexes;
   Indexes.resize(NumOperands);
@@ -234,7 +234,6 @@ void EVMStackAllocation::handleArbitraryOperands(MachineInstr &MI,
 }
 
 void EVMStackAllocation::executeInstruction(MachineInstr &MI) {
-  LLVM_DEBUG(TheStack.dump());
   for (const MachineOperand &MOP : MI.explicit_uses()) {
     if (!MOP.isReg()) {
       continue;

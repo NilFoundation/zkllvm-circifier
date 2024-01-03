@@ -22,9 +22,7 @@
 // SOFTWARE.
 //---------------------------------------------------------------------------//
 
-#include "evm_builder.h"
-#include "evm_opcodes.h"
-#include "evm_file.h"
+#include "evm_linker.h"
 #include "nil/crypto3/hash/algorithm/hash.hpp"
 #include "nil/crypto3/hash/keccak.hpp"
 #include "llvm/Object/Archive.h"
@@ -54,9 +52,6 @@ static cl::opt<bool> BinaryOutput("binary-output",
 static cl::opt<bool> KeepUnused("keep-unused",
                                 cl::desc("Keep unused symbols in result file"),
                                 llvm::cl::init(false));
-static cl::opt<bool> OptVerbose("verbose",
-                                cl::desc("Verbose output"),
-                                llvm::cl::init(false));
 static cl::opt<bool> MakeArchive("make-archive",
                                  cl::desc("Compose input files into an archive,"
                                           " without linking"),
@@ -68,38 +63,6 @@ static cl::opt<unsigned> StackAlignment("stack-align",
 static std::unique_ptr<ToolOutputFile> OpenOutputFile(std::string_view Path);
 static void WriteDataToStream(raw_fd_ostream& OS, const void* Data, size_t Size);
 
-class EvmLinker {
-public:
-  int run();
-
-  void collectFilesInfo();
-
-  void buildDispatcher();
-
-  void buildConstructor();
-
-  void removeUnreachable();
-
-  void resolve(bool CheckReachable);
-
-  void readArchive(std::unique_ptr<object::Archive> Archive,
-                   std::string_view FileName,
-                   std::vector<std::unique_ptr<EvmFile>>& Files);
-
-  void emit();
-
-  int emitArchive();
-
-private:
-  evm::Builder Dispatcher;
-  evm::Builder Constructor;
-  std::vector<std::unique_ptr<EvmFile>> Files;
-  std::vector<uint8_t> InitData;
-  SymbolMap SymMap;
-  SymbolManager SymManager;
-  unsigned GlobalsSectionSize{0};
-  unsigned CodeSize{0};
-};
 
 int EvmLinker::run() {
   if (MakeArchive) {
@@ -107,23 +70,22 @@ int EvmLinker::run() {
   }
   Files.reserve(InputFilenames.size());
   for (auto& InputFile : InputFilenames) {
-    {
-      // At first, check that the file is an archive file, if so, unpack it and process all its containing files.
-      if (auto Buf = MemoryBuffer::getFile(InputFile, false, false); Buf) {
-        if (Buf.get()->getBuffer().startswith(object::ArchiveMagic)) {
-          Expected<std::unique_ptr<object::Archive>> ArchiveOrError =
-              object::Archive::create(Buf.get()->getMemBufferRef());
-          if (!ArchiveOrError) {
-            std::string Message;
-            handleAllErrors(ArchiveOrError.takeError(),
-                            [&](ErrorInfoBase &EIB) {
-              Message = EIB.message();
-            });
-            report_fatal_error(Twine("Read archive failed: ") + Message);
-          }
-          readArchive(std::move(ArchiveOrError.get()), InputFile, Files);
-          continue;
+    // At first, check that the file is an archive file, if so, unpack it and
+    // process all its containing files.
+    if (auto Buf = MemoryBuffer::getFile(InputFile, false, false); Buf) {
+      if (Buf.get()->getBuffer().startswith(object::ArchiveMagic)) {
+        Expected<std::unique_ptr<object::Archive>> ArchiveOrError =
+            object::Archive::create(Buf.get()->getMemBufferRef());
+        if (!ArchiveOrError) {
+          std::string Message;
+          handleAllErrors(ArchiveOrError.takeError(),
+                          [&](ErrorInfoBase &EIB) {
+            Message = EIB.message();
+          });
+          report_fatal_error(Twine("Read archive failed: ") + Message);
         }
+        readArchive(std::move(ArchiveOrError.get()), InputFile, Files);
+        continue;
       }
     }
 
@@ -133,6 +95,14 @@ int EvmLinker::run() {
       return 1;
     }
     Files.push_back(std::move(File));
+  }
+
+  for (auto& Func : functions()) {
+    if (Func.GlobalInit) {
+      assert(GlobalInitFunc == nullptr &&
+             "Only one global init function allowed");
+      GlobalInitFunc = &Func;
+    }
   }
 
   buildDispatcher();
@@ -247,6 +217,16 @@ void EvmLinker::buildDispatcher() {
   Dispatcher.inst(opcodes::LT);
   Dispatcher.push("fail");
   Dispatcher.inst(opcodes::JUMPI);
+
+  if (GlobalInitFunc != nullptr) {
+    Dispatcher.push("global_init_func");
+    Dispatcher.inst(opcodes::PUSH1, 4);
+    Dispatcher.inst(opcodes::PC);
+    Dispatcher.inst(opcodes::ADD);
+    Dispatcher.inst(opcodes::SWAP1);
+    Dispatcher.inst(opcodes::JUMP);
+    Dispatcher.inst(opcodes::JUMPDEST);
+  }
 
   // Load callee function's hash
   Dispatcher.inst(opcodes::PUSH1, 0);
@@ -374,6 +354,9 @@ void EvmLinker::resolve(bool CheckReachable) {
                           CodeSize + Dispatcher.size());
   Dispatcher.resolveFixup("init_data_mem_offset", InitDataOffset);
   Dispatcher.resolveFixup("stack_start", GlobalsSectionSize);
+  if (GlobalInitFunc != nullptr) {
+    Dispatcher.resolveFixup("global_init_func", GlobalInitFunc->Offset);
+  }
   if (!NoCtor) {
     Constructor.resolveFixup("codesize", CodeSize + Dispatcher.size());
   }
@@ -383,10 +366,8 @@ void EvmLinker::resolve(bool CheckReachable) {
 /// are the symbols, that have `evm` attribute.
 void EvmLinker::removeUnreachable() {
   if (KeepUnused) {
-    for (auto& File : Files) {
-      for (auto &Func : File->getFunctions()) {
-        Func->Reachable = true;
-      }
+    for (auto &Func : functions()) {
+      Func.Reachable = true;
     }
     return;
   }
@@ -394,11 +375,9 @@ void EvmLinker::removeUnreachable() {
   for (auto& File : Files) {
     File->buildDepGraph(DepGraph);
   }
-  for (auto& File : Files) {
-    for (auto &Func : File->getFunctions()) {
-      if (Func->Visible) {
-        DepGraph.markReachable(Func.get());
-      }
+  for (auto &Func : functions()) {
+    if (Func.isLeaf()) {
+      DepGraph.markReachable(&Func);
     }
   }
   for (auto& File : Files) {
@@ -469,16 +448,14 @@ void EvmLinker::emit() {
     });
 
     JsonInfo.attributeObject("functions", [&]() {
-      for (auto &File : Files) {
-        for (auto &Func : File->getFunctions()) {
-          JsonInfo.attributeObject(Func->Name, [&]() {
-            JsonInfo.attribute("symbol", Func->Name);
-            JsonInfo.attribute("name", Func->DemangledName);
-            JsonInfo.attribute("offset", Func->Offset);
-            JsonInfo.attribute("size", Func->Size);
-            JsonInfo.attribute("hash", getFuncHash(Func.get()));
-          });
-        }
+      for (auto &Func : functions()) {
+        JsonInfo.attributeObject(Func.Name, [&]() {
+          JsonInfo.attribute("symbol", Func.Name);
+          JsonInfo.attribute("name", Func.DemangledName);
+          JsonInfo.attribute("offset", Func.Offset);
+          JsonInfo.attribute("size", Func.Size);
+          JsonInfo.attribute("hash", getFuncHash(&Func));
+        });
       }
       JsonInfo.attributeObject("__dispatcher__", [&]() {
         JsonInfo.attribute("symbol", "__dispatcher__");
@@ -533,8 +510,6 @@ void EvmLinker::emit() {
         });
       }
     });
-
-
     JsonInfo.objectEnd();
   }
 }
@@ -560,10 +535,4 @@ static void WriteDataToStream(raw_fd_ostream& OS, const void* Data, size_t Size)
     LOG() << "Size=" << Size << '\n';
     OS.write(reinterpret_cast<char*>(HexData.data()), HexData.size());
   }
-}
-
-int main(int argc, char **argv) {
-  cl::ParseCommandLineOptions(argc, argv, "Link EVM compiled files\n");
-  Logger::Enabled = OptVerbose;
-  return EvmLinker().run();
 }

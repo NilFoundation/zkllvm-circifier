@@ -6,6 +6,7 @@ set(LLVM_LINK_COMPONENTS
 add_definitions("-Wno-gnu-zero-variadic-macro-arguments")
 
 add_llvm_tool(evm-linker
+  main.cpp
   evm_builder.cpp
   evm_file.cpp
   evm_linker.cpp

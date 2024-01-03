@@ -66,7 +66,87 @@ public:
                                         SMLoc &StartLoc,
                                         SMLoc &EndLoc) override;
 
+  void Initialize(MCAsmParser &P) override {
+    // Call the base implementation.
+    this->MCAsmParserExtension::Initialize(P);
+
+    addDirectiveHandler<&EVMAsmParser::parseSectionDirectiveText>(".text");
+    addDirectiveHandler<&EVMAsmParser::parseSectionDirectiveData>(".data");
+    addDirectiveHandler<&EVMAsmParser::parseDirectiveSize>(".size");
+    addDirectiveHandler<&EVMAsmParser::parseDirectiveType>(".type");
+  }
+
 private:
+  template<bool (EVMAsmParser::*HandlerMethod)(StringRef, SMLoc)>
+  void addDirectiveHandler(StringRef Directive) {
+    MCAsmParser::ExtensionDirectiveHandler Handler = std::make_pair(
+        this, HandleDirective<EVMAsmParser, HandlerMethod>);
+    getParser().addDirectiveHandler(Directive, Handler);
+  }
+
+  bool parseSectionDirectiveText(StringRef, SMLoc) {
+    auto *S = getContext().getObjectFileInfo()->getTextSection();
+    getStreamer().switchSection(S);
+    return false;
+  }
+
+  bool parseSectionDirectiveData(StringRef, SMLoc) {
+    auto *S = getContext().getObjectFileInfo()->getDataSection();
+    getStreamer().switchSection(S);
+    return false;
+  }
+
+  bool parseDirectiveSize(StringRef, SMLoc) {
+    StringRef Name;
+    if (Parser.parseIdentifier(Name))
+      return TokError("expected identifier in directive");
+    auto Sym = getContext().getOrCreateSymbol(Name);
+    if (expectToken(AsmToken::Comma, ","))
+      return true;
+    const MCExpr *Expr;
+    if (Parser.parseExpression(Expr))
+      return true;
+    if (expectToken(AsmToken::EndOfStatement, "eol"))
+      return true;
+    // This is done automatically by the assembler for functions currently,
+    // so this is only currently needed for data sections:
+    getStreamer().emitELFSize(Sym, Expr);
+    return false;
+  }
+  
+  bool parseDirectiveType(StringRef, SMLoc) {
+    // This could be the start of a function, check if followed by
+    // "label,@function"
+    if (!Lexer.is(AsmToken::Identifier))
+      return error("Expected label after .type directive, got: ",
+                   Lexer.getTok());
+    auto Sym = cast<MCSymbolEVM>(
+        getStreamer().getContext().getOrCreateSymbol(
+            Lexer.getTok().getString()));
+    Lex();
+    if (!(isNext(AsmToken::Comma) && isNext(AsmToken::At) &&
+          Lexer.is(AsmToken::Identifier)))
+      return error("Expected label,@type declaration, got: ", Lexer.getTok());
+    auto TypeName = Lexer.getTok().getString();
+    if (TypeName == "function") {
+      Sym->setKind(MCSymbolEVM::KindFunction);
+      auto Section = (getStreamer().getCurrentSectionOnly());
+      auto& Fragment =
+          cast<MCDataFragment>(*Section->getFragmentList().begin());
+      Sym->setOffset(Fragment.getContents().size());
+      if (CurrentFunctionSym != nullptr) {
+        CurrentFunctionSym->setSize(Fragment.getContents().size() -
+                                    CurrentFunctionSym->getOffset());
+      }
+      CurrentFunctionSym = Sym;
+    } else if (TypeName == "object") {
+      Sym->setKind(MCSymbolEVM::KindGlobalValue);
+    } else
+      return error("Unknown EVM symbol type: ", Lexer.getTok());
+    Lex();
+    return expectToken(AsmToken::EndOfStatement, "EOL");
+  }
+
   MCAsmParser &getParser() const { return Parser; }
   MCAsmLexer &getLexer() const { return Lexer; }
 
@@ -104,6 +184,19 @@ private:
     return Parser.Error(Tok.getLoc(), Msg + Tok.getString());
   }
 
+  bool isNext(AsmToken::TokenKind Kind) {
+    auto Ok = Lexer.is(Kind);
+    if (Ok)
+      Lex();
+    return Ok;
+  }
+
+  bool expectToken(AsmToken::TokenKind Kind, const char *KindName) {
+    if (!isNext(Kind))
+      return error(std::string("Expected ") + KindName + ", instead got: ",
+                   Lexer.getTok());
+    return false;
+  }
 };
 
 /// An parsed EVM assembly operand.
@@ -288,43 +381,12 @@ bool EVMAsmParser::ParseSignature(SmallVectorImpl<EVM::ValType>& Types) {
 }
 
 bool EVMAsmParser::ParseDirective(AsmToken DirectiveID) {
-  if (DirectiveID.getString() == ".globl") {
-    auto SymName = expectIdent();
-    if (SymName.empty())
-      return true;
-    auto Sym = cast<MCSymbolEVM>(getContext().getOrCreateSymbol(SymName));
-    Sym->setKind(MCSymbolEVM::KindFunction);
-    Sym->setHidden(false);
-  } else if (DirectiveID.getString() == ".hidden") {
+  if (DirectiveID.getString() == ".hidden") {
     auto SymName = expectIdent();
     if (SymName.empty())
       return true;
     auto Sym = cast<MCSymbolEVM>(getContext().getOrCreateSymbol(SymName));
     Sym->setHidden(true);
-  } else if (DirectiveID.getString() == ".type") {
-    auto SymName = expectIdent();
-    if (SymName.empty())
-      return true;
-    auto Sym = cast<MCSymbolEVM>(getContext().getOrCreateSymbol(SymName));
-    if (!Lexer.is(AsmToken::Comma)) {
-      return error("Expected comma: ", Lexer.getTok());
-    }
-    Parser.Lex();
-    auto Type = expectIdent();
-    if (Type == "function") {
-      Sym->setKind(MCSymbolEVM::KindFunction);
-      auto Section = (getStreamer().getCurrentSectionOnly());
-      auto& Fragment =
-          cast<MCDataFragment>(*Section->getFragmentList().begin());
-      Sym->setOffset(Fragment.getContents().size());
-      if (CurrentFunctionSym != nullptr) {
-        CurrentFunctionSym->setSize(Fragment.getContents().size() -
-                                    CurrentFunctionSym->getOffset());
-      }
-      CurrentFunctionSym = Sym;
-    } else {
-      return error("Unsupported symbol type: ", Lexer.getTok());
-    }
   } else if (DirectiveID.getString() == ".functype") {
     auto SymName = expectIdent();
     if (SymName.empty())
@@ -336,9 +398,6 @@ bool EVMAsmParser::ParseDirective(AsmToken DirectiveID) {
     Parser.Lex();
     if (ParseSignature(Sym))
       return true;
-  } else if (DirectiveID.getString() == ".weak") {
-    expectIdent();
-    return false;
   }
   return true;
 }

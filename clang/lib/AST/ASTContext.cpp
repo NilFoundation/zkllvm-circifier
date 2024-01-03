@@ -1900,16 +1900,7 @@ static getConstantArrayInfoInChars(const ASTContext &Context,
   assert((Size == 0 || static_cast<uint64_t>(EltInfo.Width.getQuantity()) <=
               (uint64_t)(-1)/Size) &&
          "Overflow in array type char size evaluation");
-  // EVM_BEGIN
-  uint64_t Width;
-  if (Context.getCXXABIKind() == clang::TargetCXXABI::EVM) {
-    // We must align size of each element to 256-bits word.
-    Width = llvm::alignTo(EltInfo.Width.getQuantity(),
-                          EltInfo.Align.getQuantity()) * Size;
-  } else {
-    Width = EltInfo.Width.getQuantity() * Size;
-  }
-  // EVM_END
+  uint64_t Width = EltInfo.Width.getQuantity() * Size;
   unsigned Align = EltInfo.Align.getQuantity();
   if (!Context.getTargetInfo().getCXXABI().isMicrosoft() ||
       Context.getTargetInfo().getPointerWidth(0) == 64)
@@ -2019,11 +2010,8 @@ TypeInfo ASTContext::getTypeInfoImpl(const Type *T) const {
     Width = EltInfo.Width * Size;
     Align = EltInfo.Align;
     AlignRequirement = EltInfo.AlignRequirement;
-    // EVM_BEGIN
     if ((!getTargetInfo().getCXXABI().isMicrosoft() ||
-        getTargetInfo().getPointerWidth(0) == 64) &&
-        getCXXABIKind() != TargetCXXABI::EVM)
-      // EVM_BEND
+        getTargetInfo().getPointerWidth(0) == 64))
       Width = llvm::alignTo(Width, Align);
     break;
   }

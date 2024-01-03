@@ -121,6 +121,8 @@ void EVMExpandPseudos::expandLOCAL(MachineInstr* MI) const {
 
   //# TODO: improve this
   unsigned fiSize = this->MF->getFrameInfo().getStackSize();
+  // Stack allocation uses 256-bits slots, so we need to align frame size up
+  fiSize = alignTo(fiSize, 32);
 
   BuildMI(*MBB, MI, DL, TII->get(EVM::PUSH32_r), reg)
       .addImm(ST->getFramePointer());

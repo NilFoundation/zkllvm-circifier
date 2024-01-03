@@ -156,6 +156,15 @@ uint64_t EVMBinaryObjectWriter::writeObject(MCAssembler &Asm,
   Json.arrayEnd();
   Json.attributeEnd();
 
+  /**
+   * Format of the data elements:
+   * - u<size>:<number> - integer value with width of `size` bytes and `value`
+   *   as a decimal number
+   * - u<size>:@<symbol> - symbol, where `size` is a size of occupied data,
+   *   `symbol` is a name of symbol to be relocated in the linker
+   * - fill.<size>:value - fill `size` bytes by `value`
+   * - bytes:<data> - blob of data, where `data` is a bytes in hex string
+   */
   auto DataSection = Asm.getContext().getEVMSection(".data");
   if (!DataSection->getGlobals().empty()) {
     Json.attributeArray("globals", [&] {
@@ -164,33 +173,35 @@ uint64_t EVMBinaryObjectWriter::writeObject(MCAssembler &Asm,
         Json.attribute("name", Global.Symbol->getName());
         Json.attribute("size", Global.Size);
         Json.attributeArray("data", [&] {
-          for (auto i = Global.DataIndex; i < Global.DataIndex + Global.DataCount; i++) {
-            auto& Data = DataSection->getGlobalsData(i);
+          for (auto& Data : Global.Data) {
+            std::stringstream SS;
             if (Data.isValue()) {
-              auto& Value = DataSection->getGlobalsData(i).getValue();
-              if (Data.isBigValue()) {
-                SmallString<80> Str;
-                Value.toStringUnsigned(Str, 16);
-                Json.value(Str);
-              } else {
-                Json.value(Value.getLimitedValue());
-              }
+              auto& Value = Data.getValue();
+              SS << 'u' << Value.getBitWidth() / CHAR_BIT << ':';
+              SmallString<80> SVal;
+              Value.toStringUnsigned(SVal);
+              SS << (std::string)SVal;
             } else if (Data.isExpression()) {
+              SS << "u8:";
               if (auto SymExpr = dyn_cast<MCSymbolRefExpr>(
-                  DataSection->getGlobalsData(i).getExpression())) {
-                auto Value = std::string("@") + SymExpr->getSymbol().getName().str();
-                Json.value(Value);
+                  Data.getExpression())) {
+                SS << '@' << SymExpr->getSymbol().getName().str();
               } else if (auto SymExpr = dyn_cast<MCBinaryExpr>(
-                             DataSection->getGlobalsData(i).getExpression())) {
+                             Data.getExpression())) {
                 std::string Str;
                 raw_string_ostream OS(Str);
-                OS << '@';
                 SymExpr->print(OS, nullptr);
-                Json.value(Str);
+                SS << '@' << OS.str();
               }
+            } else if (Data.isFill()) {
+              auto F = Data.getFill();
+              SS << "fill." << F.NumBytes << ':' << F.Value;
+            } else if (Data.isBytes()) {
+              SS << "bytes:" << toHex(ArrayRef(Data.getBytes()), true);
             } else {
               llvm_unreachable("Unexpected global value kind");
             }
+            Json.value(SS.str());
           }
         });
         Json.objectEnd();

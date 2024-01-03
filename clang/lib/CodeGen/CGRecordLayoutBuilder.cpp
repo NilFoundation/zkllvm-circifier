@@ -290,10 +290,6 @@ void CGRecordLowering::lower(bool NVBaseType) {
     accumulateVPtrs();
     accumulateBases();
     if (Members.empty()) {
-      // EVM_BEGIN
-      if (Context.getCXXABIKind() == clang::TargetCXXABI::EVM && !Size.isZero())
-        Size = CharUnits::One();
-      // EVM_END
       appendPaddingBytes(Size);
       computeVolatileBitfields();
       return;
@@ -815,22 +811,9 @@ void CGRecordLowering::insertPadding() {
   // Add the padding to the Members list and sort it.
   for (std::vector<std::pair<CharUnits, CharUnits> >::const_iterator
         Pad = Padding.begin(), PadEnd = Padding.end();
-        Pad != PadEnd; ++Pad) {
-    // EVM_BEGIN
-    if (Context.getCXXABIKind() == clang::TargetCXXABI::EVM) {
-      // For EVM backend we must take into account, that one byte occupies
-      // 32 bytes. Hence, we need to add padding array with size 32 times lower.
-      auto CharAlign = Context.toCharUnitsFromBits(
-                       Context.getTargetInfo().getCharAlign());
-      CharUnits Count = Pad->second / CharAlign.getQuantity();
-      if (Count.isZero())
-        Count = CharUnits::One();
-      Members.push_back(StorageInfo(Pad->first, getByteArrayType(Count)));
-    } else {
+        Pad != PadEnd; ++Pad)
       Members.push_back(StorageInfo(Pad->first, getByteArrayType(Pad->second)));
-    }
-    // EVM_END
-  }
+
   llvm::stable_sort(Members);
 }
 
@@ -948,13 +931,6 @@ CodeGenTypes::ComputeRecordLayout(const RecordDecl *D, llvm::StructType *Ty) {
 
   uint64_t TypeSizeInBits = getContext().toBits(Layout.getSize());
 
-  // EVM_BEGIN
-  if (getContext().getCXXABIKind() == TargetCXXABI::EVM) {
-    TypeSizeInBits =
-        llvm::alignTo(TypeSizeInBits, getTarget().getPointerAlign(0));
-  }
-  // EVM_END
-
   assert(TypeSizeInBits == getDataLayout().getTypeAllocSizeInBits(Ty) &&
          "Type size mismatch!");
 
@@ -963,13 +939,6 @@ CodeGenTypes::ComputeRecordLayout(const RecordDecl *D, llvm::StructType *Ty) {
 
     uint64_t AlignedNonVirtualTypeSizeInBits =
       getContext().toBits(NonVirtualSize);
-
-    // EVM_BEGIN
-    if (getContext().getCXXABIKind() == TargetCXXABI::EVM) {
-      AlignedNonVirtualTypeSizeInBits = llvm::alignTo(
-          AlignedNonVirtualTypeSizeInBits, getTarget().getPointerAlign(0));
-    }
-    // EVM_END
 
     assert(AlignedNonVirtualTypeSizeInBits ==
            getDataLayout().getTypeAllocSizeInBits(BaseTy) &&

@@ -78,9 +78,7 @@ void MCEVMStreamer::emitIntValue(uint64_t Value, unsigned Size) {
   LOG() << "emitIntValue: " << Value << ", size=" << Size << '\n';
   auto Section = static_cast<MCSectionEVM*>(getCurrentSectionOnly());
   if (Section->getKind().isData()) {
-    Section->addGlobalsData(Value);
-    auto& CurGlobal = Section->getGlobals().back();
-    CurGlobal.DataCount = Section->getGlobalsDataSize() - CurGlobal.DataIndex;
+    Section->addGlobalsData(APInt(Size * CHAR_BIT, Value));
   }
 }
 
@@ -88,22 +86,13 @@ void MCEVMStreamer::emitIntValue(APInt Value) {
   auto Section = static_cast<MCSectionEVM*>(getCurrentSectionOnly());
   if (Section->getKind().isData()) {
     Section->addGlobalsData(Value);
-    auto& CurGlobal = Section->getGlobals().back();
-    CurGlobal.DataCount = Section->getGlobalsDataSize() - CurGlobal.DataIndex;
-    LOG() << Section->getGlobalsDataSize() << " emitAPIntValue\n";
   }
 }
 
 void MCEVMStreamer::emitBytes(StringRef Data) {
   auto Section = static_cast<MCSectionEVM*>(getCurrentSectionOnly());
   assert (Section->getKind().isData());
-  LOG() << Section->getGlobalsDataSize() << " emitBytes: size=" << Data.size()
-        << '\n';
-  auto& CurGlobal = Section->getGlobals().back();
-  for (auto Ch : Data) {
-    Section->addGlobalsData(static_cast<unsigned>(Ch));
-  }
-  CurGlobal.DataCount = Section->getGlobalsDataSize() - CurGlobal.DataIndex;
+  Section->emitBytes(Data);
 }
 
 void MCEVMStreamer::emitValueImpl(const MCExpr *Value, unsigned Size,
@@ -116,21 +105,10 @@ void MCEVMStreamer::emitValueImpl(const MCExpr *Value, unsigned Size,
       break;
     case MCExpr::SymbolRef: {
       Section->addGlobalsData(Value);
-      auto& CurGlobal = Section->getGlobals().back();
-      CurGlobal.DataCount = Section->getGlobalsDataSize() - CurGlobal.DataIndex;
-      LOG() << Section->getGlobalsDataSize() << " emit Symbol: "
-            << dyn_cast<MCSymbolRefExpr>(Value)->getSymbol().getName().data()
-            << ", size=" << Size << '\n';
       break;
     }
     case MCExpr::Binary: {
       Section->addGlobalsData(Value);
-      auto& CurGlobal = Section->getGlobals().back();
-      CurGlobal.DataCount = Section->getGlobalsDataSize() - CurGlobal.DataIndex;
-      LOG() << Section->getGlobalsDataSize() << " emit Binary: ";
-#if VERBOSE
-      Value->dump();
-#endif
       break;
     }
     default:
@@ -145,19 +123,9 @@ void MCEVMStreamer::emitFill(const MCExpr &NumBytes, uint64_t FillValue,
   int64_t NumBytesValue;
   if (!NumBytes.evaluateAsAbsolute(NumBytesValue))
     report_fatal_error("Invalid expression for emitFill");
-  if (NumBytesValue == 0)
-    return;
-  if (NumBytesValue < 32)
-    return;
-  LOG() << "emitFill: " << FillValue << ", size=" << NumBytesValue << '\n';
-  if (NumBytesValue < 32) {
-    NumBytesValue = alignTo(NumBytesValue, 32);
-  }
-  assert((NumBytesValue % 32) == 0 && "Only 32 bytes chunk supported");
-
-  for (int i = 0; i < NumBytesValue; i += 32) {
-    emitIntValue(FillValue, 32);
-  }
+  auto Section = static_cast<MCSectionEVM*>(getCurrentSectionOnly());
+  assert (Section->getKind().isData());
+  Section->emitFill(NumBytesValue,FillValue);
 }
 
 void MCEVMStreamer::changeSection(MCSection *Section,

@@ -109,6 +109,7 @@ public:
 
 private:
   Function* getFunctionByOffset(unsigned Offset);
+  void loadGlobals(llvm::json::Object* Data);
 
 private:
   std::string FileName;

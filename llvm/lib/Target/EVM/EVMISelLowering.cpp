@@ -37,7 +37,7 @@ using namespace llvm;
 #define DEBUG_TYPE "evm-lower"
 
 EVMTargetLowering::EVMTargetLowering(const TargetMachine &TM,
-                                         const EVMSubtarget &STI)
+                                     const EVMSubtarget &STI)
     : TargetLowering(TM), Subtarget(STI) {
 
   // Legal register classes:
@@ -110,17 +110,19 @@ EVMTargetLowering::EVMTargetLowering(const TargetMachine &TM,
     setOperationAction(ISD::ExternalSymbol, VT, Custom);
     setOperationAction(ISD::BlockAddress, VT, Expand);
 
+    setOperationAction(ISD::FrameIndex, VT, Custom);
+    setOperationAction(ISD::TargetFrameIndex, VT, Custom);
+
     // FIXME: DYNAMIC_STACKALLOC
     setOperationAction(ISD::DYNAMIC_STACKALLOC, VT, Expand);
   }
   setOperationAction(ISD::BR_CC, MVT::i256, Custom);
   setOperationAction(ISD::BR_JT, MVT::Other, Expand);
 
-  // custom lowering the branch 
+  // custom lowering the branch
   setOperationAction(ISD::BRCOND, MVT::Other, Expand);
 
   setOperationAction(ISD::FrameIndex, MVT::i256, Custom);
-  setOperationAction(ISD::GlobalAddress, MVT::i256, Custom);
 
   setOperationAction(ISD::STACKSAVE, MVT::Other, Expand);
   setOperationAction(ISD::STACKRESTORE, MVT::Other, Expand);
@@ -145,7 +147,8 @@ EVMTargetLowering::EVMTargetLowering(const TargetMachine &TM,
     setLoadExtAction(ISD::SEXTLOAD, VT, MVT::i1,  Promote);
   }
 
-  setTargetDAGCombine({ISD::SIGN_EXTEND, ISD::ZERO_EXTEND, ISD::ANY_EXTEND});
+  setTargetDAGCombine({ISD::SIGN_EXTEND, ISD::ZERO_EXTEND, ISD::ANY_EXTEND,
+                       ISD::LOAD, ISD::STORE});
 }
 
 EVT EVMTargetLowering::getSetCCResultType(const DataLayout &DL, LLVMContext &,
@@ -197,11 +200,15 @@ static EVMISD::NodeType getReverseCmpOpcode(ISD::CondCode CC) {
 
 SDValue EVMTargetLowering::LowerFrameIndex(SDValue Op,
                                            SelectionDAG &DAG) const {
-    unsigned FI = cast<FrameIndexSDNode>(Op)->getIndex();
+  unsigned FI = cast<FrameIndexSDNode>(Op)->getIndex();
 
-    // Record the FI so that we know how many frame slots are allocated to
-    // frames.
-    return DAG.getTargetFrameIndex(FI, Op.getValueType());
+  // Record the FI so that we know how many frame slots are allocated to
+  // frames.
+  auto Res = DAG.getTargetFrameIndex(FI, {MVT::i256});
+  if (Op.getValueType().getSizeInBits() < 256) {
+    Res = DAG.getNode(ISD::TRUNCATE, SDLoc(Op), Op.getValueType(), Res);
+  }
+  return Res;
 }
 
 SDValue
@@ -217,10 +224,15 @@ EVMTargetLowering::LowerGlobalAddress(SDValue Op,
     llvm_unreachable("multiple address space unimplemented");
   }
 
-  return DAG.getNode(EVMISD::WRAPPER, DL, VT,
-                     DAG.getTargetGlobalAddress(GA->getGlobal(),
-                                                DL, VT,
-                                                GA->getOffset()));
+  auto Res = DAG.getNode(EVMISD::WRAPPER, DL, {MVT::i256},
+                         DAG.getTargetGlobalAddress(GA->getGlobal(),
+                                                    DL, {MVT::i256},
+                                                    GA->getOffset()));
+  if (VT.getSizeInBits() < 256) {
+    Res = DAG.getNode(ISD::TRUNCATE, SDLoc(Op), VT, Res);
+  }
+
+  return Res;
 }
 
 SDValue
@@ -228,12 +240,11 @@ EVMTargetLowering::LowerExternalSymbol(SDValue Op,
                                        SelectionDAG &DAG) const {
   SDLoc DL(Op);
   const auto *ES = cast<ExternalSymbolSDNode>(Op);
-  EVT VT = Op.getValueType();
   assert(ES->getTargetFlags() == 0 &&
          "Unexpected target flags on generic ExternalSymbolSDNode");
 
   return DAG.getNode(
-      EVMISD::WRAPPER, DL, VT,
+      EVMISD::WRAPPER, DL, MVT::i256,
       DAG.getTargetExternalSymbol(ES->getSymbol(), MVT::i256));
 }
 
@@ -278,7 +289,6 @@ SDValue EVMTargetLowering::LowerSELECT_CC(SDValue Op, SelectionDAG &DAG) const {
   SDLoc DL(Op);
 
   // Extend operands in case they are smaller than 256-bits.
-  // If we don't do this extension, Type Legalizing would fail.
   if (LHS.getValueType().getSizeInBits() < 256) {
     LHS = DAG.getNode(ISD::ZERO_EXTEND, SDLoc(LHS), {MVT::i256}, LHS);
   }
@@ -296,8 +306,6 @@ SDValue EVMTargetLowering::LowerSELECT_CC(SDValue Op, SelectionDAG &DAG) const {
 SDValue EVMTargetLowering::LowerSIGN_EXTEND(SDValue Op, SelectionDAG &DAG) const {
   SDValue Op0 = Op.getOperand(0);
   SDLoc dl(Op);
-  // TODO: probably we need to remove this assert
-  assert(Op.getValueType() == MVT::i256 && "Unhandled target sign_extend.");
 
   if (Op0.getValueType().getSizeInBits() < 256) {
     Op0 = DAG.getNode(ISD::ZERO_EXTEND, SDLoc(Op0), {MVT::i256}, Op0);
@@ -336,6 +344,10 @@ SDValue EVMTargetLowering::LowerOperation(SDValue Op,
     return LowerSELECT_CC(Op, DAG);
   case ISD::FrameIndex:
     return LowerFrameIndex(Op, DAG);
+  case ISD::TargetFrameIndex: {
+    auto FI = cast<FrameIndexSDNode>(Op)->getIndex();
+    return DAG.getTargetFrameIndex(FI, {MVT::i256});
+  }
   case ISD::SIGN_EXTEND:
   case ISD::SIGN_EXTEND_INREG:
     return LowerSIGN_EXTEND(Op, DAG);
@@ -648,7 +660,7 @@ SDValue EVMTargetLowering::LowerFormalArguments(
   // record the number of stack args.
   MFI->setNumStackArgs(Ins.size());
 
-  for (const ISD::InputArg &In __attribute__((unused)) : Ins) {
+  for ([[maybe_unused]] const ISD::InputArg &In : Ins) {
     SmallVector<SDValue, 4> Opnds;
 
     // (top) stackarg0(1st arg), stackarg1 (2nd arg), ... (bottom)
@@ -658,7 +670,7 @@ SDValue EVMTargetLowering::LowerFormalArguments(
     Opnds.push_back(idx);
 
     const SDValue &StackArg =
-       DAG.getNode(EVMISD::STACKARG, DL, MVT::i256, Opnds);
+        DAG.getNode(EVMISD::STACKARG, DL, In.VT, Opnds);
 
     InVals.push_back(StackArg);
   }
@@ -717,6 +729,10 @@ SDValue EVMTargetLowering::LowerCall(CallLoweringInfo &CLI,
   unsigned NumBytes = CCInfo.getNextStackOffset();
   auto PtrVT = getPointerTy(MF.getDataLayout());
   Chain = DAG.getCALLSEQ_START(Chain, NumBytes, 0, DL);
+
+  if (Callee.getValueType() != MVT::i256) {
+    Callee = DAG.getNode(ISD::ZERO_EXTEND, SDLoc(Callee), {MVT::i256}, Callee);
+  }
 
   // Compute the operands for the CALLn node.
   SmallVector<SDValue, 16> Ops;
@@ -842,11 +858,58 @@ Instruction *EVMTargetLowering::emitTrailingFence(IRBuilderBase &Builder,
 
 SDValue EVMTargetLowering::PerformDAGCombine(SDNode *N,
                   TargetLowering::DAGCombinerInfo &DCI) const {
-  if (N->getOpcode() == ISD::ZERO_EXTEND || N->getOpcode() == ISD::SIGN_EXTEND
-      || N->getOpcode() == ISD::ANY_EXTEND) {
+  switch (N->getOpcode()) {
+  case ISD::ZERO_EXTEND:
+  case ISD::SIGN_EXTEND:
+  case ISD::ANY_EXTEND:
     if (N->getValueSizeInBits(0) == N->getOperand(0).getValueSizeInBits()) {
       DCI.DAG.ReplaceAllUsesOfValueWith(SDValue(N, 0), N->getOperand(0));
     }
+    break;
+  case ISD::LOAD: {
+    LoadSDNode *LN = cast<LoadSDNode>(N);
+    SDValue Ptr = LN->getBasePtr();
+    SDValue Offset = LN->getOffset();
+    if (Ptr.getValueType().getSizeInBits() < 256) {
+      Ptr = DCI.DAG.getNode(ISD::ZERO_EXTEND, SDLoc(Ptr), {MVT::i256}, Ptr);
+    }
+    if (Offset.getValueType().getSizeInBits() < 256) {
+      Offset =
+          DCI.DAG.getNode(ISD::SIGN_EXTEND, SDLoc(Offset), {MVT::i256}, Offset);
+    }
+    SDValue Ch = LN->getChain();
+
+    auto Res = DCI.DAG.UpdateNodeOperands(N, Ch, Ptr, Offset);
+    if (Res != N) {
+      DCI.DAG.ReplaceAllUsesOfValueWith(SDValue(N, 0), SDValue(Res, 0));
+      DCI.DAG.ReplaceAllUsesOfValueWith(SDValue(N, 1), SDValue(Res, 1));
+    }
+    break;
+  }
+  case ISD::STORE: {
+    StoreSDNode *Store = cast<StoreSDNode>(N);
+    auto Ptr = Store->getBasePtr();
+    auto Offset = Store->getOffset();
+    auto Value = Store->getValue();
+    auto VT = Value.getValueType();
+    if (VT.getSizeInBits() < 256) {
+      Value = DCI.DAG.getNode(ISD::TRUNCATE, SDLoc(Value), VT, Value);
+    }
+    if (Offset.getValueType().getSizeInBits() < 256) {
+      Offset =
+          DCI.DAG.getNode(ISD::SIGN_EXTEND, SDLoc(Offset), {MVT::i256}, Offset);
+    }
+    if (Ptr.getValueType().getSizeInBits() < 256) {
+      Ptr = DCI.DAG.getNode(ISD::ZERO_EXTEND, SDLoc(Ptr), {MVT::i256}, Ptr);
+    }
+
+    auto Res = DCI.DAG.UpdateNodeOperands(Store, Store->getChain(), Value, Ptr,
+                                          Offset);
+    if (Res != N) {
+      DCI.DAG.ReplaceAllUsesOfValueWith(SDValue(N, 0), SDValue(Res, 0));
+    }
+    break;
+  }
   }
   return SDValue();
 }

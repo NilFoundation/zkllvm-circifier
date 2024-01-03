@@ -100,46 +100,7 @@ std::unique_ptr<EvmFile> EvmFile::Create(StringRef FileName,
             });
 
   // Load global variables/constants
-  if (auto Globals = JsonData->getArray("globals")) {
-    for (auto& V : *Globals) {
-      auto GObj = V.getAsObject();
-      auto G = std::make_unique<Global>();
-
-      G->Name = GObj->getString("name").value();
-      G->Size = GObj->getInteger("size").value();
-      if (auto Data = GObj->getArray("data")) {
-        assert(Data->size() * BytesInEvmWord == G->Size);
-        for (auto V : *Data) {
-          switch (V.kind()) {
-          case json::Value::Number:
-            G->InitData.emplace_back(BitsInEvmWord, V.getAsUINT64().value());
-            break;
-          case json::Value::String: {
-            auto Str = V.getAsString().value().str();
-            // All symbols are prepended by '@' symbol, otherwise it is a big
-            // integer, that will be parsed by APInt.
-            if (Str[0] == '@') {
-              unsigned Addend;
-              auto SymbolName = parseRelocSymbol(Str.substr(1), &Addend);
-              auto& Reloc = File->RelocationsMap[std::string(SymbolName)];
-              unsigned Offset = static_cast<unsigned>(G->InitData.size());
-              Reloc.push_back({G.get(), Addend, Offset, 4,
-                               Relocation::SpaceKind::InitData});
-              G->InitData.emplace_back(BitsInEvmWord, 0);
-            } else {
-              APInt Value(BitsInEvmWord, Str, 16);
-              G->InitData.push_back(Value);
-            }
-            break;
-          }
-          default:
-            llvm_unreachable("Unsupported type for globals data");
-          }
-        }
-      }
-      File->Globals.push_back(std::move(G));
-    }
-  }
+  File->loadGlobals(JsonData);
 
   // Load code
   auto HexCode = JsonData->getString("code").value();
@@ -174,7 +135,8 @@ std::unique_ptr<EvmFile> EvmFile::Create(StringRef FileName,
         support::endian::write32(&File->Code[Offset], Value,
                                  support::endianness::big);
 
-        Reloc.push_back({Func, 0, Offset - Func->Offset, 4, Relocation::SpaceKind::Code});
+        Reloc.push_back({Func, 0, Offset - Func->Offset, SymbolRelocSizeInBytes,
+                         Relocation::SpaceKind::Code});
       }
     }
     if (auto abs4 = Relocations->getObject("abs4")) {
@@ -190,6 +152,73 @@ std::unique_ptr<EvmFile> EvmFile::Create(StringRef FileName,
   }
 
   return File;
+}
+
+void EvmFile::loadGlobals(llvm::json::Object* Data) {
+  if (auto Globals = Data->getArray("globals")) {
+    for (auto& V : *Globals) {
+      auto GObj = V.getAsObject();
+      auto G = std::make_unique<Global>();
+
+      G->Name = GObj->getString("name").value();
+      G->Size = GObj->getInteger("size").value();
+
+      if (auto Data = GObj->getArray("data")) {
+        for (auto V : *Data) {
+          switch (V.kind()) {
+          case json::Value::Number:
+            llvm::report_fatal_error("Integer is not supported");
+            break;
+          case json::Value::String: {
+            auto Str = V.getAsString().value().str();
+            switch (Str[0]) {
+            case 'u': {
+              auto Pos = Str.find(':');
+              assert(Pos != Str.npos);
+              auto Size = std::stoll(Str.substr(1, Pos - 1));
+              auto Value = Str.substr(Pos + 1);
+              if (Value[0] == '@') {
+                auto Name = Str.substr(Pos + 2);
+                unsigned Addend;
+                auto SymbolName = parseRelocSymbol(Name, &Addend);
+                auto& Reloc = RelocationsMap[std::string(SymbolName)];
+                unsigned Offset = G->InitData.size();
+                Reloc.push_back({G.get(), Addend, Offset, unsigned(Size),
+                                 Relocation::SpaceKind::InitData});
+                G->InitData.resize(Offset + Size, 0);
+              } else {
+                G->addInt(APInt(Size * CHAR_BIT, Value, 10));
+              }
+              break;
+            }
+            case 'f': {
+              assert(Str.find("fill.") == 0);
+              auto Pos = Str.find(':');
+              assert(Pos != Str.npos);
+              auto Size = std::stoll(Str.substr(5, Pos - 5));
+              auto FillValue = std::stoll(Str.substr(Pos + 1));
+              G->InitData.resize(G->InitData.size() + Size, FillValue);
+              break;
+            }
+            case 'b': {
+              assert(Str.find("bytes:") == 0);
+              auto Bytes = fromHex(Str.substr(6));
+              G->InitData.insert(G->InitData.end(), Bytes.begin(), Bytes.end());
+              break;
+            }
+            default:
+              llvm::report_fatal_error("Unrecognized data descriptor");
+            }
+            break;
+          }
+          default:
+            llvm_unreachable("Unsupported type for globals data");
+          }
+        }
+      }
+      this->Globals.push_back(std::move(G));
+    }
+  }
 }
 
 void EvmFile::resolve(const SymbolMap& Map) {
@@ -243,15 +272,23 @@ void EvmFile::resolve(const SymbolMap& Map) {
         auto Offset = Reloc.Offset +
                       (Reloc.TargetSymbol ? Reloc.TargetSymbol->Offset : 0) -
                       this->Offset.value();
-        LOG() << "Resolve in offset=" << Offset << " by value=" << Symbol->Offset << '\n';
+        LOG() << "  code in offset=" << Offset << " by value=" << Symbol->Offset << '\n';
         assert(opcodes::getPushSize(Code[Offset - 1]) == 4);
         support::endian::write32(&Code[Offset], Symbol->Offset,
                                  support::endianness::big);
         break;
       }
       case Relocation::SpaceKind::InitData: {
+        assert(Reloc.Size == 4 || Reloc.Size == 8);
         auto Glob = static_cast<Global*>(Reloc.TargetSymbol);
-        Glob->InitData[Reloc.Offset] = Symbol->Offset + Reloc.Addend;
+        uint64_t Value = Symbol->Offset + Reloc.Addend;
+        if (Reloc.Size == 4) {
+          support::endian::write32(&Glob->InitData[Reloc.Offset], Value,
+                                   support::endianness::big);
+        } else {
+          support::endian::write64(&Glob->InitData[Reloc.Offset], Value,
+                                   support::endianness::big);
+        }
         break;
         }
       }
@@ -260,17 +297,8 @@ void EvmFile::resolve(const SymbolMap& Map) {
 }
 
 void EvmFile::appendInitData(std::vector<uint8_t>& Data) {
-  unsigned Offset = Data.size();
   for (auto& Global : Globals) {
-    Data.resize(Data.size() + Global->InitData.size() * BytesInEvmWord);
-    for (auto V : Global->InitData) {
-      assert(V.getBitWidth() == BitsInEvmWord);
-      support::endian::write64be(&Data[Offset + 0], V.getRawData()[3]);
-      support::endian::write64be(&Data[Offset + 8], V.getRawData()[2]);
-      support::endian::write64be(&Data[Offset + 16], V.getRawData()[1]);
-      support::endian::write64be(&Data[Offset + 24], V.getRawData()[0]);
-      Offset += BytesInEvmWord;
-    }
+    Data.insert(Data.end(), Global->InitData.begin(), Global->InitData.end());
   }
 }
 
@@ -279,7 +307,7 @@ unsigned EvmFile::resolveGlobalsWithInitData(unsigned Offset) {
     if (!Global->InitData.empty() && Global->Reachable) {
       assert(Global->InitData.size() != 0);
       Global->Offset = Offset;
-      Offset += Global->InitData.size() * BytesInEvmWord;
+      Offset += Global->InitData.size();
     }
   }
   return Offset;

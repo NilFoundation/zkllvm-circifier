@@ -1,6 +1,5 @@
 
 set(CLANG_OPTIONS -fno-rtti -std=c++17 -O3)
-set(CLANG_CPP_OPTIONS -Xclang -disable-llvm-passes -fno-exceptions)
 
 set(BUILTINS_OUPTUT builtins.o)
 add_custom_command(OUTPUT ${BUILTINS_OUPTUT}

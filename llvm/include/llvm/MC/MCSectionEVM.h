@@ -49,14 +49,55 @@ public:
     unsigned Size;
   };
 
-  struct Global {
-    MCSymbol* Symbol{nullptr};
-    unsigned DataIndex{0};
-    unsigned DataCount{0};
-    unsigned Size{0};
+  struct GlobalData {
+    struct Fill {
+      unsigned NumBytes{0};
+      unsigned Value{0};
+    };
+    using Bytes = std::vector<uint8_t>;
+    GlobalData(StringRef V) : Data(Bytes(V.begin(), V.end())) {}
+
+    template<typename T>
+    GlobalData(T V) : Data(V) {}
+
+    bool isValue() const {
+      return std::holds_alternative<APInt>(Data);
+    }
+    bool isExpression() const {
+      return std::holds_alternative<const MCExpr*>(Data);
+    }
+    bool isFill() const {
+      return std::holds_alternative<Fill>(Data);
+    }
+    bool isBytes() const {
+      return std::holds_alternative<Bytes>(Data);
+    }
+
+    APInt& getValue() {
+      return std::get<APInt>(Data);
+    }
+    const APInt& getValue() const {
+      return std::get<APInt>(Data);
+    }
+    const MCExpr* getExpression() {
+      return std::get<const MCExpr*>(Data);
+    }
+    Fill getFill() {
+      return std::get<Fill>(Data);
+    }
+    const Bytes& getBytes() {
+      return std::get<Bytes>(Data);
+    }
+
+  private:
+    std::variant<APInt, const MCExpr*, Fill, Bytes> Data;
   };
 
-  struct GlobalData;
+  struct Global {
+    MCSymbol* Symbol{nullptr};
+    unsigned Size{0};
+    std::vector<GlobalData> Data;
+  };
 
 public:
   friend class MCContext;
@@ -98,28 +139,29 @@ public:
   void addGlobal(MCSymbol *Symbol) {
     auto& G = Globals.emplace_back();
     G.Symbol = Symbol;
-    G.DataIndex = GlobalsData.size();
   }
 
   auto& getGlobals() {
     return Globals;
   }
 
-  const auto& getGlobals() const {
-    return Globals;
-  }
-
   template<typename T>
   void addGlobalsData(T Value) {
-    GlobalsData.push_back(Value);
+    getCurrentGLobal().Data.push_back(Value);
   }
 
-  GlobalData& getGlobalsData(unsigned Index) {
-    return GlobalsData[Index];
+  void emitFill(unsigned NumBytes, unsigned Value) {
+    getCurrentGLobal().Data.push_back(GlobalData::Fill{NumBytes, Value});
   }
 
-  unsigned getGlobalsDataSize() const {
-    return GlobalsData.size();
+  void emitBytes(StringRef Data) {
+    getCurrentGLobal().Data.push_back(Data);
+  }
+
+private:
+  Global& getCurrentGLobal() {
+    assert(!Globals.empty());
+    return Globals.back();
   }
 
 private:
@@ -129,37 +171,6 @@ private:
   SmallVector<Fixup> Fixups;
   std::unordered_map<std::string, std::vector<unsigned>> Relocations;
   std::vector<Global> Globals;
-  std::vector<GlobalData> GlobalsData;
-};
-
-struct MCSectionEVM::GlobalData {
-  GlobalData(uint64_t V) : Data(APInt(64, V)) {}
-  GlobalData(APInt V) : Data(V) {}
-  GlobalData(const MCExpr* V) : Data(V) {}
-
-  bool isValue() const {
-    return std::holds_alternative<APInt>(Data);
-  }
-  bool isBigValue() const {
-    assert(isValue());
-    return !getValue().isSingleWord(); //isIntN(sizeof(uint64_t) * CHAR_BIT);;
-  }
-  bool isExpression() const {
-    return std::holds_alternative<const MCExpr*>(Data);
-  }
-
-  APInt& getValue() {
-    return std::get<APInt>(Data);
-  }
-  const APInt& getValue() const {
-    return std::get<APInt>(Data);
-  }
-
-  const MCExpr* getExpression() {
-    return std::get<const MCExpr*>(Data);
-  }
-
-  std::variant<APInt, const MCExpr*> Data;
 };
 
 } // end namespace llvm

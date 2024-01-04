@@ -428,6 +428,7 @@ defm PUSH31: PUSHInst<0x7e, 31, 3>;
 // swap instructions
 def SWAP_r: EVMPseudo<(outs), (ins I256Imm:$num), []>;
 //only in stack instruction form.
+def SWAP:  EVMInst<(outs), (ins), [], "true", "SWAP",  0xa6, 3>;
 def SWAP1:  EVMInst<(outs), (ins), [], "true", "SWAP1",  0x90, 3>;
 def SWAP2:  EVMInst<(outs), (ins), [], "true", "SWAP2",  0x91, 3>;
 def SWAP3:  EVMInst<(outs), (ins), [], "true", "SWAP3",  0x92, 3>;
@@ -447,6 +448,7 @@ def SWAP16: EVMInst<(outs), (ins), [], "true", "SWAP16", 0x9f, 3>;
 
 def DUP_r: EVMPseudo<(outs), (ins I256Imm:$num), []>;
 //only in stack instruction form.
+def DUP:  EVMInst<(outs), (ins), [], "true", "DUP",  0xa7, 3>;
 def DUP1:  EVMInst<(outs), (ins), [], "true", "DUP1",  0x80, 3>;
 def DUP2:  EVMInst<(outs), (ins), [], "true", "DUP2",  0x81, 3>;
 def DUP3:  EVMInst<(outs), (ins), [], "true", "DUP3",  0x82, 3>;

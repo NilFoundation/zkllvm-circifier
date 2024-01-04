@@ -248,9 +248,6 @@ void EVMStackAllocation::executeInstruction(MachineInstr &MI) {
   if (MI.getNumExplicitDefs() != 0) {
     auto Reg = getDefRegister(MI);
     auto NumUsers = getUsersCountInSameBB(Reg, MI);
-    if (NumUsers != 0) {
-      ensureSpaceInStack(MI);
-    }
     TheStack.push(Reg, NumUsers);
     if (hasUsersInOtherBB(MI)) {
       insertSpill(MI);
@@ -290,55 +287,6 @@ bool EVMStackAllocation::hasUsersInOtherBB(const MachineInstr &MI) const {
     }
   }
   return false;
-}
-
-void EVMStackAllocation::ensureSpaceInStack(MachineInstr &MI) {
-  if (TheStack.size() >= (MAX_STACK_DEPTH - 1)) {
-    unsigned MinUsers = 1000;
-    unsigned MinUsersIndex = -1;
-    for (unsigned i = 0; i < TheStack.size(); i++) {
-      auto& Item = TheStack[i];
-      auto& Slot = MemorySlotsMap[Item.getReg()];
-      if (Slot != INVALID_SLOT) {
-        if (Item.getNumUsers() < MinUsers) {
-          MinUsers = Item.getNumUsers();
-          MinUsersIndex = i;
-        }
-      }
-    }
-    assert(MinUsersIndex != unsigned(-1));
-    LLVM_DEBUG(errs() << "Free up stack: " << TheStack[MinUsersIndex].getValue()
-                      << '\n');
-    insertSwap<BEFORE>(MI, MinUsersIndex);
-    insertPop<BEFORE>(MI);
-
-    // TODO: the following code does spill of a stack item, in case there are
-    // no items in stack, that have slot in memory. Turn it off for a while,
-    // since we have no tests for that case yet.
-#if 0
-    auto Reg = Register::index2VirtReg(TheStack[MinUsersIndex].getValue());
-    auto& Slot = MemorySlotsMap[Reg];
-    if (Slot == INVALID_SLOT) {
-      Slot = AllocatedSlotNumber++;
-    }
-
-    insertSwap<BEFORE>(MI, MinUsersIndex);
-
-    LLVM_DEBUG(errs() << "ensureSpaceInStack: " << TheStack[MinUsersIndex].getValue() << '\n');
-
-    auto PutLocal = BuildMI(*MF, MI.getDebugLoc(), TII->get(EVM::pPUTLOCAL_r))
-                        .addReg(Reg)
-                        .addImm(Slot);
-    addInstComment(*PutLocal.getInstr(), *MF,
-                   "PUTLOCAL(full stack): reg=",
-                   Register::virtReg2Index(Reg),
-                   ", slot=", Slot);
-    MI.getParent()->insert(MachineBasicBlock::iterator(MI), PutLocal);
-    LIS->InsertMachineInstrInMaps(*PutLocal);
-    MemorySlotsMap[Reg] = Slot;
-    TheStack.pop();
-#endif
-  }
 }
 
 /**

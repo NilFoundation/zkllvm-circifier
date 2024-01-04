@@ -52,9 +52,8 @@ private:
   bool runOnMachineFunction(MachineFunction &MF) override;
 
   int convertCall(MachineInstr &MI, MachineBasicBlock &MBB) const;
-  void convertSWAP(MachineInstr* MI) const;
   void convertDUP(MachineInstr* MI) const;
-  void convertMOVE(MachineInstr* MI) const;
+  MachineInstr* convertSWAP(MachineInstr& MI, int Index = -1) const;
 };
 } // end anonymous namespace
 
@@ -86,8 +85,20 @@ static unsigned getSWAPOpcode(unsigned idx) {
     case 15: return EVM::SWAP15;
     case 16: return EVM::SWAP16;
     default:
-      llvm_unreachable("invalid index");
+      return EVM::SWAP;
   }
+}
+
+MachineInstr* EVMConvertRegToStack::convertSWAP(MachineInstr& MI, int Index/* = -1*/) const {
+  if (Index == -1) {
+      assert(MI.getOpcode() == EVM::SWAP_r);
+      Index = MI.getOperand(0).getImm();
+  }
+  unsigned Opcode = getSWAPOpcode(Index);
+  if (Opcode == EVM::SWAP) {
+      BuildMI(*MI.getParent(), MI, MI.getDebugLoc(), TII->get(EVM::PUSH32)).addImm(Index);
+  }
+  return BuildMI(*MI.getParent(), MI, MI.getDebugLoc(), TII->get(Opcode));
 }
 
 static unsigned getDUPOpcode(unsigned idx) {
@@ -109,31 +120,18 @@ static unsigned getDUPOpcode(unsigned idx) {
     case 15: return EVM::DUP15;
     case 16: return EVM::DUP16;
     default:
-      llvm_unreachable("invalid index");
+      return EVM::DUP;
   }
-}
-void EVMConvertRegToStack::convertMOVE(MachineInstr* MI) const {
-
-}
-
-void EVMConvertRegToStack::convertSWAP(MachineInstr* MI) const {
-  unsigned swapIdx = MI->getOperand(0).getImm();
-  swapIdx = (swapIdx > 16) ? 16 : swapIdx;
-  assert(swapIdx <= 16 && "invalid SWAP");
-
-  unsigned opc = getSWAPOpcode(swapIdx);
-
-  BuildMI(*MI->getParent(), MI, MI->getDebugLoc(), TII->get(opc))->setComment(MI->getComment());
-  MI->removeFromParent();
 }
 
 void EVMConvertRegToStack::convertDUP(MachineInstr* MI) const {
-  unsigned dupIdx = MI->getOperand(0).getImm();
-  assert(dupIdx <= 16 && "invalid DUP");
+  unsigned Index = MI->getOperand(0).getImm();
 
-  unsigned opc = getDUPOpcode(dupIdx);
-
-  BuildMI(*MI->getParent(), MI, MI->getDebugLoc(), TII->get(opc));
+  unsigned Opcode = getDUPOpcode(Index);
+  if (Opcode == EVM::DUP) {
+      BuildMI(*MI->getParent(), MI, MI->getDebugLoc(), TII->get(EVM::PUSH32)).addImm(Index);
+  }
+  BuildMI(*MI->getParent(), MI, MI->getDebugLoc(), TII->get(Opcode));
   MI->removeFromParent();
 }
 
@@ -206,7 +204,7 @@ int EVMConvertRegToStack::convertCall(MachineInstr &MI, MachineBasicBlock &MBB) 
 
       // Swap the callee address with the return address
       unsigned Uses = std::distance(MI.uses().begin(), MI.uses().end());
-      MakeInst(getSWAPOpcode(Uses))->setAsmPrinterFlag(
+      convertSWAP(*InsertBefore, Uses)->setAsmPrinterFlag(
           EVM::BuildCommentFlags(EVM::SUBROUTINE_BEGIN, 0));
       StackOpcode = EVM::JUMP;
   }
@@ -268,7 +266,8 @@ bool EVMConvertRegToStack::runOnMachineFunction(MachineFunction &MF) {
 
       // expand SWAP
       if (opc == EVM::SWAP_r) {
-        convertSWAP(&MI);
+        convertSWAP(MI)->setComment(MI.getComment());
+        MI.removeFromParent();
         continue;
       }
 
@@ -334,7 +333,6 @@ bool EVMConvertRegToStack::runOnMachineFunction(MachineFunction &MF) {
       }
     }
   }
-
 
   return true;
 }

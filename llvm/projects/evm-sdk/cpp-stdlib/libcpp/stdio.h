@@ -59,7 +59,13 @@ void setbuf(FILE* restrict stream, char* restrict buf);
 int setvbuf(FILE* restrict stream, char* restrict buf, int mode, size_t size);
 int fprintf(FILE* restrict stream, const char* restrict format, ...);
 int fscanf(FILE* restrict stream, const char * restrict format, ...);
+
+#ifdef __EVM__
+#define printf __builtin_evm_printf
+#else
 int printf(const char* restrict format, ...);
+#endif
+
 int scanf(const char* restrict format, ...);
 int snprintf(char* restrict s, size_t n, const char* restrict format, ...);    // C99
 int sprintf(char* restrict s, const char* restrict format, ...);

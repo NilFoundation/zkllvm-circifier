@@ -1,8 +1,7 @@
     .file	"memory.S"
 
 .macro STDLIB_FUNC name
-	.type	\name,function
-	.hidden	\name
+	.type	\name,@function
 \name:
 .endm
 
@@ -12,6 +11,13 @@
     INVALID
 .endm
 
+    .data
+    .type   __dso_handle,@object
+__dso_handle:
+    .zero	8
+	.size	__dso_handle, 8
+
+    .text
 ################################ MEMSET ################################
 # INPUT STACK: 1:mem, 2:value, 3:count
 #
@@ -226,6 +232,20 @@ modpow_cont:
     # Stack: [result, return_address]
     JUMP
 
+# This function registers a function (typically destructor) to be called by exit
+# Arguments:
+# - address of the function to be called
+# - argument that will be passed to the function
+# - dso_handle
+# Does nothing for now.
+STDLIB_FUNC __cxa_atexit
+    JUMPDEST
+    POP  # Pop 3 arguments
+    POP
+    POP
+    PUSH1 0  # Return value
+    SWAP1
+    JUMP
 
 # TODO: Implement memmove
 STDLIB_FUNC_INVALID memmove

@@ -147,7 +147,16 @@ struct Function : public EvmSymbol {
   std::vector<llvm::EVM::ValType> Inputs;
   std::vector<llvm::EVM::ValType> Outputs;
 
-  bool Visible;
+  /**
+   *  If function is a leaf in the dependency tree, i.e. function that can't be
+   *  removed.
+   */
+  bool isLeaf() const {
+    return Visible || GlobalInit;
+  }
+
+  bool Visible{false};
+  bool GlobalInit{false};
 };
 
 struct Global : public EvmSymbol {

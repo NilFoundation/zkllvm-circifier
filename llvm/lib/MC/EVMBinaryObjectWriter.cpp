@@ -128,6 +128,12 @@ uint64_t EVMBinaryObjectWriter::writeObject(MCAssembler &Asm,
     Json.attribute("size", Size);
     Json.attribute("visible", Visible);
 
+    // `_GLOBAL__sub_I_` is a prefix for global init function. It is created
+    // by LLVM frontend, see CGDeclCXX.cpp.
+    if (StringRef(FuncName).startswith("_GLOBAL__sub_I_")) {
+      Json.attribute("init", true);
+    }
+
     if (Visible) {
       Json.attribute("stateMutability", "");
       Json.attribute("type", "function");

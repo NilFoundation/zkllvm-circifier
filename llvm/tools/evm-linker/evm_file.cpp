@@ -66,6 +66,7 @@ std::unique_ptr<EvmFile> EvmFile::Create(StringRef FileName,
       Func->Name = FuncObj->getString("symbol")->str();
       Func->DemangledName = FuncObj->getString("name")->str();
       Func->Visible = FuncObj->getBoolean("visible").value();
+      Func->GlobalInit = FuncObj->getBoolean("init").value_or(false);
       Func->Offset = FuncObj->getInteger("offset").value();
       Func->Size = FuncObj->getInteger("size").value();
 

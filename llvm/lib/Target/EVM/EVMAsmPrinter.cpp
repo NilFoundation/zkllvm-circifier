@@ -181,7 +181,7 @@ void EVMAsmPrinter::emitConstantPool() {
   auto Sym = cast<MCSymbolEVM>(getSymbol(&F));
   auto Streamer =
       static_cast<EVMTargetStreamer*>(OutStreamer->getTargetStreamer());
-  Streamer->emitType(Sym, "function");
+  Streamer->emitType(Sym, "@function");
 
   // Emit function signature only for functions with [[evm]] attribute.
   if (!F.getAttributes().hasFnAttr(Attribute::EvmFunc))

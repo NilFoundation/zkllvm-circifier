@@ -125,7 +125,7 @@ void MCEVMStreamer::emitFill(const MCExpr &NumBytes, uint64_t FillValue,
     report_fatal_error("Invalid expression for emitFill");
   auto Section = static_cast<MCSectionEVM*>(getCurrentSectionOnly());
   assert (Section->getKind().isData());
-  Section->emitFill(NumBytesValue,FillValue);
+  Section->emitFill(NumBytesValue, FillValue);
 }
 
 void MCEVMStreamer::changeSection(MCSection *Section,

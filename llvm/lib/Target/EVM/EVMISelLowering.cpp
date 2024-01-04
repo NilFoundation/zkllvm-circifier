@@ -148,7 +148,7 @@ EVMTargetLowering::EVMTargetLowering(const TargetMachine &TM,
   }
 
   setTargetDAGCombine({ISD::SIGN_EXTEND, ISD::ZERO_EXTEND, ISD::ANY_EXTEND,
-                       ISD::LOAD, ISD::STORE});
+                       ISD::LOAD, ISD::STORE, ISD::INTRINSIC_VOID});
 }
 
 EVT EVMTargetLowering::getSetCCResultType(const DataLayout &DL, LLVMContext &,
@@ -905,6 +905,23 @@ SDValue EVMTargetLowering::PerformDAGCombine(SDNode *N,
 
     auto Res = DCI.DAG.UpdateNodeOperands(Store, Store->getChain(), Value, Ptr,
                                           Offset);
+    if (Res != N) {
+      DCI.DAG.ReplaceAllUsesOfValueWith(SDValue(N, 0), SDValue(Res, 0));
+    }
+    break;
+  }
+  case ISD::INTRINSIC_VOID: {
+    SmallVector<SDValue, 5> Ops;
+    for (unsigned i = 0; i < N->getNumOperands(); i++) {
+      auto& Op = N->getOperand(i);
+      auto VT = Op.getValueType();
+      if (VT.isInteger() && VT.getSizeInBits() < 256) {
+        Ops.push_back(DCI.DAG.getNode(ISD::SIGN_EXTEND, SDLoc(Op), {MVT::i256}, Op));
+      } else {
+        Ops.push_back(Op);
+      }
+    }
+    auto Res = DCI.DAG.UpdateNodeOperands(N, Ops);
     if (Res != N) {
       DCI.DAG.ReplaceAllUsesOfValueWith(SDValue(N, 0), SDValue(Res, 0));
     }

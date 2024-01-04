@@ -71,7 +71,13 @@ int fprintf(FILE * stream,
             const char * format, ...);
 int fscanf(FILE * stream,
            const char * format, ...);
+
+#ifdef __EVM__
+#define printf __builtin_evm_printf
+#else
 int printf(const char * format, ...);
+#endif
+
 int scanf(const char * format, ...);
 int snprintf(char * s, size_t n,
              const char * format, ...);

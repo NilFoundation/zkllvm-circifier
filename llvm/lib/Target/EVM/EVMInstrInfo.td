@@ -569,6 +569,10 @@ let isCall = 1 in {
     EVMPseudo<(outs), (ins variable_ops), []>;
 }
 
+let hasSideEffects = 1 in {
+  defm PRINTF: RSInst<(outs), (ins brtarget:$dst, variable_ops), [], "PRINTF_r \t$dst", "PRINTF", 0xa5, 3>;
+}
+
 let isTerminator = 1, isBarrier = 1, isBranch = 1 in {
   def pJUMPTO_r  : EVMPseudo<(outs), (ins brtarget:$dst), []>;
   def pJUMPIF_r  : EVMPseudo<(outs), (ins GPR:$src, brtarget:$dst), []>;

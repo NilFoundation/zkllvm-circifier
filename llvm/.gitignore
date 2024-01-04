@@ -42,6 +42,7 @@ autoconf/autom4te.cache
 projects/*
 !projects/*.*
 !projects/evm-sdk
+!projects/evm-tests
 !projects/Makefile
 runtimes/*
 !runtimes/*.*

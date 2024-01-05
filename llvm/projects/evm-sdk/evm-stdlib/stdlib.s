@@ -1,4 +1,4 @@
-    .file	"memory.S"
+    .file	"stdlib.s"
 
 .macro STDLIB_FUNC name
 	.type	\name,@function

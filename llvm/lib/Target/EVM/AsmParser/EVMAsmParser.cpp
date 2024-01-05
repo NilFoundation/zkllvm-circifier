@@ -398,6 +398,12 @@ bool EVMAsmParser::ParseDirective(AsmToken DirectiveID) {
     Parser.Lex();
     if (ParseSignature(Sym))
       return true;
+  } else if (DirectiveID.getString() == ".globl") {
+    auto SymName = expectIdent();
+    if (SymName.empty())
+      return error("Invalid symbol: ", Lexer.getTok());
+    auto Sym = cast<MCSymbolEVM>(getContext().getOrCreateSymbol(SymName));
+    Sym->setHidden(false);
   }
   return true;
 }
@@ -417,7 +423,7 @@ bool EVMAsmParser::MatchAndEmitInstruction(SMLoc IDLoc, unsigned &Opcode,
     Out.emitInstruction(Inst, getSTI());
     break;
   default:
-    llvm_unreachable("Unexpected MatchResult. Maybe wrong instruction");
+    return Error(IDLoc, "Unknown instruction");
   }
 
   return false;

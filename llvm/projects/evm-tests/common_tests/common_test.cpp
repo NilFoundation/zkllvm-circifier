@@ -1,6 +1,13 @@
+
+// There was a bug with the `main` function. For some reason, it was handled in
+// a special way, although it shouldn't differ from the regular functions.
+// EVM_RUN: function: main, input: [], result: 123
+[[evm]] int main() {
+    return 123;;
+}
+
 // EVM_RUN: function: add, input: [1,2], result: 3
 // EVM_RUN: function: add, input: [0x100,0x23], result: 0x123
-
 [[evm]]
 int add(int a, int b) {
   return a + b;

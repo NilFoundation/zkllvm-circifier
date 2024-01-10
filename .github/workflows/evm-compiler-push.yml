@@ -3,6 +3,8 @@ name: EVM compiler testing
 on:
   pull_request:
     branches: [ evm-compiler ]
+  push:
+    branches: [ evm-compiler ]
 
 jobs:
   test:

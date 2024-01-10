@@ -50,12 +50,12 @@ private:
                           options::OPT_nostdlibinc)) {
       return;
     }
-    addExternCSystemInclude(DriverArgs, CC1Args, "/usr/include/zkllvm");
+    addExternCSystemInclude(DriverArgs, CC1Args, "/usr/lib/zkllvm/include/libc");
   }
   void AddClangCXXStdlibIncludeArgs(
       const llvm::opt::ArgList &DriverArgs,
       llvm::opt::ArgStringList &CC1Args) const override {
-    addSystemInclude(DriverArgs, CC1Args, "/usr/include/zkllvm/c++");
+    addSystemInclude(DriverArgs, CC1Args, "/usr/lib/zkllvm/include/c++/v1");
     SmallString<128> ResourceDirInclude(getDriver().ResourceDir);
     llvm::sys::path::append(ResourceDirInclude, "include");
     addSystemInclude(DriverArgs, CC1Args, ResourceDirInclude);

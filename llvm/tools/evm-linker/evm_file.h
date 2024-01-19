@@ -30,8 +30,9 @@
 #include "llvm/BinaryFormat/EVM.h"
 #include <memory>
 #include <optional>
-#include <variant>
 #include <string>
+#include <unordered_map>
+#include <variant>
 #include <vector>
 
 #include "llvm/Support/JSON.h"

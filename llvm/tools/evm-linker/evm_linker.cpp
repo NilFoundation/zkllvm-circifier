@@ -349,16 +349,16 @@ void EvmLinker::resolve(bool CheckReachable) {
                                return Acc + F->getCode().size();
                              });
 
-  Dispatcher.resolveFixup("init_data_size", InitData.size());
+  Dispatcher.resolveFixup("init_data_size", static_cast<uint64_t>(InitData.size()));
   Dispatcher.resolveFixup("init_data_code_offset",
-                          CodeSize + Dispatcher.size());
+                          static_cast<uint64_t>(CodeSize + Dispatcher.size()));
   Dispatcher.resolveFixup("init_data_mem_offset", InitDataOffset);
   Dispatcher.resolveFixup("stack_start", GlobalsSectionSize);
   if (GlobalInitFunc != nullptr) {
     Dispatcher.resolveFixup("global_init_func", GlobalInitFunc->Offset);
   }
   if (!NoCtor) {
-    Constructor.resolveFixup("codesize", CodeSize + Dispatcher.size());
+    Constructor.resolveFixup("codesize", static_cast<uint64_t>(CodeSize + Dispatcher.size()));
   }
 }
 
@@ -410,14 +410,14 @@ void EvmLinker::emit() {
     }
     Dispatcher.verify();
     LOG() << "Dispatcher, ";
-    WriteDataToStream(Stream->os(), Dispatcher.data(), Dispatcher.size());
+    WriteDataToStream(Stream->os(), Dispatcher.data(), static_cast<uint64_t>(Dispatcher.size()));
     for (auto &File : Files) {
       LOG() << "Code for " << File->getName() << ", ";
       WriteDataToStream(Stream->os(), File->getCode().data(),
                         File->getCode().size());
     }
     LOG() << "Init data, ";
-    WriteDataToStream(Stream->os(), InitData.data(), InitData.size());
+    WriteDataToStream(Stream->os(), InitData.data(), static_cast<uint64_t>(InitData.size()));
   }
 
   { // Emit Abi file
@@ -440,10 +440,10 @@ void EvmLinker::emit() {
     JsonInfo.objectBegin();
 
     JsonInfo.attributeObject("info", [&]() {
-      JsonInfo.attribute("dispatcher.size", Dispatcher.size());
+      JsonInfo.attribute("dispatcher.size", static_cast<uint64_t>(Dispatcher.size()));
       JsonInfo.attribute("code.size", CodeSize);
-      JsonInfo.attribute("globals.offset", CodeSize + Dispatcher.size());
-      JsonInfo.attribute("globals.size", InitData.size());
+      JsonInfo.attribute("globals.offset", static_cast<uint64_t>(CodeSize + Dispatcher.size()));
+      JsonInfo.attribute("globals.size", static_cast<uint64_t>(InitData.size()));
       JsonInfo.attribute("code.file", BinOutputName);
     });
 
@@ -461,7 +461,7 @@ void EvmLinker::emit() {
         JsonInfo.attribute("symbol", "__dispatcher__");
         JsonInfo.attribute("name", "DISPATCHER");
         JsonInfo.attribute("offset", 0);
-        JsonInfo.attribute("size", Dispatcher.size());
+        JsonInfo.attribute("size", static_cast<uint64_t>(Dispatcher.size()));
       });
     });
 

@@ -27,6 +27,8 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/FileSystem.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/Mutex.h"
 #include "llvm/Support/TimeProfiler.h"
@@ -1396,6 +1398,14 @@ void FPPassManager::dumpPassStructure(unsigned Offset) {
   }
 }
 
+static std::string CanonizeName(StringRef Name) {
+  auto Result = Name.str();
+  std::replace_if(Result.begin(), Result.end(), [](char c) {
+        return c == ' ' || c == '/' || c == '&' || c == '>' || c == '-';
+      }, '_');
+  return Result.substr(0, 255);
+}
+
 /// Execute all of the passes scheduled for execution by invoking
 /// runOnFunction method.  Keep track of whether any of the passes modifies
 /// the function, and if so, return true.
@@ -1438,6 +1448,22 @@ bool FPPassManager::runOnFunction(Function &F) {
 #endif
       bool Chg = FP->runOnFunction(F);
       LocalChanged |= Chg;
+
+#define DUMPE 0
+      if (DUMPE && (LocalChanged || Index == 0)) {
+        auto DirName = "ir_dump/" + CanonizeName(F.getName());
+        if (auto Error = sys::fs::create_directories(DirName, true)) {
+          errs() << "DIRECTORY NAME:" << DirName << '\n';
+          errs() << Error.message() << '\n';
+          report_fatal_error("Can't create dump directory!");
+        }
+        auto name = formatv("{0}/{1,0+4}_{2}", DirName, Index,
+                            CanonizeName(FP->getPassName()));
+        std::error_code EC;
+
+        raw_fd_ostream OS(name.str(), EC);
+        FP->dumpIR(OS, F);
+      }
 
  #if defined(EXPENSIVE_CHECKS) && !defined(NDEBUG)
       if (!LocalChanged && (RefHash != StructuralHash(F))) {

@@ -188,6 +188,10 @@ Pass *Pass::createPass(AnalysisID ID) {
   return PI->createPass();
 }
 
+void FunctionPass::dumpIR(raw_ostream &OS, Function &F) {
+  F.print(OS);
+}
+
 //===----------------------------------------------------------------------===//
 //                  Analysis Group Implementation Code
 //===----------------------------------------------------------------------===//

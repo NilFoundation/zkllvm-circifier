@@ -37,6 +37,9 @@ public:
     ClearedProperties = getClearedProperties();
     return false;
   }
+
+  void dumpIR(raw_ostream &OS, Function &F) override;
+
 protected:
   explicit MachineFunctionPass(char &ID) : FunctionPass(ID) {}
 

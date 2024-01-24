@@ -120,7 +120,7 @@ struct small_dict_map {
   }
 
   __always_inline std::tuple<Key, Element, bool> max() const {
-    auto [keysl, value, success] = dict_.dictmax(KeyLen::value);
+    auto [value, keysl, success] = dict_.dictmax(KeyLen::value);
     if (success)
       return {schema::parse<Key>(keysl), schema::parse<Element>(value), true};
     return {{}, {}, false};

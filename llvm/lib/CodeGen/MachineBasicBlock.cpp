@@ -695,12 +695,13 @@ void MachineBasicBlock::updateTerminator(
     // The block has a non-fallthrough conditional branch. If one of its
     // successors is its layout successor, rewrite it to a fallthrough
     // conditional branch.
-    if (isLayoutSuccessor(TBB)) {
+    // TVM local begin
+    if (isFallthroughSuccessor(TBB)) {
+      // TVM local end
       if (TII->reverseBranchCondition(Cond))
         return;
       TII->removeBranch(*this);
       TII->insertBranch(*this, FBB, nullptr, Cond, DL);
-//    } else if (isLayoutSuccessor(FBB)) {
       // TVM local begin
     } else if (isFallthroughSuccessor(FBB)) {
       // TVM local end

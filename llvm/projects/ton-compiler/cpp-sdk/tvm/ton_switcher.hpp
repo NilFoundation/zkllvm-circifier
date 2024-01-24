@@ -20,9 +20,14 @@ namespace tvm {
 
 #ifndef NDEBUG
   #define DEBUG_PRINT(msg) __builtin_tvm_printstr(msg)
+  #define DEBUG_VALUE(v) __builtin_tvm_dump_value(v)
 #else
   #define DEBUG_PRINT(msg)
+  #define DEBUG_VALUE(v)
 #endif
+
+// Define it as DEBUG_PRINT to see logs from the Switcher
+#define SWITCHER_PRINT
 
 template<typename T>
 using _recv_internal_t = decltype(&T::_recv_internal);
@@ -59,7 +64,7 @@ constexpr bool has_signature_check_v = std::experimental::is_detected_v<has_sign
 
 template <class Contract>
 __always_inline Contract load_contract_data() {
-  DEBUG_PRINT("load_smc_data");
+  SWITCHER_PRINT("load_smc_data");
   using DContract = typename Contract::data;
   Contract contract;
   auto &base = static_cast<DContract &>(contract);
@@ -95,13 +100,13 @@ struct dispatch {
         parser body_p(msg_body);
 
         if constexpr (args_sz != 0) {
-          DEBUG_PRINT("parse_args");
+          SWITCHER_PRINT("parse_args");
           auto parsed_args = parse<Args>(body_p);
-          DEBUG_PRINT("call_w_args");
+          SWITCHER_PRINT("call_w_args");
           std::apply_f<func>(std::tuple_cat(std::make_tuple(std::ref(contract)),
                                             to_std_tuple(parsed_args)));
         } else {
-          DEBUG_PRINT("call_wo_args");
+          SWITCHER_PRINT("call_wo_args");
           (contract.*func)();
         }
         return;
@@ -130,7 +135,7 @@ __always_inline int ton_switcher(cell msg, slice msg_body) {
   bool is_deploy = msg_has_init<Internal>(msg.ctos());
 
   if (is_deploy && msg_body.srempty()) {
-    DEBUG_PRINT("deploy");
+    SWITCHER_PRINT("deploy");
     tvm_accept();
     return 0;
   }
@@ -140,7 +145,7 @@ __always_inline int ton_switcher(cell msg, slice msg_body) {
   contract.set_msg_body(msg_body);
 
   if constexpr (Internal) {
-    DEBUG_PRINT("internal");
+    SWITCHER_PRINT("internal");
     slice msg_slice = msg.ctos();
     if constexpr (supports_msg_slice_v<Contract>)
       contract.set_msg_slice(msg_slice);
@@ -148,7 +153,7 @@ __always_inline int ton_switcher(cell msg, slice msg_body) {
       set_msg(msg);
     if constexpr (supports_on_bounced2_v<Contract>) {
       if (is_bounced(msg_slice)) {
-        DEBUG_PRINT("bounced");
+        SWITCHER_PRINT("bounced");
         contract._on_bounced(msg, msg_body);
         return;
       }
@@ -156,7 +161,7 @@ __always_inline int ton_switcher(cell msg, slice msg_body) {
       require(!is_bounced(msg_slice), error_code::unsupported_bounced_msg);
     }
   } else {
-    DEBUG_PRINT("external");
+    SWITCHER_PRINT("external");
     // Store msg cell into contract if it supports the required field
     // Otherwise, store into global (set_msg)
     if constexpr (supports_msg_slice_v<Contract>)
@@ -166,19 +171,19 @@ __always_inline int ton_switcher(cell msg, slice msg_body) {
   }
 
   if constexpr (is_manual_dispatch_v<Contract>) {
-    DEBUG_PRINT("manual_dispatch");
+    SWITCHER_PRINT("manual_dispatch");
     if constexpr (Internal) {
       contract._recv_internal(msg, msg_body);
     } else {
       contract._recv_external(msg, msg_body);
     }
   } else {
-    DEBUG_PRINT("regular_dispatch");
+    SWITCHER_PRINT("regular_dispatch");
     static const unsigned methods_count = get_interface_methods_count<IContract>::value;
     parser body_p(msg_body);
 
     if (msg_body.empty() && msg_body.srempty()) {
-      DEBUG_PRINT("receive");
+      SWITCHER_PRINT("receive");
       if constexpr (supports_receive2_v<Contract>) {
         contract._receive(msg, msg_body);
         save_contract_data(contract);
@@ -196,7 +201,7 @@ __always_inline int ton_switcher(cell msg, slice msg_body) {
       if (auto opt_val = body_p.lduq(32))
         func_id = *opt_val;
       else {
-        DEBUG_PRINT("fallback");
+        SWITCHER_PRINT("fallback");
         contract._fallback(msg, msg_body, Internal, -1);
         save_contract_data(contract);
         return 0;
@@ -204,7 +209,7 @@ __always_inline int ton_switcher(cell msg, slice msg_body) {
     } else {
       func_id = body_p.ldu(32);
     }
-    DEBUG_PRINT("dispatch_start");
+    SWITCHER_PRINT("dispatch_start");
     dispatch<Internal, Contract, IContract, DContract, 0, methods_count>::execute(
         contract, msg, body_p.sl(), func_id);
   }
@@ -238,7 +243,7 @@ struct getter_invoke_impl {
 
         using Args = get_interface_method_arg_struct<ISmart, Index>;
         constexpr unsigned args_sz = calc_fields_count<Args>::value;
-        DEBUG_PRINT("call_getter");
+        SWITCHER_PRINT("call_getter");
 
         if constexpr (args_sz != 0) {
           auto parsed_args = pop_args(parser(args_pack.ctos()),
@@ -274,7 +279,7 @@ struct getter_invoke_impl<Contract, IContract, DContract, Index, 0> {
 
 template <class Contract, class IContract, class DContract>
 GetterResult getter_invoke(int func_id, cell args_pack) {
-  DEBUG_PRINT("getter_invoke");
+  SWITCHER_PRINT("getter_invoke");
   Contract contract = load_contract_data<Contract>();
   static const unsigned methods_count = get_interface_methods_count<IContract>::value;
   return getter_invoke_impl<Contract, IContract, DContract, 0, methods_count>::execute(contract, func_id, args_pack);
@@ -282,7 +287,7 @@ GetterResult getter_invoke(int func_id, cell args_pack) {
 
 template <class Contract, class IContract, class DContract>
 void main_ticktock_impl(uint256 balance, uint256 address, bool is_tock) {
-  DEBUG_PRINT("ticktock");
+  SWITCHER_PRINT("ticktock");
   if constexpr (has_on_ticktock_v<Contract>) {
     Contract contract = load_contract_data<Contract>();
     contract.on_ticktock(balance, address, is_tock);

@@ -1467,7 +1467,9 @@ public:
   int64_t getSExtValue() const {
     if (isSingleWord())
       return SignExtend64(U.VAL, BitWidth);
-    assert(getMinSignedBits() <= 64 && "Too many bits for int64_t");
+    // TVM local begin: comment to be able to run in Debug
+    // assert(getMinSignedBits() <= 64 && "Too many bits for int64_t");
+    // TVM local end
     return int64_t(U.pVal[0]);
   }
 

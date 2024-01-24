@@ -107,7 +107,7 @@ cxxflags = ['-O3']
 if args.cxxflags:
   cxxflags += args.cxxflags.split()
 
-ir_dump = os.path.join(os.getcwd(), "ir_dump")
+ir_dump = os.path.join(os.getcwd(), "ir_temps")
 os.makedirs(ir_dump, exist_ok=True)
 
 for filename in input_cpp:

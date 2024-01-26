@@ -1,3 +1,7 @@
+if(NOT LLVM_INCLUDE_TESTS)
+    return()
+endif()
+
 include(ExternalProject)
 
 set(EVM_TEST_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/evm_test.rb)

@@ -155,7 +155,7 @@ bool EVMDAGToDAGISel::SelectLOAD(SDNode *Node) {
       assert(unsigned(index) < sizeof(LoadOpcodes)/sizeof(LoadOpcodes[0]));
       unsigned Opcode = LoadOpcodes[index];
       if (Opcode == EVM::INVALID) {
-        Node->dump();
+        LLVM_DEBUG(Node->dump());
         report_fatal_error("Invalid LOAD size");
       }
       SDNode* Load = CurDAG->getMachineNode(Opcode, SDLoc(Node), MVT::i256,

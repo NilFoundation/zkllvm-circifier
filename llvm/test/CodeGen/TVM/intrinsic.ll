@@ -343,6 +343,13 @@ define i257 @chksignu(i257 %hash, slice %signature, i257 %key) {
   ret i257 %result
 }
 
+; CHECK-LABEL: ecrecover
+define i257 @ecrecover(i257 %hash, slice %signature, slice %key) {
+; CHECK: ECRECOVER
+  %result = call i257 @llvm.tvm.ecrecover(i257 %hash, slice %signature, slice %key)
+  ret i257 %result
+}
+
 ; CHECK-LABEL: cdatasize
 define {i257, i257, i257} @cdatasize(cell %c, i257 %len) {
 ; CHECK: CDATASIZE

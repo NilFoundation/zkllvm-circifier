@@ -52,6 +52,13 @@ defm CHKSIGNU : I0<(outs I257 : $result),
                                                            I257  : $key))],
                    "CHKSIGNU", 0xf910>;
 
+defm ECRECOVER : I0<(outs I257 : $result),
+                   (ins I257 : $hash, Slice : $signature, Slice : $key),
+                   [(set I257 : $result, (int_tvm_ecrecover I257  : $hash,
+                                                           Slice : $signature,
+                                                           Slice  : $key))],
+                   "ECRECOVER", 0xf912>;
+
 def : Pat<(int_tvm_get_temporary_data), (TO_TUPLE_COPY (PUSHC 7))>;
 
 // A.11.4. Configuration primitives.

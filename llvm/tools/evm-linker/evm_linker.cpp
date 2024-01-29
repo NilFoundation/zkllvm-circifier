@@ -294,7 +294,7 @@ void EvmLinker::buildConstructor() {
   Constructor.inst(opcodes::PUSH1, 0x80);
   Constructor.inst(opcodes::PUSH1, 0x40);
   Constructor.inst(opcodes::MSTORE);
-  Constructor.push4("codesize");
+  Constructor.push4("contractsize");
   Constructor.inst(opcodes::DUP1);
   Constructor.push1("codestart");
   Constructor.inst(opcodes::PUSH1, 0x00);
@@ -358,7 +358,8 @@ void EvmLinker::resolve(bool CheckReachable) {
     Dispatcher.resolveFixup("global_init_func", GlobalInitFunc->Offset);
   }
   if (!NoCtor) {
-    Constructor.resolveFixup("codesize", static_cast<uint64_t>(CodeSize + Dispatcher.size()));
+    unsigned ContractSize = CodeSize + InitData.size() + Dispatcher.size();
+    Constructor.resolveFixup("contractsize", ContractSize);
   }
 }
 

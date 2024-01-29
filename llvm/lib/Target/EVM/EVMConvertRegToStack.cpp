@@ -315,7 +315,7 @@ bool EVMConvertRegToStack::runOnMachineFunction(MachineFunction &MF) {
           }
         }
         if (StackOpcode == -1) {
-          MI.dump();
+          LLVM_DEBUG(MI.dump());
           report_fatal_error("Failed to convert instruction to stack version.");
         }
 

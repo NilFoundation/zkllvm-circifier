@@ -9,7 +9,8 @@ BUILD_DIR=${CWD}/build
 NPROC=`nproc`
 
 function build() {
-  cmake -S ${SOURCE_DIR}/../../ -B ${BUILD_DIR} -DCMAKE_BUILD_TYPE=Debug \
+  cmake -S ${SOURCE_DIR}/../../ -B ${BUILD_DIR} \
+    -DCMAKE_BUILD_TYPE=$1 \
     -DLLVM_ENABLE_PROJECTS="clang" \
     -DLLVM_TARGETS_TO_BUILD="EVM" \
     -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD=EVM \
@@ -36,9 +37,13 @@ function run_test() {
 }
 
 case $1 in
-  build )
+  build-debug )
     shift
-    build
+    build Debug
+    ;;
+  build-release )
+    shift
+    build Release
     ;;
   test )
     shift

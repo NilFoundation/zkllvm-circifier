@@ -23,10 +23,16 @@ function build() {
 }
 
 function run_test() {
+  # Run without constructor
   ruby ${SOURCE_DIR}/evm_test.rb \
        --bin-dir ${BUILD_DIR}/bin \
        --glob "${SOURCE_DIR}/common_tests/*.{s,cpp}" \
        --no-ctor --clang-args "--sysroot=${BUILD_DIR}/install" --evmone ${BUILD_DIR}/evmone-build
+  # Run with constructor
+  ruby ${SOURCE_DIR}/evm_test.rb \
+        --bin-dir ${BUILD_DIR}/bin \
+        --glob "${SOURCE_DIR}/common_tests/*.{s,cpp}" \
+        --clang-args "--sysroot=${BUILD_DIR}/install" --evmone ${BUILD_DIR}/evmone-build
 }
 
 case $1 in

@@ -64,16 +64,16 @@ def get_func_keccak(name, abifile)
   function_sha3
 end
 
-def run_vm(codefile, input)
+def run_vm(codefile, input=nil)
+  input = input ? "--input #{input}" : ""
   if options.evmone
-    result = command("#{options.evmone}/bin/evmc run @#{codefile} --vm #{options.evmone}/lib/libevmone.so,trace-bin --input #{input}").strip
-    m = result.match /Output: +([0-9a-f]+)/
+    result = command("#{options.evmone}/bin/evmc run @#{codefile} --vm #{options.evmone}/lib/libevmone.so,trace-bin #{input}").strip
+    m = result.match /Output: +(.*)$/
     raise "Invalid evmc output: #{result}" unless m
-    return m[1].to_i(16)
+    return m[1]
   end
-  result = command("evm --input #{input} --codefile #{codefile} run").strip
-  result = result.to_i(16) if result.start_with? '0x'
-  result
+  result = command("evm #{input} --codefile #{codefile} run").strip
+  result[2..-1]
 end
 
 def run_test(source)
@@ -107,9 +107,10 @@ def run_test(source)
 
   # Run constructor if required
   unless options.no_ctor
-    result = command("evm --codefile #{codefile} run").strip
+    result = run_vm(codefile)
     # Write the real code of the contract
-    File.write(codefile, result[2..-1])
+    codefile = "#{basename}_deployed.evm_h"
+    File.write(codefile, result)
   end
 
   $files_count += 1
@@ -124,7 +125,7 @@ def run_test(source)
     mask = (1 << 256) - 1
     input += test_run.input.map{|x| "%064x" % (x & mask) }.join if test_run.input
 
-    result = run_vm(codefile, input)
+    result = run_vm(codefile, input).to_i(16)
     if test_run.result && test_run.result != result
       if options.debug
         result = command("evm -debug --gas 1000000 --input #{input} --codefile #{codefile} run")

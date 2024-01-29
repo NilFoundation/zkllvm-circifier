@@ -88,7 +88,6 @@ std::unique_ptr<EvmFile> EvmFile::Create(StringRef FileName,
           auto Arg = V.getAsObject();
           auto Type = EVM::parseType(Arg->getString("type").value());
           Func->Outputs.push_back(Type);
-          Func->Outputs.push_back(Type);
         }
       }
       File->Functions.push_back(std::move(Func));

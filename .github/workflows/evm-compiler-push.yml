@@ -10,7 +10,6 @@ jobs:
   test:
     runs-on: [self-hosted, tests-runner]
     name: EVM compiler tests
-    
     steps:
       - name: checkout
         uses: actions/checkout@v3
@@ -26,6 +25,20 @@ jobs:
           ruby-version: '3.3'
       - run: gem install keccak256
       - name: Build
-        run: bash llvm/projects/evm-tests/run_evm_tests.sh build
+        run: bash llvm/projects/evm-tests/run_evm_tests.sh build-debug
       - name: Run regression EVM tests
         run: bash llvm/projects/evm-tests/run_evm_tests.sh test
+  build_release:
+    runs-on: [self-hosted, tests-runner]
+    name: Release build
+    steps:
+      - name: checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: true
+      - name: Setup Cmake
+        uses: jwlawson/actions-setup-cmake@v1.13
+        with:
+          cmake-version: '3.22.x'
+      - name: Build
+        run: bash llvm/projects/evm-tests/run_evm_tests.sh build-release

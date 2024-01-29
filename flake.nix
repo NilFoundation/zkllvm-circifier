@@ -11,11 +11,14 @@
         pname = "zkllvm";
         version = "1.0";
 
-        src = self;
+        src = self + "/llvm";
 
-        nativeBuildInputs = with nixpkgs.legacyPackages.x86_64-linux; [ cmake ninja clang llvm ];
+        nativeBuildInputs = with nixpkgs.legacyPackages.x86_64-linux; [
+          cmake ninja clang llvm gnulib boost ];
 
         buildInputs = []; # Add your dependencies here
+
+        cmakeDir = "../llvm";
 
         cmakeFlags = [
           "-DLLVM_ENABLE_PROJECTS=clang"

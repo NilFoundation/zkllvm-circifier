@@ -18,18 +18,15 @@
         buildInputs = []; # Add your dependencies here
 
         cmakeFlags = [
-          "-DCMAKE_C_COMPILER=clang"
-          "-DCMAKE_CXX_COMPILER=clang++"
-          "-DCMAKE_BUILD_TYPE=Release"
           "-DLLVM_ENABLE_PROJECTS=clang"
           "-DLLVM_TARGETS_TO_BUILD=EVM"
           "-DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD=EVM"
           "-DLLVM_CCACHE_BUILD=ON"
           "-DLLVM_ENABLE_LLD=ON"
-          "-DCMAKE_INSTALL_PREFIX=${placeholder "out"}"
           "-DLLVM_INSTALL_TOOLCHAIN_ONLY=ON"
           "-DDEFAULT_SYSROOT=/usr"
           "-DEVM_HOST=ON"
+          "-DLLVM_INCLUDE_TESTS=OFF"
           "-DLLVM_DISTRIBUTION_COMPONENTS='clang;evm-stdlib;evm-linker;zkllvm-cxx-headers;zkllvm-c-headers'"
         ];
       };

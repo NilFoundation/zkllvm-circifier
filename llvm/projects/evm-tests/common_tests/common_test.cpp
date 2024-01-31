@@ -52,3 +52,10 @@ __uint256_t v256 = 0x12345678123456781234567812345678ababababcdcdcdcdefefefef123
     return 5;
   return 0;
 }
+
+// EVM_RUN: function: return_void, input: [1]
+int return_void_value;
+
+[[evm]] void return_void(int N) {
+  return_void_value = N;
+}

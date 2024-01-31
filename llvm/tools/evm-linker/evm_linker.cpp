@@ -271,9 +271,12 @@ void EvmLinker::buildDispatcher() {
       Dispatcher.push(Func->Name);
       Dispatcher.inst(opcodes::JUMP);
       Dispatcher.jump_dest(Func->Name + "#return");
-      // TODO: Should read function's abi to determine return size.
-      Dispatcher.inst(opcodes::PUSH1, 0);
-      Dispatcher.inst(opcodes::MSTORE);
+      if (!Func->Outputs.empty()) {
+        // TODO: Should read function's abi to determine return size.
+        assert(Func->Outputs.size() == 1);
+        Dispatcher.inst(opcodes::PUSH1, 0);
+        Dispatcher.inst(opcodes::MSTORE);
+      }
       Dispatcher.inst(opcodes::PUSH1, 0x20);
       Dispatcher.inst(opcodes::PUSH1, 0);
       Dispatcher.inst(opcodes::RETURN);

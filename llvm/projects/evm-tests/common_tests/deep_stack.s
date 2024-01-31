@@ -1,6 +1,6 @@
 // Testing SWAP and DUP instructions with arbitrary stack depth
 
-// EVM_RUN: function: test, input: [], result: 0
+// EVM_RUN: function: test, input: []
     .type	test,@function
     .globl  test
 test:
@@ -13,5 +13,10 @@ test:
     PUSH1 1  // -1 0
     DUP      // -1 -1
     SUB      // 0
-    SWAP1    // Swap return address and result
+    PUSH4 failed
+    JUMPI
     JUMP
+failed:
+    JUMPDEST
+    INVALID
+

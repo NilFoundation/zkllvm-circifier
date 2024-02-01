@@ -53,8 +53,8 @@ public:
 class signature_checker_v3 {
 public:
   // msg_sl - slice from header begin
-  inline static bool check(slice hash, slice signature, slice pubkey) {
-    return __builtin_tvm_ecrecover(hash, signature, pubkey);
+  inline static bool check(schema::uint256 hash, slice signature, slice pubkey) {
+    return __builtin_tvm_ecrecover(hash.get(), signature, pubkey);
   }
 };
 

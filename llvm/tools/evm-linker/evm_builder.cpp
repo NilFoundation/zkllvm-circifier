@@ -40,8 +40,10 @@ void Builder::push(uint32_t Value) {
     inst(opcodes::PUSH2, Value);
   } else if (Value <= 0xffffff) {
     inst(opcodes::PUSH3, Value);
+  } else {
+    assert(Value <= std::numeric_limits<uint32_t>::max());
+    inst(opcodes::PUSH4, Value);
   }
-  inst(opcodes::PUSH4, Value);
 }
 
 void Builder::resolveFixup(const std::string &Name, unsigned Value) {

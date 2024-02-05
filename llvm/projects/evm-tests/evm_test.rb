@@ -123,7 +123,13 @@ def run_test(source)
     input = function_sha3[0..7]
     # Use 'x & 0xfffff...' for proper extraction hex strings from negative numbers
     mask = (1 << 256) - 1
-    input += test_run.input.map{|x| "%064x" % (x & mask) }.join if test_run.input
+    if test_run.input.is_a? Array
+      input += test_run.input.map{|x| "%064x" % (x & mask) }.join
+    elsif test_run.input.is_a? String
+      input += test_run.input
+    else
+      raise "Wrong input type: #{test_run.input.class}"
+    end if test_run.input
 
     result = run_vm(codefile, input).to_i(16)
     if test_run.result && test_run.result != result

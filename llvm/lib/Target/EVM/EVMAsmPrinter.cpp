@@ -194,8 +194,10 @@ void EVMAsmPrinter::emitConstantPool() {
       *TM.getSubtarget<EVMSubtarget>(F).getTargetLowering();
   auto Signature = Sym->getSignature();
 
-  for (auto *Param : F.getFunctionType()->params())
+  for (auto *Param : F.getFunctionType()->params()) {
+    Sym->Params.push_back(Param);
     ComputeValueVTs(TLI, DL, Param, EParams);
+  }
   for (EVT VT : EParams) {
     auto RegisterVT = TLI.getRegisterType(F.getContext(), VT);
     Signature->Params.push_back(valTypeFromMVT(RegisterVT));

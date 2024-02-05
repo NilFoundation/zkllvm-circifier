@@ -217,18 +217,6 @@ enum : unsigned {
   EVM_SEC_EVENT = 13      // Event declarations
 };
 
-// Type immediate encodings used in various contexts.
-enum : unsigned {
-  EVM_TYPE_I32 = 0x7F,
-  EVM_TYPE_I64 = 0x7E,
-  EVM_TYPE_I128 = 0x7B,
-  EVM_TYPE_I256 = 0x7A,
-  EVM_TYPE_FUNCREF = 0x70,
-  EVM_TYPE_EXCEPT_REF = 0x68,
-  EVM_TYPE_FUNC = 0x60,
-  EVM_TYPE_NORESULT = 0x40, // for blocks with no result values
-};
-
 // Kinds of event attributes.
 enum EVMEventAttribute : unsigned {
   EVM_EVENT_ATTRIBUTE_EXCEPTION = 0x0,
@@ -237,10 +225,11 @@ enum EVMEventAttribute : unsigned {
 // Subset of types that a value can have
 enum class ValType {
   INVALID = 0,
-  I32 = EVM_TYPE_I32,
-  I64 = EVM_TYPE_I64,
-  I128 = EVM_TYPE_I128,
-  I256 = EVM_TYPE_I256,
+  I32,
+  I64,
+  I128,
+  I256,
+  PTR
 };
 
 inline const char* ValTypeToString(ValType Type) {
@@ -249,6 +238,7 @@ inline const char* ValTypeToString(ValType Type) {
   case ValType::I64: return "int64";
   case ValType::I128: return "int128";
   case ValType::I256: return "int256";
+  case ValType::PTR: return "ptr";
   default:
     llvm_unreachable("Invalid type!");
   }
@@ -263,6 +253,8 @@ inline ValType parseType(StringRef Str) {
     return ValType::I128;
   if (Str == "int256")
     return ValType::I256;
+  if (Str == "ptr")
+    return ValType::PTR;
   return ValType::INVALID;
 }
 

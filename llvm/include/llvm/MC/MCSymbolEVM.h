@@ -14,6 +14,7 @@
 namespace llvm {
 
 class GlobalValue;
+class Type;
 
 class MCSymbolEVM : public MCSymbol {
 
@@ -60,6 +61,7 @@ public:
   const EVM::EVMSignature* getSignature() const {
     return &Signature;
   }
+  SmallVector<Type*, 4> Params;
 private:
   EVM::EVMSignature Signature;
   SymbolKind Kind{KindNone};

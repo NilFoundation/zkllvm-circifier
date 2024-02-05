@@ -27,8 +27,15 @@
 #include "llvm/ADT/Twine.h"
 #include <iostream>
 
+// Offset to the data where init data will be located.
 static constexpr unsigned InitDataOffset = 32 * 2;
+
+// Default size of memory chunk to be fixed by resolved symbol relocation.
 static constexpr unsigned SymbolRelocSizeInBytes = 4;
+
+// Size of function Id, which is hash(signature)[0..4],
+// passed to the function selector.
+static constexpr unsigned SizeOfFuncId = 4;
 
 class Logger {
 public:

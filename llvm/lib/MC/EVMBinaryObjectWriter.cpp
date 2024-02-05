@@ -138,11 +138,22 @@ uint64_t EVMBinaryObjectWriter::writeObject(MCAssembler &Asm,
       Json.attribute("stateMutability", "");
       Json.attribute("type", "function");
       Json.attributeArray("inputs", [&] {
-        for (auto Param : Sym->getSignature()->Params) {
-          auto TypeString = EVM::ValTypeToString(Param);
+        bool WasPtr = false;
+        for (auto Param : Sym->Params) {
+          if (Visible && WasPtr) {
+            report_fatal_error("Pointer argument must be last argument");
+          }
           Json.object([&]() {
             Json.attribute("name", "TBD!");
-            Json.attribute("type", TypeString);
+            if (Param->isIntegerTy()) {
+              Json.attribute("type", "int256");
+            } else if (Param->isPointerTy()) {
+              Json.attribute("type", "ptr");
+              WasPtr = true;
+            } else {
+              Param->print(errs());
+              report_fatal_error("Unsupported type in EVM function");
+            }
           });
         }
       });

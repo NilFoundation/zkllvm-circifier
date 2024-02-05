@@ -13,8 +13,7 @@ void swap(long *xp, long *yp);
   }
 }
 
-
-[[evm]] void swap(long *xp, long *yp)
+void swap(long *xp, long *yp)
 {  
     long temp = *xp;  
     *xp = *yp;  

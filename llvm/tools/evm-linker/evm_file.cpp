@@ -145,7 +145,8 @@ std::unique_ptr<EvmFile> EvmFile::Create(StringRef FileName,
         for (auto V : *Offsets.getAsArray()) {
           unsigned Offset = V.getAsUINT64().value();
           auto Func = File->getFunctionByOffset(Offset);
-          Reloc.push_back({Func, 0, Offset - Func->Offset, 4, Relocation::SpaceKind::Code});
+          Reloc.push_back({Func, 0, Offset - Func->Offset, SymbolRelocSizeInBytes,
+                           Relocation::SpaceKind::Code});
         }
       }
     }

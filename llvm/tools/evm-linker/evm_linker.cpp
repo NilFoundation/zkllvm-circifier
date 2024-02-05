@@ -263,10 +263,45 @@ void EvmLinker::buildDispatcher() {
       Dispatcher.jump_dest(Func->Name + "#trampoline");
       Dispatcher.inst(opcodes::POP);
       Dispatcher.push(Func->Name + "#return");
-      // Push arguments in reverse order
-      for (int i = Func->Inputs.size() - 1; i >= 0; i--) {
-        Dispatcher.inst(opcodes::PUSH1, 4 + i * 32);
-        Dispatcher.inst(opcodes::CALLDATALOAD);
+      bool HasPtrArgs = std::find(
+                            Func->Inputs.begin(), Func->Inputs.end(),
+                            llvm::EVM::ValType::PTR) != Func->Inputs.end();
+      if (HasPtrArgs) {
+        // If we have struct in the function signature, we need to copy CALLDATA to the memory
+        // and set pointer to right place in this memory.
+        Dispatcher.inst(opcodes::CALLDATASIZE);
+        Dispatcher.push(0);
+        Dispatcher.push("stack_start");
+        Dispatcher.inst(opcodes::CALLDATACOPY);
+
+        // Calculate real address of inbound struct.
+        // TODO: use Fixup with addend, so we can use only one PUSH instruction here
+        Dispatcher.push("stack_start");
+        Dispatcher.push(4 + (Func->Inputs.size() - 1) * 32);
+        Dispatcher.inst(opcodes::ADD);
+
+        for (int i = Func->Inputs.size() - 2; i >= 0; i--) {
+          Dispatcher.push(SizeOfFuncId + i * 32);
+          Dispatcher.inst(opcodes::CALLDATALOAD);
+        }
+        Dispatcher.push("stack_start");
+        Dispatcher.inst(opcodes::CALLDATASIZE);
+        Dispatcher.inst(opcodes::ADD);
+
+        // Round up to 32-bytes alignment
+        Dispatcher.push(0x1f);
+        Dispatcher.inst(opcodes::ADD);
+        Dispatcher.push(0xffe0);
+        Dispatcher.inst(opcodes::AND);
+
+        Dispatcher.push(0x00);
+        Dispatcher.inst(opcodes::MSTORE);
+      } else {
+        // Push arguments in reverse order
+        for (int i = Func->Inputs.size() - 1; i >= 0; i--) {
+          Dispatcher.inst(opcodes::PUSH1, SizeOfFuncId + i * 32);
+          Dispatcher.inst(opcodes::CALLDATALOAD);
+        }
       }
       Dispatcher.push(Func->Name);
       Dispatcher.inst(opcodes::JUMP);

@@ -4,7 +4,6 @@ add_llvm_component_library(LLVMEVMDesc
                            EVMInstPrinter.cpp
                            EVMMCCodeEmitter.cpp
                            EVMTargetStreamer.cpp
-                           EVMELFObjectWriter.cpp
                            EVMBinaryObjectWriter.cpp
                            EVMObjectWriter.cpp
 

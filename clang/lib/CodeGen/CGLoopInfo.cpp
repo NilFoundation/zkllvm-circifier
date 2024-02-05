@@ -11,6 +11,7 @@
 #include "clang/AST/Attr.h"
 #include "clang/AST/Expr.h"
 #include "clang/Basic/CodeGenOptions.h"
+#include "clang/Basic/TargetInfo.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/CFG.h"
 #include "llvm/IR/Constants.h"
@@ -18,6 +19,7 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Metadata.h"
 #include <optional>
+
 using namespace clang::CodeGen;
 using namespace llvm;
 
@@ -797,6 +799,11 @@ void LoopInfoStack::push(BasicBlock *Header, clang::ASTContext &Ctx,
         (StagedAttrs.UnrollEnable == LoopAttributes::Unspecified &&
          StagedAttrs.UnrollCount == 0))
       setUnrollState(LoopAttributes::Disable);
+
+  // force unroll loops for assigner target
+  if (Ctx.getTargetInfo().getTriple().getArch() == llvm::Triple::assigner) {
+    setUnrollState(LoopAttributes::Full);
+  }
 
   /// Stage the attributes.
   push(Header, StartLoc, EndLoc);

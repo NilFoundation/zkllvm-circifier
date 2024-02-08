@@ -42,6 +42,9 @@
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Transforms/Utils/SanitizerStats.h"
 
+#include "llvm/IR/IntrinsicsEVM.h"
+
+
 #include <string>
 
 using namespace clang;
@@ -1903,6 +1906,11 @@ void CodeGenFunction::EmitStoreOfScalar(llvm::Value *Value, Address Addr,
     }
   }
 
+  if (EmitEvmStorageStore(Value, Addr)) {
+    return;
+  }
+
+
   Value = EmitToMemory(Value, Ty);
 
   LValue AtomicLValue =
@@ -1966,6 +1974,10 @@ RValue CodeGenFunction::EmitLoadOfLValue(LValue LV, SourceLocation Loc) {
     llvm::Value *Object = EmitARCLoadWeakRetained(LV.getAddress(*this));
     Object = EmitObjCConsumeObject(LV.getType(), Object);
     return RValue::get(Object);
+  }
+
+  if (auto V = EmitEvmStorageLoad(LV, Loc)) {
+    return RValue::get(V);
   }
 
   if (LV.isSimple()) {

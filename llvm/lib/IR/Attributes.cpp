@@ -499,6 +499,9 @@ std::string Attribute::getAsString(bool InAttrGrp) const {
   if (hasAttribute(Attribute::EvmFunc))
     return "evm";
 
+  if (hasAttribute(Attribute::EvmStorage))
+    return "storage";
+
   llvm_unreachable("Unknown attribute");
 }
 

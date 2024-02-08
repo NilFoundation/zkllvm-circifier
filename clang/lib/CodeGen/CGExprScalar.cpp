@@ -44,6 +44,10 @@
 #include "llvm/Support/TypeSize.h"
 #include <cstdarg>
 
+#include "llvm/IR/Intrinsics.h"
+#include "llvm/IR/IntrinsicsEVM.h"
+
+
 using namespace clang;
 using namespace CodeGen;
 using llvm::Value;
@@ -286,6 +290,7 @@ public:
   /// value l-value, this method emits the address of the l-value, then loads
   /// and returns the result.
   Value *EmitLoadOfLValue(const Expr *E) {
+    E->dump();
     Value *V = EmitLoadOfLValue(EmitCheckedLValue(E, CodeGenFunction::TCK_Load),
                                 E->getExprLoc());
 
@@ -504,7 +509,17 @@ public:
       return CGF.emitScalarConstant(Constant, E);
     return EmitLoadOfLValue(E);
   }
+#if 1
+  Value *EmitEvmStorageValue(const Expr *E) {
+    auto *Callee = CGF.CGM.getIntrinsic(llvm::Intrinsic::evm_sload);
+    SmallVector<llvm::Value*, 5> Ops;
+    auto C = llvm::ConstantInt::get(llvm::Type::getInt256Ty(Builder.getContext()), 0);
+    Ops.push_back(C); //Builder.getInt64(0));
+    auto Call = Builder.CreateCall(Callee, Ops);
 
+    return Call;
+  }
+#endif
   Value *VisitObjCSelectorExpr(ObjCSelectorExpr *E) {
     return CGF.EmitObjCSelectorExpr(E);
   }
@@ -4868,6 +4883,12 @@ Value *ScalarExprEmitter::VisitAtomicExpr(AtomicExpr *E) {
 Value *CodeGenFunction::EmitScalarExpr(const Expr *E, bool IgnoreResultAssign) {
   assert(E && hasScalarEvaluationKind(E->getType()) &&
          "Invalid scalar expression to emit");
+
+  if (auto* DE = dyn_cast<DeclRefExpr>(E)) {
+    if (DE->getDecl()->getAttr<EVMStorageAttr>()) {
+      llvm::errs() << "AAAAAAAAAA" << '\n';
+    }
+  }
 
   return ScalarExprEmitter(*this, IgnoreResultAssign)
       .Visit(const_cast<Expr *>(E));

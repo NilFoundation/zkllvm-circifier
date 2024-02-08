@@ -393,6 +393,11 @@ static void handleEvmAttribute(Sema &S, Decl *D,
                                   const AttributeCommonInfo &CI) {
   D->addAttr(::new (S.Context) EVMFuncAttr(S.Context, CI));
 }
+
+static void handleEvmStorageAttribute(Sema &S, Decl *D,
+                               const AttributeCommonInfo &CI) {
+  D->addAttr(::new (S.Context) EVMStorageAttr(S.Context, CI));
+}
 // EVM_END
 
 template <typename... DiagnosticArgs>
@@ -9109,6 +9114,9 @@ ProcessDeclAttribute(Sema &S, Scope *scope, Decl *D, const ParsedAttr &AL,
   // EVM_BEGIN
   case ParsedAttr::AT_EVMFunc:
     handleEvmAttribute(S, D, AL);
+    break;
+  case ParsedAttr::AT_EVMStorage:
+    handleEvmStorageAttribute(S, D, AL);
     break;
   // EVM_ENd
   }

@@ -180,6 +180,8 @@ class Preprocessor {
   IdentifierInfo *Ident__is_target_environment;    // __is_target_environment
   IdentifierInfo *Ident__FLT_EVAL_METHOD__;        // __FLT_EVAL_METHOD
 
+  IdentifierInfo *Ident__test;   // __LINE__, __FILE__
+
   // Weak, only valid (and set) while InMacroArgs is true.
   Token* ArgMacro;
 

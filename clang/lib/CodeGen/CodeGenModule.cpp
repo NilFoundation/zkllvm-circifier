@@ -2059,6 +2059,9 @@ void CodeGenModule::SetLLVMFunctionAttributesForDefinition(const Decl *D,
   // EVM_BEGIN
   if (D->hasAttr<EVMFuncAttr>())
     B.addAttribute(llvm::Attribute::EvmFunc);
+
+  if (D->hasAttr<EVMStorageAttr>())
+    B.addAttribute(llvm::Attribute::EvmStorage);
   // EVM_END
 
   F->addFnAttrs(B);
@@ -4186,6 +4189,19 @@ bool CodeGenModule::isTypeConstant(QualType Ty, bool ExcludeCtor) {
   return true;
 }
 
+static unsigned getOccupiedSlots(llvm::Type* Ty, unsigned CurrentIdx) {
+  if (auto *TyInt = dyn_cast<llvm::IntegerType>(Ty)) {
+    return 1;
+  } else if (auto *TyStruct = dyn_cast<llvm::StructType>(Ty)) {
+    auto Sum = 0;
+    for (auto El: TyStruct->elements()) {
+      Sum += getOccupiedSlots(El, CurrentIdx);
+    }
+    return Sum;
+  }
+  llvm_unreachable("Unexpected type");
+}
+
 /// GetOrCreateLLVMGlobal - If the specified mangled name is not in the module,
 /// create and return an llvm GlobalVariable with the specified type and address
 /// space. If there is something in the module with the specified name, return
@@ -4259,6 +4275,19 @@ CodeGenModule::GetOrCreateLLVMGlobal(StringRef MangledName, llvm::Type *Ty,
       getModule(), Ty, false, llvm::GlobalValue::ExternalLinkage, nullptr,
       MangledName, nullptr, llvm::GlobalVariable::NotThreadLocal,
       getContext().getTargetAddressSpace(DAddrSpace));
+
+  if (D->hasAttr<EVMStorageAttr>()) {
+    static int n = 0;
+//    auto attr = llvm::Attribute::get(getLLVMContext(), llvm::Attribute::EvmStorage, n++);
+//    llvm::AttrBuilder B(getLLVMContext());
+//    B.addAttribute(attr);
+//    GV->setAttributes(llvm::AttributeSet::get(getLLVMContext(), B));
+
+    auto Ty = GV->getValueType();
+
+    GV->addAttribute("storage", std::to_string(EVMStorageSlots));
+    EVMStorageSlots += getOccupiedSlots(Ty, 0);
+  }
 
   // If we already created a global with the same mangled name (but different
   // type) before, take its name and remove it from its parent.

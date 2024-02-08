@@ -120,6 +120,10 @@ public:
     return MVT::i256;
   }
 
+//  const TargetRegisterClass *getRegClassFor(MVT VT, bool isDivergent = false) const override {
+//    return TargetLowering::getRegClassFor(MVT::i256, isDivergent);
+//  }
+
 private:
   // Lower incoming arguments, copy physregs into vregs
   SDValue LowerFormalArguments(

@@ -280,6 +280,8 @@ class CodeGenModule : public CodeGenTypeCache {
   CodeGenModule(const CodeGenModule &) = delete;
   void operator=(const CodeGenModule &) = delete;
 
+  unsigned EVMStorageSlots = 0;
+
 public:
   struct Structor {
     Structor() : Priority(0), Initializer(nullptr), AssociatedData(nullptr) {}

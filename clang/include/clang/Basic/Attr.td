@@ -4082,3 +4082,10 @@ def EVMFunc : InheritableAttr {
   let Documentation = [Undocumented];
   let MeaningfulToClassTemplateDefinition = 1;
 }
+
+def EVMStorage : InheritableAttr {
+  let Spellings = [GCC<"storage">, CXX11<"", "storage", 123>,
+                                                    C2x<"", "storage", 123>];
+  let Documentation = [Undocumented];
+  let MeaningfulToClassTemplateDefinition = 1;
+}

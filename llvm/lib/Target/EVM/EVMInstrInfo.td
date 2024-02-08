@@ -376,9 +376,15 @@ defm GETPC    : Inst_0_1<"GETPC",
 defm MSIZE    : Inst_0_1<"MSIZE",
                          [(set GPR:$dst, (int_evm_msize))],
                          0x59, 2>;
+
 defm GAS      : Inst_0_1<"GAS",
                          [(set GPR:$dst, (int_evm_gas))],
                          0x5a, 2>;
+
+defm NOW      : Inst_0_1<"NOW",
+                         [(set GPR:$dst, (int_evm_now))],
+                         0xa9, 3>;
+
 defm JUMPDEST : Inst_0_0<"JUMPDEST", [(int_evm_jumpdest)], 0x5b, 1>;
 
 let BaseName = "PUSH32" in {
@@ -498,6 +504,14 @@ defm CALLNODE   : Inst_7_1<"CALLNODE",
                        (int_evm_call GPR:$src1, GPR:$src2, GPR:$src3,
                        GPR:$src4, GPR:$src5, GPR:$src6, GPR:$src7))],
                       0xf2, 0>;
+}
+
+let hasSideEffects = 1 in {
+defm SEND_MSG   : Inst_6_1<"SEND_MSG",
+                      [(set GPR:$dst,
+                       (int_evm_send_msg GPR:$src1, GPR:$src2, GPR:$src3,
+                       GPR:$src4, GPR:$src5, GPR:$src6))],
+                       0xa8, 0>;
 }
 
 let isBarrier = 1, hasSideEffects = 1, mayStore = 1 in {

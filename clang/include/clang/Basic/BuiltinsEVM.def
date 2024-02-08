@@ -507,6 +507,8 @@ BUILTIN(__builtin_evm_addmod, "LLLLiLLLLiLLLLiLLLLi", "nc")
 //    - MULMOD opcode: `0x08`
 BUILTIN(__builtin_evm_mulmod, "LLLLiLLLLiLLLLiLLLLi", "nc")
 
+BUILTIN(__builtin_evm_now, "LLLLi", "nc")
+
 BUILTIN(__builtin_evm_printf, "vcC*.", "nc")
 
 #undef BUILTIN

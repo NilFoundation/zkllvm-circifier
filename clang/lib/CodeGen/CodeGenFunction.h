@@ -1980,6 +1980,10 @@ public:
   CodeGenFunction(CodeGenModule &cgm, bool suppressNewContext=false);
   ~CodeGenFunction();
 
+  llvm::Value* EmitEvmStorageLoad(LValue LV, SourceLocation Loc);
+  llvm::Value* EmitEvmStorageStore(llvm::Value *Value, Address Addr);
+  bool isEvmStorageOperation(llvm::Value* Address);
+
   CodeGenTypes &getTypes() const { return CGM.getTypes(); }
   ASTContext &getContext() const { return CGM.getContext(); }
   CGDebugInfo *getDebugInfo() {

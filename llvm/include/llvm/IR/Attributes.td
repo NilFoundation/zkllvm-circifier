@@ -374,3 +374,4 @@ def : MergeRule<"setAND<MustProgressAttr>">;
 
 /// EVM function
 def EvmFunc : EnumAttr<"evm", [FnAttr]>;
+def EvmStorage : EnumAttr<"storage", []>;

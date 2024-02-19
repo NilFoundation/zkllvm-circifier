@@ -20723,6 +20723,12 @@ Value *CodeGenFunction::EmitAssignerBuiltinExpr(unsigned int BuiltinID,
     ID = Intrinsic::assigner_exit_check;
     break;
   }
+  case assigner::BI__builtin_assigner_exit_check_eq_pallas: {
+    ID = Intrinsic::assigner_exit_check_eq_pallas;
+    auto ElemTy = llvm::GaloisFieldType::get(context, llvm::GALOIS_FIELD_PALLAS_BASE);
+    OverloadTypes = {ElemTy};
+    break;
+  }
   case assigner::BI__builtin_assigner_print_native_pallas_field: {
     ID = Intrinsic::assigner_print_native_pallas_field;
     auto ElemTy = llvm::GaloisFieldType::get(context, llvm::GALOIS_FIELD_PALLAS_BASE);

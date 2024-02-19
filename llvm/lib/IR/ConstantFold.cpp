@@ -30,6 +30,7 @@
 #include "llvm/IR/Operator.h"
 #include "llvm/IR/PatternMatch.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/ZK/FieldArithmetics.h"
 using namespace llvm;
 using namespace llvm::PatternMatch;
 
@@ -1218,6 +1219,32 @@ Constant *llvm::ConstantFoldBinaryInstruction(unsigned Opcode, Constant *C1,
       }
 
       return ConstantVector::get(Result);
+    }
+  }
+
+  if (auto *CF1 = dyn_cast<ConstantField>(C1)) {
+    if (auto *CF2 = dyn_cast<ConstantField>(C2)) {
+      FieldElem Elem1 = CF1->getValue();
+      FieldElem Elem2 = CF2->getValue();
+      assert(Elem1.getKind() == Elem2.getKind());
+      FieldOperation Op;
+      switch (Opcode) {
+      case Instruction::Add:
+        Op = F_Add;
+        break;
+      case Instruction::Sub:
+        Op = F_Sub;
+        break;
+      case Instruction::Mul:
+        Op = F_Mul;
+        break;
+      case Instruction::UDiv:
+      case Instruction::SDiv:
+        Op = F_Div;
+        break;
+      }
+      FieldElem Res = FieldBinOp(Op, Elem1, Elem2);
+      return ConstantField::get(llvm::cast<GaloisFieldType>(C1->getType()), Res);
     }
   }
 

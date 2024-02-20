@@ -32,7 +32,7 @@ def int_assigner_bit_decomposition_field: Intrinsic<[], [llvm_ptr_ty, llvm_i32_t
 def int_assigner_bit_composition: Intrinsic<[llvm_any_ty], [llvm_ptr_ty, llvm_i32_ty, llvm_i1_ty]>;
 
 def int_assigner_exit_check: Intrinsic<[], [llvm_i1_ty]>;
-def int_assigner_exit_check_eq_pallas: Intrinsic<[], [llvm_any_ty, LLVMMatchType<0>]>;
+def int_assigner_exit_check_eq: Intrinsic<[], [llvm_any_ty, LLVMMatchType<0>]>;
 
 def int_assigner_print_native_pallas_field: Intrinsic<[], [llvm_any_ty]>;
 

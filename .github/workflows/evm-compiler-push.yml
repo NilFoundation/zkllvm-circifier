@@ -8,26 +8,41 @@ on:
 
 jobs:
   test:
-    runs-on: [self-hosted, tests-runner]
+    runs-on: [self-hosted, Linux, X64, aws_autoscaling]
     name: EVM compiler tests
+    env:
+      DBMS_USER: ${{ secrets.DBMS_USER }}
+      DBMS_PASSWORD: ${{ secrets.DBMS_PASSWORD }}
+    container:
+      image: ubuntu:22.04
     steps:
-      - name: checkout
+      - name: Install dependencies
+        run: |
+          env && \
+          apt update && \
+          apt install -y \
+            build-essential \
+            cmake \
+            ninja-build \
+            git \
+            libboost-all-dev \
+            python3 \
+            ruby-dev && \
+          gem install keccak256
+      - name: Install dbms
+        run: |
+          echo "deb [trusted=yes] https://${{ env.DBMS_USER }}:${{ env.DBMS_PASSWORD }}@d3fr4n1vs5nw39.cloudfront.net/ubuntu all main" > /etc/apt/sources.list.d/dbms.list && \
+          apt update && \
+          apt install -y dbms
+      - name: Checkout sources
         uses: actions/checkout@v3
         with:
+          fetch-depth: 0
           submodules: true
-      - name: Setup Cmake
-        uses: jwlawson/actions-setup-cmake@v1.13
-        with:
-          cmake-version: '3.22.x'
-      - name: Setup Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: '3.3'
-      - run: gem install keccak256
       - name: Build
         run: bash llvm/projects/evm-tests/run_evm_tests.sh build-debug
       - name: Run regression EVM tests
-        run: bash llvm/projects/evm-tests/run_evm_tests.sh test
+        run: bash llvm/projects/evm-tests/run_evm_tests.sh test vm_run
   build_release:
     runs-on: [self-hosted, tests-runner]
     name: Release build

@@ -18850,6 +18850,44 @@ Value *CodeGenFunction::EmitEVMBuiltinExpr(unsigned BuiltinID,
     auto Call = Builder.CreateCall(Callee, Ops);
     return Call;
   }
+  case EVM::BI__builtin_evm_sha3_vargs: {
+    assert(E->getNumArgs() >= 1);
+    if (GAI == nullptr) {
+      GAI = Builder.CreateAlloca(
+          Builder.getInt8Ty(),
+          ConstantInt::get(Builder.getInt8Ty(), 32 * E->getNumArgs()));
+      MaxStorageIndex = E->getNumArgs();
+    }
+
+    if (E->getNumArgs() > MaxStorageIndex) {
+      MaxStorageIndex = E->getNumArgs();
+      GAI->setOperand(0, ConstantInt::get(Builder.getInt8Ty(),
+                                          32 * MaxStorageIndex));
+    }
+    Value* CurrMem = GAI;
+    for (unsigned NumOp = 0; NumOp < E->getNumArgs(); NumOp++) {
+      auto Arg = E->getArg(NumOp);
+      Value* V = nullptr;
+      if (Arg->isPRValue()) {
+        V = EmitScalarExpr(Arg);
+      } else {
+        auto LV = EmitLValue(Arg);
+        V = LV.getPointer(*this);
+      }
+      V = Builder.CreateZExt(V, Builder.getInt256Ty());
+      Builder.CreateStore(V, Address(CurrMem, Builder.getInt8Ty(),
+                                     CharUnits::One()));
+      auto Pos = ConstantInt::get(Builder.getInt64Ty(), 32 * (NumOp + 1));
+      CurrMem = Builder.CreateGEP(Builder.getInt8Ty(), GAI, {Pos});
+    }
+
+    Function *Sha3Callee = CGM.getIntrinsic(Intrinsic::evm_sha3);
+    auto Mem = Builder.CreateCast(llvm::Instruction::CastOps::PtrToInt, GAI,
+                                  Builder.getInt256Ty());
+    auto Size = ConstantInt::get(llvm::Type::getInt256Ty(Builder.getContext()),
+                                 32 * E->getNumArgs());
+    return Builder.CreateCall(Sha3Callee, {Mem, Size});
+  }
   default:
     return nullptr;
   }

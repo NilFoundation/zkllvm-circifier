@@ -3,6 +3,9 @@
 set -e
 set -x
 
+COMMAND=$1
+VMRUN=$2
+
 SOURCE_DIR=$(realpath `dirname -- "$0"`)
 CWD=`pwd`
 BUILD_DIR=${CWD}/build
@@ -28,7 +31,7 @@ function run_test() {
   ruby ${SOURCE_DIR}/evm_test.rb \
        --bin-dir ${BUILD_DIR}/bin \
        --glob "${SOURCE_DIR}/common_tests/*.{s,cpp}" \
-       --no-ctor --clang-args "--sysroot=${BUILD_DIR}/install" --evmone ${BUILD_DIR}/evmone-build
+       --no-ctor --clang-args "--sysroot=${BUILD_DIR}/install" --evmone ${BUILD_DIR}/evmone-build --vmrun $VMRUN
   # Run with constructor
   ruby ${SOURCE_DIR}/evm_test.rb \
         --bin-dir ${BUILD_DIR}/bin \
@@ -36,7 +39,7 @@ function run_test() {
         --clang-args "--sysroot=${BUILD_DIR}/install" --evmone ${BUILD_DIR}/evmone-build
 }
 
-case $1 in
+case $COMMAND in
   build-debug )
     shift
     build Debug

@@ -688,6 +688,11 @@ public:
   llvm::BasicBlock *OMPScanDispatch = nullptr;
   bool OMPFirstScanLoop = false;
 
+  // EVM_BEGIN
+  llvm::AllocaInst* GAI = nullptr;
+  unsigned MaxStorageIndex = 0;
+  // EVM_END
+
   /// Manages parent directive for scan directives.
   class ParentLoopDirectiveForScanRegion {
     CodeGenFunction &CGF;

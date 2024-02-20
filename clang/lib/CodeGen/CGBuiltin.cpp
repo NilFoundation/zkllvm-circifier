@@ -20724,7 +20724,7 @@ Value *CodeGenFunction::EmitAssignerBuiltinExpr(unsigned int BuiltinID,
     break;
   }
   case assigner::BI__builtin_assigner_exit_check_eq_pallas: {
-    ID = Intrinsic::assigner_exit_check_eq_pallas;
+    ID = Intrinsic::assigner_exit_check_eq;
     auto ElemTy = llvm::GaloisFieldType::get(context, llvm::GALOIS_FIELD_PALLAS_BASE);
     OverloadTypes = {ElemTy};
     break;

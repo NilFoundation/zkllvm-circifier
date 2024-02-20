@@ -203,12 +203,12 @@ defm ROR : ShiftInst<rotr, "SAR", 0x1f, 3>;
 
 defm BYTE :  Inst_2_1<"BYTE",
                       [(set GPR:$dst, (int_evm_byte GPR:$src1, GPR:$src2))],
-                      0x20, 3>;
+                      0x1A, 3>;
 
 let mayLoad = 1, mayStore = 0 in {
 defm SHA3      : Inst_2_1<"SHA3",
                           [(set GPR:$dst, (int_evm_sha3 GPR:$src1, GPR:$src2))],
-                          0x21, 30>;
+                          0x20, 30>;
 }
 
 

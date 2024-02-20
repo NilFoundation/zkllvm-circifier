@@ -509,5 +509,9 @@ BUILTIN(__builtin_evm_mulmod, "LLLLiLLLLiLLLLiLLLLi", "nc")
 
 BUILTIN(__builtin_evm_printf, "vcC*.", "nc")
 
+// Same as __builtin_evm_sha3 but accepts variable number of arguments. They will be copied to
+// the frame buffer, which will be passed to SHA3 instruction.
+BUILTIN(__builtin_evm_sha3_vargs, "LLLLi.", "nc")
+
 #undef BUILTIN
 #undef TARGET_BUILTIN

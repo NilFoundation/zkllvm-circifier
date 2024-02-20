@@ -1,0 +1,69 @@
+#include "evm_sdk.h"
+#include "storage_gen.h"
+
+using namespace evm;
+
+static constexpr const char* STORAGE_YAML = R"(
+variables:
+- { name: gv, type: int }
+- { name: dict, type: Dict<Foo> }
+- { name: foo, type: Foo }
+
+types:
+- name: Foo
+  fields:
+  - { name: a, type: int }
+  - { name: b, type: int }
+  - { name: c, type: Dict<Bar> }
+  - { name: d, type: Dict<int> }
+  - { name: bar, type: Bar }
+- name: Bar
+  fields:
+  - { name: a, type: int }
+  - { name: b, type: int }
+  - { name: d, type: Dict<int> }
+)";
+
+//! DEPLOY
+//! CALL        function: :get_dict_d, input: [10, 20], result: 0
+//! CALL        function: :set_data, input: [10, 20, 123456]
+//! CALL        function: :get_dict_d, input: [10, 20], result: 123456
+
+[[evm]] void set_data(int k, int kk, int v) {
+  auto f = stor::dict[k];
+
+  //! CHECK_STOR  key: "sha3(sha3(1, 10), 3, 20)", result: 123456
+  f.d[kk].set(v);
+  //! CHECK_STOR  key: "sha3(1, 10) + 0", result: 123456 + 1
+  f.a.set(v + 1);
+  //! CHECK_STOR  key: "sha3(1, 10) + 1", result: 123456 + 2
+  f.b.set(v + 2);
+
+  //! CHECK_STOR  key: "sha3(1, 10) + 4 + 1", result: 123456 + 2
+  f.bar.b.set(v + 2);
+
+  //! CHECK_STOR  key: "sha3(sha3(1, 10), 2, 20) + 1", result: 123456 + 3
+  auto bar = f.c[kk];
+  bar.b.set(v + 3);
+
+  //! CHECK_STOR  key: 3, result: 123456
+  stor::foo.b.set(v);
+  //! CHECK_STOR  key: 7, result: 123456 + 1
+  stor::foo.bar.b.set(v + 1);
+}
+
+[[evm]] __int256_t get_dict_d(int k, int kk) {
+  return stor::dict[k].d[kk].get();
+}
+
+//! CALL function: :test_sha3_vargs, input: [456789]
+[[evm]] void test_sha3_vargs(unsigned v) {
+
+  //! CHECK_STOR  key: "sha3(2)", result: 456789
+  auto key = __builtin_evm_sha3_vargs(2);
+  __builtin_evm_sstore(key ,v);
+
+  //! CHECK_STOR  key: "sha3(2, 34, 56, 78, 90)", result: 456789 + 1
+  key = __builtin_evm_sha3_vargs(2, 34, 56, 78, 90);
+  __builtin_evm_sstore(key, v + 1);
+}

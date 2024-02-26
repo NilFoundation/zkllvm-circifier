@@ -107,7 +107,7 @@ let TargetPrefix = "evm" in {  // All intrinsics start with "llvm.evm."
               Intrinsic<[], [llvm_i256_ty, llvm_i256_ty],
               [IntrNoMem, IntrHasSideEffects]>;
   def int_evm_log1 : ClangBuiltin<"__builtin_evm_log1">,
-              Intrinsic<[], [llvm_i256_ty, llvm_i256_ty, llvm_i256_ty],
+              Intrinsic<[], [llvm_ptr_ty, llvm_i256_ty, llvm_i256_ty],
               [IntrNoMem, IntrHasSideEffects]>;
   def int_evm_log2 : ClangBuiltin<"__builtin_evm_log2">,
               Intrinsic<[], [llvm_i256_ty, llvm_i256_ty, llvm_i256_ty,

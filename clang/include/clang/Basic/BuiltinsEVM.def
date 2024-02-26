@@ -314,7 +314,7 @@ BUILTIN(__builtin_evm_gas, "LLLLi", "nc")
 //- **Return:** *None*
 //- **Codegen details:**
 //    - LOG1 opcode: `0xa1`
-// BUILTIN(__builtin_evm_log1, "WiTs", "nc")
+BUILTIN(__builtin_evm_log1, "vcC*LLLLiLLLLi", "nc")
 
 // @brief Log2
 //

@@ -211,7 +211,11 @@ defm SHA3      : Inst_2_1<"SHA3",
                           0x20, 30>;
 }
 
-
+let hasSideEffects = 1 in {
+defm LOG1    : Inst_3_0<"LOG1",
+                       [(int_evm_log1 GPR:$src1, GPR:$src2, GPR:$src3)],
+                       0xa1, 750>;
+}
 
 defm ADDRESS   : Inst_0_1<"ADDRESS",
                           [(set GPR:$dst, (int_evm_address))],

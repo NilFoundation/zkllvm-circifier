@@ -37,8 +37,8 @@ extern "C" void LLVMInitializeEVMTarget() {
 }
 
 static std::string computeDataLayout(const Triple &TT) {
-  return "E-S64-a:0:64-p:64:64-i1:8:8-i8:8:8-i16:16:16-i32"
-         ":32:64-i64:64:64-i128:128:128-i256:256:256";
+  return "E-S64-a:0:32-p:64:64-i1:8:8-i8:8:8-i16:16:16-i32"
+         ":32:32-i64:32:32-i128:32:32-i256:32:32";
 }
 
 static Reloc::Model getEffectiveRelocModel(const Triple &TT,

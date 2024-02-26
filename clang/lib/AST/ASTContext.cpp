@@ -2118,7 +2118,7 @@ TypeInfo ASTContext::getTypeInfoImpl(const Type *T) const {
     case BuiltinType::Int256:
     case BuiltinType::UInt256:
       Width = 256;
-      Align = 256; // TODO: FIXME
+      Align = Target->getInt256Align();
       break;
     // EVM_END
     case BuiltinType::ShortAccum:

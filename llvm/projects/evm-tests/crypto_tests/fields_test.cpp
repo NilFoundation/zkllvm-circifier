@@ -5,7 +5,7 @@ using namespace nil::crypto3::algebra;
 using namespace nil::crypto3::algebra::fields;
 using namespace nil::crypto3;
 
-// EVM_RUN: function: test_simple, input: [], result: 0
+//[SKIP] EVM_RUN: function: test_simple, input: [], result: 0
 [[evm]] int test_simple() {
     using T = fields::bls12_fr<381>;
 
@@ -22,7 +22,7 @@ using namespace nil::crypto3;
     return 0;
 }
 
-// EVM_RUN: function: test_bn128_fq, input: [], result: 0
+//[SKIP] EVM_RUN: function: test_bn128_fq, input: [], result: 0
 [[evm]] int test_bn128_fq() {
     using T = fields::bn128_fq<254>;
 

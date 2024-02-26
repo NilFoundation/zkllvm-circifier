@@ -79,7 +79,7 @@ struct TransferrableTargetInfo {
   unsigned short LargeArrayMinWidth, LargeArrayAlign;
   unsigned short LongWidth, LongAlign;
   unsigned short LongLongWidth, LongLongAlign;
-  unsigned short Int128Align;
+  unsigned short Int128Align, Int256Align;
 
   // Fixed point bit widths
   unsigned short ShortAccumWidth, ShortAccumAlign;
@@ -478,6 +478,8 @@ public:
 
   /// getInt128Align() - Returns the alignment of Int128.
   unsigned getInt128Align() const { return Int128Align; }
+
+  unsigned getInt256Align() const { return Int256Align; }
 
   /// getShortAccumWidth/Align - Return the size of 'signed short _Accum' and
   /// 'unsigned short _Accum' for this target, in bits.

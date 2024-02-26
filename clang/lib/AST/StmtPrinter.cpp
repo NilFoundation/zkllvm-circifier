@@ -1292,6 +1292,10 @@ void StmtPrinter::VisitIntegerLiteral(IntegerLiteral *Node) {
     break; // no suffix.
   case BuiltinType::UInt128:
     break; // no suffix.
+  case BuiltinType::Int256:
+    break; // no suffix.
+  case BuiltinType::UInt256:
+    break; // no suffix.
   }
 }
 

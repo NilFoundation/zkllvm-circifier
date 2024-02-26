@@ -25,19 +25,7 @@ class LLVM_LIBRARY_VISIBILITY EVMTargetInfo : public TargetInfo {
   static const Builtin::Info BuiltinInfo[];
 
 public:
-  EVMTargetInfo(const llvm::Triple &Triple, const TargetOptions &)
-      : TargetInfo(Triple) {
-
-    PointerWidth = 64;
-    BoolWidth = 8;
-    CharWidth = 8;
-    IntWidth = 32;
-    LongWidth = 64;
-    LongLongWidth = 64;
-    MaxBitIntWidth = 64;
-    resetDataLayout("E-S64-a:0:64-p:64:64-i1:8:8-i8:8:8-i16:16:16-i32"
-                    ":32:64-i64:64:64-i128:128:128-i256:256:256");
-  }
+  EVMTargetInfo(const llvm::Triple &Triple, const TargetOptions &);
 
   void getTargetDefines(const LangOptions &Opts,
                         MacroBuilder &Builder) const override;

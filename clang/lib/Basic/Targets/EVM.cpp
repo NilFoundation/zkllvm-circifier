@@ -25,6 +25,21 @@ const Builtin::Info EVMTargetInfo::BuiltinInfo[] = {
 #include "clang/Basic/BuiltinsEVM.def"
 };
 
+EVMTargetInfo::EVMTargetInfo(const llvm::Triple &Triple, const TargetOptions &)
+    : TargetInfo(Triple) {
+  PointerWidth = 64;
+  BoolWidth = 8;
+  CharWidth = 8;
+  IntWidth = 32;
+  LongWidth = 64;
+  LongLongWidth = 64;
+  MaxBitIntWidth = 64;
+  LongLongAlign = 32;
+  Int256Align = 32;
+  resetDataLayout("E-S64-a:0:32-p:64:64-i1:8:8-i8:8:8-i16:16:16-i32"
+                  ":32:32-i64:32:32-i128:32:32-i256:32:32");
+}
+
 void EVMTargetInfo::getTargetDefines(const LangOptions &Opts,
                                      MacroBuilder &Builder) const {
   Builder.defineMacro("__evm__");

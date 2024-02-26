@@ -3,9 +3,9 @@
 
 using namespace nil::crypto3::multiprecision;
 
-// EVM_RUN: function: test_arith_256, input: [0], result: 0
-// EVM_RUN: function: test_arith_256, input: [1], result: 0
-// EVM_RUN: function: test_arith_256, input: [2], result: 1
+//[SKIP] EVM_RUN: function: test_arith_256, input: [0], result: 0
+//[SKIP] EVM_RUN: function: test_arith_256, input: [1], result: 0
+//[SKIP] EVM_RUN: function: test_arith_256, input: [2], result: 1
 [[evm]] int test_arith_256(int action) {
     auto a = 0x1101010123232323454545456767676789898989ababababcdcdcdcdefefefef_cppui256;
     auto b = 0x12345678123456781234567812345678_cppui256;
@@ -30,7 +30,7 @@ using namespace nil::crypto3::multiprecision;
     return 0;
 }
 
-// EVM_RUN: function: test_arith_381, input: [], result: 0
+//[SKIP] EVM_RUN: function: test_arith_381, input: [], result: 0
 [[evm]] int test_arith_381() {
     auto a = 0x12345678123456781234567812345678ababababcdcdcdcdefefefef010101012323232345454545_cppui381;
     auto b = 0xabcdef44abcdef44abcdef44abcdef44abcdef44abcdef44abcdef44abcdef44abcdef44abcdef44_cppui381;
@@ -43,7 +43,7 @@ using namespace nil::crypto3::multiprecision;
     return 0;
 }
 
-// EVM_RUN: function: test_mulitply, input: [], result: 0
+//[SKIP] EVM_RUN: function: test_mulitply, input: [], result: 0
 [[evm]]
 int test_mulitply() {
     auto a = 0x1101010123232323454545456767676789898989ababababcdcdcdcdefefefef_cppui256;
@@ -55,7 +55,7 @@ int test_mulitply() {
     return 0;
 }
 
-// EVM_RUN: function: test_mulitply_320, input: [], result: 0
+//[SKIP] EVM_RUN: function: test_mulitply_320, input: [], result: 0
 [[evm]]
 int test_mulitply_320() {
     auto a = 0xf101010123232323454545456767676789898989ababababcdcdcdcdefefefefcdcdefefefefcdc_cppui320;

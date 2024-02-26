@@ -35,74 +35,18 @@ using int256_t = __int256_t;
 
 namespace evm {
 
-void require(bool expr, int code = 1) {
+using Address = __uint256_t;
+using Gwei = __uint256_t;
+
+void require(bool expr) {
   if (!expr) {
     __builtin_evm_revert(0, 0);
   }
 }
 
-namespace stor {
-
-template <class T, unsigned key_>
-struct SlotStatic {
-  void set(const T &v) {
-    __builtin_evm_sstore(key_, v);
-  }
-
-  T get() const {
-    return __builtin_evm_sload(key_);
-  }
-};
-
-template <class T>
-struct Slot {
-
-  explicit Slot(__int256_t key) : key_(key) {}
-
-  void set(const T &v) {
-    __builtin_evm_sstore(key_, v);
-  }
-
-  T get() const {
-    return __builtin_evm_sload(key_);
-  }
-
-  template <class TT> void operator=(TT) = delete;
-
-private:
-  __int256_t key_;
-};
-
-template <typename T, __int256_t Index>
-struct DictStatic {
-  auto operator[](__int256_t k) {
-    auto k1 = __builtin_evm_sha3_vargs(Index, k);
-    if constexpr (std::is_integral_v<T>) {
-      return Slot<T>(k1);
-    } else {
-      return T(k1);
-    }
-  }
-};
-
-template <typename T, __int256_t Pos>
-struct Dict {
-  Dict(__int256_t slot) : slot_(slot) {}
-
-  auto operator[](__int256_t k) {
-    auto k1 = __builtin_evm_sha3_vargs(slot_, Pos, k);
-    if constexpr (std::is_integral_v<T>) {
-      return Slot<T>(k1);
-    } else {
-      return T(k1);
-    }
-  }
-
-private:
-  __int256_t slot_;
-};
-
-}  // namespace stor
+uint256_t now() {
+  return __builtin_evm_timestamp();
+}
 
 }  // namespace evm
 

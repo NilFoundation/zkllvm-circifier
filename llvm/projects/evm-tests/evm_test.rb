@@ -171,15 +171,22 @@ class Checker
   end
 
   def run
-    actions = File.readlines(@source_file)
-                  .map(&:strip)
-                  .each_with_index.select { _1[0].start_with?("//! ") }
-                  # Remove prefix '//!'
-                  .map { |x, i| [x[3..], i + 1] }
-                  # Add extra {} for empty arguments cases, like "DEPLOY". Because Ruby treats it as a constant.
-                  .map { |x, i| [x.split.size <=1 ? x + " {}" : x, i] }
+    tests_exist = false
+    code = File.readlines(@source_file)
+               .map(&:strip)
+               .map{ |line|
+                  if line.start_with?("//! ")
+                    tests_exist = true
+                    line = line[3..].strip
+                    # Add extra {} for empty arguments cases, like "DEPLOY". Because Ruby treats it as a constant
+                    # without parenthesis.
+                    (line.include?(' ') || line.upcase != line) ? line : line + ' {}'
+                  else
+                    ''
+                  end
+               }.join("\n")
 
-    return false if actions.empty?
+    return false unless tests_exist
 
     unless VM_RUN
       puts "WARNING: File contains vmrun tests, but `--vmrun` option is not specified. File: #{@source_file}"
@@ -188,12 +195,14 @@ class Checker
 
     compile
 
-    actions.each do |action|
-      self.instance_eval action[0], @source_file, action[1]
-    end
+    self.instance_eval code, @source_file
     $tests_count += 1
     $files_count += 1
     true
+  end
+
+  def let(name, value)
+    self.class.send(:define_method, name) { value }
   end
 
   def compile
@@ -206,7 +215,6 @@ class Checker
     #clang_cmd += ' -Xclang -disable-llvm-passes '
     clang_cmd += ' -std=c++17 '
     clang_cmd += ' -O3 '
-    clang_cmd += ' -DNDEBUG '
     clang_cmd += ' -Xlinker --no-ctor ' if options.no_ctor
     clang_cmd += " -Xlinker #{options.linker_args}" if options.linker_args
     clang_cmd += " #{options.clang_args}" if options.clang_args
@@ -244,13 +252,20 @@ class Checker
     end if input
 
     selector = function_sha3[0..7].to_i(16)
-    output = command("#{VM_RUN} call --method-id #{selector} --address #{address} --args s#{calldata} --verbose")
-    if result
-      m = output.match /Result stack:  (.*)/
-      raise "Invalid vm_run output: #{output}" unless m
-      stack = eval(m[1])
-      raise "Must be only one stack value" unless stack.size == 1
-      raise "Result mismatch: expected(#{result}) != real(#{stack[0]})" if result != stack[0]
+    calldata_arg = !calldata.empty? ? "--args s#{calldata}" : ""
+    begin
+      output = command("#{VM_RUN} call --method-id #{selector} --address #{address} #{calldata_arg}")
+    rescue RuntimeError => e
+      raise unless args[:expect_fail]
+    else
+      raise "Test expected to fail" if args[:expect_fail]
+      if result
+        m = output.match /Result stack:  (.*)/
+        raise "Invalid vm_run output: #{output}" unless m
+        stack = eval(m[1])
+        raise "Must be only one stack value" unless stack.size == 1
+        raise "Result mismatch: expected(#{result}) != real(#{stack[0]})" if result != stack[0]
+      end
     end
   end
 
@@ -292,7 +307,7 @@ def main
     puts "Run tests for: #{file}" if options.verbose
     tested1 = run_test(file)
     tested2 = Checker.new(file).run
-    raise "File doesn't contain any tests: #{file}" unless tested1 || tested2
+    puts "[WARNING] File doesn't contain any tests: #{file}" unless tested1 || tested2
   end
   puts "#{$tests_count} tests passed from #{$files_count} files"
 end

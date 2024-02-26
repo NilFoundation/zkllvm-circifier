@@ -1,3 +1,4 @@
+#include <cassert>
 
 // There was a bug with the `main` function. For some reason, it was handled in
 // a special way, although it shouldn't differ from the regular functions.
@@ -58,4 +59,10 @@ int return_void_value;
 
 [[evm]] void return_void(int N) {
   return_void_value = N;
+}
+
+//! DEPLOY
+//! CALL function: :test, expect_fail: true
+[[evm]] void test() {
+  assert(false);
 }

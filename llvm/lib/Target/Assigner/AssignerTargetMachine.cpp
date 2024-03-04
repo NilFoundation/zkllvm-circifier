@@ -24,8 +24,7 @@ extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeAssignerTarget() {
 static std::string computeDataLayout(const Triple &TT) {
   assert(TT.getArch() == Triple::assigner);
   // based on x64_86:
-  return "e-m:e-p270:32:32-p271:32:32-p272:64:64-v768:8-v1152:8-v1536:8-i64:64-"
-         "f80:128-n8:16:32:64-S128";
+  return "e-m:e-p:64:8-a:8-i16:8-i32:8-i64:8-v768:8-v1152:8-v1536:8";
 }
 
 static Reloc::Model getEffectiveRelocModel(std::optional<Reloc::Model> RM) {

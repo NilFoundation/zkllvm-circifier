@@ -11,6 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 def int_assigner_malloc:    Intrinsic<[llvm_ptr_ty], [llvm_i64_ty]>;
+def int_assigner_aligned_alloc:    Intrinsic<[llvm_ptr_ty], [llvm_i64_ty, llvm_i64_ty]>;
+def int_assigner_calloc:    Intrinsic<[llvm_ptr_ty], [llvm_i64_ty, llvm_i64_ty]>;
+def int_assigner_realloc:    Intrinsic<[llvm_ptr_ty], [llvm_ptr_ty, llvm_i64_ty]>;
 def int_assigner_free:      Intrinsic<[], [llvm_ptr_ty]>;
 def int_assigner_poseidon:  Intrinsic<[llvm_anyvector_ty], [LLVMMatchType<0>]>;
 def int_assigner_sha2_256:  Intrinsic<[llvm_anyvector_ty], [LLVMMatchType<0>, LLVMMatchType<0>]>;

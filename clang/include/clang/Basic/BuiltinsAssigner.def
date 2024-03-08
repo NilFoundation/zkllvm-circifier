@@ -38,6 +38,9 @@
 // letters: https://github.com/NilFoundation/zkllvm-circifier/blob/master/clang/include/clang/Basic/Builtins.def#L20
 // numbers: https://github.com/NilFoundation/zkllvm-circifier/blob/master/clang/lib/AST/ASTContext.cpp#L11086-L11118
 BUILTIN(__builtin_assigner_malloc, "v*z", "n")
+BUILTIN(__builtin_assigner_aligned_alloc, "v*zz", "n")
+BUILTIN(__builtin_assigner_calloc, "v*zz", "n")
+BUILTIN(__builtin_assigner_realloc, "v*v*z", "n")
 BUILTIN(__builtin_assigner_free, "vv*", "n")
 BUILTIN(__builtin_assigner_poseidon_pallas_base, "E3g1E3g1", "n")
 BUILTIN(__builtin_assigner_sha2_256_pallas_base, "E2g1E2g1E2g1", "n")

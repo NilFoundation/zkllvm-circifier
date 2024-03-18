@@ -7,18 +7,18 @@ static constexpr const char* STORAGE_YAML = R"(
 types:
 - name: Foo
   fields:
-  - { name: a, type: int }
-  - { name: b, type: Vector<Bar> }
-  - { name: c, type: Vector<int> }
+  - a: i32
+  - b: Vector<Bar>
+  - c: Vector<i32>
 - name: Bar
   fields:
-  - { name: a, type: int }
-  - { name: b, type: int }
-  - { name: c, type: Vector<int> }
+  - a: i32
+  - b: i32
+  - c: Vector<i32>
 variables:
-- { name: arr, type: Vector<uint256_t> }
-- { name: arr_foo, type: Vector<Foo> }
-- { name: map_arr, type: Map<Foo> }
+- arr: Vector<u256>
+- arr_foo: Vector<Foo>
+- map_arr: Map<Foo>
 )";
 
 //! DEPLOY

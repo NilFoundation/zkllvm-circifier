@@ -1,0 +1,83 @@
+#include "evm_sdk.h"
+#include "storage.h"
+
+namespace <%= ir.namespace %> {
+
+% ir.types.select{ _2.is_a? (StructType) }.each do |name, type|
+struct <%= type.name %> {
+  static constexpr unsigned FIELDS_NUM = <%= type.slots_size %>;
+
+  <%= type.name %>(uint256_t key): <%= type.fields.map.with_index{ |x, i| x.name + '(key + ' + i.to_s + ')'}.join(', ')%> {}
+
+% #  <%= type['name'] %>(__int256_t key): <%= type['ctor_initializer'] %> {}
+%   type.fields&.each do |field|
+  <%= field.type.storage_name %> <%= field.name %>;
+%   end
+};
+
+template<__uint256_t Key>
+struct <%= type.name %>Static {
+  static constexpr unsigned FIELDS_NUM = <%= type.slots_size %>;
+%   i = 0
+%   type.fields&.each do |field|
+  <%= field.type.storage_name_static(lambda{'Key + ' + i.to_s}) %> <%= field.name %>;
+%   i += field.type.slots_size
+%   end
+};
+
+% end
+
+% i = 0
+% ir.variables&.fields.each do |field|
+<%= field.type.storage_name_static(i) %> <%= field.name %>;
+% i += field.type.slots_size
+% end
+
+}  // namespace <%= ir.namespace %>
+
+% ir.variables&.fields&.select{ _1.data['getter'] }.each do |field|
+[[evm]] uint256_t get_<%= field.name %>() {
+    return <%= ir.namespace %>::<%= field.name %>.get();
+}
+
+% end
+
+namespace evm::constants {
+
+% ir.data['constants']&.each do |constant|
+%   type = constant['type']
+%   if constant.include?('constants')
+
+namespace <%= constant['name'] %> {
+%     constant['constants'].each do |constant|
+    static constexpr uint256_t <%= constant['name'] %> = <%= constant['value'] %>;
+%     end
+}
+%   else
+static constexpr uint256_t <%= constant['name'] %> = <%= constant['value'] %>;
+%   end
+% end
+
+}  // namespace evm::constants
+
+namespace evm::ser {
+
+% ir.types.each do |name, type|
+%   next unless type.is_a?(StructType)
+%   next if type.descr['flags']&.include?("storage")
+struct DVM_PACKED <%= name %> {
+%   if type.descr['flags']&.include?("message")
+    MessageHeader header;
+%   end
+%   type.fields.each do |field|
+%     init = field.descr.include?('constant') ? 'evm::constants::' + field.descr['constant'] : ''
+    <%= field.type.cpp_name %> <%= field.name %>{<%= init %>};
+%   end
+    static constexpr unsigned size() {
+        return sizeof(<%= name %>);
+    }
+};
+
+% end
+
+}  // namespace evm::ser

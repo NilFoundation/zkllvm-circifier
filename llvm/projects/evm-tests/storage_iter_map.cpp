@@ -6,16 +6,17 @@ using namespace evm;
 static constexpr const char* STORAGE_YAML = R"(
 types:
 - name: Foo
+  flags: [storage]
   fields:
-  - { name: a, type: uint256_t }
-  - { name: b, type: uint256_t }
-  - { name: c, type: uint256_t }
-  - { name: map, type: IterableMap<int> }
+  - a: u256
+  - b: u256
+  - c: u256
+  - map: IterableMap<i32>
 variables:
-- { name: dummy, type: Foo }
-- { name: map, type: IterableMap<int> }
-- { name: map_foo, type: IterableMap<Foo> }
-- { name: flag, type: bool }
+- dummy: Foo
+- map: IterableMap<i32>
+- map_foo: IterableMap<Foo>
+- flag: bool
 )";
 
 //! DEPLOY

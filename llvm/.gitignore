@@ -31,7 +31,7 @@ autoconf/autom4te.cache
 # Visual Studio built-in CMake configuration
 /CMakeSettings.json
 # CLion project configuration
-/.idea
+.idea
 # Qt Creator project configuration
 /CMakeLists.txt.user
 
@@ -43,6 +43,7 @@ projects/*
 !projects/*.*
 !projects/evm-sdk
 !projects/evm-tests
+!projects/evm-tools
 !projects/Makefile
 runtimes/*
 !runtimes/*.*

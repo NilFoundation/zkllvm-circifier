@@ -143,7 +143,7 @@ let TargetPrefix = "evm" in {  // All intrinsics start with "llvm.evm."
                         [IntrWriteMem, IntrHasSideEffects]>;
 
   def int_evm_revert : ClangBuiltin<"__builtin_evm_revert">,
-              Intrinsic<[], [llvm_i256_ty, llvm_i256_ty], [IntrWriteMem, IntrHasSideEffects, IntrNoReturn]>;
+              Intrinsic<[], [llvm_ptr_ty, llvm_i256_ty], [IntrWriteMem, IntrHasSideEffects, IntrNoReturn]>;
 
   def int_evm_return : ClangBuiltin<"__builtin_evm_return">,
               Intrinsic<[], [llvm_i256_ty, llvm_i256_ty], [IntrWriteMem, IntrHasSideEffects, IntrNoReturn]>;
@@ -169,4 +169,7 @@ let TargetPrefix = "evm" in {  // All intrinsics start with "llvm.evm."
               Intrinsic<[llvm_i256_ty], [llvm_i256_ty, llvm_i256_ty, llvm_i256_ty], [IntrNoMem]>;
 
   def int_evm_printf : Intrinsic<[], [llvm_ptr_ty, llvm_vararg_ty], []>;
+
+  def int_evm_cload : ClangBuiltin<"__builtin_evm_cload">,
+                Intrinsic<[llvm_i256_ty], [llvm_i256_ty], [IntrNoMem, IntrHasSideEffects]>;
 }

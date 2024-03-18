@@ -62,7 +62,7 @@ int return_void_value;
 }
 
 //! DEPLOY
-//! CALL function: :test, expect_fail: true
-[[evm]] void test() {
+//! CALL function: :test_assert, expect_fail: true
+[[evm]] void test_assert() {
   assert(false);
 }

@@ -5,23 +5,25 @@ using namespace evm;
 
 static constexpr const char* STORAGE_YAML = R"(
 variables:
-- { name: gv, type: int }
-- { name: map, type: Map<Foo> }
-- { name: foo, type: Foo }
+- gv: i32
+- map: Map<Foo>
+- foo: Foo
 
 types:
 - name: Foo
+  flags: [storage]
   fields:
-  - { name: a, type: int }
-  - { name: b, type: int }
-  - { name: c, type: Map<Bar> }
-  - { name: d, type: Map<int> }
-  - { name: bar, type: Bar }
+  - a: i32
+  - b: i32
+  - c: Map<Bar>
+  - d: Map<i32>
+  - bar: Bar
 - name: Bar
+  flags: [storage]
   fields:
-  - { name: a, type: int }
-  - { name: b, type: int }
-  - { name: d, type: Map<int> }
+  - a: i32
+  - b: i32
+  - d: Map<i32>
 )";
 
 //! let :value, 123456

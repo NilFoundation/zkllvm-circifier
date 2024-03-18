@@ -1,0 +1,38 @@
+
+namespace dvm::<%= ir.namespace %> {
+
+namespace slots {
+enum {
+% slot = 0
+% ir.variables.fields.each do |var|
+    <%= var.name %> = <%= slot %>,
+%   if var.type.is_a?(StructType)
+%     var.type.fields.each do |field|
+%       raise "Unsupported nested struct type" if field.type.is_a?(StructType)
+    <%= var.name %>_<%= field.name %> = <%= slot %>,
+%       slot += field.type.slots_size
+%     end
+%   else
+%   slot += var.type.slots_size
+%   end
+% end
+};
+
+}
+
+namespace sizes {
+enum {
+% ir.variables.fields.each do |var|
+%   if var.type.is_a?(StructType)
+%     var.type.fields.each do |field|
+%       next unless field.type.is_a?(PrimitiveType)
+    <%= var.name %>_<%= field.name %> = <%= field.type.bytes_size %>,
+%     end
+%   elsif var.type.is_a?(PrimitiveType)
+    <%= var.name %> = <%= var.type.bytes_size %>,
+%   end
+% end
+};
+}
+
+}  // namespace dvm::<%= ir.namespace %>

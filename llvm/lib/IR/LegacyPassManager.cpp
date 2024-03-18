@@ -1472,8 +1472,8 @@ bool FPPassManager::runOnFunction(Function &F) {
 #endif
       LocalChanged |= FP->runOnFunction(F);
 
-#define DUMPE 1
-      if (DUMPE && (LocalChanged || Index == 0)) {
+#define IR_DUMP_ENABLED 0
+      if (IR_DUMP_ENABLED && (LocalChanged || Index == 0)) {
         auto DirName = "ir_dump/" + CanonizeName(F.getName());
         if (auto Error = sys::fs::create_directories(DirName, true)) {
           errs() << "DIRECTORY NAME:" << DirName << '\n';

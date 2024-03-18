@@ -7,17 +7,17 @@ static constexpr const char* STORAGE_YAML = R"(
 types:
 - name: Foo
   fields:
-  - { name: a, type: uint256_t }
-  - { name: b, type: uint256_t }
-  - { name: c, type: uint256_t }
+  - a: u256
+  - b: u256
+  - c: u256
 - name: Bar
   fields:
-  - { name: a, type: uint256_t }
-  - { name: b, type: uint256_t }
-  - { name: c, type: uint256_t }
+  - a: u256
+  - b: u256
+  - c: u256
 variables:
-- { name: foo, type: Foo }
-- { name: bar, type: Bar }
+- foo: Foo
+- bar: Bar
 )";
 
 //! DEPLOY

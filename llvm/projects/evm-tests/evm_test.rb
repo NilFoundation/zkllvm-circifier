@@ -31,8 +31,8 @@ end.parse!(into: $options)
 
 def options; $options; end
 
-VM_RUN = options.vmrun # "/home/mike/bld/dbms-nix/bin/vmrun/vm_run"
-ECC_GEN = "#{__dir__}/../evm-sdk/ecc_gen.rb"
+VM_RUN = options.vmrun
+ECC_TOOL = "#{__dir__}/../evm-tools/ecc_tool.rb"
 
 options.src_dir = File.realpath(__dir__ + '/../../../') unless options.src_dir
 
@@ -83,7 +83,7 @@ def run_vm(codefile, input=nil)
   input = input ? "--input #{input}" : ""
   if options.evmone
     result = command("#{options.evmone}/bin/evmc run @#{codefile} --vm #{options.evmone}/lib/libevmone.so,trace-bin #{input}").strip
-    m = result.match /Output: +(.*)$/
+    m = result.match /Output: *(.*)$/
     raise "Invalid evmc output: #{result}" unless m
     return m[1]
   end
@@ -207,7 +207,7 @@ class Checker
 
   def compile
 
-    command("ruby #{ECC_GEN} -c #{@source_file}")
+    command("ruby #{ECC_TOOL} #{@source_file} --generate=contract --output #{@basename}_gen.h")
 
     clang_cmd = "#{@bindir}/ecc #{@source_file} -o #{@codefile} "
     clang_cmd += ' -v ' if options.verbose
@@ -236,6 +236,7 @@ class Checker
     function = args[:function]&.to_s
     address = args[:address] || 0
     result = args[:result]
+    no_result = args[:no_result]
     input = args[:input]
 
     raise "Function name must be specified" unless function
@@ -262,9 +263,15 @@ class Checker
       if result
         m = output.match /Result stack:  (.*)/
         raise "Invalid vm_run output: #{output}" unless m
-        stack = eval(m[1])
-        raise "Must be only one stack value" unless stack.size == 1
-        raise "Result mismatch: expected(#{result}) != real(#{stack[0]})" if result != stack[0]
+        # TODO: remove this line once we get rid of `bytes.fromhex` from method's output
+        res = m[1].gsub(/bytes.fromhex\((.+?)\)/, '\1')
+        stack = eval(res)
+        if no_result
+          raise "Method return non empty stack for test with `no_result`" unless stack.empty?
+        else
+          raise "Must be only one stack value" unless stack.size == 1
+          raise "Result mismatch: expected(#{result}) != real(#{stack[0]})" if result != stack[0]
+        end
       end
     end
   end
@@ -276,7 +283,6 @@ class Checker
     raise "Key must be specified" unless key
 
     def calc_key(key, hex_out=true)
-      # return key if key.is_a? Integer
       s = key.reduce('') do |acc, key|
         acc + (key.is_a?(Array) ? calc_key(key, false) : pack_i256(key))
       end

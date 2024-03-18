@@ -359,6 +359,10 @@ defm SLOAD  : Inst_1_1<"SLOAD",
 defm SSTORE : Inst_2_0<"SSTORE",
                        [(int_evm_sstore GPR:$src1, GPR:$src2)],
                        0x55, 200000>;
+
+defm CLOAD  : Inst_1_1<"CLOAD",
+                       [(set GPR:$dst, (int_evm_cload GPR:$src))],
+                       0xc4, 200>;
 }
 
 let isBranch = 1, isTerminator = 1, isIndirectBranch = 1 in {
@@ -699,6 +703,8 @@ def : Pat<(i256 (int_evm_sload GPR:$addr)),
           (i256 (SLOAD_r GPR:$addr))>;
 def : Pat<(int_evm_sstore GPR:$offset, GPR:$value),
           (SSTORE_r GPR:$offset, GPR:$value)>;
+def : Pat<(i256 (int_evm_cload GPR:$addr)),
+          (i256 (CLOAD_r GPR:$addr))>;
 
 def : Pat<(int_evm_mload GPR:$addr), (MLOAD_r GPR:$addr)>;
 def : Pat<(int_evm_mstore GPR:$offset, GPR:$value),

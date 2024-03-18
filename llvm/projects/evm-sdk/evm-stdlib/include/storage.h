@@ -1,3 +1,6 @@
+#ifndef _STORAGE_H
+#define _STORAGE_H
+
 #include "evm_sdk.h"
 #include <utility>
 
@@ -11,7 +14,8 @@ void remove_sequence(uint256_t slot,
   (__builtin_evm_sstore(slot + Slots, 0), ...);
 }
 
-template <typename T> void clear(uint256_t slot) {
+template <typename T>
+void clear(uint256_t slot) {
   if constexpr (std::is_integral_v<T>) {
     __builtin_evm_sstore(slot, 0);
   } else {
@@ -20,16 +24,44 @@ template <typename T> void clear(uint256_t slot) {
   }
 }
 
-template <class T, unsigned slot_>
+struct ConfigAccessor {
+  static uint256_t load(uint256_t slot) {
+    return __builtin_evm_cload(slot);
+  }
+
+  static void store(uint256_t slot, uint256_t v) {
+    __builtin_evm_revert(0, 0);
+  }
+};
+
+struct StorageAccessor {
+  static uint256_t load(uint256_t slot) {
+    return __builtin_evm_sload(slot);
+  }
+
+  static void store(uint256_t slot, uint256_t v) {
+    __builtin_evm_sstore(slot, v);
+  }
+};
+
+template <typename T, typename Accessor, unsigned slot_>
 struct SlotStaticImpl {
   using ValueType = T;
 
   static constexpr uint256_t slot() {
     return slot_;
   }
+
+  uint256_t load() const {
+    return Accessor::load(slot_);
+  }
+
+  void store(uint256_t v) const {
+    Accessor::store(slot_, v);
+  }
 };
 
-template <class T>
+template <class T, typename Accessor>
 struct SlotImpl {
   using ValueType = T;
 
@@ -37,6 +69,14 @@ struct SlotImpl {
 
   uint256_t slot() const {
     return slot_;
+  }
+
+  uint256_t load() const {
+    return Accessor::load(slot_);
+  }
+
+  void store(uint256_t v) const {
+    Accessor::store(slot_, v);
   }
 
   uint256_t slot_;
@@ -50,11 +90,15 @@ struct SlotBase: private Impl {
   using Impl::Impl;
 
   void set(const ValueType &v) {
-    __builtin_evm_sstore(Impl::slot(), v);
+    Impl::store(v);
+  }
+
+  uint256_t slot() const {
+    return Impl::slot();
   }
 
   ValueType get() const {
-    return __builtin_evm_sload(Impl::slot());
+    return Impl::load();
   }
 
   SlotBase& operator=(const ValueType &v) {
@@ -68,10 +112,10 @@ struct SlotBase: private Impl {
 };
 
 template<typename T>
-using Slot = SlotBase<details::SlotImpl<T>>;
+using Slot = SlotBase<details::SlotImpl<T, details::StorageAccessor>>;
 
 template<typename T, uint256_t Key>
-using SlotStatic = SlotBase<details::SlotStaticImpl<T, Key>>;
+using SlotStatic = SlotBase<details::SlotStaticImpl<T, details::StorageAccessor, Key>>;
 
 /*******************************************************************************
  * Dynamic array.
@@ -95,7 +139,7 @@ public:
   }
 
   unsigned size() const {
-    return __builtin_evm_sload(Impl::slot());
+    return Impl::load();
   }
 
   bool empty() const {
@@ -105,7 +149,7 @@ public:
   auto push() {
     auto sz = size();
     uint256_t new_size = sz + 1;
-    __builtin_evm_sstore(Impl::slot(), new_size);
+    Impl::store(new_size);
     return operator[](sz);
   }
 
@@ -113,7 +157,7 @@ public:
     auto sz = size();
     require(sz != 0);
     details::clear<ValueType>(get_storage_key() + sz - 1);
-    __builtin_evm_sstore(Impl::slot(), sz - 1);
+    Impl::store(sz - 1);
   }
 
 private:
@@ -123,10 +167,10 @@ private:
 };
 
 template<typename T>
-using Vector = VectorBase<details::SlotImpl<T>>;
+using Vector = VectorBase<details::SlotImpl<T, details::StorageAccessor>>;
 
 template<typename T, uint256_t Slot>
-using VectorStatic = VectorBase<details::SlotStaticImpl<T, Slot>>;
+using VectorStatic = VectorBase<details::SlotStaticImpl<T, details::StorageAccessor, Slot>>;
 
 /*******************************************************************************
  * Basic map.
@@ -158,10 +202,10 @@ struct MapBase: private Impl {
 };
 
 template<typename T>
-using Map = MapBase<details::SlotImpl<T>>;
+using Map = MapBase<details::SlotImpl<T, details::StorageAccessor>>;
 
 template<typename T, uint256_t Slot>
-using MapStatic = MapBase<details::SlotStaticImpl<T, Slot>>;
+using MapStatic = MapBase<details::SlotStaticImpl<T, details::StorageAccessor, Slot>>;
 
 /*******************************************************************************
  * Iterable map.
@@ -192,6 +236,18 @@ public:
   uint256_t get_key_at(uint256_t index) const {
     require(index < size());
     return Impl::keys[index].get();
+  }
+
+  auto get_at_index(uint256_t index) {
+    auto key = get_key_at(index);
+    return operator[](key);
+  }
+
+  void clear() {
+    for (unsigned i = 0; i < size(); i++) {
+      auto key = Impl::keys[i].get();
+      remove(key);
+    }
   }
 
   void remove(uint256_t key) {
@@ -255,3 +311,25 @@ template<typename T, uint256_t Slot>
 using IterableMapStatic = IterableMapBase<IterableMapStaticImpl<T, Slot>>;
 
 }  // namespace evm::stor
+
+namespace evm::config {
+
+template<typename T>
+using Slot = evm::stor::SlotBase<evm::stor::details::SlotImpl<T, evm::stor::details::ConfigAccessor>>;
+template<typename T, uint256_t Key>
+using SlotStatic = evm::stor::SlotBase<evm::stor::details::SlotStaticImpl<T, evm::stor::details::ConfigAccessor, Key>>;
+
+template<typename T>
+using Vector = evm::stor::VectorBase<evm::stor::details::SlotImpl<T, evm::stor::details::ConfigAccessor>>;
+template<typename T, uint256_t Slot>
+using VectorStatic = evm::stor::VectorBase<evm::stor::details::SlotStaticImpl<T, evm::stor::details::ConfigAccessor, Slot>>;
+
+template<typename T>
+using Map = evm::stor::MapBase<evm::stor::details::SlotImpl<T, evm::stor::details::ConfigAccessor>>;
+template<typename T, uint256_t Slot>
+using MapStatic = evm::stor::MapBase<evm::stor::details::SlotStaticImpl<T, evm::stor::details::ConfigAccessor, Slot>>;
+
+}  // namespace evm::config
+
+
+#endif  // _STORAGE_H

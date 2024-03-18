@@ -30,6 +30,9 @@
 // Offset to the data where init data will be located.
 static constexpr unsigned InitDataOffset = 32 * 2;
 
+// Slot of the size of the arbitrary-sized return data.
+static constexpr unsigned ReturnSizeOffset = 32 * 1;
+
 // Default size of memory chunk to be fixed by resolved symbol relocation.
 static constexpr unsigned SymbolRelocSizeInBytes = 4;
 

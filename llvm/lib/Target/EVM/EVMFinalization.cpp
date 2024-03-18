@@ -139,7 +139,6 @@ bool EVMFinalization::runOnMachineFunction(MachineFunction &MF) {
       BuildMI(MBB, begin, begin->getDebugLoc(), TII->get(EVM::BEGINSUB));
     }
 
-
     // use iterator since we need to remove pseudo instructions
     for (MachineBasicBlock::iterator I = MBB.begin(), E = MBB.end();
          I != E;) {
@@ -161,39 +160,29 @@ bool EVMFinalization::runOnMachineFunction(MachineFunction &MF) {
     }
   }
 
+  auto& MFI = *MF.getInfo<EVMMachineFunctionInfo>();
+  if (MFI.hasDynamicAlloc()) {
+    // For dynamically sized frame, we need to allocate additional slot in
+    // frame, and write frame size there. It will be updated each time dynamic
+    // allocation occurs.
+    auto I = ++(MF.begin()->instr_begin()); //->getNextNode();
+    auto &MBB = *MF.begin();
+    auto Offset = MF.getFrameInfo().getObjectOffset(MFI.getDynSizeIndex());
+    unsigned FpAddress = MF.getSubtarget<EVMSubtarget>().getFramePointer();
 
-  // Emit final code to separate file. It is better than disassembling of the result binary, since it contains basic
-  // blocks and some additional information.
-  // TODO(EVM): this is kept in the repository solely for debug purposes. Once the EVM matures, we need to rework it.
-  if (1) {
-    unsigned Pc = 89;
-    std::error_code EC;
-    raw_fd_ostream OS("code.ir", EC);
-    OS << "Function: " << MF.getName() << '\n';
-    for (MachineBasicBlock &MBB : MF) {
-      OS << "\nbb." << MBB.getNumber()<< '.' << MBB.getName() << ":\n";
-      OS << "; predecessors: ";
-      if (!MBB.pred_empty()) {
-        ListSeparator LS;
-        for (auto *Pred : MBB.predecessors())
-          OS << LS << printMBBReference(*Pred);
-        OS << '\n';
-      }
-      if (!MBB.succ_empty()) {
-        OS.indent(2) << "successors: ";
-        ListSeparator LS;
-        for (auto I = MBB.succ_begin(), E = MBB.succ_end(); I != E; ++I) {
-          OS << LS << printMBBReference(**I);
-        }
-        OS << '\n';
-      }
-      for (auto &MI : MBB) {
-        OS << "  " << Pc << " " << MI;
-        Pc += 1;
-        // TSFlags contains immediate size
-        Pc += MI.getDesc().TSFlags;
-      }
-    }
+    auto TII = MF.getSubtarget<EVMSubtarget>().getInstrInfo();
+    BuildMI(MBB, *I, DebugLoc(), TII->get(EVM::PUSH4))
+        .addImm(FpAddress);
+    BuildMI(MBB, *I, DebugLoc(), TII->get(EVM::MLOAD));     // fp
+    BuildMI(MBB, *I, DebugLoc(), TII->get(EVM::DUP1));      // fp, fp
+    BuildMI(MBB, *I, DebugLoc(), TII->get(EVM::PUSH4))
+        .addImm(MFI.getFrameSizeInBytes());                 // fp, fp, frame_size
+    BuildMI(MBB, *I, DebugLoc(), TII->get(EVM::ADD));       // fp, new_fp = fp + frame_size
+    BuildMI(MBB, *I, DebugLoc(), TII->get(EVM::SWAP1));     // new_fp, fp
+    BuildMI(MBB, *I, DebugLoc(), TII->get(EVM::PUSH4))
+        .addImm(Offset);                                    // new_fp, fp, dyn_size_offset
+    BuildMI(MBB, *I, DebugLoc(), TII->get(EVM::ADD));       // new_fp, dyn_size_slot
+    BuildMI(MBB, *I, DebugLoc(), TII->get(EVM::MSTORE));
   }
 
   return Changed;

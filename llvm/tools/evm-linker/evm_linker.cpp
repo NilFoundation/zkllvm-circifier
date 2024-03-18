@@ -307,13 +307,25 @@ void EvmLinker::buildDispatcher() {
       Dispatcher.inst(opcodes::JUMP);
       Dispatcher.jump_dest(Func->Name + "#return");
       if (!Func->Outputs.empty()) {
-        // TODO: Should read function's abi to determine return size.
-        assert(Func->Outputs.size() == 1);
+        assert(Func->Outputs.size() == 1 && "Multiple return is not supported");
+        auto& Output = Func->Outputs.front();
+        if (Output == EVM::ValType::PTR) {
+          // Function returns data with arbitrary size. Which is stored in the memory at slot
+          // `ReturnSizeOffset`. So we read it here and return to the caller as a size of return
+          // data.
+          Dispatcher.inst(opcodes::PUSH1, ReturnSizeOffset);
+          Dispatcher.inst(opcodes::MLOAD);
+          Dispatcher.inst(opcodes::SWAP1);
+        } else {
+          Dispatcher.inst(opcodes::PUSH1, 0);
+          Dispatcher.inst(opcodes::MSTORE);
+          Dispatcher.inst(opcodes::PUSH1, 0x20);
+          Dispatcher.inst(opcodes::PUSH1, 0);
+        }
+      } else {
         Dispatcher.inst(opcodes::PUSH1, 0);
-        Dispatcher.inst(opcodes::MSTORE);
+        Dispatcher.inst(opcodes::PUSH1, 0);
       }
-      Dispatcher.inst(opcodes::PUSH1, 0x20);
-      Dispatcher.inst(opcodes::PUSH1, 0);
       Dispatcher.inst(opcodes::RETURN);
     }
   }

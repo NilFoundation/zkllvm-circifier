@@ -49,7 +49,6 @@ EVMTargetLowering::EVMTargetLowering(const TargetMachine &TM,
   setBooleanContents(ZeroOrOneBooleanContent);
   setBooleanVectorContents(ZeroOrOneBooleanContent);
   setSchedulingPreference(Sched::RegPressure);
-  setStackPointerRegisterToSaveRestore(EVM::SP);
 
   setOperationAction(ISD::CopyToReg, MVT::Other, Custom);
 
@@ -113,8 +112,9 @@ EVMTargetLowering::EVMTargetLowering(const TargetMachine &TM,
     setOperationAction(ISD::FrameIndex, VT, Custom);
     setOperationAction(ISD::TargetFrameIndex, VT, Custom);
 
-    // FIXME: DYNAMIC_STACKALLOC
-    setOperationAction(ISD::DYNAMIC_STACKALLOC, VT, Expand);
+    setOperationAction(ISD::DYNAMIC_STACKALLOC, VT, Custom);
+    setOperationAction(ISD::STACKSAVE, VT, Custom);
+    setOperationAction(ISD::STACKRESTORE, VT, Custom);
   }
   setOperationAction(ISD::BR_CC, MVT::i256, Custom);
   setOperationAction(ISD::BR_JT, MVT::Other, Expand);
@@ -382,6 +382,8 @@ SDValue EVMTargetLowering::LowerOperation(SDValue Op,
     // arithmetic instructions.
     return DAG.getNode(ISD::TRUNCATE, SDLoc(Op), Op.getValueType(), Res);
   }
+  case ISD::DYNAMIC_STACKALLOC:
+    return LowerDYNAMIC_STACKALLOC(Op, DAG);
   case ISD::CTLZ:
   case ISD::CTTZ:
   case ISD::CTLZ_ZERO_UNDEF:
@@ -433,6 +435,33 @@ SDValue EVMTargetLowering::LowerCtxz(SDValue Op, SelectionDAG &DAG) const {
   return ResNode;
 }
 
+SDValue EVMTargetLowering::LowerDYNAMIC_STACKALLOC(SDValue Op, SelectionDAG &DAG) const {
+  SDLoc DL(Op);
+  SDValue Chain = Op.getOperand(0);
+  SDValue Size = Op.getOperand(1);
+
+  MachineFunction &MF = DAG.getMachineFunction();
+  auto& MFI = *MF.getInfo<EVMMachineFunctionInfo>();
+
+  if (!MFI.hasDynamicAlloc()) {
+    auto Ty = IntegerType::get(MF.getFunction().getContext(), 32);
+    auto Align = MF.getDataLayout().getPrefTypeAlign(Ty);
+    auto Index = MF.getFrameInfo().CreateStackObject(32, Align, false);
+    MFI.setDynSizeIndex(Index);
+  }
+
+  auto FI = DAG.getTargetFrameIndex(MFI.getDynSizeIndex(), {MVT::i256});
+  auto LD = DAG.getLoad(MVT::i256, DL, Chain, FI, MachinePointerInfo());
+  if (Size.getValueSizeInBits() < 256) {
+    Size = DAG.getNode(ISD::ZERO_EXTEND, DL, {MVT::i256}, Size);
+  }
+  auto NewDynSize = DAG.getNode(ISD::ADD, DL, MVT::i256, {LD, Size});
+  LD = DAG.getNode(ISD::TRUNCATE, DL, Op.getValueType(), LD);
+  Chain = DAG.getStore(Chain, DL, NewDynSize, FI, MachinePointerInfo());
+
+  return DAG.getMergeValues({LD, Chain}, DL);
+}
+
 SDValue EVMTargetLowering::LowerCopyToReg(SDValue Op,
                                           SelectionDAG &DAG) const {
   SDValue Src = Op.getOperand(2);
@@ -457,11 +486,27 @@ void EVMTargetLowering::ReplaceNodeResults(SDNode *N,
                                            SelectionDAG &DAG) const {
   SDLoc DL(N);
 
-  assert(N->getNumValues() == 1);
+  // TODO: Support stacksave/stackrestore. Currently we just ignore them.
+  if (N->getOpcode() == ISD::STACKSAVE) {
+    Results.push_back(N->getOperand(0));
+    Results.push_back(N->getOperand(0));
+    return;
+  }
+  if (N->getOpcode() == ISD::STACKRESTORE) {
+    Results.push_back(N->getOperand(0));
+    Results.push_back(N->getOperand(1));
+    return;
+  }
+
 
   auto Result = LowerOperation(SDValue(N, 0), DAG);
-
-  Results.push_back(Result);
+  if (Result.getOpcode() == ISD::MERGE_VALUES) {
+    for (unsigned i = 0; i < Result.getNumOperands(); i++) {
+      Results.push_back(Result.getOperand(i));
+    }
+  } else {
+    Results.push_back(Result);
+  }
 }
 
 MachineBasicBlock *

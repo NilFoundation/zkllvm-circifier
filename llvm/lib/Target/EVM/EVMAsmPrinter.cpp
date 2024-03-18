@@ -203,11 +203,16 @@ void EVMAsmPrinter::emitConstantPool() {
     Signature->Params.push_back(valTypeFromMVT(RegisterVT));
   }
 
-  ComputeValueVTs(TLI, DL, F.getFunctionType()->getReturnType(), EResults);
-  for (EVT VT : EResults) {
-    auto RegisterVT = TLI.getRegisterType(F.getContext(), VT);
-    Signature->Returns.push_back(valTypeFromMVT(RegisterVT));
+  if (F.getFunctionType()->getReturnType()->isPointerTy()) {
+    Signature->Returns.push_back(ValType::PTR);
+  } else {
+    ComputeValueVTs(TLI, DL, F.getFunctionType()->getReturnType(), EResults);
+    for (EVT VT : EResults) {
+      auto RegisterVT = TLI.getRegisterType(F.getContext(), VT);
+      Signature->Returns.push_back(valTypeFromMVT(RegisterVT));
+    }
   }
+
   Streamer->emitFunctionType(Sym);
 }
 

@@ -146,13 +146,15 @@ static unsigned getSlotMemOpcode(bool IsStore) {
 }
 
 int EVMConvertRegToStack::convertCall(MachineInstr &MI, MachineBasicBlock &MBB) const {
-  int StackOpcode = -1;
-
   auto& MF = *MBB.getParent();
   EVMMachineFunctionInfo *MFI = MF.getInfo<EVMMachineFunctionInfo>();
 
   unsigned FrameSize = MFI->getFrameSizeInBytes();
   assert(FrameSize % MFI->getStackSlotSizeInBytes() == 0);
+  if (MFI->hasDynamicAlloc()) {
+    // Additional slot for dynamic frame size.
+    FrameSize += MFI->getStackSlotSizeInBytes();
+  }
 
   auto* InsertBefore = &MI;
   auto MakeInst = [&]<class... Imms>(unsigned Opcode, Imms... imms) {
@@ -167,22 +169,45 @@ int EVMConvertRegToStack::convertCall(MachineInstr &MI, MachineBasicBlock &MBB) 
   using namespace EVM;
   auto LoadOpc = getSlotMemOpcode(false);
   auto StoreOpc = getSlotMemOpcode(true);
+  auto SlotSize = MFI->getStackSlotSizeInBytes();
 
-  // Save current FP in the slot after current frame
-  MakeInst(PUSH32, FpAddress).addComment(MF, "Call start");
-                                // fpaddr
-  MakeInst(MLOAD);              // fp
-  MakeInst(DUP1);               // fp, fp
-  MakeInst(PUSH32, FrameSize);  // fp, fp, frame_size
-  MakeInst(ADD);                // fp, fp + frame_size
-  MakeInst(StoreOpc);           // -
+  // Update FP for the callee frame
+  if (MFI->hasDynamicAlloc()) {
+    // Function has dynamic stack allocation, so we need to read frame size
+    // from the special slot in the frame.
+    auto Offset = MF.getFrameInfo().getObjectOffset(MFI->getDynSizeIndex());
+    MakeInst(PUSH32, FpAddress)  // fpaddr
+        .addComment(MF, "Call start");
+    MakeInst(MLOAD);             // fp
+    MakeInst(DUP1);              // fp, fp
+    MakeInst(PUSH32, Offset);    // fp, fp, dyn_size_offset
+    MakeInst(ADD);               // fp, new_fp_slot
+    MakeInst(MLOAD);             // fp, new_fp
+    MakeInst(PUSH32, SlotSize);  // fp, new_fp, slot_size
+    MakeInst(ADD);               // fp, new_fp + slot_size
+    MakeInst(SWAP1);             // new_fp, fp
+    MakeInst(DUP2);              // new_fp, fp, new_fp
+    MakeInst(PUSH32, SlotSize);  // new_fp, fp, new_fp, slot_size
+    MakeInst(SWAP1);             // new_fp, fp, slot_size, new_fp
+    MakeInst(SUB);               // new_fp, fp, new_fp - slot_size
+    MakeInst(StoreOpc);          // new_fp
+  } else {
+    // Save current FP in the slot after current frame
+    MakeInst(PUSH32, FpAddress)   // fpaddr
+        .addComment(MF, "Call start");
+    MakeInst(MLOAD);              // fp
+    MakeInst(DUP1);               // fp, fp
+    MakeInst(PUSH32, FrameSize);  // fp, fp, frame_size
+    MakeInst(ADD);                // fp, fp + frame_size
+    MakeInst(StoreOpc);           // -
 
-  // Update FP to the callee frame
-  MakeInst(PUSH32, FpAddress);  // fpaddr
-  MakeInst(MLOAD);              // fp
-  MakeInst(PUSH32, FrameSize + MFI->getStackSlotSizeInBytes());
-                                // fp, frame_size
-  MakeInst(ADD);                // new_fp
+    MakeInst(PUSH32, FpAddress); // fpaddr
+    MakeInst(MLOAD);             // fp
+    MakeInst(PUSH32, FrameSize + SlotSize);
+    // fp, frame_size
+    MakeInst(ADD); // new_fp
+  }
+
   MakeInst(DUP1);               // new_fp, new_fp
   MakeInst(PUSH32, FpAddress);  // new_fp, new_fp, fpaddr
   MakeInst(MSTORE);             // new_fp
@@ -192,6 +217,7 @@ int EVMConvertRegToStack::convertCall(MachineInstr &MI, MachineBasicBlock &MBB) 
   MakeInst(PUSH32, SpAddress);  // new_fp, spaddr
   MakeInst(MSTORE);             // -
 
+  int StackOpcode;
   if (MF.getSubtarget<EVMSubtarget>().hasSubroutine()) {
       // With subroutine support we do not push return address on to stack
       StackOpcode = EVM::JUMPSUB;
@@ -219,8 +245,7 @@ int EVMConvertRegToStack::convertCall(MachineInstr &MI, MachineBasicBlock &MBB) 
   MakeInst(JUMPDEST).addComment(MF, "Call continuation");
   MakeInst(PUSH32, FpAddress);  // fpaddr
   MakeInst(MLOAD);              // fp
-  MakeInst(PUSH32, MFI->getStackSlotSizeInBytes());
-                                // fp, slot_size
+  MakeInst(PUSH32, SlotSize);   // fp, slot_size
   MakeInst(SWAP1);              // slot_size, fp
   MakeInst(SUB);                // fp - slot_size
   MakeInst(LoadOpc);            // caller_fp

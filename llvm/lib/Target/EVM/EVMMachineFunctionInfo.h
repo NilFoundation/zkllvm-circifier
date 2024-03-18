@@ -42,6 +42,18 @@ public:
     return SpillsCount * getStackSlotSizeInBytes() + LocalsSize;
   }
 
+  bool hasDynamicAlloc() const {
+    return DynSizeIndex != -1;
+  }
+
+  void setDynSizeIndex(int I) {
+    DynSizeIndex = I;
+  }
+
+  int getDynSizeIndex() const {
+    return DynSizeIndex;
+  }
+
   static unsigned getStackSlotSizeInBytes() {
     return 8;
   }
@@ -50,7 +62,7 @@ private:
   MachineFunction &MF;
   unsigned NumStackArgs{0};
   unsigned SpillsCount{0};
-
+  int DynSizeIndex{-1};
 };
 
 } // end namespace llvm

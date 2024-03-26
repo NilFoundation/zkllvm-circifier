@@ -39,7 +39,7 @@
 // numbers: https://github.com/NilFoundation/zkllvm-circifier/blob/master/clang/lib/AST/ASTContext.cpp#L11086-L11118
 BUILTIN(__builtin_assigner_malloc, "v*z", "n")
 BUILTIN(__builtin_assigner_free, "vv*", "n")
-BUILTIN(__builtin_assigner_poseidon_pallas_base, "E3g1E3g1", "n")
+BUILTIN(__builtin_assigner_poseidon_pallas_base, "g1g1g1", "n")
 BUILTIN(__builtin_assigner_sha2_256_pallas_base, "E2g1E2g1E2g1", "n")
 BUILTIN(__builtin_assigner_sha2_256_bls12381_base, "g3g3", "n")
 BUILTIN(__builtin_assigner_sha2_512_curve25519, "g6e4e4E4g1", "n")

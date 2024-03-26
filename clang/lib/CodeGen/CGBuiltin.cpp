@@ -20570,7 +20570,7 @@ Value *CodeGenFunction::EmitAssignerBuiltinExpr(unsigned int BuiltinID,
     ID = Intrinsic::assigner_poseidon;
     auto ElemTy = llvm::GaloisFieldType::get(context,
                                              llvm::GALOIS_FIELD_PALLAS_BASE);
-    OverloadTypes = {llvm::FixedVectorType::get(ElemTy, 3)};
+    OverloadTypes = {ElemTy};
     break;
   }
   case assigner::BI__builtin_assigner_sha2_256_pallas_base: {

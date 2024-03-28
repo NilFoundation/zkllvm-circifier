@@ -2,7 +2,8 @@
 
 #include <tvm/schema/basics.hpp>
 
-namespace tvm { inline namespace schema {
+namespace tvm {
+inline namespace schema {
 
 using std::optional;
 using std::variant;
@@ -52,17 +53,11 @@ using MsgAddressExt = variant<addr_none, addr_extern>;
 using MsgAddressInt = variant<addr_std, addr_var>;
 using MsgAddress = variant<MsgAddressExt, MsgAddressInt>;
 
-struct ExtraCurrencyCollection {
-  HashmapE<32, varuint<32>> dict;
-};
-
 struct CurrencyCollection {
   Grams grams;
-  ExtraCurrencyCollection other;
 };
 
-template<class SrcT>
-struct int_msg_info_t {
+template <class SrcT> struct int_msg_info_t {
   bitconst<1, 0b0> kind;
 
   bool_t ihr_disabled;
@@ -87,8 +82,7 @@ struct ext_in_msg_info {
   Grams import_fee;
 };
 
-template<class SrcT>
-struct ext_out_msg_info_t {
+template <class SrcT> struct ext_out_msg_info_t {
   bitconst<2, 0b11> kind;
 
   lazy<SrcT> src;
@@ -101,7 +95,7 @@ using ext_out_msg_info_relaxed = ext_out_msg_info_t<MsgAddress>;
 
 using CommonMsgInfo = variant<int_msg_info, ext_in_msg_info, ext_out_msg_info>;
 using CommonMsgInfoRelaxed =
-  variant<int_msg_info_relaxed, ext_in_msg_info, ext_out_msg_info_relaxed>;
+    variant<int_msg_info_relaxed, ext_in_msg_info, ext_out_msg_info_relaxed>;
 
 struct TickTock {
   bool_t tick;
@@ -118,15 +112,13 @@ struct StateInit {
   optional<cell> library;
 };
 
-template<typename X>
-struct message {
+template <typename X> struct message {
   CommonMsgInfo info;
   optional<Either<StateInit, ref<StateInit>>> init;
   Either<X, ref<X>> body;
 };
 
-template<typename X>
-struct message_relaxed {
+template <typename X> struct message_relaxed {
   CommonMsgInfoRelaxed info;
   optional<Either<StateInit, ref<StateInit>>> init;
   Either<X, ref<X>> body;
@@ -136,8 +128,7 @@ struct addr_std_fixed {
   addr_std_fixed() {}
 
   addr_std_fixed(int8 workchain_id, uint256 address)
-    : workchain_id(workchain_id), address(address) {
-  }
+      : workchain_id(workchain_id), address(address) {}
 
   addr_std_fixed(lazy<schema::MsgAddressInt> full_addr) {
     auto addr = std::get<addr_std>(full_addr.val());
@@ -148,10 +139,10 @@ struct addr_std_fixed {
     return lazy<schema::MsgAddressInt>::make_std(workchain_id, address);
   }
 
-  bool operator == (addr_std_fixed tt) const {
+  bool operator==(addr_std_fixed tt) const {
     return workchain_id == tt.workchain_id && address == tt.address;
   }
-  bool operator != (addr_std_fixed tt) const {
+  bool operator!=(addr_std_fixed tt) const {
     return workchain_id != tt.workchain_id || address != tt.address;
   }
 
@@ -159,17 +150,16 @@ struct addr_std_fixed {
   uint256 address;
 };
 
-// the same as above^, just serialized as an abi address (additional 3bits header)
+// the same as above^, just serialized as an abi address (additional 3bits
+// header)
 struct addr_std_compact {
   addr_std_compact() {}
 
   addr_std_compact(int8 workchain_id, uint256 address)
-    : workchain_id(workchain_id), address(address) {
-  }
+      : workchain_id(workchain_id), address(address) {}
 
   addr_std_compact(addr_std_fixed val)
-    : workchain_id(val.workchain_id), address(val.address) {
-  }
+      : workchain_id(val.workchain_id), address(val.address) {}
 
   addr_std_compact(lazy<schema::MsgAddressInt> full_addr) {
     auto addr = std::get<addr_std>(full_addr.val());
@@ -183,10 +173,10 @@ struct addr_std_compact {
     return addr_std_fixed(workchain_id, address);
   }
 
-  bool operator == (addr_std_compact tt) const {
+  bool operator==(addr_std_compact tt) const {
     return workchain_id == tt.workchain_id && address == tt.address;
   }
-  bool operator != (addr_std_compact tt) const {
+  bool operator!=(addr_std_compact tt) const {
     return workchain_id != tt.workchain_id || address != tt.address;
   }
 
@@ -194,10 +184,11 @@ struct addr_std_compact {
   uint256 address;
 };
 
-}} // namespace tvm::schema
+} // namespace schema
+} // namespace tvm
 
 namespace tvm {
 using address = schema::lazy<schema::MsgAddressInt>;
 using address_ext = schema::lazy<schema::MsgAddressExt>;
 using address_opt = std::optional<address>;
-}
+} // namespace tvm

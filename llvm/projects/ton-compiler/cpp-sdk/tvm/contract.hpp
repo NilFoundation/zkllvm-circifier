@@ -255,7 +255,7 @@ static inline void tvm_transfer(schema::MsgAddressInt dest, unsigned nanograms, 
   msg_info.bounce = bounce;
   msg_info.bounced = false;
   msg_info.dest = dest;
-  msg_info.value.grams = nanograms;
+  msg_info.value = nanograms;
   msg_info.src = addr_none{}; // Will be filled by vm
   msg_info.ihr_fee = 0;
   msg_info.fwd_fee = 0;
@@ -276,7 +276,7 @@ static inline void tvm_transfer(schema::lazy<schema::MsgAddressInt> dest, unsign
   msg_info.bounce = bounce;
   msg_info.bounced = false;
   msg_info.dest = dest;
-  msg_info.value.grams = nanograms;
+  msg_info.value = nanograms;
   msg_info.src = addr_none{}; // Will be filled by vm
   msg_info.ihr_fee = 0;
   msg_info.fwd_fee = 0;
@@ -306,7 +306,7 @@ static inline void tvm_transfer(slice dest, unsigned nanograms, unsigned bounce,
   msg_info.bounce = bounce;
   msg_info.bounced = false;
   msg_info.dest = dest;
-  msg_info.value.grams = nanograms;
+  msg_info.value = nanograms;
   msg_info.src = addr_none{}; // Will be filled by vm
   msg_info.ihr_fee = 0;
   msg_info.fwd_fee = 0;
@@ -337,7 +337,7 @@ static inline void tvm_transfer(schema::lazy<schema::MsgAddressInt> dest, unsign
   msg_info.bounce = bounce;
   msg_info.bounced = false;
   msg_info.dest = dest;
-  msg_info.value.grams = nanograms;
+  msg_info.value = nanograms;
   msg_info.src = addr_none{}; // Will be filled by vm
   msg_info.ihr_fee = 0;
   msg_info.fwd_fee = 0;

@@ -63,7 +63,7 @@ cell contract_call_prepare(address addr, Evers amount,
   out_info.dest = addr;
   out_info.created_lt = 0;
   out_info.created_at = 0;
-  out_info.value.grams = amount;
+  out_info.value = amount;
 
   using est_t = estimate_element<message<decltype(hdr_plus_args)>>;
   if constexpr (est_t::max_bits > cell::max_bits || est_t::max_refs > cell::max_refs) {
@@ -348,7 +348,7 @@ void contract_deploy_impl(address addr, StateInit init,
   out_info.dest = addr;
   out_info.created_lt = 0;
   out_info.created_at = 0;
-  out_info.value.grams = amount;
+  out_info.value = amount;
 
   auto chain_tup = make_chain_tuple(hdr_plus_args);
   message_relaxed<decltype(chain_tup)> out_msg;
@@ -373,7 +373,7 @@ void contract_deploy_noop_impl(address addr, StateInit init,
   out_info.dest = addr;
   out_info.created_lt = 0;
   out_info.created_at = 0;
-  out_info.value.grams = amount;
+  out_info.value = amount;
 
   auto chain_tup = make_chain_tuple(to_std_tuple(hdr));
   message_relaxed<decltype(chain_tup)> out_msg;

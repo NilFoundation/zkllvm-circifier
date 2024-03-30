@@ -12,9 +12,7 @@ struct __attribute__((tvm_tuple)) incoming_msg final {
   schema::ext_in_msg_info external() const {
     return std::get_known<schema::ext_in_msg_info>(impl_);
   }
-  int value() const {
-    return internal().value.grams();
-  }
+  Grams value() const { return internal().value; }
   schema::lazy<schema::MsgAddressInt> int_sender() const {
     return internal().src;
   }

@@ -185,7 +185,7 @@ __always_inline void send_internal_answer(Contract& c, unsigned func_id, ReturnV
   out_info.dest = int_return_address(c);
   out_info.created_lt = 0;
   out_info.created_at = 0;
-  out_info.value.grams = int_return_value(c);
+  out_info.value = int_return_value(c);
 
   using est_t = estimate_element<message<decltype(hdr_plus_rv)>>;
   if constexpr (est_t::max_bits > cell::max_bits || est_t::max_refs > cell::max_refs) {

@@ -7,7 +7,7 @@
     FIELD_UNSIGNED(block_lt, 64) \
     FIELD_UNSIGNED(trans_lt, 64) \
     FIELD_UNSIGNED(rand_seed, 256) \
-    FIELD_COMPLEX(balance_remaining, CurrencyCollection) \
+    FIELD_COMPLEX(balance_remaining, Grams) \
     FIELD_COMPLEX(myself, MsgAddressInt)
 #include HEADER_OR_C
 

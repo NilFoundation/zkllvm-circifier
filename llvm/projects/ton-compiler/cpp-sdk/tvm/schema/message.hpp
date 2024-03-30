@@ -53,10 +53,6 @@ using MsgAddressExt = variant<addr_none, addr_extern>;
 using MsgAddressInt = variant<addr_std, addr_var>;
 using MsgAddress = variant<MsgAddressExt, MsgAddressInt>;
 
-struct CurrencyCollection {
-  Grams grams;
-};
-
 template <class SrcT> struct int_msg_info_t {
   bitconst<1, 0b0> kind;
 
@@ -65,7 +61,7 @@ template <class SrcT> struct int_msg_info_t {
   bool_t bounced;
   lazy<SrcT> src;
   lazy<MsgAddressInt> dest;
-  CurrencyCollection value;
+  Grams value;
   Grams ihr_fee;
   Grams fwd_fee;
   uint64 created_lt;

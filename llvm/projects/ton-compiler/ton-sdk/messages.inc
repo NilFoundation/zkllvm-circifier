@@ -3,11 +3,6 @@
     FIELD_VAR_UNSIGNED(amount, 4)
 #include HEADER_OR_C
 
-#define TON_STRUCT_NAME CurrencyCollection
-#define TON_STRUCT \
-    FIELD_COMPLEX(grams, Grams)
-#include HEADER_OR_C
-
 #define TON_STRUCT_NAME Bit
 #define TON_STRUCT \
     FIELD_UNSIGNED(bit, 1)
@@ -42,7 +37,7 @@
     FIELD_SIGNED(bounced, 1) \
     FIELD_COMPLEX(src, MsgAddressInt) \
     FIELD_COMPLEX(dst, MsgAddressInt) \
-    FIELD_COMPLEX(value, CurrencyCollection) \
+    FIELD_COMPLEX(value, Grams) \
     FIELD_COMPLEX(ihr_fee, Grams) \
     FIELD_COMPLEX(fwd_fee, Grams) \
     FIELD_UNSIGNED(created_lt, 64) \

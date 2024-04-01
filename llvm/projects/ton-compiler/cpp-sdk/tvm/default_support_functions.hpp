@@ -32,7 +32,7 @@
     if (!int_sender_) {                                                                                    \
       auto parsed_msg = parse<schema::int_msg_info>(parser(msg_slice()), error_code::bad_incoming_msg);    \
       int_sender_ = incoming_msg(parsed_msg).int_sender();                                                 \
-      int_value_ = parsed_msg.value;                                                                 \
+      int_value_ = parsed_msg.value;                                                                       \
     }                                                                                                      \
     return *int_sender_;                                                                                   \
   }                                                                                                        \

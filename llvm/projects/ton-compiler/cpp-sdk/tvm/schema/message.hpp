@@ -106,7 +106,6 @@ struct StateInit {
   optional<TickTock> special;
   optional<cell> code;
   optional<cell> data;
-  optional<cell> library;
 };
 
 template<typename X>

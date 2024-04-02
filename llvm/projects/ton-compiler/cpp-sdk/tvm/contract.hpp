@@ -141,9 +141,8 @@ uint256 tvm_state_init_hash(uint256 code_hash, uint256 data_hash, uint16 code_de
   b.stu(2, 8) // amount of refs - code + data = 2
    .stu(1, 8) // data bitlen descriptor = ((bitlen / 8) << 1) + ((bitlen % 8) ? 1 : 0)
    // data bits: optional<..> split_depth, optional<..> special,
-   // optional<ref> code, optional<ref> data,
-   // optional<..> library ==> b00110
-   .stu(0b00110, 5)
+   // optional<ref> code, optional<ref> data ==> b0011
+   .stu(0b0011, 4)
    .stu(0b100, 3) // completion tag b100
    .stu(code_depth.get(), 16)
    .stu(data_depth.get(), 16)

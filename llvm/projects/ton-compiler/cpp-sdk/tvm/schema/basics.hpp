@@ -620,63 +620,6 @@ struct anydict {
 };
 using optcell = anydict;
 
-template<class X>
-struct EitherLeft {
-  bitconst<1, 0b0> tag;
-  X val;
-
-  DEFAULT_EQUAL(EitherLeft)
-};
-template<class Y>
-struct EitherRight {
-  bitconst<1, 0b1> tag;
-  Y val;
-
-  DEFAULT_EQUAL(EitherRight)
-};
-template<typename X, typename Y>
-struct Either {
-  using base_t = std::variant<EitherLeft<X>, EitherRight<Y>>;
-
-  Either() {}
-  Either(X left) : val_(EitherLeft<X>{ {}, left }) {}
-  Either(Y right) : val_(EitherRight<Y>{ {}, right }) {}
-
-  Either& operator=(X left) {
-    val_ = EitherLeft<X>{ {}, left };
-    return *this;
-  }
-  Either& operator=(Y right) {
-    val_ = EitherRight<Y>{ {}, right };
-    return *this;
-  }
-
-  bool operator == (const Either& v) const {
-    return val_ == v.val_;
-  }
-  template<class T>
-  __always_inline bool isa() const {
-    if constexpr (std::is_same_v<T, X>)
-      return std::holds_alternative<EitherLeft<X>>(val_);
-    else if constexpr (std::is_same_v<T, Y>)
-      return std::holds_alternative<EitherRight<Y>>(val_);
-    else
-      return false;
-  }
-  template<class T>
-  __always_inline T get() const {
-    if constexpr (std::is_same_v<T, X>)
-      return std::get<EitherLeft<X>>(val_).val;
-    else if constexpr (std::is_same_v<T, Y>)
-      return std::get<EitherRight<Y>>(val_).val;
-    else
-      static_assert(std::is_same_v<T, X> || std::is_same_v<T, Y>,
-                    "bad get in Either variant");
-  }
-  base_t operator()() const { return val_; }
-  base_t val_;
-};
-
 template<typename _Tp>
 struct ref {
   _Tp operator()() const { return val_; }

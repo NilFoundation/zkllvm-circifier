@@ -142,13 +142,6 @@ struct estimate_element<std::variant<Types...>> {
   static constexpr unsigned min_refs = std::min({estimate_element<Types>::min_refs ... });
   static constexpr unsigned max_refs = std::max({estimate_element<Types>::max_refs ... });
 };
-template<class X>
-struct estimate_element<EitherLeft<X>> : detail::chain_to< to_std_tuple_t<EitherLeft<X>> > {};
-template<class Y>
-struct estimate_element<EitherRight<Y>> : detail::chain_to< to_std_tuple_t<EitherRight<Y>> > {};
-
-template<class X, class Y>
-struct estimate_element<Either<X, Y>> : detail::chain_to< to_std_tuple_t<Either<X, Y>> > {};
 
 template<class _Tp>
 struct estimate_element<lazy<_Tp>> : detail::chain_to<_Tp> {};

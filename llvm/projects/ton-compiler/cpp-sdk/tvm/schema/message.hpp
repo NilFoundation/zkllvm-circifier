@@ -111,15 +111,15 @@ struct StateInit {
 template<typename X>
 struct message {
   CommonMsgInfo info;
-  optional<Either<StateInit, ref<StateInit>>> init;
-  Either<X, ref<X>> body;
+  optional<ref<StateInit>> init;
+  ref<X> body;
 };
 
 template<typename X>
 struct message_relaxed {
   CommonMsgInfoRelaxed info;
-  optional<Either<StateInit, ref<StateInit>>> init;
-  Either<X, ref<X>> body;
+  optional<ref<StateInit>> init;
+  ref<X> body;
 };
 
 struct addr_std_fixed {

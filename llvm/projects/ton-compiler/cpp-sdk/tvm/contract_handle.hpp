@@ -353,7 +353,7 @@ void contract_deploy_impl(address addr, StateInit init,
   auto chain_tup = make_chain_tuple(hdr_plus_args);
   message_relaxed<decltype(chain_tup)> out_msg;
   out_msg.info = out_info;
-  Either<StateInit, ref<StateInit>> init_ref = ref<StateInit>{init};
+  ref<StateInit> init_ref = ref<StateInit>{init};
   out_msg.init = init_ref;
   out_msg.body = ref<decltype(chain_tup)>{chain_tup};
   tvm_sendmsg(build(out_msg).endc(), flags);
@@ -378,7 +378,7 @@ void contract_deploy_noop_impl(address addr, StateInit init,
   auto chain_tup = make_chain_tuple(to_std_tuple(hdr));
   message_relaxed<decltype(chain_tup)> out_msg;
   out_msg.info = out_info;
-  Either<StateInit, ref<StateInit>> init_ref = ref<StateInit>{init};
+  ref<StateInit> init_ref = ref<StateInit>{init};
   out_msg.init = init_ref;
   out_msg.body = ref<decltype(chain_tup)>{chain_tup};
   tvm_sendmsg(build(out_msg).endc(), flags);
@@ -418,7 +418,7 @@ void contract_deploy_ext_noop_impl(address addr, uint256 pubkey,
   auto chain_tup = make_chain_tuple(hdr_and_id);
   message_relaxed<decltype(chain_tup)> out_msg;
   out_msg.info = msg_info;
-  Either<StateInit, ref<StateInit>> init_ref = ref<StateInit>{init};
+  ref<StateInit> init_ref = ref<StateInit>{init};
   out_msg.init = init_ref;
   out_msg.body = ref<decltype(chain_tup)>{chain_tup};
   tvm_sendmsg(build(out_msg).endc(), flags);
@@ -459,7 +459,7 @@ void contract_deploy_ext_impl(address addr, uint256 pubkey,
   auto chain_tup = make_chain_tuple(hdr_plus_args);
   message_relaxed<decltype(chain_tup)> out_msg;
   out_msg.info = msg_info;
-  Either<StateInit, ref<StateInit>> init_ref = ref<StateInit>{init};
+  ref<StateInit> init_ref = ref<StateInit>{init};
   out_msg.init = init_ref;
   out_msg.body = ref<decltype(chain_tup)>{chain_tup};
   tvm_sendmsg(build(out_msg).endc(), flags);

@@ -98,18 +98,6 @@ struct get_bitsize<std::variant<Types...>> {
   static constexpr bool all_calculated = (get_bitsize<Types>::value && ...);
   static constexpr unsigned value = all_calculated ? std::max({get_bitsize<Types>::value ... }) : 0;
 };
-template<class X>
-struct get_bitsize<EitherLeft<X>> {
-  static constexpr unsigned value = get_bitsize< to_std_tuple_t<EitherLeft<X>> >::value;
-};
-template<class Y>
-struct get_bitsize<EitherRight<Y>> {
-  static constexpr unsigned value = get_bitsize< to_std_tuple_t<EitherRight<Y>> >::value;
-};
-template<class X, class Y>
-struct get_bitsize<Either<X, Y>> {
-  static constexpr unsigned value = get_bitsize< to_std_tuple_t<Either<X, Y>> >::value;
-};
 template<class T>
 struct get_bitsize<lazy<T>> {
   static constexpr unsigned value = get_bitsize<T>::value;

@@ -287,13 +287,8 @@ static inline void tvm_transfer(schema::lazy<schema::MsgAddressInt> dest, unsign
   builder b = build(out_msg.info);
   b = build(b, out_msg.init);
   slice payload_sl = payload.ctos();
-  if (b.brembits() > payload_sl.sbits()) {
-    out_msg.body = anyval{payload_sl};
-    b = build(b, out_msg.body);
-  } else {
-    out_msg.body = ref<anyval>{payload_sl};
-    b = build(b, out_msg.body);
-  }
+  out_msg.body = ref<anyval>{payload_sl};
+  b = build(b, out_msg.body);
   tvm_sendmsg(b.endc(), flags);
 }
 static inline void tvm_transfer(slice dest, unsigned nanograms, unsigned bounce, unsigned flags, cell payload) {
@@ -317,13 +312,8 @@ static inline void tvm_transfer(slice dest, unsigned nanograms, unsigned bounce,
   builder b = build(out_msg.info);
   b = build(b, out_msg.init);
   slice payload_sl = payload.ctos();
-  if (b.brembits() > payload_sl.sbits()) {
-    out_msg.body = anyval{payload_sl};
-    b = build(b, out_msg.body);
-  } else {
-    out_msg.body = ref<anyval>{payload_sl};
-    b = build(b, out_msg.body);
-  }
+  out_msg.body = ref<anyval>{payload_sl};
+  b = build(b, out_msg.body);
   tvm_sendmsg(b.endc(), flags);
 }
 static inline void tvm_transfer(schema::lazy<schema::MsgAddressInt> dest, unsigned nanograms, bool bounce,

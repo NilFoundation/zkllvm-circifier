@@ -29,9 +29,10 @@ void emit(Args... args) {
   out_info.created_lt = 0;
   out_info.created_at = 0;
 
-  message_relaxed<decltype(hdr_plus_args)> out_msg;
+  auto chain_tup = make_chain_tuple(hdr_plus_args);
+  message_relaxed<decltype(chain_tup)> out_msg;
   out_msg.info = out_info;
-  out_msg.body = hdr_plus_args;
+  out_msg.body = ref<decltype(chain_tup)>{chain_tup};
   tvm_sendmsg(build(out_msg).endc(), 0);
 }
 

@@ -112,14 +112,14 @@ template<typename X>
 struct message {
   CommonMsgInfo info;
   optional<ref<StateInit>> init;
-  ref<X> body;
+  optional<ref<X>> body;
 };
 
 template<typename X>
 struct message_relaxed {
   CommonMsgInfoRelaxed info;
   optional<ref<StateInit>> init;
-  ref<X> body;
+  optional<ref<X>> body;
 };
 
 struct addr_std_fixed {

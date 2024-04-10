@@ -113,19 +113,11 @@ __always_inline void send_external_answer(Contract& c, unsigned func_id, ReturnV
   out_info.created_lt = 0;
   out_info.created_at = 0;
 
-  using est_t = estimate_element<message<decltype(hdr_plus_rv)>>;
-  if constexpr (est_t::max_bits > cell::max_bits || est_t::max_refs > cell::max_refs) {
-    auto chain_tup = make_chain_tuple(hdr_plus_rv);
-    message_relaxed<decltype(chain_tup)> out_msg;
-    out_msg.info = out_info;
-    out_msg.body = ref<decltype(chain_tup)>{chain_tup};
-    tvm_sendmsg(build(out_msg).endc(), 0);
-  } else {
-    message_relaxed<decltype(hdr_plus_rv)> out_msg;
-    out_msg.info = out_info;
-    out_msg.body = hdr_plus_rv;
-    tvm_sendmsg(build(out_msg).endc(), 0);
-  }
+  auto chain_tup = make_chain_tuple(hdr_plus_rv);
+  message_relaxed<decltype(chain_tup)> out_msg;
+  out_msg.info = out_info;
+  out_msg.body = ref<decltype(chain_tup)>{chain_tup};
+  tvm_sendmsg(build(out_msg).endc(), 0);
 }
 
 template<class Contract>
@@ -187,19 +179,11 @@ __always_inline void send_internal_answer(Contract& c, unsigned func_id, ReturnV
   out_info.created_at = 0;
   out_info.value = int_return_value(c);
 
-  using est_t = estimate_element<message<decltype(hdr_plus_rv)>>;
-  if constexpr (est_t::max_bits > cell::max_bits || est_t::max_refs > cell::max_refs) {
-    auto chain_tup = make_chain_tuple(hdr_plus_rv);
-    message_relaxed<decltype(chain_tup)> out_msg;
-    out_msg.info = out_info;
-    out_msg.body = ref<decltype(chain_tup)>{chain_tup};
-    tvm_sendmsg(build(out_msg).endc(), int_return_flag(c));
-  } else {
-    message_relaxed<decltype(hdr_plus_rv)> out_msg;
-    out_msg.info = out_info;
-    out_msg.body = hdr_plus_rv;
-    tvm_sendmsg(build(out_msg).endc(), int_return_flag(c));
-  }
+  auto chain_tup = make_chain_tuple(hdr_plus_rv);
+  message_relaxed<decltype(chain_tup)> out_msg;
+  out_msg.info = out_info;
+  out_msg.body = ref<decltype(chain_tup)>{chain_tup};
+  tvm_sendmsg(build(out_msg).endc(), int_return_flag(c));
 }
 
 template<bool Internal, bool ImplicitFuncId, class Contract, class ReturnValue>
@@ -267,18 +251,13 @@ Data parse_smart(parser p) {
         >;
     using args_tup = to_std_tuple_t<Data>;
     using header_with_args = decltype(std::tuple_cat(header_tup{}, args_tup{}));
-    using est_t = estimate_element<header_with_args>;
-    if constexpr (est_t::max_bits > cell::max_bits || est_t::max_refs > cell::max_refs) {
-      using est_hdr_t = estimate_element<header_tup>;
-      // calculating placement pattern with hdr offset
-      using LinearTup = decltype(make_chain_tuple<est_hdr_t::max_bits, est_hdr_t::max_refs>(args_tup{}));
-      // uncomment to print in remark:
-      //__reflect_echo<print_chain_tuple<LinearTup>().c_str()>{};
-      auto linear_tup = parse<LinearTup>(p);
-      return chain_fold<Data>(linear_tup);
-    } else {
-      return parse<Data>(p);
-    }
+    using est_hdr_t = estimate_element<header_tup>;
+    // calculating placement pattern with hdr offset
+    using LinearTup = decltype(make_chain_tuple<est_hdr_t::max_bits, est_hdr_t::max_refs>(args_tup{}));
+    // uncomment to print in remark:
+    //__reflect_echo<print_chain_tuple<LinearTup>().c_str()>{};
+    auto linear_tup = parse<LinearTup>(p);
+    return chain_fold<Data>(linear_tup);
   }
 }
 

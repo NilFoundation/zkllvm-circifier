@@ -65,19 +65,11 @@ cell contract_call_prepare(address addr, Evers amount,
   out_info.created_at = 0;
   out_info.value = amount;
 
-  using est_t = estimate_element<message<decltype(hdr_plus_args)>>;
-  if constexpr (est_t::max_bits > cell::max_bits || est_t::max_refs > cell::max_refs) {
-    auto chain_tup = make_chain_tuple(hdr_plus_args);
-    message_relaxed<decltype(chain_tup)> out_msg;
-    out_msg.info = out_info;
-    out_msg.body = ref<decltype(chain_tup)>{chain_tup};
-    return build(out_msg).endc();
-  } else {
-    message_relaxed<decltype(hdr_plus_args)> out_msg;
-    out_msg.info = out_info;
-    out_msg.body = hdr_plus_args;
-    return build(out_msg).endc();
-  }
+  auto chain_tup = make_chain_tuple(hdr_plus_args);
+  message_relaxed<decltype(chain_tup)> out_msg;
+  out_msg.info = out_info;
+  out_msg.body = ref<decltype(chain_tup)>{chain_tup};
+  return build(out_msg).endc();
 }
 
 template<auto Func, class... Args>
@@ -85,13 +77,8 @@ __always_inline
 cell internal_body_prepare(address addr, Args... args) {
   auto hdr = prepare_internal_header<Func>();
   auto hdr_plus_args = std::make_tuple(hdr, args...);
-  using est_t = estimate_element<decltype(hdr_plus_args)>;
-  if constexpr (est_t::max_bits > cell::max_bits || est_t::max_refs > cell::max_refs) {
-    auto chain_tup = make_chain_tuple(hdr_plus_args);
-    return build(chain_tup).endc();
-  } else {
-    return build(hdr_plus_args).endc();
-  }
+  auto chain_tup = make_chain_tuple(hdr_plus_args);
+  return build(chain_tup).endc();
 }
 
 // Prepare message body for external call
@@ -108,13 +95,8 @@ cell external_body_prepare(address addr, Args... args) {
     .function_id = uint32(id_v<Func>)
   };
   auto hdr_plus_args = std::make_tuple(signature_place, hdr, args...);
-  using est_t = estimate_element<message<decltype(hdr_plus_args)>>;
-  if constexpr (est_t::max_bits > cell::max_bits || est_t::max_refs > cell::max_refs) {
-    auto chain_tup = make_chain_tuple(hdr_plus_args);
-    return build(chain_tup).endc();
-  } else {
-    return build(hdr_plus_args).endc();
-  }
+  auto chain_tup = make_chain_tuple(hdr_plus_args);
+  return build(chain_tup).endc();
 }
 
 template<auto Func, class... Args>
@@ -131,13 +113,8 @@ cell external_body_prepare_with_pubkey(address addr, uint256 pubkey, Args... arg
     .function_id = uint32(id_v<Func>)
   };
   auto hdr_plus_args = std::make_tuple(signature_place, hdr, args...);
-  using est_t = estimate_element<message<decltype(hdr_plus_args)>>;
-  if constexpr (est_t::max_bits > cell::max_bits || est_t::max_refs > cell::max_refs) {
-    auto chain_tup = make_chain_tuple(hdr_plus_args);
-    return build(chain_tup).endc();
-  } else {
-    return build(hdr_plus_args).endc();
-  }
+  auto chain_tup = make_chain_tuple(hdr_plus_args);
+  return build(chain_tup).endc();
 }
 
 template<bool has_pubkey, bool has_time, bool has_expire>
@@ -191,19 +168,11 @@ cell external_call_prepare(address addr, uint256 pubkey, Args... args) {
     .import_fee = Evers{0}
   };
 
-  using est_t = estimate_element<message<decltype(hdr_plus_args)>>;
-  if constexpr (est_t::max_bits > cell::max_bits || est_t::max_refs > cell::max_refs) {
-    auto chain_tup = make_chain_tuple(hdr_plus_args);
-    message_relaxed<decltype(chain_tup)> out_msg;
-    out_msg.info = msg_info;
-    out_msg.body = ref<decltype(chain_tup)>{chain_tup};
-    return build(out_msg).endc();
-  } else {
-    message_relaxed<decltype(hdr_plus_args)> out_msg;
-    out_msg.info = msg_info;
-    out_msg.body = hdr_plus_args;
-    return build(out_msg).endc();
-  }
+  auto chain_tup = make_chain_tuple(hdr_plus_args);
+  message_relaxed<decltype(chain_tup)> out_msg;
+  out_msg.info = msg_info;
+  out_msg.body = ref<decltype(chain_tup)>{chain_tup};
+  return build(out_msg).endc();
 }
 
 // Prepare message cell for external call (should later be signed by debot engine)
@@ -225,19 +194,11 @@ cell external_call_prepare_nosign(address addr, uint256 pubkey, Args... args) {
     .import_fee = Evers{0}
   };
 
-  using est_t = estimate_element<message<decltype(hdr_plus_args)>>;
-  if constexpr (est_t::max_bits > cell::max_bits || est_t::max_refs > cell::max_refs) {
-    auto chain_tup = make_chain_tuple(hdr_plus_args);
-    message_relaxed<decltype(chain_tup)> out_msg;
-    out_msg.info = msg_info;
-    out_msg.body = ref<decltype(chain_tup)>{chain_tup};
-    return build(out_msg).endc();
-  } else {
-    message_relaxed<decltype(hdr_plus_args)> out_msg;
-    out_msg.info = msg_info;
-    out_msg.body = hdr_plus_args;
-    return build(out_msg).endc();
-  }
+  auto chain_tup = make_chain_tuple(hdr_plus_args);
+  message_relaxed<decltype(chain_tup)> out_msg;
+  out_msg.info = msg_info;
+  out_msg.body = ref<decltype(chain_tup)>{chain_tup};
+  return build(out_msg).endc();
 }
 
 // Prepare message cell for getter call (no signature/pubkey)
@@ -260,19 +221,11 @@ cell getter_call_prepare(address addr, Args... args) {
     .import_fee = Evers{0}
   };
 
-  using est_t = estimate_element<message<decltype(hdr_plus_args)>>;
-  if constexpr (est_t::max_bits > cell::max_bits || est_t::max_refs > cell::max_refs) {
-    auto chain_tup = make_chain_tuple(hdr_plus_args);
-    message_relaxed<decltype(chain_tup)> out_msg;
-    out_msg.info = msg_info;
-    out_msg.body = ref<decltype(chain_tup)>{chain_tup};
-    return build(out_msg).endc();
-  } else {
-    message_relaxed<decltype(hdr_plus_args)> out_msg;
-    out_msg.info = msg_info;
-    out_msg.body = hdr_plus_args;
-    return build(out_msg).endc();
-  }
+  auto chain_tup = make_chain_tuple(hdr_plus_args);
+  message_relaxed<decltype(chain_tup)> out_msg;
+  out_msg.info = msg_info;
+  out_msg.body = ref<decltype(chain_tup)>{chain_tup};
+  return build(out_msg).endc();
 }
 
 // expire_val is used to place answer_id for debot external-in calls
@@ -297,19 +250,11 @@ cell external_call_prepare_with_pubkey(address addr, uint32 expire_val,
     .import_fee = Evers{0}
   };
 
-  using est_t = estimate_element<message<decltype(hdr_plus_args)>>;
-  if constexpr (est_t::max_bits > cell::max_bits || est_t::max_refs > cell::max_refs) {
-    auto chain_tup = make_chain_tuple(hdr_plus_args);
-    message_relaxed<decltype(chain_tup)> out_msg;
-    out_msg.info = msg_info;
-    out_msg.body = ref<decltype(chain_tup)>{chain_tup};
-    return build(out_msg).endc();
-  } else {
-    message_relaxed<decltype(hdr_plus_args)> out_msg;
-    out_msg.info = msg_info;
-    out_msg.body = hdr_plus_args;
-    return build(out_msg).endc();
-  }
+  auto chain_tup = make_chain_tuple(hdr_plus_args);
+  message_relaxed<decltype(chain_tup)> out_msg;
+  out_msg.info = msg_info;
+  out_msg.body = ref<decltype(chain_tup)>{chain_tup};
+  return build(out_msg).endc();
 }
 
 template<auto Func, class... Args>
@@ -473,19 +418,13 @@ struct wait_call_result {
   void await_suspend(std::experimental::coroutine_handle<>) const {}
   __always_inline
   RetT await_resume() const {
-    using est_t = estimate_element<RetT>;
-    if constexpr (est_t::max_bits > cell::max_bits || est_t::max_refs > cell::max_refs) {
-      parser p(__builtin_tvm_cast_to_slice(
-        temporary_data::getglob(global_id::coroutine_answer_slice)));
-      using LinearTup = decltype(make_chain_tuple<32, 0>(to_std_tuple(RetT{})));
-      // uncomment to print in remark:
-      //__reflect_echo<print_chain_tuple<LinearTup>().c_str()>{};
-      auto linear_tup = parse<LinearTup>(p);
-      return chain_fold<RetT>(linear_tup);
-    } else {
-      return parse<RetT>(__builtin_tvm_cast_to_slice(
-        temporary_data::getglob(global_id::coroutine_answer_slice)));
-    }
+    parser p(__builtin_tvm_cast_to_slice(
+      temporary_data::getglob(global_id::coroutine_answer_slice)));
+    using LinearTup = decltype(make_chain_tuple<32, 0>(to_std_tuple(RetT{})));
+    // uncomment to print in remark:
+    //__reflect_echo<print_chain_tuple<LinearTup>().c_str()>{};
+    auto linear_tup = parse<LinearTup>(p);
+    return chain_fold<RetT>(linear_tup);
   }
 };
 

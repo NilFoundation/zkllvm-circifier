@@ -8,13 +8,13 @@ using std::optional;
 using std::variant;
 
 struct addr_none {
-  bitconst<2, 0b00> kind;
+  bitconst<8, 0b00000000> kind;
 
   DEFAULT_EQUAL(addr_none)
 };
 
 struct addr_extern {
-  bitconst<2, 0b01> kind;
+  bitconst<8, 0b00000001> kind;
 
   uint_t<9> len;
   dynamic_bitfield<&addr_extern::len> external_address;
@@ -30,7 +30,7 @@ struct anycast_info {
 };
 
 struct addr_std {
-  bitconst<2, 0b10> kind;
+  bitconst<8, 0b00000010> kind;
   optional<anycast_info> Anycast;
   int8 workchain_id;
   uint256 address;
@@ -39,7 +39,7 @@ struct addr_std {
 };
 
 struct addr_var {
-  bitconst<2, 0b11> kind;
+  bitconst<8, 0b00000011> kind;
   optional<anycast_info> Anycast;
   uint_t<9> addr_len;
   int32 workchain_id;

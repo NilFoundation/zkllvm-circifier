@@ -38,7 +38,7 @@ void build_internal_message_bounce(MsgAddressInt *dest, unsigned value,
   builder = __builtin_tvm_stu(0b00, builder, 2);
   builder = __builtin_tvm_stu(bounce, builder, 1);
   // Serialize: bounced, src addr = addr_none
-  builder = __builtin_tvm_stu(0b000, builder, 3);
+  builder = __builtin_tvm_stu(0b0'00000000, builder, 1 + 8);
   Serialize_MsgAddressInt_Impl(&builder, dest);
   builder = build_currency_collection(builder, value);
   // Serialize: ihr_fee, fwd_fee, created_lt, created_at, init, body
@@ -50,7 +50,7 @@ void build_internal_message_bounce(MsgAddressInt *dest, unsigned value,
 void build_external_output_common_message_header () {
   __tvm_builder builder = __builtin_tvm_newc();
   // Serialize: leading 0b11, src addr = addr_none, dst addr = addr_none
-  builder = __builtin_tvm_stu(0b110000, builder, 6);
+  builder = __builtin_tvm_stu(0b11'00000000'00000000, builder, 2 + 8 + 8);
   // Serialize: created_lt, created_at, init, body
   //            64 bits,    32 bits,    1 bit 1 bit
   builder = __builtin_tvm_stu(0, builder, 64 + 32 + 1 + 1);

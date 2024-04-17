@@ -6,14 +6,13 @@
 namespace tvm {
 
 // LDMSGADDR support
-// TODO: implement as variant_tuple<addr_none, addr_extern, addr_std, addr_var>
+// TODO: implement as variant_tuple<addr_none, addr_extern, addr_std>
 class msg_address {
 public:
   enum class msg_addr_kind {
     kind_none = 0,
     kind_extern = 1,
     kind_std = 2,
-    kind_var = 3
   };
 
   // addr_none is represented by t = (0), i.e., a Tuple containing exactly
@@ -53,25 +52,6 @@ public:
     static bool isa(__tvm_tuple tp) {
       return __builtin_tvm_tlen(tp) == sizeof(addr_std) &&
         msg_addr_kind(__builtin_tvm_index(tp, 0)) == msg_addr_kind::kind_std;
-    }
-    int kind() const { return kind_; }
-    __tvm_slice rewrite_pfx() const { return rewrite_pfx_; }
-    int workchain_id() const { return workchain_id_; }
-    __tvm_slice address() const { return address_; }
-  private:
-    int kind_;
-    __tvm_slice rewrite_pfx_;
-    int workchain_id_;
-    __tvm_slice address_;
-  };
-
-  // addr_var is represented by t = (3, u, x, s), where u, x, and s have the
-  //  same meaning as for addr_std.
-  class __attribute__((tvm_tuple)) addr_var {
-  public:
-    static bool isa(__tvm_tuple tp) {
-      return __builtin_tvm_tlen(tp) == sizeof(addr_var) &&
-        msg_addr_kind(__builtin_tvm_index(tp, 0)) == msg_addr_kind::kind_var;
     }
     int kind() const { return kind_; }
     __tvm_slice rewrite_pfx() const { return rewrite_pfx_; }

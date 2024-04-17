@@ -38,18 +38,8 @@ struct addr_std {
   DEFAULT_EQUAL(addr_std)
 };
 
-struct addr_var {
-  bitconst<8, 0b00000011> kind;
-  optional<anycast_info> Anycast;
-  uint_t<9> addr_len;
-  int32 workchain_id;
-  dynamic_bitfield<&addr_var::addr_len> address;
-
-  DEFAULT_EQUAL(addr_var)
-};
-
 using MsgAddressExt = variant<addr_none, addr_extern>;
-using MsgAddressInt = variant<addr_std, addr_var>;
+using MsgAddressInt = variant<addr_std>;
 using MsgAddress = variant<MsgAddressExt, MsgAddressInt>;
 
 template<class SrcT>

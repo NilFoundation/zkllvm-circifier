@@ -26,17 +26,6 @@ inline schema::MsgAddress msg_address::unpack() const {
     rv.address = parser(unpacked.address()).ldu(256);
     return schema::MsgAddressInt { rv };
   }
-  case msg_addr_kind::kind_var: {
-    tvm::tuple<addr_var> tup(tup_);
-    auto unpacked = tup.unpack();
-    schema::addr_var rv;
-    if (!__builtin_tvm_isnull(__builtin_tvm_cast_from_slice(unpacked.rewrite_pfx())))
-      rv.Anycast = schema::parse<schema::anycast_info>(unpacked.rewrite_pfx());
-    rv.workchain_id = unpacked.workchain_id();
-    rv.address.sl_ = unpacked.address();
-    rv.address.bitlen_ = rv.address.sl_.sbits();
-    return schema::MsgAddressInt { rv };
-  }
   }
   __builtin_tvm_throw(error_code::bad_tupled_variant_kind);
 }

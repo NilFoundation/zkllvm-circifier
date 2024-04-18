@@ -56,9 +56,9 @@ template<class SrcT>
 struct int_msg_info_t {
   bitconst<1, 0b0> kind;
 
-  bool_t ihr_disabled;
-  bool_t bounce;
-  bool_t bounced;
+  uint8 ihr_disabled;
+  uint8 bounce;
+  uint8 bounced;
   lazy<SrcT> src;
   lazy<MsgAddressInt> dest;
   Grams value;

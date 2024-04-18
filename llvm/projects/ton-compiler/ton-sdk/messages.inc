@@ -32,9 +32,9 @@
 #define TON_STRUCT_NAME CommonMsgInfo
 #define TON_STRUCT \
     FIELD_UNSIGNED(zero, 1) \
-    FIELD_UNSIGNED(ihr_disabled, 1) \
-    FIELD_SIGNED(bounce, 1) \
-    FIELD_SIGNED(bounced, 1) \
+    FIELD_UNSIGNED(ihr_disabled, 8) \
+    FIELD_SIGNED(bounce, 8) \
+    FIELD_SIGNED(bounced, 8) \
     FIELD_COMPLEX(src, MsgAddressInt) \
     FIELD_COMPLEX(dst, MsgAddressInt) \
     FIELD_COMPLEX(value, Grams) \

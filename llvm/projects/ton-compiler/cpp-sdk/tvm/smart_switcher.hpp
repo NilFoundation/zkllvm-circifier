@@ -512,8 +512,8 @@ struct smart_switcher {
 __always_inline bool is_bounced(slice msg_sl) {
   parser p(msg_sl);
   require(p.ldu(1) == schema::int_msg_info{}.kind.code, error_code::bad_incoming_msg);
-  p.skip(2); // ihr_disabled + bounce
-  return p.ldu(1) != 0; // bounced != 0
+  p.skip(8 + 8); // ihr_disabled + bounce
+  return p.ldu(8) != 0; // bounced != 0
 }
 
 template<class Contract, class IContract, class DContract, class ReplayAttackProtection,

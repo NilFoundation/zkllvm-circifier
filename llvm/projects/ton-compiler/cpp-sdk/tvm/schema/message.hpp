@@ -95,8 +95,8 @@ using CommonMsgInfoRelaxed =
   variant<int_msg_info_relaxed, ext_in_msg_info, ext_out_msg_info_relaxed>;
 
 struct TickTock {
-  bool_t tick;
-  bool_t tock;
+  uint8 tick;
+  uint8 tock;
 
   DEFAULT_EQUAL(TickTock)
 };

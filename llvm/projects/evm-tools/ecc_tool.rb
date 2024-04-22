@@ -19,6 +19,7 @@ OptionParser.new do |opts|
   opts.on('--clang-args=ARGS', 'Command line arguments for clang') { $options.clang_args = _1 }
   opts.on('--linker-args=ARGS', 'Command line arguments for linker') { $options.linker_args = _1 }
   opts.on('--no-ctor', 'Do not generate EVM constructor') { $options.no_ctor = true }
+  opts.on('--global-config', 'Generate configuration access file') { $options.global_config = true }
   opts.on('-c', '--cpp-input', 'Input file is a c++ file with embedded storage description') { $options.cpp_input = _1 }
   opts.on('-v', '--verbose', 'Verbose logging')
 end.parse!(into: $options)
@@ -35,6 +36,17 @@ def command(cmd)
   end
   puts output if options.verbose
   output
+end
+
+class String
+  def snakecase
+    gsub(/([A-Z]+)([A-Z][a-z])/,'\1_\2').
+      gsub(/([a-z\d])([A-Z])/,'\1_\2').
+      tr('-', '_').
+      gsub(/\s/, '_').
+      gsub(/__+/, '_').
+      downcase
+  end
 end
 
 def cpp_type(type)
@@ -61,6 +73,10 @@ class Type
   def python_name
     @name =~ /[iu]\d+/ ? 'int' : @name
   end
+
+  def primitive?; is_a?(PrimitiveType); end
+  def container?; is_a?(ContainerType); end
+  def struct?; is_a?(StructType); end
 end
 
 class PrimitiveType < Type
@@ -105,8 +121,8 @@ class StructType < Type
   end
 
   def bytes_size
-    @fields.sum do |field|
-      sz = field.type.slots_size
+    @fields.select{ !_1.type.is_a?(ContainerType) }.sum do |field|
+      sz = field.type.bytes_size
       return nil if sz.nil?
       sz
     end
@@ -124,6 +140,14 @@ class StructType < Type
     @name
   end
 
+  def get_container_fields
+    @container_fields ||= @fields.reduce([]) do |res, field|
+      res << field if field.type.is_a?(ContainerType)
+      res += field.type.get_container_fields if field.type.is_a?(StructType)
+      res
+    end
+  end
+
   def storage_name_static(index)
     index = index.call if index.is_a?(Proc)
     "#{@name}Static<#{index}>"
@@ -137,10 +161,10 @@ class ContainerType < Type
   PYTHON_NAMES_MAP = {'Vector' => 'list', 'Map' => 'dict', 'IterableMap' => 'dict'}
   PYTHON_NAMES_MAP.default_proc = -> (_, k) { raise KeyError, "Key `#{k}` not found!" }
 
-  def initialize(name, base_type_name, sub_type)
+  def initialize(name, base_name, sub_name)
     super(name)
-    @base_type_name = base_type_name
-    @sub_type = sub_type
+    @base_type_name = base_name
+    @sub_type = sub_name
   end
 
   def slots_size
@@ -158,7 +182,7 @@ class ContainerType < Type
   def python_name
     m = @name.match /(Vector|Map|IterableMap)<(.+)>/
     raise "Invalid container type: #{@name}" unless m
-    "#{PYTHON_NAMES_MAP[m[1]]}[#{m[2]}]"
+    "#{PYTHON_NAMES_MAP[m[1]]}[#{@sub_type.python_name}]"
   end
 
   def storage_name_static(index)
@@ -168,20 +192,41 @@ class ContainerType < Type
 end
 
 class Ir
-  attr_reader :types, :variables, :namespace, :data
+  attr_reader :types, :variables, :namespace, :data, :name
 
   PRIMITIVE_TYPES = %w(u8 i8 u16 i16 u32 i32 u64 i64 u128 i128 u256 i256 bool)
 
   def initialize(data)
     @types = {}
+    @name = data.dig('contract', 'name')
+    raise "Contract must contain name" unless @name
+    @namespace = @name&.snakecase
     @data = data
     @variables = nil
-    @namespace = nil
+    @contracts = []
   end
 
   def load()
-    @namespace = 'evm::' + (@data.dig('contract', 'storage_namespace') || 'stor')
     PRIMITIVE_TYPES.each { |type| @types[type] = PrimitiveType.new(type) }
+
+    msg_type = <<-EOC
+      name: MsgHeader
+      fields:
+        - src_wc: i8
+        - src_addr: u256
+        - dst_wc: i8
+        - dst_addr: u256
+        - value: u64
+    EOC
+    msg = YAML.load(msg_type)
+    canonicalize_type(msg)
+    @data['types'] << msg
+
+    msg_hash = {'header' => 'MsgHeader'}
+    canonicalize_field(msg_hash)
+    @data['types'].each do |type|
+      type['fields'].insert(0, msg_hash ) if type['flags']&.include?('message')
+    end
 
     @data['types'].each { |type| get_or_create_type(type) }
 
@@ -189,6 +234,16 @@ class Ir
       OpenStruct.new({'name' => var['name'], 'type' => get_or_create_type(var['type']), 'data' => var})
     } || []
     @variables = StructType.new("variables", @data['variables'], fields)
+  end
+
+  def load_contracts
+    imports = @data.dig('contract', 'import')
+    return unless imports
+    imports.each do |fname|
+      fname = "#{File.dirname(file_path)}/#{fname}" unless File.exist?(fname)
+      raise "Imported contract doesn't exist: #{fname}" unless File.exist?(fname)
+
+    end
   end
 
   def get_or_create_type(str)
@@ -215,32 +270,43 @@ class Ir
   end
 end
 
-def canonicalize(data)
-  def fix_field(field)
-    if field['name']
-      raise "type must be specified for field: #{field['name']}" unless field['type']
-    else
-      field['name'], field['type'] = field.first
-    end
+def canonicalize_field(field)
+  if field['name']
+    raise "type must be specified for field: #{field['name']}" unless field['type']
+  else
+    field['name'], field['type'] = field.first
   end
-  data['types']&.each { _1['fields']&.each { |field| fix_field(field) } }
-  data['variables']&.each { fix_field(_1) }
-  data['messages']&.each { _1['fields']&.each { |field| fix_field(field) } }
+end
+
+def canonicalize_type(type)
+  type['fields']&.each { |field| canonicalize_field(field) }
+end
+
+def canonicalize(data, file_path)
+  data.dig('contract', 'include')&.each do |fname|
+    included = YAML.load_file("#{File.dirname(file_path)}/#{fname}")
+    data['types'] += included['types']
+  end
+  data['types']&.each { canonicalize_type(_1) } # { _1['fields']&.each { |field| canonicalize_field(field) } }
+  data['variables']&.each { canonicalize_field(_1) }
 end
 
 def generate
   if options.data_file
     data = YAML.load_file(options.data_file)
+    file_path = options.data_file
   else
     m = File.read(INPUT_FILE).match(/STORAGE_YAML *= *R"\((.*?)\)"/m)
     begin
       data = YAML.load(m ? m[1] : File.read(INPUT_FILE))
+      return unless data.is_a?(Hash)
     rescue
       return
     end
+    file_path = INPUT_FILE
   end
   data['types'] ||= []
-  canonicalize(data)
+  canonicalize(data, file_path)
 
   ir = Ir.new(data)
   ir.load()
@@ -248,7 +314,10 @@ def generate
   filename = "#{__dir__}/templates/#{options.generate}.erb"
   t = ERB.new(File.read(filename), nil, '%-')
   t.filename = filename
-  res = t.result(binding)
+  begin
+    res = t.result(binding)
+  rescue StopIteration
+  end
   if options.output
     Pathname(options.output).dirname.mkpath
     File.write(options.output, res)

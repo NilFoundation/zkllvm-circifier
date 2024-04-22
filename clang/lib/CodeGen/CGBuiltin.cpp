@@ -18882,11 +18882,11 @@ Value *CodeGenFunction::EmitEVMBuiltinExpr(unsigned BuiltinID,
     }
 
     Function *Sha3Callee = CGM.getIntrinsic(Intrinsic::evm_sha3);
-    auto Mem = Builder.CreateCast(llvm::Instruction::CastOps::PtrToInt, GAI,
-                                  Builder.getInt256Ty());
+//    auto Mem = Builder.CreateCast(llvm::Instruction::CastOps::PtrToInt, GAI,
+//                                  Builder.getInt256Ty());
     auto Size = ConstantInt::get(llvm::Type::getInt256Ty(Builder.getContext()),
                                  32 * E->getNumArgs());
-    return Builder.CreateCall(Sha3Callee, {Mem, Size});
+    return Builder.CreateCall(Sha3Callee, {GAI, Size});
   }
   default:
     return nullptr;

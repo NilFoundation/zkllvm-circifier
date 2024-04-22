@@ -8,7 +8,6 @@ def unpack(type, data: str | bytes):
     assert len(formats) == len(fields(type))
 
     obj = type()
-    pos = 0
     for i, field in enumerate(fields(type)):
         m = re.match(r"[iu](\d+)$", formats[i])
         if not m:
@@ -17,7 +16,8 @@ def unpack(type, data: str | bytes):
             size = val.size()
         else:
             size = int(m.group(1)) // 8
-            val = int.from_bytes(data[pos:size], "big", signed=False)
+            signed = formats[i][0] == "i"
+            val = int.from_bytes(data[:size], byteorder="big", signed=signed)
         setattr(obj, field.name, val)
         data = data[size:]
     return obj
@@ -44,33 +44,56 @@ def pack(obj):
         val = getattr(obj, field.name)
         if m := re.match(r"[iu](\d+)$", formats[i]):
             size = int(m.group(1)) // 8
-            data += val.to_bytes(size, byteorder="big", signed=False)
+            signed = formats[i][0] == "i"
+            data += val.to_bytes(size, byteorder="big", signed=signed)
+        elif formats[i] == 'array':
+            pass
         else:
             data += pack(val)
     return data
 
 
-@dataclass
-class Message:
-    addr_from: int | None = None
-    addr_to: int | None = None
-    amount: int | None = None
-    FORMAT = "u256-u256-u256"
-    def size(self):
-        return 32 * 3
+def dump(obj, indent="  "):
+    formats = obj.FORMAT.split("-")
+    for i, field in enumerate(fields(obj.__class__)):
+        val = getattr(obj, field.name)
+        if m := re.match(r"[iu](\d+)$", formats[i]):
+            print(f"{indent}{field.name}: {val}")
+        else:
+            print(f"{indent}{field.name}: ")
+            dump(val, indent + "  ")
+
+
+% MSG_FORMAT = "i8-u256-i8-u256-u64"
+#@dataclass
+#class Message:
+#    wc_from: int = 0xff
+#    addr_from: int | None = None
+#    wc_to: int = 0xff
+#    addr_to: int | None = None
+#    amount: int | None = None
+#    FORMAT = "<%= MSG_FORMAT %>"
+
+#    def size(self):
+#        return <%= MSG_FORMAT.scan(/\d+/).map(&:to_i).sum / 8 %>
+
+#    def pack(self):
+#        return pack(self)
 
 % ir.types.select{ _2.is_a?(StructType) && !_2.descr['flags']&.include?("storage") }.each do |name, type|
 
 @dataclass
 class <%= name %>:
 %   if type.descr['flags']&.include?("message")
-%     msg = "Message-"
-    message_header: Message | None = None
+%    # msg = "Message-"
+    # message_header: Message | None = None
 %   end
 %   type.fields.each do |field|
-    <%= field.name %>: <%= field.type.python_name() %> | None = None
+    <%= field.name %>: <%= field.type.python_name %> | None = None
 %   end
-    FORMAT = "<%= msg %><%= type.fields.map(&:type).map(&:name).join('-') %>"
+%   format = type.fields.map { _1.type.container?() ? 'array' : _1.type.name }
+    FORMAT = "<%= format.join('-') %>"
+% #    FORMAT = "<%= type.fields.map(&:type).map(&:name).join('-') %>"
 
     def size(self):
         sz = <%= type.fields.select{ !_1.type.is_a?(ContainerType) }.map(&:type).sum(&:bytes_size) %>

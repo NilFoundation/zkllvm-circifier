@@ -148,7 +148,7 @@ EVMTargetLowering::EVMTargetLowering(const TargetMachine &TM,
   }
 
   setTargetDAGCombine({ISD::SIGN_EXTEND, ISD::ZERO_EXTEND, ISD::ANY_EXTEND,
-                       ISD::LOAD, ISD::STORE, ISD::INTRINSIC_VOID});
+                       ISD::LOAD, ISD::STORE, ISD::INTRINSIC_VOID, ISD::INTRINSIC_W_CHAIN, ISD::STACKRESTORE});
 }
 
 EVT EVMTargetLowering::getSetCCResultType(const DataLayout &DL, LLVMContext &,
@@ -488,7 +488,7 @@ void EVMTargetLowering::ReplaceNodeResults(SDNode *N,
 
   // TODO: Support stacksave/stackrestore. Currently we just ignore them.
   if (N->getOpcode() == ISD::STACKSAVE) {
-    Results.push_back(N->getOperand(0));
+    Results.push_back(DAG.getConstant(0, DL, N->getValueType(0)));
     Results.push_back(N->getOperand(0));
     return;
   }
@@ -933,6 +933,7 @@ SDValue EVMTargetLowering::PerformDAGCombine(SDNode *N,
     }
     break;
   }
+  case ISD::INTRINSIC_W_CHAIN:
   case ISD::INTRINSIC_VOID: {
     SmallVector<SDValue, 5> Ops;
     for (unsigned i = 0; i < N->getNumOperands(); i++) {
@@ -948,6 +949,10 @@ SDValue EVMTargetLowering::PerformDAGCombine(SDNode *N,
     if (Res != N) {
       DCI.DAG.ReplaceAllUsesOfValueWith(SDValue(N, 0), SDValue(Res, 0));
     }
+    break;
+  }
+  case ISD::STACKRESTORE: {
+    DCI.DAG.ReplaceAllUsesOfValueWith(SDValue(N, 0), N->getOperand(0));
     break;
   }
   }

@@ -241,21 +241,22 @@ class Checker
 
     raise "Function name must be specified" unless function
     function_sha3 = get_func_keccak(function, @abifile)
-    calldata = "" #function_sha3[0..7]
+    calldata = function_sha3[0..7]
     # Use 'x & 0xfffff...' for proper extraction hex strings from negative numbers
     mask = (1 << 256) - 1
     if input.is_a? Array
-      calldata += input.map{|x| "%064x" % (x & mask) }.join
+      calldata += input.map do |x|
+        x.is_a?(Integer) ? "%064x" % (x & mask) : x
+      end.join
     elsif input.is_a? String
       calldata += input
     else
       raise "Wrong input type: #{input.class}"
     end if input
 
-    selector = function_sha3[0..7].to_i(16)
-    calldata_arg = !calldata.empty? ? "--args s#{calldata}" : ""
+    calldata_arg = !calldata.empty? ? "--calldata #{calldata}" : ""
     begin
-      output = command("#{VM_RUN} call --method-id #{selector} --address #{address} #{calldata_arg}")
+      output = command("#{VM_RUN} call --address #{address} #{calldata_arg} --config-file /home/mike/bld/dbms-nix/config_params.boc")
     rescue RuntimeError => e
       raise unless args[:expect_fail]
     else

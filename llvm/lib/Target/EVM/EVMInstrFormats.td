@@ -152,6 +152,25 @@ multiclass Inst_3_0<string name, list<dag> pattern, bits<8> inst, int cost>
              !strconcat(name, " \t$src1, $src2, $src3"),
              name, inst, cost>;
 
+multiclass Inst_4_0<string name, list<dag> pattern, bits<8> inst, int cost>
+    : RSInst<(outs), (ins GPR:$src1, GPR:$src2, GPR:$src3, GPR:$src4),
+             pattern,
+             !strconcat(name, " \t$src1, $src2, $src3, $src4"),
+             name, inst, cost>;
+
+multiclass Inst_5_0<string name, list<dag> pattern, bits<8> inst, int cost>
+    : RSInst<(outs), (ins GPR:$src1, GPR:$src2, GPR:$src3, GPR:$src4, GPR:$src5),
+             pattern,
+             !strconcat(name, " \t$src1, $src2, $src3, $src4, $src5"),
+             name, inst, cost>;
+
+multiclass Inst_6_0<string name, list<dag> pattern, bits<8> inst, int cost>
+    : RSInst<(outs), (ins GPR:$src1, GPR:$src2, GPR:$src3, GPR:$src4, GPR:$src5, GPR:$src6),
+             pattern,
+             !strconcat(name, " \t$src1, $src2, $src3, $src4, $src5, $src6"),
+             name, inst, cost>;
+
+
 // delta = 3, alpha = 1
 multiclass Inst_3_1<string name, list<dag> pattern, bits<8> inst, int cost>
     : RSInst<(outs GPR:$dst), (ins GPR:$src1, GPR:$src2, GPR:$src3),

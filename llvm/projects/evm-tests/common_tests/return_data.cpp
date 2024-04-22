@@ -1,8 +1,5 @@
 #include "evm_sdk.h"
 
-// TODO: Enable these tests when initial elector will be committed to DBMS.
-// This commit should fixed by removing `bytes.fromhex` from hex string.
-
 //! DEPLOY
 //! def calc(n); (0..n-1).reduce("") { |res, x| res += "%02X"%((x + 1) % 256) }; end
 //! CALL function: :test_return_dyn, input: [0], no_result: true

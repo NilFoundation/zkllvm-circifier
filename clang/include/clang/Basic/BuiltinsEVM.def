@@ -27,7 +27,7 @@
 //    - `hash: bytes32`: resulting hash
 //- **Codegen details:**
 //    - SHA3 opcode: `0x20`
-BUILTIN(__builtin_evm_sha3, "LLLLiLLLLiLLLLi", "nc")
+BUILTIN(__builtin_evm_sha3, "LLLLivC*LLLLi", "nc")
 
 // @brief Address
 //
@@ -327,7 +327,7 @@ BUILTIN(__builtin_evm_log1, "vvC*LLLLiLLLLi", "nc")
 //- **Return:** *None*
 //- **Codegen details:**
 //    - LOG2 opcode: `0xa2`
-// BUILTIN(__builtin_evm_log2, "WiTs", "nc")
+BUILTIN(__builtin_evm_log2, "vvC*LLLLiLLLLiLLLLi", "nc")
 
 //### Log3
 //
@@ -341,7 +341,7 @@ BUILTIN(__builtin_evm_log1, "vvC*LLLLiLLLLi", "nc")
 //- **Return:** *None*
 //- **Codegen details:**
 //   - LOG3 opcode: `0xa3`
-// BUILTIN(__builtin_evm_log3, "WiTs", "nc")
+BUILTIN(__builtin_evm_log3, "vvC*LLLLiLLLLiLLLLiLLLLi", "nc")
 
 //### Log4
 //
@@ -356,7 +356,7 @@ BUILTIN(__builtin_evm_log1, "vvC*LLLLiLLLLi", "nc")
 //- **Return:** *None*
 //- **Codegen details:**
 //   - LOG4 opcode: `0xa4`
-// BUILTIN(__builtin_evm_log4, "WiTs", "nc")
+BUILTIN(__builtin_evm_log4, "vvC*LLLLiLLLLiLLLLiLLLLiLLLLi", "nc")
 
 //### Create
 //

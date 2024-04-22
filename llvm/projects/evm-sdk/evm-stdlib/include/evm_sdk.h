@@ -29,6 +29,8 @@
 
 extern "C" __uint256_t __evm_builtin_modpow(__uint256_t, __uint256_t, __uint256_t);
 
+using uint128_t = __uint128_t;
+using int128_t = __int128_t;
 using uint256_t = __uint256_t;
 using int256_t = __int256_t;
 
@@ -44,6 +46,7 @@ constexpr uint256_t operator "" _gwei(unsigned long long v) {
 namespace evm {
 
 struct DVM_PACKED Address {
+  static constexpr int8_t MASTERCHAIN_WC = -1;
   int8_t workchain_id;
   uint256_t address;
 };
@@ -59,11 +62,11 @@ uint256_t now() {
 }
 
 Address caller() {
-  return {-1, uint256_t(__builtin_evm_caller())};
+  return {Address::MASTERCHAIN_WC, uint256_t(__builtin_evm_caller())};
 }
 
 Address my_address() {
-  return {-1, uint256_t(__builtin_evm_address())};
+  return {Address::MASTERCHAIN_WC, uint256_t(__builtin_evm_address())};
 }
 
 uint256_t callvalue() {
@@ -74,6 +77,15 @@ void send_message(const void* data, unsigned size) {
   __builtin_evm_log1(data, size, 0x0ec3c86d);
 }
 
+void send_message(uint32_t func_id, const void* data, unsigned size) {
+  __builtin_evm_log2(data, size, 0x0ec3c86d, func_id);
+}
+
+//void call(Address addr, uint32_t func_id, const void* data, unsigned size) {
+//  __builtin_evm_log1(data, size, func_id);
+//}
+
+
 void* return_data(void* data, unsigned size) {
   static constexpr unsigned RETURN_DATA_SIZE_SLOT_ADDRESS = 32;
   __uint256_t* p = (__uint256_t*)RETURN_DATA_SIZE_SLOT_ADDRESS;
@@ -81,6 +93,15 @@ void* return_data(void* data, unsigned size) {
   // memory address 32. Linker then reads it and properly returns to the host.
   *p = size;
   return data;
+}
+
+//template<typename... Args>
+//uint256_t sha3v(Args... args) {
+//  return __builtin_evm_sha3_vargs(args...);
+//}
+
+uint256_t sha3(const void* data, unsigned size) {
+  return __builtin_evm_sha3(data, size);
 }
 
 struct Signature {
@@ -96,11 +117,11 @@ struct Signature {
 /**
  * Header for all messages transmitted between contracts.
  */
-struct DVM_PACKED MessageHeader {
-  uint256_t address_from;
-  uint256_t address_to;
-  uint256_t amount;
-};
+//struct DVM_PACKED MessageHeader {
+//  Address address_to;
+//  Address address_from;
+//  uint64_t value;
+//};
 
 /**
  * Dynamic array with fixed size. It has precomputed size, stored in the first
@@ -110,15 +131,25 @@ struct DVM_PACKED MessageHeader {
 template<typename T>
 class DVM_PACKED Vector {
 public:
-  static Vector& create_in_buffer(void* data, unsigned size) {
+  static Vector* create_in_buffer(void* data, unsigned size) {
     Vector* self = reinterpret_cast<Vector*>(data);
     self->size_ = size;
-    return *self;
+    return self;
   }
 
   static unsigned required_size(unsigned num) {
     return sizeof(size_) + sizeof(T) * num;
   }
+
+  static unsigned required_size_elements(unsigned num) {
+    return sizeof(T) * num;
+  }
+
+  Vector() = delete;
+  Vector(const Vector&) = delete;
+  Vector(Vector&&) = delete;
+  Vector& operator=(const Vector&) = delete;
+  Vector& operator=(Vector&&) = delete;
 
   bool empty() const {
     return size() == 0;
@@ -126,6 +157,14 @@ public:
 
   unsigned size() const {
     return size_;
+  }
+
+  void set_size(unsigned sz) {
+    size_ = sz;
+  }
+
+  void resize(unsigned new_size) {
+    size_ = new_size;
   }
 
   const T* data() const {
@@ -148,8 +187,8 @@ public:
       current++;
     }
   }
-private:
-  uint32_t size_;
+//private:
+  uint32_t size_{0};
   T data_[0];
 };
 

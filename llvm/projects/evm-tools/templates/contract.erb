@@ -1,7 +1,9 @@
 #include "evm_sdk.h"
-#include "storage.h"
+#include "storage<%= options.global_config ? "_config" : "" %>.h"
 
-namespace <%= ir.namespace %> {
+% stor_namespace = options.global_config ? "config" : "stor"
+
+namespace evm::<%= stor_namespace %> {
 
 % ir.types.select{ _2.is_a? (StructType) }.each do |name, type|
 struct <%= type.name %> {
@@ -9,10 +11,15 @@ struct <%= type.name %> {
 
   <%= type.name %>(uint256_t key): <%= type.fields.map.with_index{ |x, i| x.name + '(key + ' + i.to_s + ')'}.join(', ')%> {}
 
-% #  <%= type['name'] %>(__int256_t key): <%= type['ctor_initializer'] %> {}
 %   type.fields&.each do |field|
   <%= field.type.storage_name %> <%= field.name %>;
 %   end
+
+  void clear() {
+%   type.fields&.each do |field|
+      <%= field.name %>.clear();
+%   end
+  }
 };
 
 template<__uint256_t Key>
@@ -23,6 +30,12 @@ struct <%= type.name %>Static {
   <%= field.type.storage_name_static(lambda{'Key + ' + i.to_s}) %> <%= field.name %>;
 %   i += field.type.slots_size
 %   end
+
+  void clear() {
+%   type.fields&.each do |field|
+      <%= field.name %>.clear();
+%   end
+  }
 };
 
 % end
@@ -33,16 +46,12 @@ struct <%= type.name %>Static {
 % i += field.type.slots_size
 % end
 
-}  // namespace <%= ir.namespace %>
+}  // namespace evm::<%= stor_namespace %>
 
-% ir.variables&.fields&.select{ _1.data['getter'] }.each do |field|
-[[evm]] uint256_t get_<%= field.name %>() {
-    return <%= ir.namespace %>::<%= field.name %>.get();
-}
+% unless options.global_config
 
-% end
-
-namespace evm::constants {
+//namespace evm::<%= ir.namespace %>::constants {
+  namespace evm::constants {
 
 % ir.data['constants']&.each do |constant|
 %   type = constant['type']
@@ -67,17 +76,32 @@ namespace evm::ser {
 %   next if type.descr['flags']&.include?("storage")
 struct DVM_PACKED <%= name %> {
 %   if type.descr['flags']&.include?("message")
-    MessageHeader header;
+    // MessageHeader header;
 %   end
 %   type.fields.each do |field|
 %     init = field.descr.include?('constant') ? 'evm::constants::' + field.descr['constant'] : ''
     <%= field.type.cpp_name %> <%= field.name %>{<%= init %>};
 %   end
-    static constexpr unsigned size() {
+%
+%   containers = type.get_container_fields
+%   raise "Map types are not supported in serialization structs" unless containers.all?{ _1.type.base_type_name == 'Vector' }
+    static constexpr unsigned get_size(<%= containers.map{ 'unsigned ' + _1.name }.join(', ') %>) {
+%   if !containers.empty?
+%   s = containers.map{ _1.type.cpp_name + '::required_size_elements(' + _1.name + ')' }
+        unsigned sz = <%= s.join(' + ') %>;
+        return sizeof(<%= name %>) + sz;
+%   else
         return sizeof(<%= name %>);
+%   end
     }
 };
 
 % end
 
 }  // namespace evm::ser
+
+namespace evm::contracts {
+
+}  // evm::contracts
+
+% end  # unless options.global_config

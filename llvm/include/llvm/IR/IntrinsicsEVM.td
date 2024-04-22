@@ -34,7 +34,7 @@ let TargetPrefix = "evm" in {  // All intrinsics start with "llvm.evm."
               Intrinsic<[llvm_i256_ty], [llvm_i256_ty, llvm_i256_ty], [IntrNoMem]>;
   
   def int_evm_sha3 : ClangBuiltin<"__builtin_evm_sha3">,
-              Intrinsic<[llvm_i256_ty], [llvm_i256_ty, llvm_i256_ty], [IntrReadMem]>;
+              Intrinsic<[llvm_i256_ty], [llvm_ptr_ty, llvm_i256_ty], [IntrReadMem]>;
   def int_evm_address : ClangBuiltin<"__builtin_evm_address">,
               Intrinsic<[llvm_i256_ty], [], [IntrNoMem]>;
   def int_evm_balance : ClangBuiltin<"__builtin_evm_balance">,
@@ -110,13 +110,13 @@ let TargetPrefix = "evm" in {  // All intrinsics start with "llvm.evm."
               Intrinsic<[], [llvm_ptr_ty, llvm_i256_ty, llvm_i256_ty],
               [IntrNoMem, IntrHasSideEffects]>;
   def int_evm_log2 : ClangBuiltin<"__builtin_evm_log2">,
-              Intrinsic<[], [llvm_i256_ty, llvm_i256_ty, llvm_i256_ty,
+              Intrinsic<[], [llvm_ptr_ty, llvm_i256_ty, llvm_i256_ty,
                              llvm_i256_ty], [IntrNoMem, IntrHasSideEffects]>;
   def int_evm_log3 : ClangBuiltin<"__builtin_evm_log3">,
-              Intrinsic<[], [llvm_i256_ty, llvm_i256_ty, llvm_i256_ty,
+              Intrinsic<[], [llvm_ptr_ty, llvm_i256_ty, llvm_i256_ty,
                              llvm_i256_ty, llvm_i256_ty], [IntrNoMem, IntrHasSideEffects]>;
   def int_evm_log4 : ClangBuiltin<"__builtin_evm_log4">,
-              Intrinsic<[], [llvm_i256_ty, llvm_i256_ty, llvm_i256_ty,
+              Intrinsic<[], [llvm_ptr_ty, llvm_i256_ty, llvm_i256_ty,
                              llvm_i256_ty, llvm_i256_ty, llvm_i256_ty],
                             [IntrNoMem, IntrHasSideEffects]>;
 

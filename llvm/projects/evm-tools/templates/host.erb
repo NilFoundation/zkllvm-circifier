@@ -1,5 +1,5 @@
 
-namespace dvm::<%= ir.namespace %> {
+namespace evm::<%= ir.namespace %> {
 
 namespace slots {
 enum {
@@ -8,7 +8,7 @@ enum {
     <%= var.name %> = <%= slot %>,
 %   if var.type.is_a?(StructType)
 %     var.type.fields.each do |field|
-%       raise "Unsupported nested struct type" if field.type.is_a?(StructType)
+%       raise "Unsupported nested struct type" if field.type.struct?
     <%= var.name %>_<%= field.name %> = <%= slot %>,
 %       slot += field.type.slots_size
 %     end
@@ -35,4 +35,4 @@ enum {
 };
 }
 
-}  // namespace dvm::<%= ir.namespace %>
+}  // namespace evm::<%= ir.namespace %>

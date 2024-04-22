@@ -215,6 +215,15 @@ let hasSideEffects = 1 in {
 defm LOG1    : Inst_3_0<"LOG1",
                        [(int_evm_log1 GPR:$src1, GPR:$src2, GPR:$src3)],
                        0xa1, 750>;
+defm LOG2    : Inst_4_0<"LOG2",
+                       [(int_evm_log2 GPR:$src1, GPR:$src2, GPR:$src3, GPR:$src4)],
+                       0xa2, 750>;
+defm LOG3    : Inst_5_0<"LOG3",
+                       [(int_evm_log3 GPR:$src1, GPR:$src2, GPR:$src3, GPR:$src4, GPR:$src5)],
+                       0xa3, 750>;
+defm LOG4    : Inst_6_0<"LOG4",
+                       [(int_evm_log4 GPR:$src1, GPR:$src2, GPR:$src3, GPR:$src4, GPR:$src5, GPR:$src6)],
+                       0xa4, 750>;
 }
 
 defm ADDRESS   : Inst_0_1<"ADDRESS",

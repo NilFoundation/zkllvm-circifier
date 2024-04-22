@@ -23,7 +23,6 @@ variables:
 //! DEPLOY
 //! CALL        function: :test, input: [123456]
 // Test that static fields won't overlap
-
 [[evm]] void test(int v) {
   //! CHECK_STOR  key: 0, result: 123456 + 0
   stor::foo.a = v++;
@@ -38,3 +37,5 @@ variables:
   //! CHECK_STOR  key: 5, result: 123456 + 5
   stor::bar.c = v++;
 }
+
+//! CALL        function: :test_clear, input: []

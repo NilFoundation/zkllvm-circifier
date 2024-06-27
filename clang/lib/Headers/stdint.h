@@ -18,7 +18,7 @@
  * additional definitions.
  */
 #if __STDC_HOSTED__ && __has_include_next(<stdint.h>)
-
+__STDC_HOSTED__ is true
 // C99 7.18.3 Limits of other integer types
 //
 //  Footnote 219, 220: C++ implementations should define these macros only when
@@ -61,7 +61,7 @@
 # endif
 
 #else
-
+__STDC_HOSTED__ is false
 /* C99 7.18.1.1 Exact-width integer types.
  * C99 7.18.1.2 Minimum-width integer types.
  * C99 7.18.1.3 Fastest minimum-width integer types.

@@ -60,6 +60,10 @@
 #  undef __STDC_CONSTANT_MACROS_DEFINED_BY_CLANG
 # endif
 
+#ifndef SIZE_MAX
+#  define    SIZE_MAX      __SIZE_MAX__
+#endif
+
 #else
 
 /* C99 7.18.1.1 Exact-width integer types.
